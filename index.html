@@ -44,11 +44,11 @@
       const css=dec.decode(files['styles.css']);
       let js=dec.decode(files['app.js']);
       js=js.replace("id: crypto.randomUUID(),","id: (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function' ? globalThis.crypto.randomUUID() : `tx-${Date.now()}-${Math.random().toString(16).slice(2)}`),");
-      let page=html
+      const page=html
         .replace('<link rel="manifest" href="manifest.webmanifest" />','')
         .replace('<link rel="icon" href="icon.svg" type="image/svg+xml" />','')
         .replace('<link rel="stylesheet" href="styles.css" />',`<style>${css}</style>`)
-        .replace('<script src="app.js" defer><\/script>',`<script>${js.replace(/<\\/script/gi,'<\\/script')}<\/script>`);
+        .replace('<script src="app.js" defer><\/script>',`<script>${js}<\/script>`);
       document.open();
       document.write(page);
       document.close();
