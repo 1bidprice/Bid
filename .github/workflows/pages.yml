@@ -23,12 +23,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Build static site
+      - name: Build and verify static site
         run: |
           mkdir -p dist
           cat chunks/* | base64 --decode > site.zip
           unzip -q site.zip -d dist
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('dist/app.js')
+          source = path.read_text()
+          source = source.replace(
+              "id: crypto.randomUUID(),",
+              "id: (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function' ? globalThis.crypto.randomUUID() : `tx-${Date.now()}-${Math.random().toString(16).slice(2)}`),"
+          )
+          path.write_text(source)
+          PY
           test -f dist/index.html
+          test -f dist/app.js
+          grep -q "Investor Control" dist/index.html
       - name: Configure Pages
         uses: actions/configure-pages@v5
         with:
