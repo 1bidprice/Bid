@@ -1,4 +1,4 @@
-const CACHE = 'investor-control-v0.5.0';
+const CACHE = 'investor-control-v0.5.1';
 const ASSETS = [
   './',
   './index.html',
