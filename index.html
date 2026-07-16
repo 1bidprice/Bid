@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b66ff">
+  <meta name="description" content="Προσωπική εφαρμογή παρακολούθησης επενδυτικού χαρτοφυλακίου.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <title>Investor Control</title>
   <style>
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f3f6fb;color:#10233f;display:grid;place-items:center;min-height:100vh;padding:24px;box-sizing:border-box}
@@ -45,10 +48,9 @@
       let js=dec.decode(files['app.js']);
       js=js.replace("id: crypto.randomUUID(),","id: (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function' ? globalThis.crypto.randomUUID() : `tx-${Date.now()}-${Math.random().toString(16).slice(2)}`),");
       const page=html
-        .replace('<link rel="manifest" href="manifest.webmanifest" />','')
-        .replace('<link rel="icon" href="icon.svg" type="image/svg+xml" />','')
         .replace('<link rel="stylesheet" href="styles.css" />',`<style>${css}</style>`)
-        .replace('<script src="app.js" defer><\/script>',`<script>${js}<\/script>`);
+        .replace('<script src="app.js" defer><\/script>',`<script>${js}<\/script>`)
+        .replace('<dd>0.3.0</dd>','<dd>0.3.1</dd>');
       document.open();
       document.write(page);
       document.close();
