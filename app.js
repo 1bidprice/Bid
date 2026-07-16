@@ -1,1 +1,1 @@
-PLACEHOLDER
+(()=>{const files=['app-part1.js','app-part2.js','app-part3.js','app-part4.js','app-part5.js','app-part6.js','app-run.js'];let i=0;const next=()=>{if(i>=files.length)return;const s=document.createElement('script');s.src=files[i++]+'?v=032';s.async=false;s.onload=next;s.onerror=()=>{document.body.innerHTML='<main style="font-family:system-ui;padding:24px"><h1>Investor Control</h1><p>Αποτυχία φόρτωσης αρχείων εφαρμογής.</p></main>'};document.head.appendChild(s)};next()})();
