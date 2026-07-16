@@ -1,0 +1,1 @@
+(()=>{const b=atob(window.__IC_APP_B64||'');const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);const s=new TextDecoder().decode(u);delete window.__IC_APP_B64;(0,eval)(s);})();
