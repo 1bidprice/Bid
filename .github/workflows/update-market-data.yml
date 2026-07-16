@@ -6,7 +6,7 @@ on:
     paths:
       - '.github/workflows/update-market-data.yml'
   schedule:
-    - cron: '*/5 7-15 * * 1-5'
+    - cron: '*/5 7-22 * * 1-5'
 
 permissions:
   contents: write
@@ -25,12 +25,10 @@ jobs:
           ref: gh-pages
           fetch-depth: 0
 
-      - name: Fetch latest Allwyn one-minute bar
+      - name: Fetch portfolio quotes and FX
         shell: bash
         run: |
           python - <<'PY'
-          import csv
-          import io
           import json
           import math
           import urllib.parse
@@ -41,6 +39,7 @@ jobs:
           OUT = Path('market-data.json')
           now_dt = datetime.now(timezone.utc)
           now = now_dt.isoformat().replace('+00:00', 'Z')
+
           previous = {}
           if OUT.exists():
               try:
@@ -48,17 +47,17 @@ jobs:
               except Exception:
                   previous = {}
 
+          def finite(value):
+              return isinstance(value, (int, float)) and math.isfinite(value) and value > 0
+
           def get_json(url):
               request = urllib.request.Request(url, headers={
-                  'User-Agent': 'Mozilla/5.0 InvestorControl/0.5',
+                  'User-Agent': 'Mozilla/5.0 InvestorControl/0.5.1',
                   'Accept': 'application/json,text/plain,*/*',
                   'Cache-Control': 'no-cache',
               })
               with urllib.request.urlopen(request, timeout=20) as response:
                   return json.load(response)
-
-          def finite_price(value):
-              return isinstance(value, (int, float)) and math.isfinite(value) and value > 0
 
           def yahoo_quote(ticker):
               encoded = urllib.parse.quote(ticker, safe='')
@@ -74,122 +73,130 @@ jobs:
 
                       meta = result.get('meta') or {}
                       timestamps = result.get('timestamp') or []
-                      indicators = result.get('indicators') or {}
-                      quote_rows = indicators.get('quote') or [{}]
-                      closes = (quote_rows[0] or {}).get('close') or []
+                      closes = (((result.get('indicators') or {}).get('quote') or [{}])[0] or {}).get('close') or []
 
                       price = None
                       timestamp = None
                       for ts, close in reversed(list(zip(timestamps, closes))):
-                          if finite_price(close):
+                          if finite(close):
                               price = float(close)
                               timestamp = int(ts)
                               break
 
-                      if price is None:
-                          fallback = meta.get('regularMarketPrice')
-                          if finite_price(fallback):
-                              price = float(fallback)
-                              timestamp = meta.get('regularMarketTime')
+                      if price is None and finite(meta.get('regularMarketPrice')):
+                          price = float(meta['regularMarketPrice'])
+                          timestamp = meta.get('regularMarketTime')
 
                       if price is None:
                           raise RuntimeError('invalid Yahoo price')
 
                       previous_close = meta.get('chartPreviousClose') or meta.get('previousClose')
                       updated_dt = datetime.fromtimestamp(timestamp, timezone.utc) if timestamp else now_dt
-                      updated = updated_dt.isoformat().replace('+00:00', 'Z')
-                      delay_seconds = max(0, int((now_dt - updated_dt).total_seconds()))
-
                       return {
                           'price': price,
-                          'previousClose': float(previous_close) if finite_price(previous_close) else None,
-                          'updatedAt': updated,
+                          'previousClose': float(previous_close) if finite(previous_close) else None,
+                          'updatedAt': updated_dt.isoformat().replace('+00:00', 'Z'),
                           'checkedAt': now,
-                          'delaySeconds': delay_seconds,
+                          'delaySeconds': max(0, int((now_dt - updated_dt).total_seconds())),
                           'source': 'Yahoo Finance latest 1-minute bar (unofficial)',
                           'providerSymbol': ticker,
                           'marketState': meta.get('marketState'),
-                          'currency': meta.get('currency') or 'EUR',
+                          'currency': meta.get('currency') or None,
                       }
                   except Exception as exc:
                       last_error = exc
               raise RuntimeError(str(last_error or 'Yahoo failed'))
 
-          def stooq_quote(ticker):
-              url = f'https://stooq.com/q/l/?s={urllib.parse.quote(ticker)}&f=sd2t2ohlcv&h&e=csv'
-              request = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 InvestorControl/0.5'})
-              with urllib.request.urlopen(request, timeout=20) as response:
-                  text = response.read().decode('utf-8', errors='replace')
-              rows = list(csv.DictReader(io.StringIO(text)))
-              if not rows:
-                  raise RuntimeError('empty Stooq result')
-              row = rows[0]
-              close = row.get('Close')
-              if not close or close in {'N/D', '-'}:
-                  raise RuntimeError('invalid Stooq price')
-              price = float(close)
-              if not finite_price(price):
-                  raise RuntimeError('invalid Stooq price')
-              date = row.get('Date')
-              time = row.get('Time') or '17:20:00'
-              updated = f'{date}T{time}+03:00' if date else now
-              return {
-                  'price': price,
-                  'previousClose': None,
-                  'updatedAt': updated,
-                  'checkedAt': now,
-                  'delaySeconds': None,
-                  'source': 'Stooq public CSV fallback (unofficial)',
-                  'providerSymbol': ticker,
-                  'marketState': None,
-                  'currency': 'EUR',
-              }
-
-          attempts = []
-          quote = None
-          for ticker in ('ALWN.AT', 'OPAP.AT', 'ALWN.ATH', 'OPAP.ATH'):
-              try:
-                  quote = yahoo_quote(ticker)
-                  break
-              except Exception as exc:
-                  attempts.append(f'Yahoo {ticker}: {exc}')
-
-          if quote is None:
-              for ticker in ('alwn.gr', 'opap.gr', 'alwn.at', 'opap.at'):
+          def first_quote(tickers, errors):
+              for ticker in tickers:
                   try:
-                      quote = stooq_quote(ticker)
-                      break
+                      return yahoo_quote(ticker)
                   except Exception as exc:
-                      attempts.append(f'Stooq {ticker}: {exc}')
+                      errors.append(f'Yahoo {ticker}: {exc}')
+              return None
 
-          if quote:
-              change_pct = None
-              if quote.get('previousClose'):
-                  change_pct = ((quote['price'] - quote['previousClose']) / quote['previousClose']) * 100
-              quote['changePct'] = change_pct
-              status = 'ok'
-              if isinstance(quote.get('delaySeconds'), int) and quote['delaySeconds'] > 1200:
-                  status = 'stale'
-              document = {
-                  'version': 2,
-                  'status': status,
-                  'generatedAt': now,
-                  'lastCheckedAt': now,
-                  'source': 'Investor Control near-live market feed',
-                  'error': None,
-                  'quotes': {'ALWN.GR': quote},
-              }
-          else:
-              document = previous if isinstance(previous, dict) else {}
-              document.update({
-                  'version': 2,
-                  'status': 'stale' if (document.get('quotes') or {}).get('ALWN.GR') else 'error',
-                  'lastCheckedAt': now,
-                  'source': 'Investor Control near-live market feed',
-                  'error': ' | '.join(attempts)[-2000:] or 'No quote source succeeded',
-              })
-              document.setdefault('generatedAt', now)
-              document.setdefault('quotes', {})
+          errors = []
+          quotes = {}
+
+          fx_quote = first_quote(('EURUSD=X',), errors)
+          eurusd = fx_quote['price'] if fx_quote and finite(fx_quote.get('price')) else None
+
+          alwn = first_quote(('ALWN.AT', 'OPAP.AT', 'ALWN.ATH', 'OPAP.ATH'), errors)
+          if alwn:
+              alwn['nativePrice'] = alwn['price']
+              alwn['nativePreviousClose'] = alwn.get('previousClose')
+              alwn['nativeCurrency'] = alwn.get('currency') or 'EUR'
+              alwn['currency'] = 'EUR'
+              alwn['fxRate'] = 1.0
+              alwn['changePct'] = (
+                  ((alwn['price'] - alwn['previousClose']) / alwn['previousClose']) * 100
+                  if finite(alwn.get('previousClose')) else None
+              )
+              quotes['ALWN.GR'] = alwn
+
+          spce = first_quote(('SPCE',), errors)
+          if spce:
+              native_price = spce['price']
+              native_previous = spce.get('previousClose')
+              native_currency = spce.get('currency') or 'USD'
+
+              if native_currency == 'USD':
+                  if not finite(eurusd):
+                      errors.append('EURUSD=X: unavailable; SPCE conversion skipped')
+                      spce = None
+                  else:
+                      spce['price'] = native_price / eurusd
+                      spce['previousClose'] = native_previous / eurusd if finite(native_previous) else None
+                      spce['fxRate'] = eurusd
+                      spce['source'] += ' · converted USD→EUR with EURUSD=X'
+
+              if spce:
+                  spce['nativePrice'] = native_price
+                  spce['nativePreviousClose'] = native_previous
+                  spce['nativeCurrency'] = native_currency
+                  spce['currency'] = 'EUR'
+                  spce['changePct'] = (
+                      ((native_price - native_previous) / native_previous) * 100
+                      if finite(native_previous) else None
+                  )
+                  quotes['SPCE.US'] = spce
+
+          previous_quotes = previous.get('quotes') if isinstance(previous, dict) else {}
+          if not isinstance(previous_quotes, dict):
+              previous_quotes = {}
+
+          for symbol in ('ALWN.GR', 'SPCE.US'):
+              if symbol not in quotes and symbol in previous_quotes:
+                  stale = dict(previous_quotes[symbol])
+                  stale['checkedAt'] = now
+                  stale['stale'] = True
+                  quotes[symbol] = stale
+
+          fresh_count = sum(1 for q in quotes.values() if not q.get('stale'))
+          stale_count = sum(1 for q in quotes.values() if q.get('stale'))
+          status = 'ok' if fresh_count == len(quotes) and quotes else 'stale' if quotes else 'error'
+
+          document = {
+              'version': 3,
+              'status': status,
+              'generatedAt': now,
+              'lastCheckedAt': now,
+              'source': 'Investor Control multi-market near-live feed',
+              'error': ' | '.join(errors)[-3000:] if errors else None,
+              'fxRates': {
+                  'EURUSD': {
+                      'rate': eurusd,
+                      'updatedAt': fx_quote.get('updatedAt') if fx_quote else None,
+                      'source': fx_quote.get('source') if fx_quote else None,
+                  }
+              },
+              'quotes': quotes,
+              'summary': {
+                  'fresh': fresh_count,
+                  'stale': stale_count,
+                  'symbols': sorted(quotes.keys()),
+              },
+          }
 
           OUT.write_text(json.dumps(document, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
           print(json.dumps(document, ensure_ascii=False, indent=2))
@@ -205,5 +212,5 @@ jobs:
             echo "No market-data changes"
             exit 0
           fi
-          git commit -m "Update near-live ALWN market data"
+          git commit -m "Update ALWN, SPCE and EURUSD market data"
           git push origin HEAD:gh-pages
