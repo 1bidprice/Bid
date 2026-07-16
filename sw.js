@@ -1,4 +1,4 @@
-const CACHE = 'investor-control-v0.4.1';
+const CACHE = 'investor-control-v0.5.0';
 const ASSETS = [
   './',
   './index.html',
@@ -12,6 +12,7 @@ const ASSETS = [
   './app-part6.js',
   './app-run.js',
   './automation.js',
+  './live-feed.js',
   './market-data.json',
   './manifest.webmanifest',
   './icon.svg'
@@ -45,7 +46,7 @@ self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
     const isLocal = url.origin === self.location.origin;
     const isMarketFeed = isLocal && url.pathname.endsWith('/market-data.json');
-    const isCodeAsset = isLocal && /\/(index\.html|app\.js|app-part\d+\.js|app-run\.js|automation\.js|styles\.css)$/.test(url.pathname);
+    const isCodeAsset = isLocal && /\/(index\.html|app\.js|app-part\d+\.js|app-run\.js|automation\.js|live-feed\.js|styles\.css)$/.test(url.pathname);
 
     try {
       const response = await fetch(event.request, {
