@@ -1,65 +1,295 @@
 <!doctype html>
 <html lang="el">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#0b66ff">
-  <meta name="description" content="Προσωπική εφαρμογή παρακολούθησης επενδυτικού χαρτοφυλακίου.">
-  <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b66ff" />
+  <meta name="description" content="Προσωπική εφαρμογή παρακολούθησης επενδυτικού χαρτοφυλακίου." />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
   <title>Investor Control</title>
-  <style>
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f3f6fb;color:#10233f;display:grid;place-items:center;min-height:100vh;padding:24px;box-sizing:border-box}
-    .card{max-width:520px;background:white;border-radius:24px;padding:28px;box-shadow:0 18px 60px rgba(15,35,65,.16);text-align:center}
-    .spinner{width:44px;height:44px;border:5px solid #dce7f8;border-top-color:#0b66ff;border-radius:50%;margin:0 auto 18px;animation:s 1s linear infinite}@keyframes s{to{transform:rotate(360deg)}}
-    h1{margin:0 0 8px;font-size:30px}p{line-height:1.55;color:#607089}.error{color:#a82323;text-align:left;white-space:pre-wrap}
-  </style>
 </head>
 <body>
-  <main class="card">
-    <div class="spinner" id="spinner"></div>
-    <h1>Investor Control</h1>
-    <p id="status">Φόρτωση της εφαρμογής…</p>
-    <pre id="error" class="error"></pre>
-  </main>
-  <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
-  <script>
-  (async()=>{
-    const status=document.getElementById('status');
-    const error=document.getElementById('error');
-    try{
-      if(!window.fflate) throw new Error('Δεν φορτώθηκε ο μηχανισμός αποσυμπίεσης.');
-      const names=['00','01','02','03','04','05a','05b','05c','05d','05e','06'];
-      const parts=[];
-      for(const name of names){
-        status.textContent=`Φόρτωση αρχείων ${parts.length+1}/${names.length}…`;
-        const r=await fetch(`chunks/${name}`,{cache:'no-store'});
-        if(!r.ok) throw new Error(`Αποτυχία φόρτωσης ${name}: ${r.status}`);
-        parts.push((await r.text()).trim());
-      }
-      const b64=parts.join('');
-      const binary=atob(b64);
-      const bytes=new Uint8Array(binary.length);
-      for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
-      const files=fflate.unzipSync(bytes);
-      const dec=new TextDecoder();
-      const html=dec.decode(files['index.html']);
-      const css=dec.decode(files['styles.css']);
-      let js=dec.decode(files['app.js']);
-      js=js.replace("id: crypto.randomUUID(),","id: (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function' ? globalThis.crypto.randomUUID() : `tx-${Date.now()}-${Math.random().toString(16).slice(2)}`),");
-      const page=html
-        .replace('<link rel="stylesheet" href="styles.css" />',`<style>${css}</style>`)
-        .replace('<script src="app.js" defer><\/script>',`<script>${js}<\/script>`)
-        .replace('<dd>0.3.0</dd>','<dd>0.3.1</dd>');
-      document.open();
-      document.write(page);
-      document.close();
-    }catch(e){
-      document.getElementById('spinner')?.remove();
-      status.textContent='Η εφαρμογή δεν φόρτωσε.';
-      error.textContent=e && e.stack ? e.stack : String(e);
-    }
-  })();
-  </script>
+  <div id="app">
+    <header class="app-header">
+      <div>
+        <div class="eyebrow">ΠΡΟΣΩΠΙΚΟ ΧΑΡΤΟΦΥΛΑΚΙΟ</div>
+        <h1>Investor Control</h1>
+      </div>
+      <button id="installButton" class="icon-btn hidden" aria-label="Εγκατάσταση εφαρμογής">＋</button>
+    </header>
+
+    <main>
+      <section id="dashboardView" class="view active" aria-labelledby="dashboardTab">
+        <div class="status-row">
+          <div>
+            <p class="muted">Τελευταία ενημέρωση</p>
+            <strong id="lastUpdated">—</strong>
+          </div>
+          <button id="refreshPricesButton" class="primary compact">Ανανέωση τιμών</button>
+        </div>
+
+        <section class="summary-grid" aria-label="Σύνοψη χαρτοφυλακίου">
+          <article class="summary-card">
+            <span>Αξία χαρτοφυλακίου</span>
+            <strong id="portfolioValue">€0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span>Καθαρό κόστος</span>
+            <strong id="portfolioCost">€0,00</strong>
+          </article>
+          <article class="summary-card">
+            <span>Κέρδος / Ζημία</span>
+            <strong id="portfolioPnL">€0,00</strong>
+            <small id="portfolioPnLPct">0,00%</small>
+          </article>
+          <article class="summary-card">
+            <span>Μερίσματα</span>
+            <strong id="portfolioDividends">€0,00</strong>
+          </article>
+        </section>
+
+        <section class="section-block">
+          <div class="section-heading">
+            <div>
+              <h2>Θέσεις</h2>
+              <p id="positionsCount" class="muted">0 θέσεις</p>
+            </div>
+            <button id="addTransactionFromDashboard" class="secondary">Νέα συναλλαγή</button>
+          </div>
+          <div id="positionsList" class="positions-list"></div>
+          <div id="emptyPositions" class="empty-state hidden">
+            <strong>Δεν υπάρχουν εκτελεσμένες θέσεις.</strong>
+            <p>Καταχώρισε την εκτέλεση αγοράς για να ξεκινήσουν οι πραγματικοί υπολογισμοί.</p>
+          </div>
+        </section>
+
+        <section class="section-block">
+          <div class="section-heading">
+            <div>
+              <h2>Εκκρεμείς εντολές</h2>
+              <p class="muted">Δεν υπολογίζονται μέχρι την εκτέλεση</p>
+            </div>
+          </div>
+          <div id="pendingOrdersList" class="positions-list"></div>
+        </section>
+      </section>
+
+      <section id="transactionsView" class="view" aria-labelledby="transactionsTab">
+        <div class="section-heading top-gap">
+          <div>
+            <h2>Συναλλαγές</h2>
+            <p class="muted">Αγορές, πωλήσεις, μερίσματα και έξοδα</p>
+          </div>
+          <button id="addTransactionButton" class="primary">Προσθήκη</button>
+        </div>
+        <div class="filter-row">
+          <select id="transactionFilter" aria-label="Φίλτρο συναλλαγών">
+            <option value="all">Όλες</option>
+            <option value="buy">Αγορές</option>
+            <option value="sell">Πωλήσεις</option>
+            <option value="dividend">Μερίσματα</option>
+            <option value="fee">Έξοδα</option>
+          </select>
+        </div>
+        <div id="transactionsList" class="timeline"></div>
+      </section>
+
+      <section id="alertsView" class="view" aria-labelledby="alertsTab">
+        <div class="section-heading top-gap">
+          <div>
+            <h2>Ειδοποιήσεις</h2>
+            <p class="muted">Όρια τιμών και ουσιώδεις μεταβολές</p>
+          </div>
+          <button id="notificationPermissionButton" class="secondary">Άδεια ειδοποιήσεων</button>
+        </div>
+        <div id="alertsList" class="alerts-list"></div>
+        <div class="info-card">
+          <strong>Τι λειτουργεί τώρα</strong>
+          <p>Η εφαρμογή ελέγχει τα όρια όταν ανοίγει, όταν ανανεώνεις τις τιμές και κάθε 15 λεπτά όσο παραμένει ανοιχτή.</p>
+        </div>
+      </section>
+
+      <section id="settingsView" class="view" aria-labelledby="settingsTab">
+        <div class="section-heading top-gap">
+          <div>
+            <h2>Ρυθμίσεις</h2>
+            <p class="muted">Δεδομένα αγοράς και αντίγραφα ασφαλείας</p>
+          </div>
+        </div>
+
+        <form id="marketDataForm" class="form-card">
+          <h3>Αυτόματες τιμές</h3>
+          <label>
+            Πάροχος
+            <select id="providerSelect">
+              <option value="manual">Χειροκίνητα</option>
+              <option value="twelvedata">Twelve Data</option>
+            </select>
+          </label>
+          <label id="apiKeyLabel" class="hidden">
+            API key Twelve Data
+            <input id="apiKeyInput" type="password" autocomplete="off" placeholder="Αποθηκεύεται μόνο στη συσκευή" />
+          </label>
+          <label>
+            Σύμβολο Allwyn στον πάροχο
+            <input id="allwynProviderSymbol" type="text" value="ALWN" autocapitalize="characters" />
+          </label>
+          <button type="submit" class="primary full">Αποθήκευση ρυθμίσεων</button>
+          <p class="form-help">Με ενεργό API, οι τιμές ανανεώνονται αυτόματα. Χωρίς API, μπορείς να καταχωρείς την τρέχουσα τιμή χειροκίνητα.</p>
+        </form>
+
+        <div class="form-card">
+          <h3>Αρχείο</h3>
+          <div class="button-stack">
+            <button id="exportButton" class="secondary full">Εξαγωγή αντιγράφου JSON</button>
+            <label class="secondary full file-button">
+              Εισαγωγή αντιγράφου JSON
+              <input id="importInput" type="file" accept="application/json" hidden />
+            </label>
+            <button id="resetButton" class="danger full">Επαναφορά εφαρμογής</button>
+          </div>
+        </div>
+
+        <div class="form-card">
+          <h3>Κατάσταση εφαρμογής</h3>
+          <dl class="details-list">
+            <div><dt>Έκδοση</dt><dd>0.3.2</dd></div>
+            <div><dt>Αποθήκευση</dt><dd>Τοπικά στη συσκευή</dd></div>
+            <div><dt>Offline λειτουργία</dt><dd id="offlineStatus">Έλεγχος…</dd></div>
+          </dl>
+        </div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Κύρια πλοήγηση">
+      <button id="dashboardTab" class="nav-item active" data-view="dashboardView"><span>⌂</span><small>Σύνοψη</small></button>
+      <button id="transactionsTab" class="nav-item" data-view="transactionsView"><span>⇄</span><small>Συναλλαγές</small></button>
+      <button id="alertsTab" class="nav-item" data-view="alertsView"><span>!</span><small>Ειδοποιήσεις</small></button>
+      <button id="settingsTab" class="nav-item" data-view="settingsView"><span>⚙</span><small>Ρυθμίσεις</small></button>
+    </nav>
+  </div>
+
+  <dialog id="transactionDialog">
+    <form id="transactionForm" method="dialog" class="dialog-form">
+      <div class="dialog-heading">
+        <h2 id="transactionDialogTitle">Νέα συναλλαγή</h2>
+        <button type="button" id="closeTransactionDialog" class="icon-btn" aria-label="Κλείσιμο">×</button>
+      </div>
+
+      <label>
+        Είδος
+        <select id="transactionType" required>
+          <option value="buy">Αγορά</option>
+          <option value="sell">Πώληση</option>
+          <option value="dividend">Μέρισμα</option>
+          <option value="fee">Έξοδο</option>
+        </select>
+      </label>
+      <label>
+        Εταιρεία
+        <input id="transactionCompany" value="Allwyn" required />
+      </label>
+      <label>
+        Σύμβολο
+        <input id="transactionSymbol" value="ALWN.GR" required autocapitalize="characters" />
+      </label>
+      <label>
+        Ημερομηνία
+        <input id="transactionDate" type="date" required />
+      </label>
+
+      <div id="quantityFields" class="form-grid two">
+        <label>
+          Μετοχές
+          <input id="transactionQuantity" type="number" min="0" step="1" inputmode="decimal" />
+        </label>
+        <label>
+          Τιμή ανά μετοχή
+          <input id="transactionPrice" type="number" min="0" step="0.001" inputmode="decimal" />
+        </label>
+      </div>
+
+      <div id="cashFields" class="form-grid two hidden">
+        <label>
+          Μικτό ποσό
+          <input id="transactionCashAmount" type="number" min="0" step="0.01" inputmode="decimal" />
+        </label>
+        <label>
+          Παρακράτηση φόρου
+          <input id="transactionTax" type="number" min="0" step="0.01" inputmode="decimal" value="0" />
+        </label>
+      </div>
+
+      <div class="form-grid two">
+        <label>
+          Προμήθεια / έξοδα
+          <input id="transactionFees" type="number" min="0" step="0.01" inputmode="decimal" value="0" />
+        </label>
+        <label>
+          Φόρος συναλλαγής
+          <input id="transactionTransactionTax" type="number" min="0" step="0.01" inputmode="decimal" value="0" />
+        </label>
+      </div>
+
+      <label>
+        Σημείωση
+        <textarea id="transactionNote" rows="3" placeholder="Π.χ. Πινακίδιο Πειραιώς"></textarea>
+      </label>
+
+      <div class="dialog-actions">
+        <button type="button" id="cancelTransactionButton" class="secondary">Ακύρωση</button>
+        <button type="submit" class="primary">Αποθήκευση</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="priceDialog">
+    <form id="priceForm" method="dialog" class="dialog-form">
+      <div class="dialog-heading">
+        <h2>Ενημέρωση τιμής</h2>
+        <button type="button" id="closePriceDialog" class="icon-btn" aria-label="Κλείσιμο">×</button>
+      </div>
+      <input id="priceSymbol" type="hidden" />
+      <label>
+        Τρέχουσα τιμή
+        <input id="manualPriceInput" type="number" min="0" step="0.001" inputmode="decimal" required />
+      </label>
+      <div class="dialog-actions">
+        <button type="button" id="cancelPriceButton" class="secondary">Ακύρωση</button>
+        <button type="submit" class="primary">Αποθήκευση</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="alertDialog">
+    <form id="alertForm" method="dialog" class="dialog-form">
+      <div class="dialog-heading">
+        <h2>Όρια ειδοποίησης</h2>
+        <button type="button" id="closeAlertDialog" class="icon-btn" aria-label="Κλείσιμο">×</button>
+      </div>
+      <input id="alertSymbol" type="hidden" />
+      <label>
+        Ειδοποίηση πάνω από
+        <input id="alertAbove" type="number" min="0" step="0.001" inputmode="decimal" />
+      </label>
+      <label>
+        Ειδοποίηση κάτω από
+        <input id="alertBelow" type="number" min="0" step="0.001" inputmode="decimal" />
+      </label>
+      <label>
+        Ημερήσια μεταβολή μεγαλύτερη από (%)
+        <input id="alertChangePct" type="number" min="0" step="0.1" inputmode="decimal" value="5" />
+      </label>
+      <div class="dialog-actions">
+        <button type="button" id="cancelAlertButton" class="secondary">Ακύρωση</button>
+        <button type="submit" class="primary">Αποθήκευση</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js" defer></script>
 </body>
 </html>
