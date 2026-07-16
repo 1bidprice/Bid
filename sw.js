@@ -1,15 +1,31 @@
-const CACHE = 'investor-control-v0.4.0';
+const CACHE = 'investor-control-v0.4.1';
 const ASSETS = [
-  './', './index.html', './styles.css', './app.js', './automation.js',
-  './app-part1.js', './app-part2.js', './app-part3.js', './app-part4.js',
-  './app-part5.js', './app-part6.js', './app-run.js',
-  './manifest.webmanifest', './icon.svg'
+  './',
+  './index.html',
+  './styles.css',
+  './app.js',
+  './app-part1.js',
+  './app-part2.js',
+  './app-part3.js',
+  './app-part4.js',
+  './app-part5.js',
+  './app-part6.js',
+  './app-run.js',
+  './automation.js',
+  './market-data.json',
+  './manifest.webmanifest',
+  './icon.svg'
 ];
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
-    await cache.addAll(ASSETS);
+    for (const asset of ASSETS) {
+      try {
+        const response = await fetch(asset, { cache: 'reload' });
+        if (response.ok) await cache.put(asset, response.clone());
+      } catch (_) {}
+    }
     await self.skipWaiting();
   })());
 });
@@ -24,49 +40,26 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
-  const url = new URL(event.request.url);
-
-  if (url.pathname.endsWith('/market-data.json')) {
-    event.respondWith((async () => {
-      try {
-        const response = await fetch(event.request, { cache: 'no-store' });
-        if (response.ok) {
-          const cache = await caches.open(CACHE);
-          await cache.put(event.request, response.clone());
-        }
-        return response;
-      } catch (_) {
-        return (await caches.match(event.request, { ignoreSearch: true })) || Response.error();
-      }
-    })());
-    return;
-  }
-
-  if (event.request.mode === 'navigate') {
-    event.respondWith((async () => {
-      try {
-        const response = await fetch(event.request);
-        const cache = await caches.open(CACHE);
-        await cache.put('./index.html', response.clone());
-        return response;
-      } catch (_) {
-        return (await caches.match('./index.html')) || Response.error();
-      }
-    })());
-    return;
-  }
 
   event.respondWith((async () => {
-    const cached = await caches.match(event.request, { ignoreSearch: true });
-    if (cached) return cached;
+    const url = new URL(event.request.url);
+    const isLocal = url.origin === self.location.origin;
+    const isMarketFeed = isLocal && url.pathname.endsWith('/market-data.json');
+    const isCodeAsset = isLocal && /\/(index\.html|app\.js|app-part\d+\.js|app-run\.js|automation\.js|styles\.css)$/.test(url.pathname);
+
     try {
-      const response = await fetch(event.request);
-      if (response && response.ok && url.origin === self.location.origin) {
+      const response = await fetch(event.request, {
+        cache: (isMarketFeed || isCodeAsset || event.request.mode === 'navigate') ? 'reload' : 'default'
+      });
+      if (response && response.ok && isLocal) {
         const cache = await caches.open(CACHE);
         await cache.put(event.request, response.clone());
       }
       return response;
     } catch (_) {
+      const cached = await caches.match(event.request, { ignoreSearch: true });
+      if (cached) return cached;
+      if (event.request.mode === 'navigate') return caches.match('./index.html');
       return Response.error();
     }
   })());
