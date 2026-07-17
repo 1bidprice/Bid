@@ -2,14 +2,24 @@
   "expo": {
     "name": "Investor Control",
     "slug": "investor-control",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "plugins": ["expo-secure-store"],
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "color": "#0B66FF",
+          "defaultChannel": "price-alerts"
+        }
+      ],
+      "expo-document-picker"
+    ],
     "android": {
       "package": "gr.investorcontrol.app",
-      "versionCode": 3,
+      "versionCode": 4,
       "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
@@ -18,7 +28,7 @@
     },
     "ios": {
       "bundleIdentifier": "gr.investorcontrol.app",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "supportsTablet": false
     }
   }
