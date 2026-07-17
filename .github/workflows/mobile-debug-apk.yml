@@ -1,0 +1,52 @@
+name: Build Investor Control Standalone APK
+
+on:
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/mobile-debug-apk.yml'
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --clean --non-interactive
+
+      - name: Build standalone release APK
+        run: cd android && chmod +x gradlew && ./gradlew assembleRelease --no-daemon
+
+      - name: Verify embedded JavaScript bundle
+        run: |
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          test -f "$APK"
+          unzip -l "$APK" | tee apk-contents.txt
+          grep -Eq 'index\.android\.bundle|assets/.*\.bundle' apk-contents.txt
+
+      - name: Upload standalone APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-standalone-release-apk
+          path: mobile/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
