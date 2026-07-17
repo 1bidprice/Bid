@@ -172,6 +172,36 @@ async function fetchFinnhubQuote(ticker, token) {
   };
 }
 
+export function openFinnhubTrades(token, symbols, onTrade, onStatus = () => {}) {
+  if (!token || !symbols?.length) return () => {};
+  const socket = new WebSocket(`wss://ws.finnhub.io?token=${encodeURIComponent(token)}`);
+  const clean = [...new Set(symbols.filter(Boolean).map((value) => String(value).trim().toUpperCase()))];
+  socket.onopen = () => {
+    clean.forEach((symbol) => socket.send(JSON.stringify({ type: 'subscribe', symbol })));
+    onStatus('open');
+  };
+  socket.onmessage = (event) => {
+    try {
+      const payload = JSON.parse(event.data);
+      if (payload?.type !== 'trade' || !Array.isArray(payload.data)) return;
+      const latest = [...payload.data]
+        .filter((trade) => clean.includes(String(trade?.s || '').toUpperCase()) && finite(trade?.p) && finite(trade?.t))
+        .sort((a, b) => Number(b.t) - Number(a.t))[0];
+      if (latest) onTrade({ symbol: latest.s, price: Number(latest.p), timestamp: Number(latest.t) });
+    } catch (_) {}
+  };
+  socket.onerror = () => onStatus('error');
+  socket.onclose = () => onStatus('closed');
+  return () => {
+    try {
+      clean.forEach((symbol) => {
+        if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'unsubscribe', symbol }));
+      });
+      socket.close();
+    } catch (_) {}
+  };
+}
+
 async function fetchOfficialAllwynQuote() {
   const html = await fetchText(EURONEXT_ALWN_URL);
   const text = htmlToText(html);
