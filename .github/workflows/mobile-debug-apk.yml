@@ -1,4 +1,4 @@
-name: Build Investor Control APK
+name: Build Investor Control Standalone APK
 
 on:
   pull_request:
@@ -34,12 +34,19 @@ jobs:
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean --non-interactive
 
-      - name: Build debug APK
-        run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+      - name: Build standalone release APK
+        run: cd android && chmod +x gradlew && ./gradlew assembleRelease --no-daemon
 
-      - name: Upload APK
+      - name: Verify embedded JavaScript bundle
+        run: |
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          test -f "$APK"
+          unzip -l "$APK" | tee apk-contents.txt
+          grep -Eq 'index\.android\.bundle|assets/.*\.bundle' apk-contents.txt
+
+      - name: Upload standalone APK
         uses: actions/upload-artifact@v4
         with:
-          name: investor-control-android-apk
-          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          name: investor-control-standalone-release-apk
+          path: mobile/android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
