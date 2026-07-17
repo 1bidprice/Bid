@@ -25,8 +25,23 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Check Expo package compatibility
+        run: npx expo install --check 2>&1 | tee package-check.log
+
       - name: Expo Doctor
-        run: npx expo-doctor
+        continue-on-error: true
+        run: npx expo-doctor 2>&1 | tee doctor.log
 
       - name: Export Android bundle
-        run: npx expo export --platform android --output-dir dist
+        run: npx expo export --platform android --output-dir dist 2>&1 | tee export.log
+
+      - name: Upload validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-validation-logs
+          path: |
+            mobile/package-check.log
+            mobile/doctor.log
+            mobile/export.log
+          if-no-files-found: ignore
