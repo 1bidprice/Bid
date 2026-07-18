@@ -75,7 +75,7 @@ async function fetchText(url, timeoutMs = 15_000) {
       headers: {
         Accept: 'text/html,application/xhtml+xml,application/json,text/plain,*/*',
         'Cache-Control': 'no-cache',
-        'User-Agent': 'InvestorControl/0.2.0',
+        'User-Agent': 'InvestorControl/0.4.1',
       },
       signal: controller.signal,
     });
@@ -101,26 +101,57 @@ async function fetchJson(url, timeoutMs = 15_000) {
   }
 }
 
+function yahooSession(meta, timestamp) {
+  const zone = String(meta?.exchangeTimezoneName || meta?.timezone || '');
+  if (!zone.includes('New_York') || !finite(timestamp)) return 'regular-market';
+  const parts = zoneParts('America/New_York', new Date(Number(timestamp) * 1000));
+  const weekdays = new Set(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+  if (!weekdays.has(parts.weekday)) return 'off-hours';
+  const minutes = Number(parts.hour) * 60 + Number(parts.minute);
+  if (minutes >= 4 * 60 && minutes < 9 * 60 + 30) return 'pre-market';
+  if (minutes >= 9 * 60 + 30 && minutes <= 16 * 60) return 'regular-market';
+  if (minutes > 16 * 60 && minutes <= 20 * 60) return 'post-market';
+  return 'off-hours';
+}
+
 function latestYahooPoint(result) {
   const candidates = [];
+  const meta = result?.meta || {};
   const timestamps = result?.timestamp || [];
   const closes = result?.indicators?.quote?.[0]?.close || [];
+
   for (let index = Math.min(timestamps.length, closes.length) - 1; index >= 0; index -= 1) {
     if (finite(closes[index]) && finite(timestamps[index])) {
-      candidates.push({ price: Number(closes[index]), timestamp: Number(timestamps[index]), kind: '1m-bar' });
+      const timestamp = Number(timestamps[index]);
+      const session = yahooSession(meta, timestamp);
+      candidates.push({
+        price: Number(closes[index]),
+        timestamp,
+        kind: session === 'regular-market' ? '1m-bar' : `${session}-1m-bar`,
+        session,
+        priority: 1,
+      });
       break;
     }
   }
-  const meta = result?.meta || {};
-  if (finite(meta.regularMarketPrice)) {
+
+  const addMetaPoint = (priceKey, timeKey, kind, session, priority) => {
+    if (!finite(meta[priceKey]) || !finite(meta[timeKey])) return;
     candidates.push({
-      price: Number(meta.regularMarketPrice),
-      timestamp: finite(meta.regularMarketTime) ? Number(meta.regularMarketTime) : Math.floor(Date.now() / 1000),
-      kind: 'regular-market',
+      price: Number(meta[priceKey]),
+      timestamp: Number(meta[timeKey]),
+      kind,
+      session,
+      priority,
     });
-  }
+  };
+
+  addMetaPoint('preMarketPrice', 'preMarketTime', 'pre-market', 'pre-market', 4);
+  addMetaPoint('postMarketPrice', 'postMarketTime', 'post-market', 'post-market', 4);
+  addMetaPoint('regularMarketPrice', 'regularMarketTime', 'regular-market', 'regular-market', 3);
+
   if (!candidates.length) return null;
-  return candidates.sort((a, b) => b.timestamp - a.timestamp)[0];
+  return candidates.sort((a, b) => (b.timestamp - a.timestamp) || (b.priority - a.priority))[0];
 }
 
 async function fetchYahooQuote(ticker) {
@@ -128,7 +159,7 @@ async function fetchYahooQuote(ticker) {
   for (const host of YAHOO_HOSTS) {
     try {
       const payload = await fetchJson(
-        `https://${host}/v8/finance/chart/${encodeURIComponent(ticker)}?range=1d&interval=1m&includePrePost=false&events=div%2Csplits`,
+        `https://${host}/v8/finance/chart/${encodeURIComponent(ticker)}?range=5d&interval=1m&includePrePost=true&events=div%2Csplits`,
       );
       const result = payload?.chart?.result?.[0];
       if (!result) throw new Error(payload?.chart?.error?.description || 'κενό αποτέλεσμα');
@@ -138,15 +169,24 @@ async function fetchYahooQuote(ticker) {
       const previousClose = finite(meta.chartPreviousClose || meta.previousClose)
         ? Number(meta.chartPreviousClose || meta.previousClose)
         : null;
+      const regularMarketPrice = finite(meta.regularMarketPrice)
+        ? Number(meta.regularMarketPrice)
+        : null;
+      const changeBase = ['pre-market', 'post-market'].includes(point.session) && finite(regularMarketPrice)
+        ? regularMarketPrice
+        : previousClose;
       return {
         nativePrice: point.price,
         nativePreviousClose: previousClose,
+        nativeChangeBase: changeBase,
+        nativeRegularMarketPrice: regularMarketPrice,
         nativeCurrency: String(meta.currency || '').toUpperCase() || null,
         updatedAt: new Date(point.timestamp * 1000).toISOString(),
         checkedAt: new Date().toISOString(),
         source: `Yahoo Finance ${point.kind} (εφεδρική πηγή)`,
         providerSymbol: ticker,
         quality: 'unofficial',
+        session: point.session,
       };
     } catch (error) {
       errors.push(`${host}: ${error.message}`);
@@ -163,12 +203,14 @@ async function fetchFinnhubQuote(ticker, token) {
   return {
     nativePrice: Number(payload.c),
     nativePreviousClose: finite(payload.pc) ? Number(payload.pc) : null,
+    nativeChangeBase: finite(payload.pc) ? Number(payload.pc) : null,
     nativeCurrency: 'USD',
     updatedAt: new Date(timestamp * 1000).toISOString(),
     checkedAt: new Date().toISOString(),
     source: 'Finnhub real-time US quote',
     providerSymbol: ticker,
     quality: 'realtime',
+    session: 'regular-market',
   };
 }
 
@@ -211,6 +253,7 @@ async function fetchOfficialAllwynQuote() {
   return {
     nativePrice: priceValue,
     nativePreviousClose: finite(previousClose) ? previousClose : null,
+    nativeChangeBase: finite(previousClose) ? previousClose : null,
     nativeCurrency: 'EUR',
     updatedAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
     checkedAt: new Date().toISOString(),
@@ -218,6 +261,7 @@ async function fetchOfficialAllwynQuote() {
     providerSymbol: 'ALWN',
     quality: 'delayed15',
     advertisedDelayMinutes: 15,
+    session: 'regular-market',
   };
 }
 
@@ -236,8 +280,11 @@ function classifyQuote(symbol, quote) {
   const ageSeconds = Math.max(0, Math.round((Date.now() - new Date(quote.updatedAt).getTime()) / 1000));
   const allowedAge = symbol === 'ALWN.GR' ? 25 * 60 : 3 * 60;
   let status;
-  if (!exchange.open) status = 'closed';
-  else if (quote.quality === 'delayed15') status = 'delayed';
+  if (!exchange.open) {
+    if (quote.session === 'pre-market') status = 'pre-market';
+    else if (quote.session === 'post-market') status = 'post-market';
+    else status = 'closed';
+  } else if (quote.quality === 'delayed15') status = 'delayed';
   else if (ageSeconds <= allowedAge) status = quote.quality === 'realtime' ? 'live' : 'near-live';
   else status = 'stale';
   return { ...quote, ageSeconds, status, exchangeOpen: exchange.open, usable: status !== 'stale' };
@@ -286,8 +333,13 @@ export async function fetchPortfolioQuotes(symbols, { finnhubToken = '' } = {}) 
         : nativeCurrency === 'USD'
           ? Number(native.nativePreviousClose) / Number(fx.rate)
           : Number(native.nativePreviousClose);
-      const changePct = finite(native.nativePreviousClose)
-        ? ((Number(native.nativePrice) - Number(native.nativePreviousClose)) / Number(native.nativePreviousClose)) * 100
+      const changeBase = finite(native.nativeChangeBase)
+        ? Number(native.nativeChangeBase)
+        : finite(native.nativePreviousClose)
+          ? Number(native.nativePreviousClose)
+          : null;
+      const changePct = finite(changeBase)
+        ? ((Number(native.nativePrice) - changeBase) / changeBase) * 100
         : null;
       quotes[symbol] = classifyQuote(symbol, {
         ...native,
@@ -318,6 +370,8 @@ export function quoteStatusText(quote) {
   if (quote.status === 'live') return 'Real-time';
   if (quote.status === 'near-live') return 'Near-live';
   if (quote.status === 'delayed') return 'Καθυστέρηση 15′';
+  if (quote.status === 'pre-market') return 'Προσυνεδριακή';
+  if (quote.status === 'post-market') return 'Μετασυνεδριακή';
   if (quote.status === 'closed') return 'Τιμή κλεισίματος';
   return 'Παρωχημένη τιμή — δεν υπολογίζεται';
 }
