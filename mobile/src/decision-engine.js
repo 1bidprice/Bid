@@ -1,9 +1,39 @@
 export const DECISION_STORAGE_KEY = '@investor_control_decision_plans_v1';
+export const DECISION_SETTINGS_KEY = '@investor_control_decision_settings_v1';
 export const DECISION_FORMAT = 'investor-control-decision-os';
-export const DECISION_VERSION = 1;
+export const DECISION_VERSION = 2;
+
+export const DEFAULT_DECISION_SETTINGS = Object.freeze({
+  maxAllocationPct: 25,
+  maxRiskPct: 2,
+  reviewDays: 90,
+});
 
 const finite = (value) => Number.isFinite(Number(value));
 const positive = (value) => finite(value) && Number(value) > 0;
+const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
+
+export function normalizeDecisionSettings(raw) {
+  const source = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  return {
+    maxAllocationPct: positive(source.maxAllocationPct)
+      ? clamp(Number(source.maxAllocationPct), 1, 100)
+      : DEFAULT_DECISION_SETTINGS.maxAllocationPct,
+    maxRiskPct: positive(source.maxRiskPct)
+      ? clamp(Number(source.maxRiskPct), 0.1, 100)
+      : DEFAULT_DECISION_SETTINGS.maxRiskPct,
+    reviewDays: positive(source.reviewDays)
+      ? Math.round(clamp(Number(source.reviewDays), 7, 3650))
+      : DEFAULT_DECISION_SETTINGS.reviewDays,
+  };
+}
+
+export function nextReviewDate(reviewDays = DEFAULT_DECISION_SETTINGS.reviewDays, from = new Date()) {
+  const date = new Date(from);
+  date.setHours(12, 0, 0, 0);
+  date.setDate(date.getDate() + normalizeDecisionSettings({ reviewDays }).reviewDays);
+  return date.toISOString().slice(0, 10);
+}
 
 export function normalizePlans(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
@@ -15,9 +45,6 @@ export function normalizePlans(raw) {
         thesis: String(plan.thesis || ''),
         stop: positive(plan.stop) ? Number(plan.stop) : null,
         target: positive(plan.target) ? Number(plan.target) : null,
-        maxAllocationPct: positive(plan.maxAllocationPct) ? Number(plan.maxAllocationPct) : null,
-        maxRiskPct: positive(plan.maxRiskPct) ? Number(plan.maxRiskPct) : 2,
-        conviction: Math.min(5, Math.max(1, Number(plan.conviction || 3))),
         reviewDate: String(plan.reviewDate || ''),
         proposedAmountEUR: positive(plan.proposedAmountEUR) ? Number(plan.proposedAmountEUR) : 0,
         updatedAt: plan.updatedAt || null,
@@ -94,8 +121,9 @@ export function portfolioSnapshot(state) {
 
 const issue = (code, message, severity = 'warning') => ({ code, message, severity });
 
-export function evaluateDecision(position, plan, totalValueEUR) {
+export function evaluateDecision(position, plan, totalValueEUR, settingsInput = DEFAULT_DECISION_SETTINGS) {
   const normalized = normalizePlans({ [position.symbol]: plan })[position.symbol] || {};
+  const settings = normalizeDecisionSettings(settingsInput);
   const issues = [];
   const current = Number(position.nativePrice || 0);
   const currentEUR = Number(position.eurPrice || 0);
@@ -119,11 +147,8 @@ export function evaluateDecision(position, plan, totalValueEUR) {
   }
   if (!stop) issues.push(issue('stop', 'Δεν έχει οριστεί τιμή ακύρωσης της επενδυτικής ιδέας.', 'block'));
   if (!target) issues.push(issue('target', 'Δεν έχει οριστεί ρεαλιστικός στόχος τιμής.', 'block'));
-  if (!normalized.maxAllocationPct) {
-    issues.push(issue('allocation', 'Δεν έχει οριστεί ανώτατο ποσοστό χαρτοφυλακίου.', 'block'));
-  }
   if (!normalized.reviewDate) {
-    issues.push(issue('review', 'Δεν έχει οριστεί ημερομηνία επανεξέτασης.'));
+    issues.push(issue('review', 'Δεν έχει οριστεί αυτόματη ημερομηνία επανεξέτασης.'));
   }
   if (stop && current && stop >= current) {
     issues.push(issue('stop-invalid', 'Η τιμή ακύρωσης πρέπει να είναι χαμηλότερη από την τρέχουσα τιμή.', 'block'));
@@ -151,11 +176,11 @@ export function evaluateDecision(position, plan, totalValueEUR) {
   } else if (rewardRisk !== null && rewardRisk < 2) {
     issues.push(issue('rr-warning', `Η σχέση απόδοσης/κινδύνου ${rewardRisk.toFixed(2)} είναι κάτω από το πειθαρχημένο όριο 2,00.`));
   }
-  if (normalized.maxAllocationPct && projectedWeightPct !== null && projectedWeightPct > normalized.maxAllocationPct) {
-    issues.push(issue('allocation-over', `Η θέση θα φτάσει ${projectedWeightPct.toFixed(1)}% ενώ το όριο είναι ${normalized.maxAllocationPct.toFixed(1)}%.`, 'block'));
+  if (projectedWeightPct !== null && projectedWeightPct > settings.maxAllocationPct) {
+    issues.push(issue('allocation-over', `Η θέση θα φτάσει ${projectedWeightPct.toFixed(1)}% ενώ το γενικό όριο είναι ${settings.maxAllocationPct.toFixed(1)}%.`, 'block'));
   }
-  if (normalized.maxRiskPct && projectedRiskPct !== null && projectedRiskPct > normalized.maxRiskPct) {
-    issues.push(issue('risk-over', `Το κεφάλαιο σε κίνδυνο θα φτάσει ${projectedRiskPct.toFixed(2)}% του χαρτοφυλακίου, πάνω από το όριο ${normalized.maxRiskPct.toFixed(2)}%.`, 'block'));
+  if (projectedRiskPct !== null && projectedRiskPct > settings.maxRiskPct) {
+    issues.push(issue('risk-over', `Το κεφάλαιο σε κίνδυνο θα φτάσει ${projectedRiskPct.toFixed(2)}% του χαρτοφυλακίου, πάνω από το γενικό όριο ${settings.maxRiskPct.toFixed(2)}%.`, 'block'));
   }
 
   const today = new Date().toISOString().slice(0, 10);
@@ -181,14 +206,16 @@ export function evaluateDecision(position, plan, totalValueEUR) {
     projectedRiskPct,
     rewardRisk,
     proposedAmountEUR,
+    reviewDate: normalized.reviewDate || null,
+    settings,
     label: status === 'ready' ? 'ΠΕΡΝΑΕΙ' : status === 'caution' ? 'ΠΡΟΣΟΧΗ' : 'ΜΠΛΟΚΑΡΕΤΑΙ',
   };
 }
 
-export function decisionSummary(positions, plans, totalValueEUR) {
+export function decisionSummary(positions, plans, totalValueEUR, settings = DEFAULT_DECISION_SETTINGS) {
   return positions.map((position) => ({
     position,
     plan: plans[position.symbol] || null,
-    result: evaluateDecision(position, plans[position.symbol] || {}, totalValueEUR),
+    result: evaluateDecision(position, plans[position.symbol] || {}, totalValueEUR, settings),
   }));
 }
