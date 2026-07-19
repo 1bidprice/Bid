@@ -20,15 +20,20 @@ import * as Sharing from 'expo-sharing';
 import { STORAGE_KEY } from './src/background-alert-task';
 import {
   DECISION_FORMAT,
+  DECISION_SETTINGS_KEY,
   DECISION_STORAGE_KEY,
   DECISION_VERSION,
+  DEFAULT_DECISION_SETTINGS,
   decisionSummary,
   evaluateDecision,
+  nextReviewDate,
+  normalizeDecisionSettings,
   normalizePlans,
   portfolioSnapshot,
 } from './src/decision-engine';
 
-const VERSION = '0.5.0';
+const VERSION = '0.5.1';
+const SUPPORTED_BACKUP_VERSIONS = [1, DECISION_VERSION];
 
 const parseNum = (value) => {
   const raw = String(value ?? '').trim();
@@ -62,17 +67,34 @@ const percent = (value, digits = 1) => Number.isFinite(Number(value))
   ? `${Number(value).toFixed(digits)}%`
   : '—';
 
-const emptyForm = (position, plan) => ({
+const dateLabel = (iso) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ''))) return '—';
+  const [year, month, day] = iso.split('-');
+  return `${day}/${month}/${year}`;
+};
+
+const emptyForm = (plan, settings) => ({
   thesis: plan?.thesis || '',
   stop: plan?.stop ? String(plan.stop) : '',
   target: plan?.target ? String(plan.target) : '',
-  maxAllocationPct: plan?.maxAllocationPct ? String(plan.maxAllocationPct) : '25',
-  maxRiskPct: plan?.maxRiskPct ? String(plan.maxRiskPct) : '2',
-  conviction: Number(plan?.conviction || 3),
-  reviewDate: plan?.reviewDate || '',
   proposedAmountEUR: plan?.proposedAmountEUR ? String(plan.proposedAmountEUR) : '',
-  symbol: position?.symbol || '',
+  reviewDate: plan?.reviewDate || nextReviewDate(settings.reviewDays),
 });
+
+const settingsFormFrom = (settings) => ({
+  maxAllocationPct: String(settings.maxAllocationPct),
+  maxRiskPct: String(settings.maxRiskPct),
+  reviewDays: String(settings.reviewDays),
+});
+
+const legacySettingsFromPlans = (rawPlans) => {
+  if (!rawPlans || typeof rawPlans !== 'object' || Array.isArray(rawPlans)) return {};
+  const candidates = Object.values(rawPlans).filter((plan) => plan && typeof plan === 'object');
+  return {
+    maxAllocationPct: candidates.find((plan) => parseNum(plan.maxAllocationPct))?.maxAllocationPct,
+    maxRiskPct: candidates.find((plan) => parseNum(plan.maxRiskPct))?.maxRiskPct,
+  };
+};
 
 function StatusPill({ status, label }) {
   return (
@@ -92,7 +114,7 @@ function StatusPill({ status, label }) {
   );
 }
 
-function Field({ label, value, onChangeText, placeholder, keyboardType = 'default', multiline = false }) {
+function Field({ label, value, onChangeText, placeholder, keyboardType = 'default', multiline = false, helper }) {
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
@@ -107,6 +129,7 @@ function Field({ label, value, onChangeText, placeholder, keyboardType = 'defaul
         textAlignVertical={multiline ? 'top' : 'center'}
         autoCapitalize={multiline ? 'sentences' : 'none'}
       />
+      {helper ? <Text style={styles.helper}>{helper}</Text> : null}
     </View>
   );
 }
@@ -127,24 +150,43 @@ export default function DecisionOverlay() {
   const [screen, setScreen] = useState('list');
   const [portfolioState, setPortfolioState] = useState({ transactions: [], prices: {} });
   const [plans, setPlans] = useState({});
+  const [settings, setSettings] = useState(DEFAULT_DECISION_SETTINGS);
+  const [settingsForm, setSettingsForm] = useState(settingsFormFrom(DEFAULT_DECISION_SETTINGS));
   const [selectedSymbol, setSelectedSymbol] = useState(null);
-  const [form, setForm] = useState(emptyForm());
+  const [form, setForm] = useState(emptyForm(null, DEFAULT_DECISION_SETTINGS));
 
   const load = useCallback(async () => {
-    const [portfolioRaw, plansRaw] = await Promise.all([
+    const [portfolioRaw, plansRaw, settingsRaw] = await Promise.all([
       AsyncStorage.getItem(STORAGE_KEY),
       AsyncStorage.getItem(DECISION_STORAGE_KEY),
+      AsyncStorage.getItem(DECISION_SETTINGS_KEY),
     ]);
+
     try {
       setPortfolioState(portfolioRaw ? JSON.parse(portfolioRaw) : { transactions: [], prices: {} });
     } catch {
       setPortfolioState({ transactions: [], prices: {} });
     }
+
+    let parsedPlans = {};
     try {
-      setPlans(normalizePlans(plansRaw ? JSON.parse(plansRaw) : null));
+      parsedPlans = plansRaw ? JSON.parse(plansRaw) : {};
+      setPlans(normalizePlans(parsedPlans));
     } catch {
+      parsedPlans = {};
       setPlans({});
     }
+
+    let nextSettings;
+    try {
+      nextSettings = settingsRaw
+        ? normalizeDecisionSettings(JSON.parse(settingsRaw))
+        : normalizeDecisionSettings(legacySettingsFromPlans(parsedPlans));
+    } catch {
+      nextSettings = normalizeDecisionSettings(legacySettingsFromPlans(parsedPlans));
+    }
+    setSettings(nextSettings);
+    setSettingsForm(settingsFormFrom(nextSettings));
   }, []);
 
   useEffect(() => {
@@ -157,8 +199,8 @@ export default function DecisionOverlay() {
 
   const snapshot = useMemo(() => portfolioSnapshot(portfolioState), [portfolioState]);
   const rows = useMemo(
-    () => decisionSummary(snapshot.positions, plans, snapshot.totalValueEUR),
-    [snapshot, plans],
+    () => decisionSummary(snapshot.positions, plans, snapshot.totalValueEUR, settings),
+    [snapshot, plans, settings],
   );
   const selectedPosition = snapshot.positions.find((position) => position.symbol === selectedSymbol) || null;
   const formPlan = selectedPosition ? {
@@ -166,14 +208,11 @@ export default function DecisionOverlay() {
     thesis: form.thesis,
     stop: parseNum(form.stop) || null,
     target: parseNum(form.target) || null,
-    maxAllocationPct: parseNum(form.maxAllocationPct) || null,
-    maxRiskPct: parseNum(form.maxRiskPct) || 2,
-    conviction: form.conviction,
-    reviewDate: form.reviewDate,
+    reviewDate: form.reviewDate || nextReviewDate(settings.reviewDays),
     proposedAmountEUR: parseNum(form.proposedAmountEUR),
   } : {};
   const liveResult = selectedPosition
-    ? evaluateDecision(selectedPosition, formPlan, snapshot.totalValueEUR)
+    ? evaluateDecision(selectedPosition, formPlan, snapshot.totalValueEUR, settings)
     : null;
 
   const counts = rows.reduce((acc, row) => {
@@ -194,11 +233,21 @@ export default function DecisionOverlay() {
     setSelectedSymbol(null);
   };
 
+  const goBack = () => {
+    if (screen === 'list') close();
+    else setScreen('list');
+  };
+
   const edit = (position) => {
     const plan = plans[position.symbol] || null;
     setSelectedSymbol(position.symbol);
-    setForm(emptyForm(position, plan));
+    setForm(emptyForm(plan, settings));
     setScreen('editor');
+  };
+
+  const openRules = () => {
+    setSettingsForm(settingsFormFrom(settings));
+    setScreen('settings');
   };
 
   const persistPlans = async (next) => {
@@ -207,16 +256,20 @@ export default function DecisionOverlay() {
     await AsyncStorage.setItem(DECISION_STORAGE_KEY, JSON.stringify(normalized));
   };
 
+  const persistSettings = async (next) => {
+    const normalized = normalizeDecisionSettings(next);
+    setSettings(normalized);
+    setSettingsForm(settingsFormFrom(normalized));
+    await AsyncStorage.setItem(DECISION_SETTINGS_KEY, JSON.stringify(normalized));
+  };
+
   const save = async () => {
     if (!selectedPosition) return;
-    if (form.reviewDate && !/^\d{4}-\d{2}-\d{2}$/.test(form.reviewDate)) {
-      Alert.alert('Λάθος ημερομηνία', 'Χρησιμοποίησε μορφή ΕΕΕΕ-ΜΜ-ΗΗ, π.χ. 2026-10-31.');
-      return;
-    }
     const next = {
       ...plans,
       [selectedPosition.symbol]: {
         ...formPlan,
+        reviewDate: formPlan.reviewDate || nextReviewDate(settings.reviewDays),
         updatedAt: new Date().toISOString(),
       },
     };
@@ -226,6 +279,27 @@ export default function DecisionOverlay() {
       : 'Το πλάνο αποθηκεύτηκε. Οι αδυναμίες παραμένουν ορατές μέχρι να διορθωθούν.');
   };
 
+  const saveRules = async () => {
+    const maxAllocationPct = parseNum(settingsForm.maxAllocationPct);
+    const maxRiskPct = parseNum(settingsForm.maxRiskPct);
+    const reviewDays = Math.round(parseNum(settingsForm.reviewDays));
+    if (maxAllocationPct < 1 || maxAllocationPct > 100) {
+      Alert.alert('Μη έγκυρο όριο', 'Το μέγιστο βάρος θέσης πρέπει να είναι από 1% έως 100%.');
+      return;
+    }
+    if (maxRiskPct < 0.1 || maxRiskPct > 100) {
+      Alert.alert('Μη έγκυρο όριο', 'Ο μέγιστος κίνδυνος πρέπει να είναι από 0,1% έως 100%.');
+      return;
+    }
+    if (reviewDays < 7 || reviewDays > 3650) {
+      Alert.alert('Μη έγκυρο διάστημα', 'Η αυτόματη επανεξέταση πρέπει να είναι από 7 έως 3.650 ημέρες.');
+      return;
+    }
+    await persistSettings({ maxAllocationPct, maxRiskPct, reviewDays });
+    setScreen('list');
+    Alert.alert('Οι κανόνες αποθηκεύτηκαν', 'Ισχύουν πλέον για όλες τις θέσεις. Δεν χρειάζεται να τους ξαναγράφεις.');
+  };
+
   const exportPlans = async () => {
     try {
       const payload = {
@@ -233,6 +307,7 @@ export default function DecisionOverlay() {
         version: DECISION_VERSION,
         appVersion: VERSION,
         exportedAt: new Date().toISOString(),
+        settings,
         plans,
       };
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -262,13 +337,22 @@ export default function DecisionOverlay() {
       if (!asset?.uri) throw new Error('Δεν επιλέχθηκε αρχείο.');
       const text = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.UTF8 });
       const payload = JSON.parse(text);
-      if (payload?.format !== DECISION_FORMAT || payload?.version !== DECISION_VERSION) {
+      if (payload?.format !== DECISION_FORMAT || !SUPPORTED_BACKUP_VERSIONS.includes(Number(payload?.version))) {
         throw new Error('Το αρχείο δεν είναι έγκυρο αντίγραφο Decision OS.');
       }
       const incoming = normalizePlans(payload.plans);
+      const importedSettings = payload.settings
+        ? normalizeDecisionSettings(payload.settings)
+        : normalizeDecisionSettings(legacySettingsFromPlans(payload.plans));
       Alert.alert('Εισαγωγή πλάνων', `Θα προστεθούν ή θα αντικατασταθούν ${Object.keys(incoming).length} πλάνα.`, [
         { text: 'Άκυρο', style: 'cancel' },
-        { text: 'Συνέχεια', onPress: async () => persistPlans({ ...plans, ...incoming }) },
+        {
+          text: 'Συνέχεια',
+          onPress: async () => {
+            await persistPlans({ ...plans, ...incoming });
+            if (payload.settings || Number(payload.version) === 1) await persistSettings(importedSettings);
+          },
+        },
       ]);
     } catch (error) {
       Alert.alert('Εισαγωγή πλάνων', error.message);
@@ -282,11 +366,11 @@ export default function DecisionOverlay() {
         <Text style={styles.fabText}>ΑΠΟΦΑΣΗ</Text>
       </Pressable>
 
-      <Modal visible={visible} animationType="slide" onRequestClose={close} statusBarTranslucent={false}>
+      <Modal visible={visible} animationType="slide" onRequestClose={goBack} statusBarTranslucent={false}>
         <SafeAreaView style={styles.safe}>
           <View style={styles.header}>
-            <Pressable onPress={screen === 'editor' ? () => setScreen('list') : close} hitSlop={12}>
-              <Text style={styles.headerAction}>{screen === 'editor' ? '‹ Πίσω' : 'Κλείσιμο'}</Text>
+            <Pressable onPress={goBack} hitSlop={12}>
+              <Text style={styles.headerAction}>{screen === 'list' ? 'Κλείσιμο' : '‹ Πίσω'}</Text>
             </Pressable>
             <View style={styles.headerCenter}>
               <Text style={styles.headerTitle}>Decision Gate</Text>
@@ -299,8 +383,8 @@ export default function DecisionOverlay() {
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
               <View style={styles.hero}>
                 <Text style={styles.heroEyebrow}>ΠΡΙΝ ΑΓΟΡΑΣΕΙΣ Ή ΕΝΙΣΧΥΣΕΙΣ</Text>
-                <Text style={styles.heroTitle}>Όχι άλλη αγορά χωρίς σχέδιο.</Text>
-                <Text style={styles.heroText}>Η εφαρμογή ελέγχει αιτιολόγηση, τιμή ακύρωσης, στόχο, συγκέντρωση θέσης και πραγματικό κεφάλαιο σε κίνδυνο.</Text>
+                <Text style={styles.heroTitle}>Τρία στοιχεία. Καμία αγορά στα τυφλά.</Text>
+                <Text style={styles.heroText}>Εσύ δηλώνεις μόνο αιτιολόγηση, τιμή ακύρωσης και στόχο. Η εφαρμογή αναλαμβάνει όλους τους υπολογισμούς.</Text>
               </View>
 
               <View style={styles.grid}>
@@ -308,6 +392,22 @@ export default function DecisionOverlay() {
                 <Metric label="Προσοχή" value={String(counts.caution)} danger={counts.caution > 0} />
                 <Metric label="Μπλοκαρισμένες" value={String(counts.blocked)} danger={counts.blocked > 0} />
                 <Metric label="Χαρτοφυλάκιο" value={money(snapshot.totalValueEUR)} />
+              </View>
+
+              <View style={styles.card}>
+                <View style={styles.rowTop}>
+                  <View style={styles.grow}>
+                    <Text style={styles.cardTitle}>Κανόνες χαρτοφυλακίου</Text>
+                    <Text style={styles.muted}>Ορίζονται μία φορά και εφαρμόζονται αυτόματα σε όλες τις θέσεις.</Text>
+                  </View>
+                  <StatusPill status="ready" label="ΕΝΕΡΓΟΙ" />
+                </View>
+                <View style={styles.miniGrid}>
+                  <View style={styles.miniCell}><Text style={styles.muted}>Μέγιστο βάρος</Text><Text style={styles.miniValue}>{percent(settings.maxAllocationPct)}</Text></View>
+                  <View style={styles.miniCell}><Text style={styles.muted}>Μέγιστος κίνδυνος</Text><Text style={styles.miniValue}>{percent(settings.maxRiskPct)}</Text></View>
+                  <View style={styles.miniCellWide}><Text style={styles.muted}>Αυτόματη επανεξέταση</Text><Text style={styles.miniValue}>Κάθε {settings.reviewDays} ημέρες</Text></View>
+                </View>
+                <Pressable style={styles.secondary} onPress={openRules}><Text style={styles.secondaryText}>Αλλαγή γενικών κανόνων</Text></Pressable>
               </View>
 
               <Text style={styles.sectionTitle}>Έλεγχος ανά θέση</Text>
@@ -333,7 +433,7 @@ export default function DecisionOverlay() {
                     <Text style={styles.issuePreview}>{result.issues[0].message}{result.issues.length > 1 ? `  +${result.issues.length - 1} ακόμη` : ''}</Text>
                   ) : <Text style={styles.readyText}>Το πλάνο είναι πλήρες και δεν παραβιάζει τα σημερινά όρια.</Text>}
                   <Pressable style={styles.primary} onPress={() => edit(position)}>
-                    <Text style={styles.primaryText}>{plans[position.symbol] ? 'Έλεγχος / επεξεργασία πλάνου' : 'Δημιουργία επενδυτικού πλάνου'}</Text>
+                    <Text style={styles.primaryText}>{plans[position.symbol] ? 'Έλεγχος / επεξεργασία πλάνου' : 'Δημιουργία γρήγορου πλάνου'}</Text>
                   </Pressable>
                 </View>
               )) : (
@@ -345,7 +445,7 @@ export default function DecisionOverlay() {
 
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>Αντίγραφο στρατηγικής</Text>
-                <Text style={styles.heroText}>Τα πλάνα αποθηκεύονται μόνο στη συσκευή, χωριστά από τις συναλλαγές. Εξήγαγέ τα πριν αλλάξεις κινητό.</Text>
+                <Text style={styles.heroText}>Τα πλάνα και οι γενικοί κανόνες αποθηκεύονται μόνο στη συσκευή. Εξήγαγέ τα πριν αλλάξεις κινητό.</Text>
                 <Pressable style={styles.primary} onPress={exportPlans}><Text style={styles.primaryText}>Εξαγωγή πλάνων JSON</Text></Pressable>
                 <Pressable style={styles.secondary} onPress={importPlans}><Text style={styles.secondaryText}>Εισαγωγή πλάνων JSON</Text></Pressable>
               </View>
@@ -364,33 +464,52 @@ export default function DecisionOverlay() {
                     <StatusPill status={liveResult.status} label={liveResult.label} />
                   </View>
                   <Text style={styles.scoreLarge}>{liveResult.score}/100</Text>
-                  <Text style={styles.muted}>Ο βαθμός αλλάζει ζωντανά όσο συμπληρώνεις το πλάνο.</Text>
+                  <Text style={styles.muted}>Ο βαθμός αλλάζει ζωντανά όσο συμπληρώνεις τα τρία υποχρεωτικά στοιχεία.</Text>
                 </View>
 
-                <Field label="Γιατί υπάρχει αυτή η επένδυση;" value={form.thesis} onChangeText={(value) => setForm((x) => ({ ...x, thesis: value }))} placeholder="Συγκεκριμένη επενδυτική θέση, όχι ‘πιστεύω ότι θα ανέβει’." multiline />
+                <Field
+                  label="1. Γιατί υπάρχει αυτή η επένδυση;"
+                  value={form.thesis}
+                  onChangeText={(value) => setForm((x) => ({ ...x, thesis: value }))}
+                  placeholder="Συγκεκριμένη επενδυτική θέση, όχι ‘πιστεύω ότι θα ανέβει’."
+                  multiline
+                />
 
                 <View style={styles.twoColumns}>
-                  <View style={styles.column}><Field label={`Τιμή ακύρωσης (${selectedPosition.currency})`} value={form.stop} onChangeText={(value) => setForm((x) => ({ ...x, stop: value }))} placeholder="Stop / invalidation" keyboardType="decimal-pad" /></View>
-                  <View style={styles.column}><Field label={`Στόχος (${selectedPosition.currency})`} value={form.target} onChangeText={(value) => setForm((x) => ({ ...x, target: value }))} placeholder="Target" keyboardType="decimal-pad" /></View>
-                </View>
-
-                <View style={styles.twoColumns}>
-                  <View style={styles.column}><Field label="Μέγιστο βάρος θέσης %" value={form.maxAllocationPct} onChangeText={(value) => setForm((x) => ({ ...x, maxAllocationPct: value }))} placeholder="π.χ. 20" keyboardType="decimal-pad" /></View>
-                  <View style={styles.column}><Field label="Μέγιστος κίνδυνος %" value={form.maxRiskPct} onChangeText={(value) => setForm((x) => ({ ...x, maxRiskPct: value }))} placeholder="π.χ. 2" keyboardType="decimal-pad" /></View>
-                </View>
-
-                <Field label="Ημερομηνία επανεξέτασης" value={form.reviewDate} onChangeText={(value) => setForm((x) => ({ ...x, reviewDate: value }))} placeholder="ΕΕΕΕ-ΜΜ-ΗΗ" />
-                <Field label="Ποσό νέας αγοράς που εξετάζεις (€)" value={form.proposedAmountEUR} onChangeText={(value) => setForm((x) => ({ ...x, proposedAmountEUR: value }))} placeholder="0 για κανένα νέο κεφάλαιο" keyboardType="decimal-pad" />
-
-                <View style={styles.field}>
-                  <Text style={styles.label}>Βεβαιότητα επενδυτικής θέσης</Text>
-                  <View style={styles.convictionRow}>
-                    {[1, 2, 3, 4, 5].map((level) => (
-                      <Pressable key={level} style={[styles.conviction, form.conviction === level && styles.convictionOn]} onPress={() => setForm((x) => ({ ...x, conviction: level }))}>
-                        <Text style={[styles.convictionText, form.conviction === level && styles.white]}>{level}</Text>
-                      </Pressable>
-                    ))}
+                  <View style={styles.column}>
+                    <Field
+                      label={`2. Τιμή ακύρωσης (${selectedPosition.currency})`}
+                      value={form.stop}
+                      onChangeText={(value) => setForm((x) => ({ ...x, stop: value }))}
+                      placeholder="Stop"
+                      keyboardType="decimal-pad"
+                    />
                   </View>
+                  <View style={styles.column}>
+                    <Field
+                      label={`3. Στόχος (${selectedPosition.currency})`}
+                      value={form.target}
+                      onChangeText={(value) => setForm((x) => ({ ...x, target: value }))}
+                      placeholder="Target"
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
+                </View>
+
+                <Field
+                  label="Προαιρετικά: ποσό νέας αγοράς (€)"
+                  value={form.proposedAmountEUR}
+                  onChangeText={(value) => setForm((x) => ({ ...x, proposedAmountEUR: value }))}
+                  placeholder="0 για κανένα νέο κεφάλαιο"
+                  keyboardType="decimal-pad"
+                  helper="Χρησιμοποιείται μόνο για να υπολογιστεί το νέο βάρος και το νέο κεφάλαιο σε κίνδυνο."
+                />
+
+                <View style={styles.autoCard}>
+                  <Text style={styles.autoTitle}>Συμπληρώνονται αυτόματα</Text>
+                  <Text style={styles.autoText}>Επανεξέταση: {dateLabel(form.reviewDate)}</Text>
+                  <Text style={styles.autoText}>Όριο θέσης: {percent(settings.maxAllocationPct)} · όριο κινδύνου: {percent(settings.maxRiskPct)}</Text>
+                  <Text style={styles.autoText}>Τιμή, βάρος, κίνδυνος, απόδοση/κίνδυνος και ετυμηγορία υπολογίζονται από την εφαρμογή.</Text>
                 </View>
 
                 <View style={styles.grid}>
@@ -415,6 +534,49 @@ export default function DecisionOverlay() {
 
                 <Pressable style={styles.primary} onPress={save}><Text style={styles.primaryText}>Αποθήκευση επενδυτικού πλάνου</Text></Pressable>
                 <Pressable style={styles.secondary} onPress={() => setScreen('list')}><Text style={styles.secondaryText}>Επιστροφή στον έλεγχο</Text></Pressable>
+              </ScrollView>
+            </KeyboardAvoidingView>
+          ) : null}
+
+          {screen === 'settings' ? (
+            <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+              <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                <View style={styles.hero}>
+                  <Text style={styles.heroEyebrow}>ΜΙΑ ΡΥΘΜΙΣΗ ΓΙΑ ΟΛΟ ΤΟ ΧΑΡΤΟΦΥΛΑΚΙΟ</Text>
+                  <Text style={styles.heroTitle}>Οι κανόνες δεν ξαναγράφονται σε κάθε μετοχή.</Text>
+                  <Text style={styles.heroText}>Τα όρια εφαρμόζονται αυτόματα σε κάθε υφιστάμενη και νέα θέση.</Text>
+                </View>
+
+                <Field
+                  label="Μέγιστο βάρος μίας θέσης %"
+                  value={settingsForm.maxAllocationPct}
+                  onChangeText={(value) => setSettingsForm((x) => ({ ...x, maxAllocationPct: value }))}
+                  placeholder="π.χ. 25"
+                  keyboardType="decimal-pad"
+                />
+                <Field
+                  label="Μέγιστο κεφάλαιο σε κίνδυνο %"
+                  value={settingsForm.maxRiskPct}
+                  onChangeText={(value) => setSettingsForm((x) => ({ ...x, maxRiskPct: value }))}
+                  placeholder="π.χ. 2"
+                  keyboardType="decimal-pad"
+                />
+                <Field
+                  label="Αυτόματη επανεξέταση μετά από ημέρες"
+                  value={settingsForm.reviewDays}
+                  onChangeText={(value) => setSettingsForm((x) => ({ ...x, reviewDays: value }))}
+                  placeholder="π.χ. 90"
+                  keyboardType="number-pad"
+                  helper="Η ημερομηνία μπαίνει αυτόματα όταν δημιουργείται ένα νέο πλάνο."
+                />
+
+                <View style={styles.card}>
+                  <Text style={styles.cardTitle}>Τι αλλάζει άμεσα</Text>
+                  <Text style={styles.heroText}>Το Decision Gate επανυπολογίζει βάρη, κίνδυνο και ετυμηγορία για όλες τις θέσεις. Δεν αλλάζει καμία συναλλαγή.</Text>
+                </View>
+
+                <Pressable style={styles.primary} onPress={saveRules}><Text style={styles.primaryText}>Αποθήκευση γενικών κανόνων</Text></Pressable>
+                <Pressable style={styles.secondary} onPress={() => setScreen('list')}><Text style={styles.secondaryText}>Άκυρο</Text></Pressable>
               </ScrollView>
             </KeyboardAvoidingView>
           ) : null}
@@ -464,15 +626,14 @@ const styles = StyleSheet.create({
   secondaryText: { color: '#10233f', fontWeight: '900', textAlign: 'center' },
   field: { gap: 8 },
   label: { color: '#10233f', fontWeight: '900', fontSize: 15 },
+  helper: { color: '#7b8799', fontSize: 12, lineHeight: 18 },
   input: { minHeight: 58, borderRadius: 17, paddingHorizontal: 16, backgroundColor: '#fff', borderWidth: 1, borderColor: '#d7e0ec', color: '#10233f', fontSize: 16 },
   textarea: { minHeight: 132, paddingTop: 15, paddingBottom: 15 },
   twoColumns: { flexDirection: 'row', gap: 12 },
   column: { flex: 1, minWidth: 0 },
-  convictionRow: { flexDirection: 'row', gap: 9 },
-  conviction: { flex: 1, height: 50, borderRadius: 15, borderWidth: 1, borderColor: '#d7e0ec', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  convictionOn: { backgroundColor: '#0b66ff', borderColor: '#0b66ff' },
-  convictionText: { color: '#10233f', fontWeight: '900' },
-  white: { color: '#fff' },
+  autoCard: { backgroundColor: '#e8f2ff', borderWidth: 1, borderColor: '#c6dcfb', borderRadius: 20, padding: 17, gap: 7 },
+  autoTitle: { color: '#0b66ff', fontWeight: '900', fontSize: 17 },
+  autoText: { color: '#425674', fontSize: 14, lineHeight: 20 },
   pill: { borderRadius: 999, paddingHorizontal: 11, paddingVertical: 8 },
   pillReady: { backgroundColor: '#eaf9f1' },
   pillCaution: { backgroundColor: '#fff7e5' },
