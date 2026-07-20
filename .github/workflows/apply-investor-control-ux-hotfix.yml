@@ -1,0 +1,162 @@
+name: Apply Investor Control UX Hotfix
+
+on:
+  push:
+    branches:
+      - investor-control-v0.6-accounting-ux
+    paths:
+      - .github/workflows/apply-investor-control-ux-hotfix.yml
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: '20'
+  JAVA_VERSION: '17'
+
+jobs:
+  apply-test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout hotfix branch
+        uses: actions/checkout@v4
+        with:
+          ref: investor-control-v0.6-accounting-ux
+          fetch-depth: 0
+
+      - name: Apply verified Android UX corrections
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_exact(text, old, new, label):
+              if old not in text:
+                  raise SystemExit(f'Missing expected pattern: {label}')
+              return text.replace(old, new)
+
+          portfolio_path = Path('mobile/PortfolioApp.js')
+          portfolio = portfolio_path.read_text(encoding='utf-8')
+
+          replacements = [
+              ("const VERSION = '0.6.0';", "const VERSION = '0.6.1';", 'portfolio version'),
+              ("edges={['bottom', 'left', 'right']}", "edges={['top', 'bottom', 'left', 'right']}", 'modal safe area'),
+              ("edges={['top', 'left', 'right']}", "edges={['top', 'bottom', 'left', 'right']}", 'main safe area'),
+              ("<View style={styles.sectionRow}><View><Text style={styles.section}>Συναλλαγές</Text><Text style={styles.muted}>Αγορά, πώληση και πραγματικό κόστος</Text></View><Pressable style={styles.primarySmall} onPress={openNewTransaction}><Text style={styles.whiteStrong}>Προσθήκη</Text></Pressable></View>",
+               "<View style={styles.sectionRow}><View style={styles.grow}><Text style={styles.section}>Συναλλαγές</Text><Text style={styles.muted}>Αγορά, πώληση και πραγματικό κόστος</Text></View><Pressable style={styles.addSmall} onPress={openNewTransaction} accessibilityLabel=\"Προσθήκη συναλλαγής\"><Text style={styles.addSmallText}>＋</Text></Pressable></View>",
+               'transactions header'),
+              ("safe: { flex: 1, backgroundColor: '#eef5ff' }, app: { flex: 1 }, scroll: { flex: 1 }, content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 125 },",
+               "safe: { flex: 1, backgroundColor: '#eef5ff' }, app: { flex: 1 }, scroll: { flex: 1 }, content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 112 },",
+               'screen content spacing'),
+              ("title: { color: '#16345f', fontSize: 40, lineHeight: 45, fontWeight: '900' }, titleCompact: { fontSize: 34 }, versionLine: { color: '#718096', marginTop: 4, fontWeight: '700' }, rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }, grow: { flex: 1 },",
+               "title: { color: '#16345f', fontSize: 36, lineHeight: 41, fontWeight: '900' }, titleCompact: { fontSize: 31 }, versionLine: { color: '#718096', marginTop: 4, fontWeight: '700' }, rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }, grow: { flex: 1, minWidth: 0 },",
+               'responsive header'),
+              ("grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 12, marginTop: 14 }, metric: { width: '48%', minHeight: 118, borderRadius: 24, borderWidth: 1, borderColor: '#d5dfec', backgroundColor: '#fff', padding: 17, justifyContent: 'space-between' }, metricCompact: { paddingHorizontal: 13 }, metricValue: { color: '#16345f', fontSize: 23, lineHeight: 29, fontWeight: '900', marginTop: 12 },",
+               "grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10, marginTop: 12 }, metric: { width: '48.5%', minHeight: 102, borderRadius: 20, borderWidth: 1, borderColor: '#d5dfec', backgroundColor: '#fff', padding: 14, justifyContent: 'space-between' }, metricCompact: { paddingHorizontal: 11 }, metricValue: { color: '#16345f', fontSize: 21, lineHeight: 26, fontWeight: '900', marginTop: 9 },",
+               'compact metrics'),
+              ("sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 28, marginBottom: 12 }, section: { color: '#16345f', fontSize: 31, lineHeight: 38, fontWeight: '900', marginTop: 28, marginBottom: 14 }, subsection: { color: '#16345f', fontSize: 24, fontWeight: '900', marginTop: 22, marginBottom: 10 },",
+               "sectionRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10, marginTop: 22, marginBottom: 12 }, section: { color: '#16345f', fontSize: 28, lineHeight: 34, fontWeight: '900', marginTop: 22, marginBottom: 12 }, subsection: { color: '#16345f', fontSize: 22, fontWeight: '900', marginTop: 20, marginBottom: 10 },",
+               'responsive section headings'),
+              ("card: { backgroundColor: '#fff', borderRadius: 26, borderWidth: 1, borderColor: '#d4deeb', padding: 20, marginBottom: 14 }, cardTitle: { color: '#16345f', fontSize: 24, lineHeight: 29, fontWeight: '900' },",
+               "card: { backgroundColor: '#fff', borderRadius: 22, borderWidth: 1, borderColor: '#d4deeb', padding: 17, marginBottom: 12 }, cardTitle: { color: '#16345f', fontSize: 21, lineHeight: 26, fontWeight: '900' },",
+               'compact cards'),
+              ("priceRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 22, gap: 12 }, big: { color: '#16345f', fontSize: 43, lineHeight: 49, fontWeight: '900', marginTop: 2 }, change: { fontSize: 22, fontWeight: '900', paddingBottom: 8 },",
+               "priceRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 18, gap: 10 }, big: { color: '#16345f', fontSize: 39, lineHeight: 45, fontWeight: '900', marginTop: 2 }, change: { fontSize: 21, fontWeight: '900', paddingBottom: 7 },",
+               'compact price row'),
+              ("primarySmall: { minWidth: 112, height: 52, backgroundColor: '#0B66FF', borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 15 }, primary:",
+               "addSmall: { width: 52, height: 52, flexShrink: 0, backgroundColor: '#0B66FF', borderRadius: 17, alignItems: 'center', justifyContent: 'center' }, addSmallText: { color: '#fff', fontSize: 29, lineHeight: 32, fontWeight: '500' }, primarySmall: { minWidth: 104, height: 50, backgroundColor: '#0B66FF', borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 13 }, primary:",
+               'compact add button'),
+              ("nav: { position: 'absolute', left: 0, right: 0, bottom: 0, minHeight: 86, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#dbe3ee', flexDirection: 'row', paddingHorizontal: 8, paddingTop: 7, paddingBottom: Platform.OS === 'android' ? 10 : 16 }, navItem: { flex: 1, borderRadius: 20, alignItems: 'center', justifyContent: 'center', paddingVertical: 7 }, navItemOn: { backgroundColor: '#edf4ff' }, navIcon: { color: '#7c899d', fontSize: 22, fontWeight: '900' }, navText: { color: '#7c899d', fontSize: 11, marginTop: 2, fontWeight: '800' }, navTextOn: { color: '#0B66FF' },",
+               "nav: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 78, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#dbe3ee', flexDirection: 'row', paddingHorizontal: 6, paddingTop: 6, paddingBottom: 6 }, navItem: { flex: 1, borderRadius: 18, alignItems: 'center', justifyContent: 'center', paddingVertical: 5 }, navItemOn: { backgroundColor: '#edf4ff' }, navIcon: { color: '#66758a', fontSize: 21, fontWeight: '900' }, navText: { color: '#66758a', fontSize: 11, lineHeight: 14, marginTop: 1, fontWeight: '800' }, navTextOn: { color: '#0B66FF' },",
+               'bottom navigation'),
+              ("overlay: { flex: 1, backgroundColor: 'rgba(10, 25, 50, 0.45)', justifyContent: 'flex-end' }, keyboardLayer: { maxHeight: '94%', width: '100%' }, sheet: { backgroundColor: '#f8fbff', borderTopLeftRadius: 30, borderTopRightRadius: 30, overflow: 'hidden' }, form: { padding: 22, paddingBottom: 34 }, sheetTitle: { color: '#16345f', fontSize: 29, fontWeight: '900' },",
+               "overlay: { flex: 1, backgroundColor: 'rgba(10, 25, 50, 0.45)', justifyContent: 'flex-end' }, keyboardLayer: { flex: 1, width: '100%', justifyContent: 'flex-end', paddingTop: Platform.OS === 'android' ? 10 : 0 }, sheet: { maxHeight: '94%', backgroundColor: '#f8fbff', borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden' }, form: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: Platform.OS === 'android' ? 72 : 42 }, sheetTitle: { color: '#16345f', fontSize: 27, lineHeight: 33, fontWeight: '900' },",
+               'modal safe layout'),
+              ("modalActions: { flexDirection: 'row', gap: 10, marginTop: 12 }, actionFull: { flex: 1 },",
+               "modalActions: { flexDirection: 'row', gap: 10, marginTop: 14, marginBottom: 8 }, actionFull: { flex: 1 },",
+               'modal action clearance'),
+          ]
+
+          for old, new, label in replacements:
+              portfolio = replace_exact(portfolio, old, new, label)
+
+          portfolio_path.write_text(portfolio, encoding='utf-8')
+
+          decision_path = Path('mobile/DecisionOverlay.js')
+          decision = decision_path.read_text(encoding='utf-8')
+          decision_replacements = [
+              ("const VERSION = '0.5.1';", "const VERSION = '0.6.1';", 'decision version'),
+              ("<Pressable style={styles.fab} onPress={open} accessibilityLabel=\"Άνοιγμα Decision Gate\">\n        <Text style={styles.fabTop}>✓</Text>\n        <Text style={styles.fabText}>ΑΠΟΦΑΣΗ</Text>\n      </Pressable>",
+               "<Pressable style={styles.fab} onPress={open} accessibilityLabel=\"Άνοιγμα Decision Gate\" accessibilityHint=\"Έλεγχος επενδυτικής απόφασης\">\n        <Text style={styles.fabTop}>✓</Text>\n      </Pressable>",
+               'compact decision button'),
+              ("fab: { position: 'absolute', right: 17, bottom: 88, zIndex: 20, elevation: 12, minWidth: 104, height: 54, paddingHorizontal: 14, borderRadius: 19, backgroundColor: '#07163e', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 9, shadowOffset: { width: 0, height: 4 } },\n  fabTop: { color: '#55a6ff', fontSize: 22, fontWeight: '900' },\n  fabText: { color: '#fff', fontSize: 11, fontWeight: '900', letterSpacing: 0.4 },",
+               "fab: { position: 'absolute', right: 14, bottom: 90, zIndex: 20, elevation: 10, width: 54, height: 54, borderRadius: 27, backgroundColor: '#07163e', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 7, shadowOffset: { width: 0, height: 3 } },\n  fabTop: { color: '#55a6ff', fontSize: 27, lineHeight: 31, fontWeight: '900' },\n  fabText: { display: 'none' },",
+               'decision button style'),
+          ]
+          for old, new, label in decision_replacements:
+              decision = replace_exact(decision, old, new, label)
+          decision_path.write_text(decision, encoding='utf-8')
+
+          package_path = Path('mobile/package.json')
+          package = package_path.read_text(encoding='utf-8')
+          package = replace_exact(package, '"version": "0.6.0"', '"version": "0.6.1"', 'package version')
+          package_path.write_text(package, encoding='utf-8')
+
+          app_path = Path('mobile/app.json')
+          app = app_path.read_text(encoding='utf-8')
+          app = replace_exact(app, '"version": "0.6.0"', '"version": "0.6.1"', 'app version')
+          app = replace_exact(app, '"versionCode": 8', '"versionCode": 9', 'android version code')
+          app = replace_exact(app, '"buildNumber": "8"', '"buildNumber": "9"', 'ios build number')
+          app_path.write_text(app, encoding='utf-8')
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm ci
+
+      - name: Validate Expo compatibility
+        working-directory: mobile
+        run: |
+          npx expo install --check
+          npx expo-doctor@latest
+          npx expo export --platform android --output-dir dist-ux-hotfix
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Build standalone Android APK
+        working-directory: mobile
+        run: |
+          npx expo prebuild --platform android --clean --no-install
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Stage release APK
+        run: |
+          mkdir -p release
+          cp mobile/android/app/build/outputs/apk/release/app-release.apk release/Investor-Control-v0.6.1.apk
+
+      - name: Upload tested APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v0.6.1-ux-hotfix-apk
+          path: release/Investor-Control-v0.6.1.apk
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Commit validated hotfix
+        run: |
+          git config user.name "Investor Control CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add mobile/PortfolioApp.js mobile/DecisionOverlay.js mobile/package.json mobile/app.json
+          git commit -m "fix(mobile): Android UX hotfix v0.6.1 [ux-hotfix-applied]"
+          git push origin HEAD:investor-control-v0.6-accounting-ux
