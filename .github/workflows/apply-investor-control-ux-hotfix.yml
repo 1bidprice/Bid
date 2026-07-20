@@ -11,54 +11,56 @@ permissions:
   contents: write
 
 jobs:
-  apply-test-commit:
+  apply-hotfix:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout hotfix branch
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: investor-control-v0.6-accounting-ux
           fetch-depth: 0
 
-      - name: Apply Android UX hotfix safely
+      - name: Apply hotfix or produce diagnostics
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          from datetime import datetime, timezone
 
-          def replace_required(text, old, new, label, *, all_occurrences=False):
-              if new in text and old not in text:
-                  print(f'Already applied: {label}')
+          report = []
+          missing = []
+
+          def apply(text, old, new, label, *, all_occurrences=False):
+              if old in text:
+                  count = text.count(old)
+                  report.append(f'APPLY {label}: {count} match(es)')
+                  return (text.replace(old, new) if all_occurrences else text.replace(old, new, 1))
+              if new in text:
+                  report.append(f'OK {label}: already applied')
                   return text
-              if old not in text:
-                  raise SystemExit(f'Cannot apply {label}: source pattern was not found')
-              return text.replace(old, new) if all_occurrences else text.replace(old, new, 1)
+              report.append(f'MISSING {label}')
+              missing.append(label)
+              return text
 
           portfolio_path = Path('mobile/PortfolioApp.js')
-          portfolio = portfolio_path.read_text(encoding='utf-8')
+          decision_path = Path('mobile/DecisionOverlay.js')
+          package_path = Path('mobile/package.json')
+          app_path = Path('mobile/app.json')
 
-          portfolio = replace_required(portfolio, "const VERSION = '0.6.0';", "const VERSION = '0.6.1';", 'portfolio version')
-          portfolio = replace_required(
-              portfolio,
-              "edges={['bottom', 'left', 'right']}",
-              "edges={['top', 'bottom', 'left', 'right']}",
-              'modal safe areas',
-              all_occurrences=True,
-          )
-          portfolio = replace_required(
-              portfolio,
-              "edges={['top', 'left', 'right']}",
-              "edges={['top', 'bottom', 'left', 'right']}",
-              'main safe area',
-          )
-          portfolio = replace_required(
-              portfolio,
+          portfolio_original = portfolio_path.read_text(encoding='utf-8')
+          decision_original = decision_path.read_text(encoding='utf-8')
+          package_original = package_path.read_text(encoding='utf-8')
+          app_original = app_path.read_text(encoding='utf-8')
+
+          portfolio = portfolio_original
+          portfolio = apply(portfolio, "const VERSION = '0.6.0';", "const VERSION = '0.6.1';", 'portfolio version')
+          portfolio = apply(portfolio, "edges={['bottom', 'left', 'right']}", "edges={['top', 'bottom', 'left', 'right']}", 'modal safe areas', all_occurrences=True)
+          portfolio = apply(portfolio, "edges={['top', 'left', 'right']}", "edges={['top', 'bottom', 'left', 'right']}", 'main safe area')
+          portfolio = apply(portfolio,
               '<View style={styles.sectionRow}><View><Text style={styles.section}>Συναλλαγές</Text><Text style={styles.muted}>Αγορά, πώληση και πραγματικό κόστος</Text></View><Pressable style={styles.primarySmall} onPress={openNewTransaction}><Text style={styles.whiteStrong}>Προσθήκη</Text></Pressable></View>',
               '<View style={styles.sectionRow}><View style={styles.grow}><Text style={styles.section}>Συναλλαγές</Text><Text style={styles.muted}>Αγορά, πώληση και πραγματικό κόστος</Text></View><Pressable style={styles.addSmall} onPress={openNewTransaction} accessibilityLabel="Προσθήκη συναλλαγής"><Text style={styles.addSmallText}>＋</Text></Pressable></View>',
-              'compact transaction header',
-          )
+              'compact transaction header')
 
-          substitutions = [
+          pairs = [
               ("content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 125 }", "content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 112 }", 'content spacing'),
               ("title: { color: '#16345f', fontSize: 40, lineHeight: 45", "title: { color: '#16345f', fontSize: 36, lineHeight: 41", 'main title'),
               ("titleCompact: { fontSize: 34 }", "titleCompact: { fontSize: 31 }", 'compact title'),
@@ -85,62 +87,47 @@ jobs:
               ("sheetTitle: { color: '#16345f', fontSize: 29, fontWeight: '900' }", "sheetTitle: { color: '#16345f', fontSize: 27, lineHeight: 33, fontWeight: '900' }", 'modal title'),
               ("modalActions: { flexDirection: 'row', gap: 10, marginTop: 12 }", "modalActions: { flexDirection: 'row', gap: 10, marginTop: 14, marginBottom: 8 }", 'modal actions'),
           ]
-          for old, new, label in substitutions:
-              portfolio = replace_required(portfolio, old, new, label)
-          portfolio_path.write_text(portfolio, encoding='utf-8')
+          for old, new, label in pairs:
+              portfolio = apply(portfolio, old, new, label)
 
-          decision_path = Path('mobile/DecisionOverlay.js')
-          decision = decision_path.read_text(encoding='utf-8')
-          decision = replace_required(decision, "const VERSION = '0.5.1';", "const VERSION = '0.6.1';", 'decision version')
-          decision = replace_required(
-              decision,
+          decision = decision_original
+          decision = apply(decision, "const VERSION = '0.5.1';", "const VERSION = '0.6.1';", 'decision version')
+          decision = apply(decision,
               '<Pressable style={styles.fab} onPress={open} accessibilityLabel="Άνοιγμα Decision Gate">\n        <Text style={styles.fabTop}>✓</Text>\n        <Text style={styles.fabText}>ΑΠΟΦΑΣΗ</Text>\n      </Pressable>',
               '<Pressable style={styles.fab} onPress={open} accessibilityLabel="Άνοιγμα Decision Gate" accessibilityHint="Έλεγχος επενδυτικής απόφασης">\n        <Text style={styles.fabTop}>✓</Text>\n      </Pressable>',
-              'compact decision button markup',
+              'decision button markup')
+          decision = apply(decision,
+              "  fab: { position: 'absolute', right: 17, bottom: 88, zIndex: 20, elevation: 12, minWidth: 104, height: 54, paddingHorizontal: 14, borderRadius: 19, backgroundColor: '#07163e', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 9, shadowOffset: { width: 0, height: 4 } },\n  fabTop: { color: '#55a6ff', fontSize: 22, fontWeight: '900' },\n  fabText: { color: '#fff', fontSize: 11, fontWeight: '900', letterSpacing: 0.4 },",
+              "  fab: { position: 'absolute', right: 14, bottom: 90, zIndex: 20, elevation: 10, width: 54, height: 54, borderRadius: 27, backgroundColor: '#07163e', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 7, shadowOffset: { width: 0, height: 3 } },\n  fabTop: { color: '#55a6ff', fontSize: 27, lineHeight: 31, fontWeight: '900' },\n  fabText: { display: 'none' },",
+              'decision button style')
+
+          package = apply(package_original, '"version": "0.6.0"', '"version": "0.6.1"', 'package version')
+          app = apply(app_original, '"version": "0.6.0"', '"version": "0.6.1"', 'app version')
+          app = apply(app, '"versionCode": 8', '"versionCode": 9', 'Android version code')
+          app = apply(app, '"buildNumber": "8"', '"buildNumber": "9"', 'iOS build number')
+
+          success = not missing
+          if success:
+              portfolio_path.write_text(portfolio, encoding='utf-8')
+              decision_path.write_text(decision, encoding='utf-8')
+              package_path.write_text(package, encoding='utf-8')
+              app_path.write_text(app, encoding='utf-8')
+
+          report_path = Path('mobile/ux-hotfix-diagnostics.txt')
+          report_path.write_text(
+              f"generated={datetime.now(timezone.utc).isoformat()}\nstatus={'APPLIED' if success else 'BLOCKED'}\n" +
+              '\n'.join(report) +
+              ("\nmissing=" + ', '.join(missing) if missing else '') + '\n',
+              encoding='utf-8'
           )
-          old_fab = "  fab: { position: 'absolute', right: 17, bottom: 88, zIndex: 20, elevation: 12, minWidth: 104, height: 54, paddingHorizontal: 14, borderRadius: 19, backgroundColor: '#07163e', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 9, shadowOffset: { width: 0, height: 4 } },\n  fabTop: { color: '#55a6ff', fontSize: 22, fontWeight: '900' },\n  fabText: { color: '#fff', fontSize: 11, fontWeight: '900', letterSpacing: 0.4 },"
-          new_fab = "  fab: { position: 'absolute', right: 14, bottom: 90, zIndex: 20, elevation: 10, width: 54, height: 54, borderRadius: 27, backgroundColor: '#07163e', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 7, shadowOffset: { width: 0, height: 3 } },\n  fabTop: { color: '#55a6ff', fontSize: 27, lineHeight: 31, fontWeight: '900' },\n  fabText: { display: 'none' },"
-          decision = replace_required(decision, old_fab, new_fab, 'compact decision button style')
-          decision_path.write_text(decision, encoding='utf-8')
-
-          for path in [Path('mobile/package.json'), Path('mobile/app.json')]:
-              text = path.read_text(encoding='utf-8')
-              text = replace_required(text, '"version": "0.6.0"', '"version": "0.6.1"', f'{path.name} version')
-              if path.name == 'app.json':
-                  text = replace_required(text, '"versionCode": 8', '"versionCode": 9', 'Android version code')
-                  text = replace_required(text, '"buildNumber": "8"', '"buildNumber": "9"', 'iOS build number')
-              path.write_text(text, encoding='utf-8')
-
-          print('UX hotfix source changes applied successfully.')
+          print(report_path.read_text(encoding='utf-8'))
           PY
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: npm
-          cache-dependency-path: mobile/package-lock.json
-
-      - name: Install dependencies
-        working-directory: mobile
-        run: npm ci
-
-      - name: Validate mobile bundle
-        working-directory: mobile
-        run: |
-          npx expo install --check
-          npx expo-doctor@latest
-          npx expo export --platform android --output-dir dist-ux-hotfix
-
-      - name: Commit validated hotfix
+      - name: Commit result
         shell: bash
         run: |
           git config user.name "Investor Control CI"
           git config user.email "actions@users.noreply.github.com"
-          git add mobile/PortfolioApp.js mobile/DecisionOverlay.js mobile/package.json mobile/app.json
-          if git diff --cached --quiet; then
-            echo "Hotfix was already applied; nothing to commit."
-            exit 0
-          fi
-          git commit -m "fix(mobile): Android UX hotfix v0.6.1 [ux-hotfix-applied]"
+          git add mobile/PortfolioApp.js mobile/DecisionOverlay.js mobile/package.json mobile/app.json mobile/ux-hotfix-diagnostics.txt
+          git commit -m "fix(mobile): apply or diagnose Android UX hotfix v0.6.1"
           git push origin HEAD:investor-control-v0.6-accounting-ux
