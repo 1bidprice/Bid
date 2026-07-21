@@ -1,4 +1,4 @@
-name: Apply Investor Control UX Hotfix
+name: Apply Investor Control Market Integrity v0.6.2
 
 on:
   push:
@@ -6,20 +6,34 @@ on:
       - investor-control-v0.6-accounting-ux
     paths:
       - .github/workflows/apply-investor-control-ux-hotfix.yml
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  apply-hotfix:
+  apply-test-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout release branch
+        uses: actions/checkout@v4
         with:
           ref: investor-control-v0.6-accounting-ux
           fetch-depth: 0
 
-      - name: Apply hotfix or produce diagnostics
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Apply v0.6.2 market-integrity patch
         shell: bash
         run: |
           python3 - <<'PY'
@@ -33,7 +47,7 @@ jobs:
               if old in text:
                   count = text.count(old)
                   report.append(f'APPLY {label}: {count} match(es)')
-                  return (text.replace(old, new) if all_occurrences else text.replace(old, new, 1))
+                  return text.replace(old, new) if all_occurrences else text.replace(old, new, 1)
               if new in text:
                   report.append(f'OK {label}: already applied')
                   return text
@@ -42,92 +56,315 @@ jobs:
               return text
 
           portfolio_path = Path('mobile/PortfolioApp.js')
+          market_path = Path('mobile/src/market-data.js')
           decision_path = Path('mobile/DecisionOverlay.js')
           package_path = Path('mobile/package.json')
           app_path = Path('mobile/app.json')
 
-          portfolio_original = portfolio_path.read_text(encoding='utf-8')
-          decision_original = decision_path.read_text(encoding='utf-8')
-          package_original = package_path.read_text(encoding='utf-8')
-          app_original = app_path.read_text(encoding='utf-8')
+          portfolio = portfolio_path.read_text(encoding='utf-8')
+          market = market_path.read_text(encoding='utf-8')
+          decision = decision_path.read_text(encoding='utf-8')
+          package = package_path.read_text(encoding='utf-8')
+          app = app_path.read_text(encoding='utf-8')
 
-          portfolio = portfolio_original
-          portfolio = apply(portfolio, "const VERSION = '0.6.0';", "const VERSION = '0.6.1';", 'portfolio version')
-          portfolio = apply(portfolio, "edges={['bottom', 'left', 'right']}", "edges={['top', 'bottom', 'left', 'right']}", 'modal safe areas', all_occurrences=True)
-          portfolio = apply(portfolio, "edges={['top', 'left', 'right']}", "edges={['top', 'bottom', 'left', 'right']}", 'main safe area')
-          portfolio = apply(portfolio,
-              '<View style={styles.sectionRow}><View><Text style={styles.section}>Συναλλαγές</Text><Text style={styles.muted}>Αγορά, πώληση και πραγματικό κόστος</Text></View><Pressable style={styles.primarySmall} onPress={openNewTransaction}><Text style={styles.whiteStrong}>Προσθήκη</Text></Pressable></View>',
-              '<View style={styles.sectionRow}><View style={styles.grow}><Text style={styles.section}>Συναλλαγές</Text><Text style={styles.muted}>Αγορά, πώληση και πραγματικό κόστος</Text></View><Pressable style={styles.addSmall} onPress={openNewTransaction} accessibilityLabel="Προσθήκη συναλλαγής"><Text style={styles.addSmallText}>＋</Text></Pressable></View>',
-              'compact transaction header')
+          portfolio = apply(
+              portfolio,
+              "  FINNHUB_TOKEN_KEY,\n  MARKET_REFRESH_MS,\n  fetchPortfolioQuotes,\n  openFinnhubTrades,\n  quoteStatusText,\n} from './src/market-data';",
+              "  FINNHUB_TOKEN_KEY,\n  MARKET_REFRESH_MS,\n  classifyQuote,\n  fetchPortfolioQuotes,\n  marketSessionAt,\n  mergePortfolioQuotes,\n  openFinnhubTrades,\n  quoteStatusText,\n} from './src/market-data';",
+              'market integrity imports',
+          )
+          portfolio = apply(portfolio, "const VERSION = '0.6.1';", "const VERSION = '0.6.2';", 'portfolio version')
+          portfolio = apply(
+              portfolio,
+              "    const prices = { ...current.prices, ...quotes };",
+              "    const prices = mergePortfolioQuotes(current.prices, quotes);",
+              'monotonic quote merge',
+          )
+          portfolio = apply(
+              portfolio,
+              """    return openFinnhubTrades(token.trim(), ['SPCE'], async (trade) => {
+      const current = stateRef.current;
+      const old = current.prices['SPCE.US'];
+      const fxRate = Number(old?.fxRate || 0);
+      if (!fxRate) return;
+      const previousClose = Number(old?.nativePreviousClose || 0);
+      const quote = { ...old, nativePrice: trade.price, price: trade.price / fxRate, updatedAt: new Date(trade.timestamp).toISOString(), checkedAt: new Date().toISOString(), source: 'Finnhub WebSocket real-time trade', quality: 'realtime', status: 'live', usable: true, ageSeconds: 0, changePct: previousClose > 0 ? ((trade.price - previousClose) / previousClose) * 100 : old?.changePct };
+      await applyQuotes(current, { 'SPCE.US': quote }, new Date().toISOString(), current.meta.errors || [], { silent: true });
+    });""",
+              """    return openFinnhubTrades(token.trim(), ['SPCE'], async (trade) => {
+      const current = stateRef.current;
+      const old = current.prices['SPCE.US'];
+      const fxRate = Number(old?.fxRate || 0);
+      if (!fxRate) return;
+      const tradeAt = new Date(trade.timestamp);
+      if (!Number.isFinite(tradeAt.getTime())) return;
+      const previousClose = Number(old?.nativePreviousClose || 0);
+      const session = marketSessionAt('SPCE.US', tradeAt);
+      const rawQuote = {
+        ...old,
+        nativePrice: trade.price,
+        price: trade.price / fxRate,
+        nativeRegularMarketPrice: session === 'regular-market'
+          ? trade.price
+          : Number(old?.nativeRegularMarketPrice || old?.nativePrice || 0) || null,
+        updatedAt: tradeAt.toISOString(),
+        checkedAt: new Date().toISOString(),
+        source: 'Finnhub WebSocket real-time trade',
+        quality: 'realtime',
+        session,
+        changePct: previousClose > 0 ? ((trade.price - previousClose) / previousClose) * 100 : old?.changePct,
+      };
+      const quote = classifyQuote('SPCE.US', rawQuote);
+      await applyQuotes(current, { 'SPCE.US': quote }, new Date().toISOString(), current.meta.errors || [], { silent: true });
+    });""",
+              'websocket quote classification',
+          )
 
-          pairs = [
-              ("content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 125 }", "content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 112 }", 'content spacing'),
-              ("title: { color: '#16345f', fontSize: 40, lineHeight: 45", "title: { color: '#16345f', fontSize: 36, lineHeight: 41", 'main title'),
-              ("titleCompact: { fontSize: 34 }", "titleCompact: { fontSize: 31 }", 'compact title'),
-              ("gap: 12 }, grow: { flex: 1 },", "gap: 10 }, grow: { flex: 1, minWidth: 0 },", 'responsive header row'),
-              ("rowGap: 12, marginTop: 14", "rowGap: 10, marginTop: 12", 'grid spacing'),
-              ("width: '48%', minHeight: 118, borderRadius: 24", "width: '48.5%', minHeight: 102, borderRadius: 20", 'metric geometry'),
-              ("padding: 17, justifyContent: 'space-between' }, metricCompact: { paddingHorizontal: 13 }, metricValue: { color: '#16345f', fontSize: 23, lineHeight: 29, fontWeight: '900', marginTop: 12", "padding: 14, justifyContent: 'space-between' }, metricCompact: { paddingHorizontal: 11 }, metricValue: { color: '#16345f', fontSize: 21, lineHeight: 26, fontWeight: '900', marginTop: 9", 'metric typography'),
-              ("alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 28, marginBottom: 12", "alignItems: 'flex-end', justifyContent: 'space-between', gap: 10, marginTop: 22, marginBottom: 12", 'section header layout'),
-              ("fontSize: 31, lineHeight: 38, fontWeight: '900', marginTop: 28, marginBottom: 14", "fontSize: 28, lineHeight: 34, fontWeight: '900', marginTop: 22, marginBottom: 12", 'section title'),
-              ("fontSize: 24, fontWeight: '900', marginTop: 22, marginBottom: 10", "fontSize: 22, fontWeight: '900', marginTop: 20, marginBottom: 10", 'subsection title'),
-              ("borderRadius: 26, borderWidth: 1, borderColor: '#d4deeb', padding: 20, marginBottom: 14", "borderRadius: 22, borderWidth: 1, borderColor: '#d4deeb', padding: 17, marginBottom: 12", 'cards'),
-              ("fontSize: 24, lineHeight: 29, fontWeight: '900'", "fontSize: 21, lineHeight: 26, fontWeight: '900'", 'card title'),
-              ("marginTop: 22, gap: 12 }, big: { color: '#16345f', fontSize: 43, lineHeight: 49", "marginTop: 18, gap: 10 }, big: { color: '#16345f', fontSize: 39, lineHeight: 45", 'price row'),
-              ("change: { fontSize: 22, fontWeight: '900', paddingBottom: 8", "change: { fontSize: 21, fontWeight: '900', paddingBottom: 7", 'price change'),
-              ("primarySmall: { minWidth: 112, height: 52", "addSmall: { width: 52, height: 52, flexShrink: 0, backgroundColor: '#0B66FF', borderRadius: 17, alignItems: 'center', justifyContent: 'center' }, addSmallText: { color: '#fff', fontSize: 29, lineHeight: 32, fontWeight: '500' }, primarySmall: { minWidth: 104, height: 50", 'small add button'),
-              ("minHeight: 86, backgroundColor: '#fff'", "height: 78, backgroundColor: '#fff'", 'bottom nav height'),
-              ("paddingHorizontal: 8, paddingTop: 7, paddingBottom: Platform.OS === 'android' ? 10 : 16", "paddingHorizontal: 6, paddingTop: 6, paddingBottom: 6", 'bottom nav padding'),
-              ("borderRadius: 20, alignItems: 'center', justifyContent: 'center', paddingVertical: 7", "borderRadius: 18, alignItems: 'center', justifyContent: 'center', paddingVertical: 5", 'bottom nav item'),
-              ("color: '#7c899d', fontSize: 22", "color: '#66758a', fontSize: 21", 'nav icon'),
-              ("color: '#7c899d', fontSize: 11, marginTop: 2", "color: '#66758a', fontSize: 11, lineHeight: 14, marginTop: 1", 'nav text'),
-              ("keyboardLayer: { maxHeight: '94%', width: '100%' }", "keyboardLayer: { flex: 1, width: '100%', justifyContent: 'flex-end', paddingTop: Platform.OS === 'android' ? 10 : 0 }", 'modal keyboard layer'),
-              ("sheet: { backgroundColor: '#f8fbff', borderTopLeftRadius: 30, borderTopRightRadius: 30, overflow: 'hidden' }", "sheet: { maxHeight: '94%', backgroundColor: '#f8fbff', borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden' }", 'modal sheet'),
-              ("form: { padding: 22, paddingBottom: 34 }", "form: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: Platform.OS === 'android' ? 72 : 42 }", 'modal form spacing'),
-              ("sheetTitle: { color: '#16345f', fontSize: 29, fontWeight: '900' }", "sheetTitle: { color: '#16345f', fontSize: 27, lineHeight: 33, fontWeight: '900' }", 'modal title'),
-              ("modalActions: { flexDirection: 'row', gap: 10, marginTop: 12 }", "modalActions: { flexDirection: 'row', gap: 10, marginTop: 14, marginBottom: 8 }", 'modal actions'),
-          ]
-          for old, new, label in pairs:
-              portfolio = apply(portfolio, old, new, label)
+          market = apply(
+              market,
+              """export function exchangeState(symbol, at = new Date()) {
+  const isUs = String(symbol).toUpperCase().endsWith('.US');
+  const timeZone = isUs ? 'America/New_York' : 'Europe/Athens';
+  const parts = zoneParts(timeZone, at);
+  const weekdays = new Set(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+  const minutes = Number(parts.hour) * 60 + Number(parts.minute);
+  const open = isUs
+    ? weekdays.has(parts.weekday) && minutes >= 9 * 60 + 30 && minutes <= 16 * 60
+    : weekdays.has(parts.weekday) && minutes >= 10 * 60 + 15 && minutes <= 17 * 60 + 25;
+  return { open, timeZone, localDate: `${parts.year}-${parts.month}-${parts.day}` };
+}""",
+              """export function marketSessionAt(symbol, at = new Date()) {
+  const isUs = String(symbol).toUpperCase().endsWith('.US');
+  const timeZone = isUs ? 'America/New_York' : 'Europe/Athens';
+  const parts = zoneParts(timeZone, at);
+  const weekdays = new Set(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+  if (!weekdays.has(parts.weekday)) return 'closed';
+  const minutes = Number(parts.hour) * 60 + Number(parts.minute);
+  if (isUs) {
+    if (minutes >= 4 * 60 && minutes < 9 * 60 + 30) return 'pre-market';
+    if (minutes >= 9 * 60 + 30 && minutes <= 16 * 60) return 'regular-market';
+    if (minutes > 16 * 60 && minutes <= 20 * 60) return 'post-market';
+    return 'closed';
+  }
+  return minutes >= 10 * 60 + 15 && minutes <= 17 * 60 + 25
+    ? 'regular-market'
+    : 'closed';
+}
 
-          decision = decision_original
-          decision = apply(decision, "const VERSION = '0.5.1';", "const VERSION = '0.6.1';", 'decision version')
-          decision = apply(decision,
-              '<Pressable style={styles.fab} onPress={open} accessibilityLabel="Άνοιγμα Decision Gate">\n        <Text style={styles.fabTop}>✓</Text>\n        <Text style={styles.fabText}>ΑΠΟΦΑΣΗ</Text>\n      </Pressable>',
-              '<Pressable style={styles.fab} onPress={open} accessibilityLabel="Άνοιγμα Decision Gate" accessibilityHint="Έλεγχος επενδυτικής απόφασης">\n        <Text style={styles.fabTop}>✓</Text>\n      </Pressable>',
-              'decision button markup')
-          decision = apply(decision,
-              "  fab: { position: 'absolute', right: 17, bottom: 88, zIndex: 20, elevation: 12, minWidth: 104, height: 54, paddingHorizontal: 14, borderRadius: 19, backgroundColor: '#07163e', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 9, shadowOffset: { width: 0, height: 4 } },\n  fabTop: { color: '#55a6ff', fontSize: 22, fontWeight: '900' },\n  fabText: { color: '#fff', fontSize: 11, fontWeight: '900', letterSpacing: 0.4 },",
-              "  fab: { position: 'absolute', right: 14, bottom: 90, zIndex: 20, elevation: 10, width: 54, height: 54, borderRadius: 27, backgroundColor: '#07163e', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 7, shadowOffset: { width: 0, height: 3 } },\n  fabTop: { color: '#55a6ff', fontSize: 27, lineHeight: 31, fontWeight: '900' },\n  fabText: { display: 'none' },",
-              'decision button style')
+export function exchangeState(symbol, at = new Date()) {
+  const isUs = String(symbol).toUpperCase().endsWith('.US');
+  const timeZone = isUs ? 'America/New_York' : 'Europe/Athens';
+  const parts = zoneParts(timeZone, at);
+  const session = marketSessionAt(symbol, at);
+  return {
+    open: session === 'regular-market',
+    timeZone,
+    localDate: `${parts.year}-${parts.month}-${parts.day}`,
+    session,
+  };
+}""",
+              'market session classifier',
+          )
+          market = apply(
+              market,
+              "    nativeChangeBase: finite(payload.pc) ? Number(payload.pc) : null,\n    nativeCurrency: 'USD',",
+              "    nativeChangeBase: finite(payload.pc) ? Number(payload.pc) : null,\n    nativeRegularMarketPrice: Number(payload.c),\n    nativeCurrency: 'USD',",
+              'Finnhub regular market reference',
+          )
+          market = apply(
+              market,
+              "    session: 'regular-market',",
+              "    session: marketSessionAt(`${ticker}.US`, new Date(timestamp * 1000)),",
+              'Finnhub timestamp session',
+          )
+          market = apply(market, 'function classifyQuote(symbol, quote) {', 'export function classifyQuote(symbol, quote) {', 'export quote classifier')
+          market = apply(
+              market,
+              """  return { ...quote, ageSeconds, status, exchangeOpen: exchange.open, usable: status !== 'stale' };
+}
 
-          package = apply(package_original, '"version": "0.6.0"', '"version": "0.6.1"', 'package version')
-          app = apply(app_original, '"version": "0.6.0"', '"version": "0.6.1"', 'app version')
-          app = apply(app, '"versionCode": 8', '"versionCode": 9', 'Android version code')
-          app = apply(app, '"buildNumber": "8"', '"buildNumber": "9"', 'iOS build number')
+async function fetchNativeQuote(symbol, finnhubToken) {""",
+              """  return { ...quote, ageSeconds, status, exchangeOpen: exchange.open, usable: status !== 'stale' };
+}
 
-          success = not missing
-          if success:
-              portfolio_path.write_text(portfolio, encoding='utf-8')
-              decision_path.write_text(decision, encoding='utf-8')
-              package_path.write_text(package, encoding='utf-8')
-              app_path.write_text(app, encoding='utf-8')
+function quoteTimestamp(quote) {
+  const value = new Date(quote?.updatedAt || 0).getTime();
+  return Number.isFinite(value) ? value : 0;
+}
 
-          report_path = Path('mobile/ux-hotfix-diagnostics.txt')
+function checkedTimestamp(quote) {
+  const value = new Date(quote?.checkedAt || 0).getTime();
+  return Number.isFinite(value) ? value : 0;
+}
+
+function quotePriority(quote) {
+  const quality = { realtime: 400, delayed15: 300, unofficial: 200 }[quote?.quality] || 100;
+  const source = String(quote?.source || '');
+  return quality + (/WebSocket/i.test(source) ? 25 : 0) + (/Euronext/i.test(source) ? 10 : 0);
+}
+
+export function chooseMostRecentQuote(symbol, currentQuote, incomingQuote) {
+  if (!currentQuote && !incomingQuote) return null;
+  if (!currentQuote) return classifyQuote(symbol, incomingQuote);
+  if (!incomingQuote) return classifyQuote(symbol, currentQuote);
+
+  const currentTime = quoteTimestamp(currentQuote);
+  const incomingTime = quoteTimestamp(incomingQuote);
+  const toleranceMs = 1000;
+  let selected;
+
+  if (incomingTime > currentTime + toleranceMs) selected = incomingQuote;
+  else if (currentTime > incomingTime + toleranceMs) selected = currentQuote;
+  else selected = quotePriority(incomingQuote) >= quotePriority(currentQuote) ? incomingQuote : currentQuote;
+
+  const selectedAt = new Date(selected?.updatedAt || 0);
+  const repairedSession = /WebSocket/i.test(String(selected?.source || '')) && Number.isFinite(selectedAt.getTime())
+    ? marketSessionAt(symbol, selectedAt)
+    : selected?.session;
+  const checkedAt = checkedTimestamp(incomingQuote) >= checkedTimestamp(currentQuote)
+    ? incomingQuote.checkedAt
+    : currentQuote.checkedAt;
+
+  return classifyQuote(symbol, {
+    ...selected,
+    session: repairedSession,
+    checkedAt: checkedAt || new Date().toISOString(),
+  });
+}
+
+export function mergePortfolioQuotes(current = {}, incoming = {}) {
+  const symbols = new Set([...Object.keys(current || {}), ...Object.keys(incoming || {})]);
+  const merged = {};
+  symbols.forEach((symbol) => {
+    const quote = chooseMostRecentQuote(symbol, current?.[symbol], incoming?.[symbol]);
+    if (quote) merged[symbol] = quote;
+  });
+  return merged;
+}
+
+async function fetchNativeQuote(symbol, finnhubToken) {""",
+              'quote chronology guard',
+          )
+
+          decision = apply(decision, "const VERSION = '0.6.1';", "const VERSION = '0.6.2';", 'decision version')
+          package = apply(package, '"version": "0.6.1"', '"version": "0.6.2"', 'package version')
+          app = apply(app, '"version": "0.6.1"', '"version": "0.6.2"', 'app version')
+          app = apply(app, '"versionCode": 9', '"versionCode": 10', 'Android version code')
+          app = apply(app, '"buildNumber": "9"', '"buildNumber": "10"', 'iOS build number')
+
+          if missing:
+              raise SystemExit('Patch blocked: ' + ', '.join(missing))
+
+          portfolio_path.write_text(portfolio, encoding='utf-8')
+          market_path.write_text(market, encoding='utf-8')
+          decision_path.write_text(decision, encoding='utf-8')
+          package_path.write_text(package, encoding='utf-8')
+          app_path.write_text(app, encoding='utf-8')
+
+          report_path = Path('mobile/market-integrity-diagnostics.txt')
           report_path.write_text(
-              f"generated={datetime.now(timezone.utc).isoformat()}\nstatus={'APPLIED' if success else 'BLOCKED'}\n" +
-              '\n'.join(report) +
-              ("\nmissing=" + ', '.join(missing) if missing else '') + '\n',
-              encoding='utf-8'
+              f"generated={datetime.now(timezone.utc).isoformat()}\nstatus=APPLIED\n" + '\n'.join(report) + '\n',
+              encoding='utf-8',
           )
           print(report_path.read_text(encoding='utf-8'))
           PY
 
-      - name: Commit result
+      - name: Test quote chronology and sessions
         shell: bash
         run: |
-          git config user.name "Investor Control CI"
-          git config user.email "actions@users.noreply.github.com"
-          git add mobile/PortfolioApp.js mobile/DecisionOverlay.js mobile/package.json mobile/app.json mobile/ux-hotfix-diagnostics.txt
-          git commit -m "fix(mobile): apply or diagnose Android UX hotfix v0.6.1"
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+
+          const source = fs.readFileSync('mobile/src/market-data.js', 'utf8');
+          const market = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+
+          assert.equal(
+            market.marketSessionAt('SPCE.US', new Date('2026-07-20T20:35:00Z')),
+            'post-market',
+          );
+
+          const websocket = {
+            nativePrice: 2.57,
+            nativePreviousClose: 2.53,
+            nativeChangeBase: 2.53,
+            nativeCurrency: 'USD',
+            price: 2.25,
+            fxRate: 1.14,
+            updatedAt: '2026-07-20T20:35:00.000Z',
+            checkedAt: '2026-07-20T20:35:01.000Z',
+            source: 'Finnhub WebSocket real-time trade',
+            quality: 'realtime',
+            session: 'regular-market',
+          };
+          const olderRest = {
+            ...websocket,
+            nativePrice: 2.56,
+            updatedAt: '2026-07-20T20:00:00.000Z',
+            checkedAt: '2026-07-20T20:36:00.000Z',
+            source: 'Finnhub real-time US quote',
+          };
+
+          const kept = market.mergePortfolioQuotes(
+            { 'SPCE.US': websocket },
+            { 'SPCE.US': olderRest },
+          )['SPCE.US'];
+          assert.equal(kept.nativePrice, 2.57);
+          assert.match(kept.source, /WebSocket/);
+          assert.equal(kept.session, 'post-market');
+
+          const newer = {
+            ...olderRest,
+            nativePrice: 2.61,
+            updatedAt: '2026-07-21T14:00:00.000Z',
+          };
+          const replaced = market.mergePortfolioQuotes(
+            { 'SPCE.US': websocket },
+            { 'SPCE.US': newer },
+          )['SPCE.US'];
+          assert.equal(replaced.nativePrice, 2.61);
+
+          console.log('PASS: newer market events win; older REST responses cannot roll prices back.');
+          NODE
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: Generate Android project
+        working-directory: mobile
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Build standalone release APK
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Verify embedded JavaScript bundle
+        shell: bash
+        run: |
+          APK='mobile/android/app/build/outputs/apk/release/app-release.apk'
+          test -s "$APK"
+          unzip -l "$APK" | grep -q 'assets/index.android.bundle'
+          cp "$APK" 'mobile/Investor-Control-v0.6.2.apk'
+          sha256sum 'mobile/Investor-Control-v0.6.2.apk' | tee mobile/Investor-Control-v0.6.2.sha256
+
+      - name: Commit verified release source
+        shell: bash
+        run: |
+          git config user.name 'Investor Control CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git add mobile/PortfolioApp.js mobile/src/market-data.js mobile/DecisionOverlay.js mobile/package.json mobile/app.json mobile/market-integrity-diagnostics.txt
+          git commit -m 'fix(mobile): prevent stale quote rollback v0.6.2'
           git push origin HEAD:investor-control-v0.6-accounting-ux
+
+      - name: Upload verified v0.6.2 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v0.6.2-apk
+          path: |
+            mobile/Investor-Control-v0.6.2.apk
+            mobile/Investor-Control-v0.6.2.sha256
+          if-no-files-found: error
+          retention-days: 90
