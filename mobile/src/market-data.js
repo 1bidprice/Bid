@@ -1,5 +1,9 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 const EURONEXT_ALWN_URL = 'https://athens.euronext.com/en/market-data/instruments/stocks/ALWN/related';
 const YAHOO_HOSTS = ['query1.finance.yahoo.com', 'query2.finance.yahoo.com'];
+const PERSISTED_STATE_KEY = 'investor-control-mobile-state-v2';
+const inMemoryQuotes = {};
 
 export const MARKET_REFRESH_MS = 30_000;
 export const FINNHUB_TOKEN_KEY = 'investor-control-finnhub-token';
@@ -31,16 +35,37 @@ function zoneParts(timeZone, at = new Date()) {
   return Object.fromEntries(parts.map((part) => [part.type, part.value]));
 }
 
-export function exchangeState(symbol, at = new Date()) {
+export function marketSessionAt(symbol, at = new Date()) {
   const isUs = String(symbol).toUpperCase().endsWith('.US');
   const timeZone = isUs ? 'America/New_York' : 'Europe/Athens';
   const parts = zoneParts(timeZone, at);
   const weekdays = new Set(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+  if (!weekdays.has(parts.weekday)) return 'closed';
+
   const minutes = Number(parts.hour) * 60 + Number(parts.minute);
-  const open = isUs
-    ? weekdays.has(parts.weekday) && minutes >= 9 * 60 + 30 && minutes <= 16 * 60
-    : weekdays.has(parts.weekday) && minutes >= 10 * 60 + 15 && minutes <= 17 * 60 + 25;
-  return { open, timeZone, localDate: `${parts.year}-${parts.month}-${parts.day}` };
+  if (isUs) {
+    if (minutes >= 4 * 60 && minutes < 9 * 60 + 30) return 'pre-market';
+    if (minutes >= 9 * 60 + 30 && minutes <= 16 * 60) return 'regular-market';
+    if (minutes > 16 * 60 && minutes <= 20 * 60) return 'post-market';
+    return 'closed';
+  }
+
+  return minutes >= 10 * 60 + 15 && minutes <= 17 * 60 + 25
+    ? 'regular-market'
+    : 'closed';
+}
+
+export function exchangeState(symbol, at = new Date()) {
+  const isUs = String(symbol).toUpperCase().endsWith('.US');
+  const timeZone = isUs ? 'America/New_York' : 'Europe/Athens';
+  const parts = zoneParts(timeZone, at);
+  const session = marketSessionAt(symbol, at);
+  return {
+    open: session === 'regular-market',
+    timeZone,
+    localDate: `${parts.year}-${parts.month}-${parts.day}`,
+    session,
+  };
 }
 
 function htmlToText(html) {
@@ -75,7 +100,7 @@ async function fetchText(url, timeoutMs = 15_000) {
       headers: {
         Accept: 'text/html,application/xhtml+xml,application/json,text/plain,*/*',
         'Cache-Control': 'no-cache',
-        'User-Agent': 'InvestorControl/0.4.1',
+        'User-Agent': 'InvestorControl/0.6.4',
       },
       signal: controller.signal,
     });
@@ -104,14 +129,7 @@ async function fetchJson(url, timeoutMs = 15_000) {
 function yahooSession(meta, timestamp) {
   const zone = String(meta?.exchangeTimezoneName || meta?.timezone || '');
   if (!zone.includes('New_York') || !finite(timestamp)) return 'regular-market';
-  const parts = zoneParts('America/New_York', new Date(Number(timestamp) * 1000));
-  const weekdays = new Set(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
-  if (!weekdays.has(parts.weekday)) return 'off-hours';
-  const minutes = Number(parts.hour) * 60 + Number(parts.minute);
-  if (minutes >= 4 * 60 && minutes < 9 * 60 + 30) return 'pre-market';
-  if (minutes >= 9 * 60 + 30 && minutes <= 16 * 60) return 'regular-market';
-  if (minutes > 16 * 60 && minutes <= 20 * 60) return 'post-market';
-  return 'off-hours';
+  return marketSessionAt('YAHOO.US', new Date(Number(timestamp) * 1000));
 }
 
 function latestYahooPoint(result) {
@@ -172,9 +190,7 @@ async function fetchYahooQuote(ticker) {
       const regularMarketPrice = finite(meta.regularMarketPrice)
         ? Number(meta.regularMarketPrice)
         : null;
-      const changeBase = ['pre-market', 'post-market'].includes(point.session) && finite(regularMarketPrice)
-        ? regularMarketPrice
-        : previousClose;
+      const changeBase = previousClose;
       return {
         nativePrice: point.price,
         nativePreviousClose: previousClose,
@@ -197,20 +213,23 @@ async function fetchYahooQuote(ticker) {
 
 async function fetchFinnhubQuote(ticker, token) {
   if (!token) throw new Error('δεν έχει αποθηκευτεί Finnhub token');
-  const payload = await fetchJson(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(ticker)}&token=${encodeURIComponent(token)}`);
+  const payload = await fetchJson(
+    `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(ticker)}&token=${encodeURIComponent(token)}`,
+  );
   if (!finite(payload?.c)) throw new Error('το Finnhub δεν επέστρεψε έγκυρη τιμή');
   const timestamp = finite(payload?.t) ? Number(payload.t) : Math.floor(Date.now() / 1000);
   return {
     nativePrice: Number(payload.c),
     nativePreviousClose: finite(payload.pc) ? Number(payload.pc) : null,
     nativeChangeBase: finite(payload.pc) ? Number(payload.pc) : null,
+    nativeRegularMarketPrice: Number(payload.c),
     nativeCurrency: 'USD',
     updatedAt: new Date(timestamp * 1000).toISOString(),
     checkedAt: new Date().toISOString(),
-    source: 'Finnhub real-time US quote',
+    source: 'Finnhub US quote',
     providerSymbol: ticker,
     quality: 'realtime',
-    session: 'regular-market',
+    session: marketSessionAt(`${ticker}.US`, new Date(timestamp * 1000)),
   };
 }
 
@@ -218,10 +237,12 @@ export function openFinnhubTrades(token, symbols, onTrade, onStatus = () => {}) 
   if (!token || !symbols?.length) return () => {};
   const socket = new WebSocket(`wss://ws.finnhub.io?token=${encodeURIComponent(token)}`);
   const clean = [...new Set(symbols.filter(Boolean).map((value) => String(value).trim().toUpperCase()))];
+
   socket.onopen = () => {
     clean.forEach((symbol) => socket.send(JSON.stringify({ type: 'subscribe', symbol })));
     onStatus('open');
   };
+
   socket.onmessage = (event) => {
     try {
       const payload = JSON.parse(event.data);
@@ -229,15 +250,45 @@ export function openFinnhubTrades(token, symbols, onTrade, onStatus = () => {}) 
       const latest = [...payload.data]
         .filter((trade) => clean.includes(String(trade?.s || '').toUpperCase()) && finite(trade?.p) && finite(trade?.t))
         .sort((a, b) => Number(b.t) - Number(a.t))[0];
-      if (latest) onTrade({ symbol: latest.s, price: Number(latest.p), timestamp: Number(latest.t) });
+      if (!latest) return;
+
+      const providerSymbol = String(latest.s).toUpperCase();
+      const appSymbol = `${providerSymbol}.US`;
+      const timestamp = Number(latest.t);
+      const current = inMemoryQuotes[appSymbol];
+      const previousClose = Number(current?.nativePreviousClose || 0);
+      const fxRate = Number(current?.fxRate || 0);
+      const session = marketSessionAt(appSymbol, new Date(timestamp));
+      inMemoryQuotes[appSymbol] = classifyQuote(appSymbol, {
+        ...current,
+        symbol: appSymbol,
+        nativePrice: Number(latest.p),
+        price: fxRate > 0 ? Number(latest.p) / fxRate : current?.price,
+        nativeRegularMarketPrice: session === 'regular-market'
+          ? Number(latest.p)
+          : current?.nativeRegularMarketPrice,
+        updatedAt: new Date(timestamp).toISOString(),
+        checkedAt: new Date().toISOString(),
+        source: 'Finnhub WebSocket real-time trade',
+        providerSymbol,
+        quality: 'realtime',
+        session,
+        changePct: previousClose > 0
+          ? ((Number(latest.p) - previousClose) / previousClose) * 100
+          : current?.changePct,
+      });
+      onTrade({ symbol: providerSymbol, price: Number(latest.p), timestamp });
     } catch (_) {}
   };
+
   socket.onerror = () => onStatus('error');
   socket.onclose = () => onStatus('closed');
   return () => {
     try {
       clean.forEach((symbol) => {
-        if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'unsubscribe', symbol }));
+        if (socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ type: 'unsubscribe', symbol }));
+        }
       });
       socket.close();
     } catch (_) {}
@@ -254,6 +305,7 @@ async function fetchOfficialAllwynQuote() {
     nativePrice: priceValue,
     nativePreviousClose: finite(previousClose) ? previousClose : null,
     nativeChangeBase: finite(previousClose) ? previousClose : null,
+    nativeRegularMarketPrice: priceValue,
     nativeCurrency: 'EUR',
     updatedAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
     checkedAt: new Date().toISOString(),
@@ -275,11 +327,34 @@ async function fetchEurUsd() {
   };
 }
 
-function classifyQuote(symbol, quote) {
+function normalizeDailyChange(quote) {
+  if (!quote) return quote;
+  const previousClose = finite(quote.nativePreviousClose)
+    ? Number(quote.nativePreviousClose)
+    : null;
+  const nativePrice = finite(quote.nativePrice)
+    ? Number(quote.nativePrice)
+    : null;
+
+  return {
+    ...quote,
+    nativeChangeBase: previousClose,
+    changePct: previousClose && nativePrice
+      ? ((nativePrice - previousClose) / previousClose) * 100
+      : null,
+  };
+}
+export function classifyQuote(symbol, quote) {
+  if (!quote || !finite(quote.nativePrice) || !quote.updatedAt) return quote;
+  const normalizedQuote = normalizeDailyChange(quote);
   const exchange = exchangeState(symbol);
-  const ageSeconds = Math.max(0, Math.round((Date.now() - new Date(quote.updatedAt).getTime()) / 1000));
+  const updatedMs = new Date(normalizedQuote.updatedAt).getTime();
+  const ageSeconds = Number.isFinite(updatedMs)
+    ? Math.max(0, Math.round((Date.now() - updatedMs) / 1000))
+    : Number.POSITIVE_INFINITY;
   const allowedAge = symbol === 'ALWN.GR' ? 25 * 60 : 3 * 60;
   let status;
+
   if (!exchange.open) {
     if (quote.session === 'pre-market') status = 'pre-market';
     else if (quote.session === 'post-market') status = 'post-market';
@@ -287,7 +362,113 @@ function classifyQuote(symbol, quote) {
   } else if (quote.quality === 'delayed15') status = 'delayed';
   else if (ageSeconds <= allowedAge) status = quote.quality === 'realtime' ? 'live' : 'near-live';
   else status = 'stale';
-  return { ...quote, ageSeconds, status, exchangeOpen: exchange.open, usable: status !== 'stale' };
+
+  return {
+    ...normalizedQuote,
+    ageSeconds,
+    status,
+    exchangeOpen: exchange.open,
+    usable: status !== 'stale',
+  };
+}
+
+function quoteTimestamp(quote) {
+  const value = new Date(quote?.updatedAt || 0).getTime();
+  return Number.isFinite(value) ? value : 0;
+}
+
+function checkedTimestamp(quote) {
+  const value = new Date(quote?.checkedAt || 0).getTime();
+  return Number.isFinite(value) ? value : 0;
+}
+
+function quotePriority(quote) {
+  const quality = { realtime: 400, delayed15: 300, unofficial: 200 }[quote?.quality] || 100;
+  const source = String(quote?.source || '');
+  return quality + (/WebSocket/i.test(source) ? 25 : 0) + (/Euronext/i.test(source) ? 10 : 0);
+}
+
+function repairSession(symbol, quote) {
+  const at = new Date(quote?.updatedAt || 0);
+  if (/WebSocket/i.test(String(quote?.source || '')) && Number.isFinite(at.getTime())) {
+    return marketSessionAt(symbol, at);
+  }
+  return quote?.session;
+}
+
+export function chooseMostRecentQuote(symbol, currentQuote, incomingQuote) {
+  if (!currentQuote && !incomingQuote) return null;
+  if (!currentQuote) return classifyQuote(symbol, incomingQuote);
+  if (!incomingQuote) return classifyQuote(symbol, currentQuote);
+
+  const currentTime = quoteTimestamp(currentQuote);
+  const incomingTime = quoteTimestamp(incomingQuote);
+  const toleranceMs = 1000;
+  let selected;
+
+  if (incomingTime > currentTime + toleranceMs) selected = incomingQuote;
+  else if (currentTime > incomingTime + toleranceMs) selected = currentQuote;
+  else selected = quotePriority(incomingQuote) >= quotePriority(currentQuote)
+    ? incomingQuote
+    : currentQuote;
+
+  const checkedAt = checkedTimestamp(incomingQuote) >= checkedTimestamp(currentQuote)
+    ? incomingQuote.checkedAt
+    : currentQuote.checkedAt;
+
+  return classifyQuote(symbol, {
+    ...selected,
+    session: repairSession(symbol, selected),
+    checkedAt: checkedAt || new Date().toISOString(),
+  });
+}
+
+export function mergePortfolioQuotes(current = {}, incoming = {}) {
+  const symbols = new Set([...Object.keys(current || {}), ...Object.keys(incoming || {})]);
+  const merged = {};
+  symbols.forEach((symbol) => {
+    const quote = chooseMostRecentQuote(symbol, current?.[symbol], incoming?.[symbol]);
+    if (quote) merged[symbol] = quote;
+  });
+  return merged;
+}
+
+async function readPersistedPrices() {
+  try {
+    const raw = await AsyncStorage.getItem(PERSISTED_STATE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed?.prices && typeof parsed.prices === 'object' ? parsed.prices : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function applyFx(symbol, quote, fx) {
+  const nativeCurrency = quote?.nativeCurrency || (symbol.endsWith('.US') ? 'USD' : 'EUR');
+  if (nativeCurrency !== 'USD') {
+    return {
+      ...quote,
+      price: Number(quote.nativePrice),
+      previousClose: quote.nativePreviousClose == null ? null : Number(quote.nativePreviousClose),
+      currency: 'EUR',
+      nativeCurrency,
+      fxRate: 1,
+      fxUpdatedAt: null,
+    };
+  }
+  if (!finite(fx?.rate)) throw new Error('λείπει η ισοτιμία EUR/USD');
+  return {
+    ...quote,
+    price: Number(quote.nativePrice) / Number(fx.rate),
+    previousClose: quote.nativePreviousClose == null
+      ? null
+      : Number(quote.nativePreviousClose) / Number(fx.rate),
+    currency: 'EUR',
+    nativeCurrency,
+    fxRate: Number(fx.rate),
+    fxUpdatedAt: fx.updatedAt,
+  };
 }
 
 async function fetchNativeQuote(symbol, finnhubToken) {
@@ -296,66 +477,89 @@ async function fetchNativeQuote(symbol, finnhubToken) {
       return await fetchOfficialAllwynQuote();
     } catch (officialError) {
       const fallback = await fetchYahooQuote('ALWN.AT');
-      return { ...fallback, nativeCurrency: 'EUR', source: `${fallback.source} · Euronext error: ${officialError.message}` };
+      return {
+        ...fallback,
+        nativeCurrency: 'EUR',
+        source: `${fallback.source} · Euronext error: ${officialError.message}`,
+      };
     }
   }
+
   if (symbol === 'SPCE.US') {
-    if (finnhubToken) {
-      try {
-        return await fetchFinnhubQuote('SPCE', finnhubToken);
-      } catch (finnhubError) {
-        const fallback = await fetchYahooQuote('SPCE');
-        return { ...fallback, nativeCurrency: 'USD', source: `${fallback.source} · Finnhub error: ${finnhubError.message}` };
-      }
-    }
-    const fallback = await fetchYahooQuote('SPCE');
-    return { ...fallback, nativeCurrency: 'USD' };
+    const providers = [];
+    if (finnhubToken) providers.push(fetchFinnhubQuote('SPCE', finnhubToken).catch(() => null));
+    providers.push(fetchYahooQuote('SPCE').catch(() => null));
+    const results = (await Promise.all(providers)).filter(Boolean);
+    if (!results.length) throw new Error('καμία πηγή δεν επέστρεψε έγκυρη τιμή SPCE');
+    return results.reduce((best, candidate) => {
+      if (!best) return candidate;
+      const bestTime = quoteTimestamp(best);
+      const candidateTime = quoteTimestamp(candidate);
+      if (candidateTime > bestTime + 1000) return candidate;
+      if (bestTime > candidateTime + 1000) return best;
+      return quotePriority(candidate) >= quotePriority(best) ? candidate : best;
+    }, null);
   }
-  const ticker = symbol.endsWith('.US') ? symbol.slice(0, -3) : symbol.endsWith('.GR') ? `${symbol.slice(0, -3)}.AT` : symbol;
+
+  const ticker = symbol.endsWith('.US')
+    ? symbol.slice(0, -3)
+    : symbol.endsWith('.GR')
+      ? `${symbol.slice(0, -3)}.AT`
+      : symbol;
   return await fetchYahooQuote(ticker);
 }
 
 export async function fetchPortfolioQuotes(symbols, { finnhubToken = '' } = {}) {
-  const cleanSymbols = [...new Set(symbols.filter(Boolean).map((value) => String(value).trim().toUpperCase()))];
+  const cleanSymbols = [...new Set(
+    symbols.filter(Boolean).map((value) => String(value).trim().toUpperCase()),
+  )];
   const needsUsd = cleanSymbols.some((symbol) => symbol.endsWith('.US'));
-  const fx = needsUsd ? await fetchEurUsd().catch(() => null) : { rate: 1, updatedAt: null, source: null };
-  const quotes = {};
+  const fx = needsUsd
+    ? await fetchEurUsd().catch(() => null)
+    : { rate: 1, updatedAt: null, source: null };
+  const fetched = {};
   const errors = [];
 
   await Promise.all(cleanSymbols.map(async (symbol) => {
     try {
       const native = await fetchNativeQuote(symbol, finnhubToken);
-      const nativeCurrency = native.nativeCurrency || (symbol.endsWith('.US') ? 'USD' : 'EUR');
-      if (nativeCurrency === 'USD' && !finite(fx?.rate)) throw new Error('λείπει η ισοτιμία EUR/USD');
-      const eurPrice = nativeCurrency === 'USD' ? Number(native.nativePrice) / Number(fx.rate) : Number(native.nativePrice);
-      const eurPreviousClose = native.nativePreviousClose == null
-        ? null
-        : nativeCurrency === 'USD'
-          ? Number(native.nativePreviousClose) / Number(fx.rate)
-          : Number(native.nativePreviousClose);
-      const changeBase = finite(native.nativeChangeBase)
-        ? Number(native.nativeChangeBase)
-        : finite(native.nativePreviousClose)
-          ? Number(native.nativePreviousClose)
+      const withFx = applyFx(symbol, native, fx);
+      const changeBase = finite(withFx.nativeChangeBase)
+        ? Number(withFx.nativeChangeBase)
+        : finite(withFx.nativePreviousClose)
+          ? Number(withFx.nativePreviousClose)
           : null;
-      const changePct = finite(changeBase)
-        ? ((Number(native.nativePrice) - changeBase) / changeBase) * 100
-        : null;
-      quotes[symbol] = classifyQuote(symbol, {
-        ...native,
+      fetched[symbol] = classifyQuote(symbol, {
+        ...withFx,
         symbol,
-        price: eurPrice,
-        previousClose: eurPreviousClose,
-        currency: 'EUR',
-        nativeCurrency,
-        fxRate: nativeCurrency === 'USD' ? Number(fx.rate) : 1,
-        fxUpdatedAt: nativeCurrency === 'USD' ? fx.updatedAt : null,
-        changePct,
+        changePct: finite(changeBase)
+          ? ((Number(withFx.nativePrice) - changeBase) / changeBase) * 100
+          : null,
       });
     } catch (error) {
       errors.push(`${symbol}: ${error.message}`);
     }
   }));
+
+  const persisted = await readPersistedPrices();
+  const baseline = mergePortfolioQuotes(persisted, inMemoryQuotes);
+  const newest = mergePortfolioQuotes(baseline, fetched);
+  const quotes = {};
+
+  cleanSymbols.forEach((symbol) => {
+    const selected = newest[symbol];
+    if (!selected) return;
+    try {
+      const withFx = applyFx(symbol, selected, fx);
+      quotes[symbol] = classifyQuote(symbol, {
+        ...withFx,
+        checkedAt: new Date().toISOString(),
+      });
+      inMemoryQuotes[symbol] = quotes[symbol];
+    } catch (error) {
+      errors.push(`${symbol}: ${error.message}`);
+    }
+  });
 
   return {
     quotes,
