@@ -1,0 +1,107 @@
+name: Build Investor Control v0.6.4 APK
+
+on:
+  push:
+    branches:
+      - investor-control-v0.6.4-daily-change
+    paths:
+      - .github/workflows/build-investor-control-v0.6.4.yml
+      - mobile/scripts/apply-v064-fix.js
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout v0.6.4 branch
+        uses: actions/checkout@v4
+        with:
+          ref: investor-control-v0.6.4-daily-change
+          fetch-depth: 0
+
+      - name: Apply authoritative daily-change fix
+        working-directory: mobile
+        run: node scripts/apply-v064-fix.js
+
+      - name: Commit verified source
+        shell: bash
+        run: |
+          git config user.name 'Investor Control CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git add mobile/src/market-data.js mobile/PortfolioApp.js mobile/DecisionOverlay.js mobile/package.json mobile/app.json
+          if git diff --cached --quiet; then
+            echo 'Source already committed.'
+          else
+            git commit -m 'fix(mobile): authoritative daily change v0.6.4'
+            git pull --rebase origin investor-control-v0.6.4-daily-change
+            git push origin HEAD:investor-control-v0.6.4-daily-change
+          fi
+
+      - name: Verify source integrity
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('mobile/src/market-data.js').read_text(encoding='utf-8')
+          assert 'const changeBase = previousClose;' in source
+          assert 'const normalizedQuote = normalizeDailyChange(quote);' in source
+          assert '...normalizedQuote,' in source
+          assert "['pre-market', 'post-market'].includes(point.session)" not in source
+          assert "point.session === 'post-market' && finite(regularMarketPrice)" not in source
+          assert round((2.77 - 2.70) / 2.70 * 100, 2) == 2.59
+          assert round((2.57 - 2.53) / 2.53 * 100, 2) == 1.58
+          assert round((13.105 - 13.274) / 13.274 * 100, 2) == -1.27
+          print('PASS: daily change always uses previous official close.')
+          PY
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: Expo Doctor
+        working-directory: mobile
+        run: npx expo-doctor@latest
+
+      - name: Generate Android project
+        working-directory: mobile
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Build standalone release APK
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Verify and package APK
+        shell: bash
+        run: |
+          APK='mobile/android/app/build/outputs/apk/release/app-release.apk'
+          test -s "$APK"
+          unzip -l "$APK" | grep -q 'assets/index.android.bundle'
+          cp "$APK" 'mobile/Investor-Control-v0.6.4.apk'
+          sha256sum 'mobile/Investor-Control-v0.6.4.apk' | tee 'mobile/Investor-Control-v0.6.4.sha256'
+
+      - name: Upload verified APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v0.6.4-apk
+          path: |
+            mobile/Investor-Control-v0.6.4.apk
+            mobile/Investor-Control-v0.6.4.sha256
+          if-no-files-found: error
+          retention-days: 90
