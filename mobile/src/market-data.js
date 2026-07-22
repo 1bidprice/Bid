@@ -100,7 +100,7 @@ async function fetchText(url, timeoutMs = 15_000) {
       headers: {
         Accept: 'text/html,application/xhtml+xml,application/json,text/plain,*/*',
         'Cache-Control': 'no-cache',
-        'User-Agent': 'InvestorControl/0.6.2',
+        'User-Agent': 'InvestorControl/0.6.4',
       },
       signal: controller.signal,
     });
@@ -190,9 +190,7 @@ async function fetchYahooQuote(ticker) {
       const regularMarketPrice = finite(meta.regularMarketPrice)
         ? Number(meta.regularMarketPrice)
         : null;
-      const changeBase = ['pre-market', 'post-market'].includes(point.session) && finite(regularMarketPrice)
-        ? regularMarketPrice
-        : previousClose;
+      const changeBase = previousClose;
       return {
         nativePrice: point.price,
         nativePreviousClose: previousClose,
@@ -329,10 +327,28 @@ async function fetchEurUsd() {
   };
 }
 
+function normalizeDailyChange(quote) {
+  if (!quote) return quote;
+  const previousClose = finite(quote.nativePreviousClose)
+    ? Number(quote.nativePreviousClose)
+    : null;
+  const nativePrice = finite(quote.nativePrice)
+    ? Number(quote.nativePrice)
+    : null;
+
+  return {
+    ...quote,
+    nativeChangeBase: previousClose,
+    changePct: previousClose && nativePrice
+      ? ((nativePrice - previousClose) / previousClose) * 100
+      : null,
+  };
+}
 export function classifyQuote(symbol, quote) {
   if (!quote || !finite(quote.nativePrice) || !quote.updatedAt) return quote;
+  const normalizedQuote = normalizeDailyChange(quote);
   const exchange = exchangeState(symbol);
-  const updatedMs = new Date(quote.updatedAt).getTime();
+  const updatedMs = new Date(normalizedQuote.updatedAt).getTime();
   const ageSeconds = Number.isFinite(updatedMs)
     ? Math.max(0, Math.round((Date.now() - updatedMs) / 1000))
     : Number.POSITIVE_INFINITY;
@@ -348,7 +364,7 @@ export function classifyQuote(symbol, quote) {
   else status = 'stale';
 
   return {
-    ...quote,
+    ...normalizedQuote,
     ageSeconds,
     status,
     exchangeOpen: exchange.open,

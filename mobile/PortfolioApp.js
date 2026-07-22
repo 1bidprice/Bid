@@ -56,7 +56,7 @@ import {
   transactionTotal,
 } from './src/transaction-accounting';
 
-const VERSION = '0.6.1';
+const VERSION = '0.6.4';
 const EMPTY_STATE = {
   schemaVersion: 5,
   transactions: [],
