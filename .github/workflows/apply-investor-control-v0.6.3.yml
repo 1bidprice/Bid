@@ -120,23 +120,46 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
 
-      - name: Verify and package APK
+      - name: Sign and verify installable APK
         shell: bash
         run: |
-          APK='mobile/android/app/build/outputs/apk/release/app-release.apk'
-          test -s "$APK"
-          unzip -l "$APK" | grep -q 'assets/index.android.bundle'
-          cp "$APK" 'mobile/Investor-Control-v0.6.3.apk'
-          sha256sum 'mobile/Investor-Control-v0.6.3.apk' | tee 'mobile/Investor-Control-v0.6.3.sha256'
+          set -euo pipefail
+          UNSIGNED='mobile/android/app/build/outputs/apk/release/app-release.apk'
+          KEYSTORE='mobile/android/app/debug.keystore'
+          OUTPUT='mobile/Investor-Control-v0.6.3.apk'
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          ZIPALIGN="$BUILD_TOOLS/zipalign"
+          APKSIGNER="$BUILD_TOOLS/apksigner"
 
-      - name: Upload verified APK
+          test -s "$UNSIGNED"
+          test -s "$KEYSTORE"
+          test -x "$ZIPALIGN"
+          test -x "$APKSIGNER"
+          unzip -l "$UNSIGNED" | grep -q 'assets/index.android.bundle'
+
+          "$ZIPALIGN" -p -f 4 "$UNSIGNED" mobile/app-release-aligned.apk
+          "$APKSIGNER" sign \
+            --ks "$KEYSTORE" \
+            --ks-key-alias androiddebugkey \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --out "$OUTPUT" \
+            mobile/app-release-aligned.apk
+
+          "$APKSIGNER" verify --verbose --print-certs "$OUTPUT" | tee mobile/Investor-Control-v0.6.3-signature.txt
+          grep -q 'Verified using v2 scheme' mobile/Investor-Control-v0.6.3-signature.txt
+          unzip -l "$OUTPUT" | grep -q 'assets/index.android.bundle'
+          sha256sum "$OUTPUT" | tee mobile/Investor-Control-v0.6.3.sha256
+
+      - name: Upload verified signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: investor-control-v0.6.3-apk
+          name: investor-control-v0.6.3-signed-apk
           path: |
             mobile/Investor-Control-v0.6.3.apk
             mobile/Investor-Control-v0.6.3.sha256
+            mobile/Investor-Control-v0.6.3-signature.txt
           if-no-files-found: error
           retention-days: 90
 
-# Triggered after verified SPCE premarket discrepancy on 2026-07-24.
+# The release APK is explicitly signed and certificate-verified before upload.
