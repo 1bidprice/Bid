@@ -1,0 +1,370 @@
+name: Apply Investor Control Market Integrity v0.6.2
+
+on:
+  push:
+    branches:
+      - investor-control-v0.6-accounting-ux
+    paths:
+      - .github/workflows/apply-investor-control-ux-hotfix.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+        with:
+          ref: investor-control-v0.6-accounting-ux
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Apply v0.6.2 market-integrity patch
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from datetime import datetime, timezone
+
+          report = []
+          missing = []
+
+          def apply(text, old, new, label, *, all_occurrences=False):
+              if old in text:
+                  count = text.count(old)
+                  report.append(f'APPLY {label}: {count} match(es)')
+                  return text.replace(old, new) if all_occurrences else text.replace(old, new, 1)
+              if new in text:
+                  report.append(f'OK {label}: already applied')
+                  return text
+              report.append(f'MISSING {label}')
+              missing.append(label)
+              return text
+
+          portfolio_path = Path('mobile/PortfolioApp.js')
+          market_path = Path('mobile/src/market-data.js')
+          decision_path = Path('mobile/DecisionOverlay.js')
+          package_path = Path('mobile/package.json')
+          app_path = Path('mobile/app.json')
+
+          portfolio = portfolio_path.read_text(encoding='utf-8')
+          market = market_path.read_text(encoding='utf-8')
+          decision = decision_path.read_text(encoding='utf-8')
+          package = package_path.read_text(encoding='utf-8')
+          app = app_path.read_text(encoding='utf-8')
+
+          portfolio = apply(
+              portfolio,
+              "  FINNHUB_TOKEN_KEY,\n  MARKET_REFRESH_MS,\n  fetchPortfolioQuotes,\n  openFinnhubTrades,\n  quoteStatusText,\n} from './src/market-data';",
+              "  FINNHUB_TOKEN_KEY,\n  MARKET_REFRESH_MS,\n  classifyQuote,\n  fetchPortfolioQuotes,\n  marketSessionAt,\n  mergePortfolioQuotes,\n  openFinnhubTrades,\n  quoteStatusText,\n} from './src/market-data';",
+              'market integrity imports',
+          )
+          portfolio = apply(portfolio, "const VERSION = '0.6.1';", "const VERSION = '0.6.2';", 'portfolio version')
+          portfolio = apply(
+              portfolio,
+              "    const prices = { ...current.prices, ...quotes };",
+              "    const prices = mergePortfolioQuotes(current.prices, quotes);",
+              'monotonic quote merge',
+          )
+          portfolio = apply(
+              portfolio,
+              """    return openFinnhubTrades(token.trim(), ['SPCE'], async (trade) => {
+      const current = stateRef.current;
+      const old = current.prices['SPCE.US'];
+      const fxRate = Number(old?.fxRate || 0);
+      if (!fxRate) return;
+      const previousClose = Number(old?.nativePreviousClose || 0);
+      const quote = { ...old, nativePrice: trade.price, price: trade.price / fxRate, updatedAt: new Date(trade.timestamp).toISOString(), checkedAt: new Date().toISOString(), source: 'Finnhub WebSocket real-time trade', quality: 'realtime', status: 'live', usable: true, ageSeconds: 0, changePct: previousClose > 0 ? ((trade.price - previousClose) / previousClose) * 100 : old?.changePct };
+      await applyQuotes(current, { 'SPCE.US': quote }, new Date().toISOString(), current.meta.errors || [], { silent: true });
+    });""",
+              """    return openFinnhubTrades(token.trim(), ['SPCE'], async (trade) => {
+      const current = stateRef.current;
+      const old = current.prices['SPCE.US'];
+      const fxRate = Number(old?.fxRate || 0);
+      if (!fxRate) return;
+      const tradeAt = new Date(trade.timestamp);
+      if (!Number.isFinite(tradeAt.getTime())) return;
+      const previousClose = Number(old?.nativePreviousClose || 0);
+      const session = marketSessionAt('SPCE.US', tradeAt);
+      const rawQuote = {
+        ...old,
+        nativePrice: trade.price,
+        price: trade.price / fxRate,
+        nativeRegularMarketPrice: session === 'regular-market'
+          ? trade.price
+          : Number(old?.nativeRegularMarketPrice || old?.nativePrice || 0) || null,
+        updatedAt: tradeAt.toISOString(),
+        checkedAt: new Date().toISOString(),
+        source: 'Finnhub WebSocket real-time trade',
+        quality: 'realtime',
+        session,
+        changePct: previousClose > 0 ? ((trade.price - previousClose) / previousClose) * 100 : old?.changePct,
+      };
+      const quote = classifyQuote('SPCE.US', rawQuote);
+      await applyQuotes(current, { 'SPCE.US': quote }, new Date().toISOString(), current.meta.errors || [], { silent: true });
+    });""",
+              'websocket quote classification',
+          )
+
+          market = apply(
+              market,
+              """export function exchangeState(symbol, at = new Date()) {
+  const isUs = String(symbol).toUpperCase().endsWith('.US');
+  const timeZone = isUs ? 'America/New_York' : 'Europe/Athens';
+  const parts = zoneParts(timeZone, at);
+  const weekdays = new Set(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+  const minutes = Number(parts.hour) * 60 + Number(parts.minute);
+  const open = isUs
+    ? weekdays.has(parts.weekday) && minutes >= 9 * 60 + 30 && minutes <= 16 * 60
+    : weekdays.has(parts.weekday) && minutes >= 10 * 60 + 15 && minutes <= 17 * 60 + 25;
+  return { open, timeZone, localDate: `${parts.year}-${parts.month}-${parts.day}` };
+}""",
+              """export function marketSessionAt(symbol, at = new Date()) {
+  const isUs = String(symbol).toUpperCase().endsWith('.US');
+  const timeZone = isUs ? 'America/New_York' : 'Europe/Athens';
+  const parts = zoneParts(timeZone, at);
+  const weekdays = new Set(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+  if (!weekdays.has(parts.weekday)) return 'closed';
+  const minutes = Number(parts.hour) * 60 + Number(parts.minute);
+  if (isUs) {
+    if (minutes >= 4 * 60 && minutes < 9 * 60 + 30) return 'pre-market';
+    if (minutes >= 9 * 60 + 30 && minutes <= 16 * 60) return 'regular-market';
+    if (minutes > 16 * 60 && minutes <= 20 * 60) return 'post-market';
+    return 'closed';
+  }
+  return minutes >= 10 * 60 + 15 && minutes <= 17 * 60 + 25
+    ? 'regular-market'
+    : 'closed';
+}
+
+export function exchangeState(symbol, at = new Date()) {
+  const isUs = String(symbol).toUpperCase().endsWith('.US');
+  const timeZone = isUs ? 'America/New_York' : 'Europe/Athens';
+  const parts = zoneParts(timeZone, at);
+  const session = marketSessionAt(symbol, at);
+  return {
+    open: session === 'regular-market',
+    timeZone,
+    localDate: `${parts.year}-${parts.month}-${parts.day}`,
+    session,
+  };
+}""",
+              'market session classifier',
+          )
+          market = apply(
+              market,
+              "    nativeChangeBase: finite(payload.pc) ? Number(payload.pc) : null,\n    nativeCurrency: 'USD',",
+              "    nativeChangeBase: finite(payload.pc) ? Number(payload.pc) : null,\n    nativeRegularMarketPrice: Number(payload.c),\n    nativeCurrency: 'USD',",
+              'Finnhub regular market reference',
+          )
+          market = apply(
+              market,
+              "    session: 'regular-market',",
+              "    session: marketSessionAt(`${ticker}.US`, new Date(timestamp * 1000)),",
+              'Finnhub timestamp session',
+          )
+          market = apply(market, 'function classifyQuote(symbol, quote) {', 'export function classifyQuote(symbol, quote) {', 'export quote classifier')
+          market = apply(
+              market,
+              """  return { ...quote, ageSeconds, status, exchangeOpen: exchange.open, usable: status !== 'stale' };
+}
+
+async function fetchNativeQuote(symbol, finnhubToken) {""",
+              """  return { ...quote, ageSeconds, status, exchangeOpen: exchange.open, usable: status !== 'stale' };
+}
+
+function quoteTimestamp(quote) {
+  const value = new Date(quote?.updatedAt || 0).getTime();
+  return Number.isFinite(value) ? value : 0;
+}
+
+function checkedTimestamp(quote) {
+  const value = new Date(quote?.checkedAt || 0).getTime();
+  return Number.isFinite(value) ? value : 0;
+}
+
+function quotePriority(quote) {
+  const quality = { realtime: 400, delayed15: 300, unofficial: 200 }[quote?.quality] || 100;
+  const source = String(quote?.source || '');
+  return quality + (/WebSocket/i.test(source) ? 25 : 0) + (/Euronext/i.test(source) ? 10 : 0);
+}
+
+export function chooseMostRecentQuote(symbol, currentQuote, incomingQuote) {
+  if (!currentQuote && !incomingQuote) return null;
+  if (!currentQuote) return classifyQuote(symbol, incomingQuote);
+  if (!incomingQuote) return classifyQuote(symbol, currentQuote);
+
+  const currentTime = quoteTimestamp(currentQuote);
+  const incomingTime = quoteTimestamp(incomingQuote);
+  const toleranceMs = 1000;
+  let selected;
+
+  if (incomingTime > currentTime + toleranceMs) selected = incomingQuote;
+  else if (currentTime > incomingTime + toleranceMs) selected = currentQuote;
+  else selected = quotePriority(incomingQuote) >= quotePriority(currentQuote) ? incomingQuote : currentQuote;
+
+  const selectedAt = new Date(selected?.updatedAt || 0);
+  const repairedSession = /WebSocket/i.test(String(selected?.source || '')) && Number.isFinite(selectedAt.getTime())
+    ? marketSessionAt(symbol, selectedAt)
+    : selected?.session;
+  const checkedAt = checkedTimestamp(incomingQuote) >= checkedTimestamp(currentQuote)
+    ? incomingQuote.checkedAt
+    : currentQuote.checkedAt;
+
+  return classifyQuote(symbol, {
+    ...selected,
+    session: repairedSession,
+    checkedAt: checkedAt || new Date().toISOString(),
+  });
+}
+
+export function mergePortfolioQuotes(current = {}, incoming = {}) {
+  const symbols = new Set([...Object.keys(current || {}), ...Object.keys(incoming || {})]);
+  const merged = {};
+  symbols.forEach((symbol) => {
+    const quote = chooseMostRecentQuote(symbol, current?.[symbol], incoming?.[symbol]);
+    if (quote) merged[symbol] = quote;
+  });
+  return merged;
+}
+
+async function fetchNativeQuote(symbol, finnhubToken) {""",
+              'quote chronology guard',
+          )
+
+          decision = apply(decision, "const VERSION = '0.6.1';", "const VERSION = '0.6.2';", 'decision version')
+          package = apply(package, '"version": "0.6.1"', '"version": "0.6.2"', 'package version')
+          app = apply(app, '"version": "0.6.1"', '"version": "0.6.2"', 'app version')
+          app = apply(app, '"versionCode": 9', '"versionCode": 10', 'Android version code')
+          app = apply(app, '"buildNumber": "9"', '"buildNumber": "10"', 'iOS build number')
+
+          if missing:
+              raise SystemExit('Patch blocked: ' + ', '.join(missing))
+
+          portfolio_path.write_text(portfolio, encoding='utf-8')
+          market_path.write_text(market, encoding='utf-8')
+          decision_path.write_text(decision, encoding='utf-8')
+          package_path.write_text(package, encoding='utf-8')
+          app_path.write_text(app, encoding='utf-8')
+
+          report_path = Path('mobile/market-integrity-diagnostics.txt')
+          report_path.write_text(
+              f"generated={datetime.now(timezone.utc).isoformat()}\nstatus=APPLIED\n" + '\n'.join(report) + '\n',
+              encoding='utf-8',
+          )
+          print(report_path.read_text(encoding='utf-8'))
+          PY
+
+      - name: Test quote chronology and sessions
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+
+          const source = fs.readFileSync('mobile/src/market-data.js', 'utf8');
+          const market = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
+
+          assert.equal(
+            market.marketSessionAt('SPCE.US', new Date('2026-07-20T20:35:00Z')),
+            'post-market',
+          );
+
+          const websocket = {
+            nativePrice: 2.57,
+            nativePreviousClose: 2.53,
+            nativeChangeBase: 2.53,
+            nativeCurrency: 'USD',
+            price: 2.25,
+            fxRate: 1.14,
+            updatedAt: '2026-07-20T20:35:00.000Z',
+            checkedAt: '2026-07-20T20:35:01.000Z',
+            source: 'Finnhub WebSocket real-time trade',
+            quality: 'realtime',
+            session: 'regular-market',
+          };
+          const olderRest = {
+            ...websocket,
+            nativePrice: 2.56,
+            updatedAt: '2026-07-20T20:00:00.000Z',
+            checkedAt: '2026-07-20T20:36:00.000Z',
+            source: 'Finnhub real-time US quote',
+          };
+
+          const kept = market.mergePortfolioQuotes(
+            { 'SPCE.US': websocket },
+            { 'SPCE.US': olderRest },
+          )['SPCE.US'];
+          assert.equal(kept.nativePrice, 2.57);
+          assert.match(kept.source, /WebSocket/);
+          assert.equal(kept.session, 'post-market');
+
+          const newer = {
+            ...olderRest,
+            nativePrice: 2.61,
+            updatedAt: '2026-07-21T14:00:00.000Z',
+          };
+          const replaced = market.mergePortfolioQuotes(
+            { 'SPCE.US': websocket },
+            { 'SPCE.US': newer },
+          )['SPCE.US'];
+          assert.equal(replaced.nativePrice, 2.61);
+
+          console.log('PASS: newer market events win; older REST responses cannot roll prices back.');
+          NODE
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: Generate Android project
+        working-directory: mobile
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Build standalone release APK
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Verify embedded JavaScript bundle
+        shell: bash
+        run: |
+          APK='mobile/android/app/build/outputs/apk/release/app-release.apk'
+          test -s "$APK"
+          unzip -l "$APK" | grep -q 'assets/index.android.bundle'
+          cp "$APK" 'mobile/Investor-Control-v0.6.2.apk'
+          sha256sum 'mobile/Investor-Control-v0.6.2.apk' | tee mobile/Investor-Control-v0.6.2.sha256
+
+      - name: Commit verified release source
+        shell: bash
+        run: |
+          git config user.name 'Investor Control CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git add mobile/PortfolioApp.js mobile/src/market-data.js mobile/DecisionOverlay.js mobile/package.json mobile/app.json mobile/market-integrity-diagnostics.txt
+          git commit -m 'fix(mobile): prevent stale quote rollback v0.6.2'
+          git push origin HEAD:investor-control-v0.6-accounting-ux
+
+      - name: Upload verified v0.6.2 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v0.6.2-apk
+          path: |
+            mobile/Investor-Control-v0.6.2.apk
+            mobile/Investor-Control-v0.6.2.sha256
+          if-no-files-found: error
+          retention-days: 90

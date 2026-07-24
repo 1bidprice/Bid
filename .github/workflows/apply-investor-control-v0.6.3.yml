@@ -1,0 +1,163 @@
+name: Build Signed Investor Control v0.6.3 APK
+
+on:
+  push:
+    branches:
+      - investor-control-v0.6-accounting-ux
+    paths:
+      - .github/workflows/apply-investor-control-v0.6.3.yml
+      - mobile/**
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: investor-control-v063-signed-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-signed-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+        with:
+          ref: investor-control-v0.6-accounting-ux
+          fetch-depth: 0
+
+      - name: Publish current workflow run id
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .github/build-metadata
+          cat > .github/build-metadata/investor-control-v0.6.3-current-run.txt <<EOF
+          status=RUNNING
+          version=0.6.3
+          versionCode=11
+          workflow_run_id=${GITHUB_RUN_ID}
+          workflow_run_attempt=${GITHUB_RUN_ATTEMPT}
+          source_commit=${GITHUB_SHA}
+          started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          EOF
+          git config user.name 'Investor Control CI'
+          git config user.email 'actions@users.noreply.github.com'
+          git add .github/build-metadata/investor-control-v0.6.3-current-run.txt
+          git commit -m 'chore(mobile): record active signed APK run [skip ci]'
+          git pull --rebase origin investor-control-v0.6-accounting-ux
+          git push origin HEAD:investor-control-v0.6-accounting-ux
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies and apply v0.6.3 integrity fix
+        working-directory: mobile
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: Verify corrected market-session logic
+        working-directory: mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q "point.session === 'post-market' && finite(regularMarketPrice)" src/market-data.js
+          ! grep -q "\['pre-market', 'post-market'\].includes(point.session)" src/market-data.js
+          grep -q "const VERSION = '0.6.3';" PortfolioApp.js
+          grep -q "const VERSION = '0.6.3';" DecisionOverlay.js
+          node scripts/apply-v063-fix.js
+
+      - name: Expo Doctor diagnostic
+        continue-on-error: true
+        working-directory: mobile
+        run: npx expo-doctor@latest
+
+      - name: Generate Android project
+        working-directory: mobile
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Build release APK
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Sign and verify installable APK
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          UNSIGNED='mobile/android/app/build/outputs/apk/release/app-release.apk'
+          KEYSTORE='mobile/android/app/debug.keystore'
+          OUTPUT='mobile/Investor-Control-v0.6.3.apk'
+          ALIGNED='mobile/Investor-Control-v0.6.3-aligned.apk'
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          ZIPALIGN="$BUILD_TOOLS/zipalign"
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+
+          test -s "$UNSIGNED"
+          test -s "$KEYSTORE"
+          test -x "$ZIPALIGN"
+          test -x "$APKSIGNER"
+          unzip -l "$UNSIGNED" | grep -q 'assets/index.android.bundle'
+
+          "$ZIPALIGN" -p -f 4 "$UNSIGNED" "$ALIGNED"
+          "$APKSIGNER" sign \
+            --ks "$KEYSTORE" \
+            --ks-key-alias androiddebugkey \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --out "$OUTPUT" \
+            "$ALIGNED"
+
+          "$APKSIGNER" verify --verbose --print-certs "$OUTPUT" | tee mobile/Investor-Control-v0.6.3-signature.txt
+          grep -Eq 'Verified using v2 scheme.*true|^Verifies$' mobile/Investor-Control-v0.6.3-signature.txt
+          unzip -l "$OUTPUT" | grep -q 'assets/index.android.bundle'
+          sha256sum "$OUTPUT" | tee mobile/Investor-Control-v0.6.3.sha256
+
+      - name: Upload verified signed APK
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v0.6.3-signed-apk
+          path: |
+            mobile/Investor-Control-v0.6.3.apk
+            mobile/Investor-Control-v0.6.3.sha256
+            mobile/Investor-Control-v0.6.3-signature.txt
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish verified artifact id
+        continue-on-error: true
+        shell: bash
+        env:
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          set -euo pipefail
+          SHA256_VALUE="$(cut -d' ' -f1 mobile/Investor-Control-v0.6.3.sha256)"
+          cat > .github/build-metadata/investor-control-v0.6.3-current-run.txt <<EOF
+          status=SIGNED_AND_VERIFIED
+          version=0.6.3
+          versionCode=11
+          workflow_run_id=${GITHUB_RUN_ID}
+          workflow_run_attempt=${GITHUB_RUN_ATTEMPT}
+          source_commit=${GITHUB_SHA}
+          artifact_id=${ARTIFACT_ID}
+          artifact_name=investor-control-v0.6.3-signed-apk
+          artifact_url=${ARTIFACT_URL}
+          apk_sha256=${SHA256_VALUE}
+          completed_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          EOF
+          git add .github/build-metadata/investor-control-v0.6.3-current-run.txt
+          git commit -m 'chore(mobile): record verified signed APK artifact [skip ci]'
+          git pull --rebase origin investor-control-v0.6-accounting-ux
+          git push origin HEAD:investor-control-v0.6-accounting-ux

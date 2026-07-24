@@ -32,7 +32,7 @@ import {
   portfolioSnapshot,
 } from './src/decision-engine';
 
-const VERSION = '0.5.1';
+const VERSION = '0.6.1';
 const SUPPORTED_BACKUP_VERSIONS = [1, DECISION_VERSION];
 
 const parseNum = (value) => {
@@ -361,9 +361,8 @@ export default function DecisionOverlay() {
 
   return (
     <>
-      <Pressable style={styles.fab} onPress={open} accessibilityLabel="Άνοιγμα Decision Gate">
+      <Pressable style={styles.fab} onPress={open} accessibilityLabel="Άνοιγμα Decision Gate" accessibilityHint="Έλεγχος επενδυτικής απόφασης">
         <Text style={styles.fabTop}>✓</Text>
-        <Text style={styles.fabText}>ΑΠΟΦΑΣΗ</Text>
       </Pressable>
 
       <Modal visible={visible} animationType="slide" onRequestClose={goBack} statusBarTranslucent={false}>
@@ -647,7 +646,7 @@ const styles = StyleSheet.create({
   issueMark: { width: 23, height: 23, borderRadius: 12, textAlign: 'center', textAlignVertical: 'center', overflow: 'hidden', color: '#fff', backgroundColor: '#d79000', fontWeight: '900' },
   issueMarkBlock: { backgroundColor: '#d73949' },
   issueText: { flex: 1, color: '#10233f', lineHeight: 20 },
-  fab: { position: 'absolute', right: 17, bottom: 88, zIndex: 20, elevation: 12, minWidth: 104, height: 54, paddingHorizontal: 14, borderRadius: 19, backgroundColor: '#07163e', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 9, shadowOffset: { width: 0, height: 4 } },
-  fabTop: { color: '#55a6ff', fontSize: 22, fontWeight: '900' },
-  fabText: { color: '#fff', fontSize: 11, fontWeight: '900', letterSpacing: 0.4 },
+  fab: { position: 'absolute', right: 14, bottom: 90, zIndex: 20, elevation: 10, width: 54, height: 54, borderRadius: 27, backgroundColor: '#07163e', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 7, shadowOffset: { width: 0, height: 3 } },
+  fabTop: { color: '#55a6ff', fontSize: 27, lineHeight: 31, fontWeight: '900' },
+  fabText: { display: 'none' },
 });
