@@ -1,4 +1,4 @@
-name: Apply Investor Control Premarket Fix v0.6.3
+name: Build Signed Investor Control v0.6.3 APK
 
 on:
   push:
@@ -6,94 +6,33 @@ on:
       - investor-control-v0.6-accounting-ux
     paths:
       - .github/workflows/apply-investor-control-v0.6.3.yml
+      - mobile/**
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: investor-control-v063-signed-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  patch-test-build:
+  build-signed-apk:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+
     steps:
       - name: Checkout release branch
         uses: actions/checkout@v4
         with:
           ref: investor-control-v0.6-accounting-ux
-          fetch-depth: 0
-
-      - name: Apply v0.6.3 premarket percentage fix
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          def replace_required(path, old, new, label):
-              text = path.read_text(encoding='utf-8')
-              if old in text:
-                  path.write_text(text.replace(old, new, 1), encoding='utf-8')
-                  print(f'APPLY {label}')
-                  return
-              if new in text:
-                  print(f'OK {label}: already applied')
-                  return
-              raise SystemExit(f'Patch blocked: {label} pattern not found in {path}')
-
-          market = Path('mobile/src/market-data.js')
-          portfolio = Path('mobile/PortfolioApp.js')
-          decision = Path('mobile/DecisionOverlay.js')
-          package = Path('mobile/package.json')
-          app = Path('mobile/app.json')
-
-          replace_required(
-              market,
-              """      const changeBase = ['pre-market', 'post-market'].includes(point.session) && finite(regularMarketPrice)
-                ? regularMarketPrice
-                : previousClose;""",
-              """      const changeBase = point.session === 'post-market' && finite(regularMarketPrice)
-                ? regularMarketPrice
-                : previousClose;""",
-              'premarket uses previous close',
-          )
-          replace_required(market, 'InvestorControl/0.6.2', 'InvestorControl/0.6.3', 'market user agent')
-          replace_required(portfolio, "const VERSION = '0.6.1';", "const VERSION = '0.6.3';", 'portfolio version')
-          replace_required(decision, "const VERSION = '0.6.1';", "const VERSION = '0.6.3';", 'decision version')
-          replace_required(package, '"version": "0.6.1"', '"version": "0.6.3"', 'package version')
-          replace_required(app, '"version": "0.6.1"', '"version": "0.6.3"', 'app version')
-          replace_required(app, '"versionCode": 9', '"versionCode": 11', 'Android version code')
-          replace_required(app, '"buildNumber": "9"', '"buildNumber": "11"', 'iOS build number')
-          PY
-
-      - name: Test session percentage bases
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          source = Path('mobile/src/market-data.js').read_text(encoding='utf-8')
-          assert "point.session === 'post-market' && finite(regularMarketPrice)" in source
-          assert "['pre-market', 'post-market'].includes(point.session)" not in source
-          assert round((2.58 - 2.46) / 2.46 * 100, 2) == 4.88
-          assert round((2.60 - 2.57) / 2.57 * 100, 2) == 1.17
-          print('PASS: premarket uses previous close and postmarket uses regular close.')
-          PY
-
-      - name: Commit verified source immediately
-        shell: bash
-        run: |
-          git config user.name 'Investor Control CI'
-          git config user.email 'actions@users.noreply.github.com'
-          git add mobile/src/market-data.js mobile/PortfolioApp.js mobile/DecisionOverlay.js mobile/package.json mobile/app.json
-          if git diff --cached --quiet; then
-            echo 'Source already committed.'
-          else
-            git commit -m 'fix(mobile): correct premarket daily change v0.6.3'
-            git pull --rebase origin investor-control-v0.6-accounting-ux
-            git push origin HEAD:investor-control-v0.6-accounting-ux
-          fi
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -102,9 +41,20 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Install dependencies
+      - name: Install dependencies and apply v0.6.3 integrity fix
         working-directory: mobile
         run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: Verify corrected market-session logic
+        working-directory: mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q "point.session === 'post-market' && finite(regularMarketPrice)" src/market-data.js
+          ! grep -q "\['pre-market', 'post-market'\].includes(point.session)" src/market-data.js
+          grep -q "const VERSION = '0.6.3';" PortfolioApp.js
+          grep -q "const VERSION = '0.6.3';" DecisionOverlay.js
+          node scripts/apply-v063-fix.js
 
       - name: Expo Doctor
         working-directory: mobile
@@ -114,7 +64,7 @@ jobs:
         working-directory: mobile
         run: npx expo prebuild --platform android --no-install --clean
 
-      - name: Build standalone release APK
+      - name: Build release APK
         working-directory: mobile/android
         run: |
           chmod +x gradlew
@@ -124,9 +74,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           UNSIGNED='mobile/android/app/build/outputs/apk/release/app-release.apk'
           KEYSTORE='mobile/android/app/debug.keystore'
           OUTPUT='mobile/Investor-Control-v0.6.3.apk'
+          ALIGNED='mobile/Investor-Control-v0.6.3-aligned.apk'
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           ZIPALIGN="$BUILD_TOOLS/zipalign"
           APKSIGNER="$BUILD_TOOLS/apksigner"
@@ -137,17 +89,17 @@ jobs:
           test -x "$APKSIGNER"
           unzip -l "$UNSIGNED" | grep -q 'assets/index.android.bundle'
 
-          "$ZIPALIGN" -p -f 4 "$UNSIGNED" mobile/app-release-aligned.apk
+          "$ZIPALIGN" -p -f 4 "$UNSIGNED" "$ALIGNED"
           "$APKSIGNER" sign \
             --ks "$KEYSTORE" \
             --ks-key-alias androiddebugkey \
             --ks-pass pass:android \
             --key-pass pass:android \
             --out "$OUTPUT" \
-            mobile/app-release-aligned.apk
+            "$ALIGNED"
 
           "$APKSIGNER" verify --verbose --print-certs "$OUTPUT" | tee mobile/Investor-Control-v0.6.3-signature.txt
-          grep -q 'Verified using v2 scheme' mobile/Investor-Control-v0.6.3-signature.txt
+          grep -Eq 'Verified using v2 scheme.*true|Verifies' mobile/Investor-Control-v0.6.3-signature.txt
           unzip -l "$OUTPUT" | grep -q 'assets/index.android.bundle'
           sha256sum "$OUTPUT" | tee mobile/Investor-Control-v0.6.3.sha256
 
@@ -161,26 +113,3 @@ jobs:
             mobile/Investor-Control-v0.6.3-signature.txt
           if-no-files-found: error
           retention-days: 90
-
-      - name: Record signed build metadata
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat > mobile/latest-signed-build.txt <<EOF
-          status=SIGNED_AND_VERIFIED
-          version=0.6.3
-          versionCode=11
-          workflow_run_id=${GITHUB_RUN_ID}
-          workflow_run_attempt=${GITHUB_RUN_ATTEMPT}
-          source_commit=${GITHUB_SHA}
-          artifact_name=investor-control-v0.6.3-signed-apk
-          built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          EOF
-          git config user.name 'Investor Control CI'
-          git config user.email 'actions@users.noreply.github.com'
-          git add mobile/latest-signed-build.txt
-          git commit -m 'chore(mobile): record verified signed APK build'
-          git pull --rebase origin investor-control-v0.6-accounting-ux
-          git push origin HEAD:investor-control-v0.6-accounting-ux
-
-# The release APK is explicitly signed and certificate-verified before upload.
