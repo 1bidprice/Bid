@@ -100,7 +100,7 @@ async function fetchText(url, timeoutMs = 15_000) {
       headers: {
         Accept: 'text/html,application/xhtml+xml,application/json,text/plain,*/*',
         'Cache-Control': 'no-cache',
-        'User-Agent': 'InvestorControl/0.6.2',
+        'User-Agent': 'InvestorControl/0.6.4',
       },
       signal: controller.signal,
     });
@@ -184,13 +184,15 @@ async function fetchYahooQuote(ticker) {
       const point = latestYahooPoint(result);
       if (!point) throw new Error('χωρίς έγκυρη τιμή');
       const meta = result.meta || {};
-      const previousClose = finite(meta.chartPreviousClose || meta.previousClose)
-        ? Number(meta.chartPreviousClose || meta.previousClose)
+      // Yahoo's chartPreviousClose can represent the 5-day chart baseline, not today's prior close.
+      // Prefer previousClose so the daily percentage matches the broker.
+      const previousClose = finite(meta.previousClose || meta.chartPreviousClose)
+        ? Number(meta.previousClose || meta.chartPreviousClose)
         : null;
       const regularMarketPrice = finite(meta.regularMarketPrice)
         ? Number(meta.regularMarketPrice)
         : null;
-      const changeBase = ['pre-market', 'post-market'].includes(point.session) && finite(regularMarketPrice)
+      const changeBase = point.session === 'post-market' && finite(regularMarketPrice)
         ? regularMarketPrice
         : previousClose;
       return {
@@ -225,6 +227,7 @@ async function fetchFinnhubQuote(ticker, token) {
     nativePreviousClose: finite(payload.pc) ? Number(payload.pc) : null,
     nativeChangeBase: finite(payload.pc) ? Number(payload.pc) : null,
     nativeRegularMarketPrice: Number(payload.c),
+    nativeProviderChangePct: Number.isFinite(Number(payload?.dp)) ? Number(payload.dp) : null,
     nativeCurrency: 'USD',
     updatedAt: new Date(timestamp * 1000).toISOString(),
     checkedAt: new Date().toISOString(),
@@ -258,9 +261,17 @@ export function openFinnhubTrades(token, symbols, onTrade, onStatus = () => {}) 
       const appSymbol = `${providerSymbol}.US`;
       const timestamp = Number(latest.t);
       const current = inMemoryQuotes[appSymbol];
-      const previousClose = Number(current?.nativePreviousClose || 0);
+      const previousClose = finite(current?.nativePreviousClose)
+        ? Number(current.nativePreviousClose)
+        : 0;
+      const regularMarketPrice = finite(current?.nativeRegularMarketPrice)
+        ? Number(current.nativeRegularMarketPrice)
+        : 0;
       const fxRate = Number(current?.fxRate || 0);
       const session = marketSessionAt(appSymbol, new Date(timestamp));
+      const changeBase = session === 'post-market' && regularMarketPrice > 0
+        ? regularMarketPrice
+        : previousClose;
       inMemoryQuotes[appSymbol] = classifyQuote(appSymbol, {
         ...current,
         symbol: appSymbol,
@@ -275,8 +286,9 @@ export function openFinnhubTrades(token, symbols, onTrade, onStatus = () => {}) 
         providerSymbol,
         quality: 'realtime',
         session,
-        changePct: previousClose > 0
-          ? ((Number(latest.p) - previousClose) / previousClose) * 100
+        nativeChangeBase: changeBase > 0 ? changeBase : current?.nativeChangeBase,
+        changePct: changeBase > 0
+          ? ((Number(latest.p) - changeBase) / changeBase) * 100
           : current?.changePct,
       });
       onTrade({ symbol: providerSymbol, price: Number(latest.p), timestamp });
@@ -396,13 +408,40 @@ export function chooseMostRecentQuote(symbol, currentQuote, incomingQuote) {
     ? incomingQuote
     : currentQuote;
 
-  const checkedAt = checkedTimestamp(incomingQuote) >= checkedTimestamp(currentQuote)
+  const incomingChecked = checkedTimestamp(incomingQuote);
+  const currentChecked = checkedTimestamp(currentQuote);
+  const checkedAt = incomingChecked >= currentChecked
     ? incomingQuote.checkedAt
     : currentQuote.checkedAt;
 
+  // The newest traded price and the freshest reference values are not always
+  // from the same payload. A persisted WebSocket trade may be newer than the
+  // REST quote, while the REST quote carries the correct previous close.
+  const referenceQuote = incomingChecked >= currentChecked ? incomingQuote : currentQuote;
+  const session = repairSession(symbol, selected);
+  const previousClose = finite(referenceQuote?.nativePreviousClose)
+    ? Number(referenceQuote.nativePreviousClose)
+    : finite(selected?.nativePreviousClose)
+      ? Number(selected.nativePreviousClose)
+      : null;
+  const regularMarketPrice = finite(referenceQuote?.nativeRegularMarketPrice)
+    ? Number(referenceQuote.nativeRegularMarketPrice)
+    : finite(selected?.nativeRegularMarketPrice)
+      ? Number(selected.nativeRegularMarketPrice)
+      : null;
+  const changeBase = session === 'post-market' && finite(regularMarketPrice)
+    ? regularMarketPrice
+    : previousClose;
+
   return classifyQuote(symbol, {
     ...selected,
-    session: repairSession(symbol, selected),
+    nativePreviousClose: previousClose,
+    nativeRegularMarketPrice: regularMarketPrice,
+    nativeChangeBase: changeBase,
+    changePct: finite(changeBase)
+      ? ((Number(selected.nativePrice) - Number(changeBase)) / Number(changeBase)) * 100
+      : selected.changePct,
+    session,
     checkedAt: checkedAt || new Date().toISOString(),
   });
 }
@@ -470,19 +509,13 @@ async function fetchNativeQuote(symbol, finnhubToken) {
   }
 
   if (symbol === 'SPCE.US') {
-    const providers = [];
-    if (finnhubToken) providers.push(fetchFinnhubQuote('SPCE', finnhubToken).catch(() => null));
-    providers.push(fetchYahooQuote('SPCE').catch(() => null));
-    const results = (await Promise.all(providers)).filter(Boolean);
-    if (!results.length) throw new Error('καμία πηγή δεν επέστρεψε έγκυρη τιμή SPCE');
-    return results.reduce((best, candidate) => {
-      if (!best) return candidate;
-      const bestTime = quoteTimestamp(best);
-      const candidateTime = quoteTimestamp(candidate);
-      if (candidateTime > bestTime + 1000) return candidate;
-      if (bestTime > candidateTime + 1000) return best;
-      return quotePriority(candidate) >= quotePriority(best) ? candidate : best;
-    }, null);
+    // When a user has a Finnhub token, keep Finnhub as the canonical source for
+    // previous close/reference prices. Yahoo remains a fallback only.
+    if (finnhubToken) {
+      const finnhub = await fetchFinnhubQuote('SPCE', finnhubToken).catch(() => null);
+      if (finnhub) return finnhub;
+    }
+    return await fetchYahooQuote('SPCE');
   }
 
   const ticker = symbol.endsWith('.US')
