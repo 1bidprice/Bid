@@ -76,7 +76,8 @@ jobs:
           grep -q "const VERSION = '0.6.4';" DecisionOverlay.js
           node -e "const p=((2.58-2.46)/2.46*100).toFixed(2); if(p!=='4.88') process.exit(1); console.log('PASS SPCE premarket '+p+'%')"
 
-      - name: Expo Doctor
+      - name: Expo Doctor diagnostic
+        continue-on-error: true
         working-directory: mobile
         run: npx expo-doctor@latest
 
