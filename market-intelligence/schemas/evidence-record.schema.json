@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://investorcontrol.local/schemas/evidence-record.schema.json",
+  "title": "EvidenceRecord",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "sourceType",
+    "sourceName",
+    "sourceUrl",
+    "publishedAt",
+    "retrievedAt",
+    "eventAt",
+    "title",
+    "contentHash",
+    "companyIds",
+    "claimType",
+    "reliabilityTier",
+    "isPrimarySource"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 8 },
+    "sourceType": {
+      "type": "string",
+      "enum": [
+        "REGULATORY_FILING",
+        "EXCHANGE_DISCLOSURE",
+        "ISSUER_IR",
+        "FINANCIAL_NEWS",
+        "MARKET_DATA",
+        "FUNDAMENTAL_DATA",
+        "MACRO_DATA",
+        "ALTERNATIVE_DATA",
+        "SOCIAL_MEDIA"
+      ]
+    },
+    "sourceName": { "type": "string", "minLength": 1 },
+    "sourceUrl": { "type": "string", "format": "uri" },
+    "sourceDocumentId": { "type": ["string", "null"] },
+    "publishedAt": { "type": "string", "format": "date-time" },
+    "retrievedAt": { "type": "string", "format": "date-time" },
+    "eventAt": { "type": "string", "format": "date-time" },
+    "title": { "type": "string", "minLength": 1 },
+    "rawText": { "type": ["string", "null"] },
+    "contentHash": { "type": "string", "minLength": 16 },
+    "language": { "type": "string", "default": "en" },
+    "companyIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "claimType": {
+      "type": "string",
+      "enum": ["FACT", "CALCULATION_INPUT", "ESTIMATE", "OPINION", "RUMOUR"]
+    },
+    "reliabilityTier": { "type": "integer", "minimum": 1, "maximum": 5 },
+    "isPrimarySource": { "type": "boolean" },
+    "independenceGroup": { "type": ["string", "null"] },
+    "supportsClaimIds": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string" },
+      "default": []
+    },
+    "contradictsClaimIds": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string" },
+      "default": []
+    },
+    "expiresAt": { "type": ["string", "null"], "format": "date-time" },
+    "notes": { "type": ["string", "null"] }
+  }
+}
