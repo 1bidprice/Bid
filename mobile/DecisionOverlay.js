@@ -6,7 +6,6 @@ import {
   Modal,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -32,7 +32,7 @@ import {
   portfolioSnapshot,
 } from './src/decision-engine';
 
-const VERSION = '0.6.4';
+const VERSION = '0.6.5';
 const SUPPORTED_BACKUP_VERSIONS = [1, DECISION_VERSION];
 
 const parseNum = (value) => {
@@ -146,6 +146,7 @@ function Metric({ label, value, danger }) {
 }
 
 export default function DecisionOverlay() {
+  const insets = useSafeAreaInsets();
   const [visible, setVisible] = useState(false);
   const [screen, setScreen] = useState('list');
   const [portfolioState, setPortfolioState] = useState({ transactions: [], prices: {} });
@@ -361,12 +362,12 @@ export default function DecisionOverlay() {
 
   return (
     <>
-      <Pressable style={styles.fab} onPress={open} accessibilityLabel="Άνοιγμα Decision Gate" accessibilityHint="Έλεγχος επενδυτικής απόφασης">
+      <Pressable style={[styles.fab, { right: 14 + insets.right, bottom: 92 + insets.bottom }]} onPress={open} accessibilityLabel="Άνοιγμα Decision Gate" accessibilityHint="Έλεγχος επενδυτικής απόφασης">
         <Text style={styles.fabTop}>✓</Text>
       </Pressable>
 
       <Modal visible={visible} animationType="slide" onRequestClose={goBack} statusBarTranslucent={false}>
-        <SafeAreaView style={styles.safe}>
+        <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
           <View style={styles.header}>
             <Pressable onPress={goBack} hitSlop={12}>
               <Text style={styles.headerAction}>{screen === 'list' ? 'Κλείσιμο' : '‹ Πίσω'}</Text>
@@ -646,7 +647,7 @@ const styles = StyleSheet.create({
   issueMark: { width: 23, height: 23, borderRadius: 12, textAlign: 'center', textAlignVertical: 'center', overflow: 'hidden', color: '#fff', backgroundColor: '#d79000', fontWeight: '900' },
   issueMarkBlock: { backgroundColor: '#d73949' },
   issueText: { flex: 1, color: '#10233f', lineHeight: 20 },
-  fab: { position: 'absolute', right: 14, bottom: 90, zIndex: 20, elevation: 10, width: 54, height: 54, borderRadius: 27, backgroundColor: '#07163e', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 7, shadowOffset: { width: 0, height: 3 } },
+  fab: { position: 'absolute', right: 14, bottom: 92, zIndex: 20, elevation: 10, width: 54, height: 54, borderRadius: 27, backgroundColor: '#07163e', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 7, shadowOffset: { width: 0, height: 3 } },
   fabTop: { color: '#55a6ff', fontSize: 27, lineHeight: 31, fontWeight: '900' },
   fabText: { display: 'none' },
 });
