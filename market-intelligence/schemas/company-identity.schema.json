@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://investorcontrol.local/schemas/company-identity.schema.json",
+  "title": "CompanyIdentity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "companyId",
+    "legalName",
+    "primaryListing",
+    "country",
+    "currency",
+    "sector",
+    "active"
+  ],
+  "properties": {
+    "companyId": { "type": "string", "minLength": 3 },
+    "legalName": { "type": "string", "minLength": 1 },
+    "displayName": { "type": "string", "minLength": 1 },
+    "primaryListing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exchange", "symbol"],
+      "properties": {
+        "exchange": { "type": "string", "minLength": 1 },
+        "symbol": { "type": "string", "minLength": 1 },
+        "mic": { "type": ["string", "null"] }
+      }
+    },
+    "listings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["exchange", "symbol"],
+        "properties": {
+          "exchange": { "type": "string" },
+          "symbol": { "type": "string" },
+          "mic": { "type": ["string", "null"] },
+          "currency": { "type": ["string", "null"] },
+          "active": { "type": "boolean", "default": true }
+        }
+      },
+      "default": []
+    },
+    "isin": { "type": ["string", "null"] },
+    "cik": { "type": ["string", "null"] },
+    "lei": { "type": ["string", "null"] },
+    "country": { "type": "string", "minLength": 2 },
+    "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
+    "sector": { "type": "string", "minLength": 1 },
+    "industry": { "type": ["string", "null"] },
+    "website": { "type": ["string", "null"], "format": "uri" },
+    "investorRelationsUrl": { "type": ["string", "null"], "format": "uri" },
+    "parentCompanyIds": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string" },
+      "default": []
+    },
+    "subsidiaryCompanyIds": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string" },
+      "default": []
+    },
+    "competitorCompanyIds": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string" },
+      "default": []
+    },
+    "relationshipEdges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["targetCompanyId", "relationshipType", "confidence", "evidenceIds"],
+        "properties": {
+          "targetCompanyId": { "type": "string" },
+          "relationshipType": {
+            "type": "string",
+            "enum": ["SUPPLIER", "CUSTOMER", "COMPETITOR", "PARTNER", "PARENT", "SUBSIDIARY", "REGULATORY_EXPOSURE", "COMMODITY_EXPOSURE"]
+          },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "evidenceIds": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string" }
+          }
+        }
+      },
+      "default": []
+    },
+    "active": { "type": "boolean" },
+    "updatedAt": { "type": ["string", "null"], "format": "date-time" }
+  }
+}
