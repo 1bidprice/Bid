@@ -100,7 +100,7 @@ async function fetchText(url, timeoutMs = 15_000) {
       headers: {
         Accept: 'text/html,application/xhtml+xml,application/json,text/plain,*/*',
         'Cache-Control': 'no-cache',
-        'User-Agent': 'InvestorControl/0.6.2',
+        'User-Agent': 'InvestorControl/0.6.3',
       },
       signal: controller.signal,
     });
@@ -190,7 +190,7 @@ async function fetchYahooQuote(ticker) {
       const regularMarketPrice = finite(meta.regularMarketPrice)
         ? Number(meta.regularMarketPrice)
         : null;
-      const changeBase = ['pre-market', 'post-market'].includes(point.session) && finite(regularMarketPrice)
+      const changeBase = point.session === 'post-market' && finite(regularMarketPrice)
         ? regularMarketPrice
         : previousClose;
       return {
