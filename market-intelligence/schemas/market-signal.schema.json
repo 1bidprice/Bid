@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://investorcontrol.local/schemas/market-signal.schema.json",
+  "title": "MarketSignal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "signalId",
+    "version",
+    "companyId",
+    "symbol",
+    "exchange",
+    "category",
+    "suggestedAction",
+    "status",
+    "generatedAt",
+    "referencePrice",
+    "referenceCurrency",
+    "referencePriceAt",
+    "timeHorizon",
+    "facts",
+    "calculations",
+    "thesis",
+    "bullCase",
+    "bearCase",
+    "catalysts",
+    "risks",
+    "invalidation",
+    "evidenceIds",
+    "confidenceScore",
+    "dataQualityScore",
+    "reviewAt",
+    "disclosure"
+  ],
+  "properties": {
+    "signalId": { "type": "string", "minLength": 8 },
+    "version": { "type": "integer", "minimum": 1 },
+    "supersedesSignalId": { "type": ["string", "null"] },
+    "companyId": { "type": "string", "minLength": 3 },
+    "symbol": { "type": "string", "minLength": 1 },
+    "exchange": { "type": "string", "minLength": 1 },
+    "category": {
+      "type": "string",
+      "enum": [
+        "QUALITY_COMPOUNDER",
+        "VALUE_REPRICING",
+        "EVENT_DRIVEN",
+        "SPECULATIVE_CATALYST",
+        "MOMENTUM_CONFIRMED",
+        "TURNAROUND",
+        "INCOME_STABILITY",
+        "DETERIORATION",
+        "EVENT_RISK",
+        "INSUFFICIENT_EVIDENCE"
+      ]
+    },
+    "suggestedAction": {
+      "type": "string",
+      "enum": ["WATCH", "CONSIDER_BUY", "HOLD", "CONSIDER_REDUCE", "AVOID"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["DRAFT", "ACTIVE", "UNDER_REVIEW", "INVALIDATED", "EXPIRED", "CLOSED"]
+    },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "referencePrice": { "type": "number", "exclusiveMinimum": 0 },
+    "referenceCurrency": { "type": "string", "minLength": 3, "maxLength": 3 },
+    "referencePriceAt": { "type": "string", "format": "date-time" },
+    "timeHorizon": {
+      "type": "string",
+      "enum": ["INTRADAY", "DAYS", "WEEKS", "MONTHS", "YEARS"]
+    },
+    "facts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["claim", "evidenceIds"],
+        "properties": {
+          "claim": { "type": "string", "minLength": 1 },
+          "evidenceIds": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "calculations": {
+      "type": "object",
+      "additionalProperties": {
+        "type": ["number", "string", "boolean", "null"]
+      }
+    },
+    "thesis": { "type": "string", "minLength": 20 },
+    "bullCase": { "type": "string", "minLength": 10 },
+    "bearCase": { "type": "string", "minLength": 10 },
+    "catalysts": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "risks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "invalidation": { "type": "string", "minLength": 10 },
+    "evidenceIds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string" }
+    },
+    "confidenceScore": { "type": "number", "minimum": 0, "maximum": 100 },
+    "dataQualityScore": { "type": "number", "minimum": 0, "maximum": 100 },
+    "personalisationScore": { "type": "number", "minimum": 0, "maximum": 100 },
+    "rankingScore": { "type": "number", "minimum": 0, "maximum": 100 },
+    "reviewAt": { "type": "string", "format": "date-time" },
+    "unknowns": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "disclosure": { "type": "string", "minLength": 20 },
+    "outcome": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "return1dPct": { "type": ["number", "null"] },
+        "return1wPct": { "type": ["number", "null"] },
+        "return1mPct": { "type": ["number", "null"] },
+        "return3mPct": { "type": ["number", "null"] },
+        "return6mPct": { "type": ["number", "null"] },
+        "return12mPct": { "type": ["number", "null"] },
+        "maxDrawdownPct": { "type": ["number", "null"] },
+        "catalystResult": {
+          "type": ["string", "null"],
+          "enum": ["CONFIRMED", "PARTIAL", "REJECTED", "NOT_YET_KNOWN", null]
+        }
+      }
+    }
+  }
+}
