@@ -97,41 +97,23 @@ jobs:
         run: npx expo prebuild --platform android --no-install --clean
 
       - name: Build release APK
-        id: gradle
-        continue-on-error: true
         working-directory: mobile/android
         shell: bash
         run: |
-          set +e
+          set -o pipefail
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee ../gradle-v0.6.5.log
-          CODE=${PIPESTATUS[0]}
-          echo "exit_code=${CODE}" >> "$GITHUB_OUTPUT"
-          exit 0
 
-      - name: Persist Gradle failure diagnosis
-        if: steps.gradle.outputs.exit_code != '0'
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p .github/build-metadata
-          {
-            echo "workflow_run_id=${GITHUB_RUN_ID}"
-            echo "source_commit=${GITHUB_SHA}"
-            echo "captured_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo
-            tail -n 300 mobile/gradle-v0.6.5.log
-          } > .github/build-metadata/investor-control-v0.6.5-gradle-failure.log
-          git config user.name 'Investor Control CI'
-          git config user.email 'actions@users.noreply.github.com'
-          git add .github/build-metadata/investor-control-v0.6.5-gradle-failure.log
-          git commit -m 'chore(mobile): record v0.6.5 Gradle failure [skip ci]'
-          git pull --rebase origin investor-control-v0.6.5-native-ui-fix
-          git push origin HEAD:investor-control-v0.6.5-native-ui-fix
-          exit 1
+      - name: Upload Gradle failure diagnostic
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v0.6.5-gradle-diagnostic
+          path: mobile/gradle-v0.6.5.log
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Sign and verify update APK
-        if: steps.gradle.outputs.exit_code == '0'
         shell: bash
         run: |
           set -euo pipefail
@@ -160,7 +142,6 @@ jobs:
           sha256sum "$OUTPUT" | tee mobile/Investor-Control-v0.6.5.sha256
 
       - name: Upload signed v0.6.5 APK
-        if: steps.gradle.outputs.exit_code == '0'
         id: upload
         uses: actions/upload-artifact@v4
         with:
@@ -173,7 +154,6 @@ jobs:
           retention-days: 90
 
       - name: Publish build metadata
-        if: steps.gradle.outputs.exit_code == '0'
         shell: bash
         env:
           ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
