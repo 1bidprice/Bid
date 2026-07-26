@@ -1,12 +1,12 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import LegacyApp from './LegacyApp';
+import PortfolioApp from './PortfolioApp';
 import DecisionOverlay from './DecisionOverlay';
 
 export default function App() {
   return (
     <View style={styles.root}>
-      <LegacyApp />
+      <PortfolioApp />
       <DecisionOverlay />
     </View>
   );
