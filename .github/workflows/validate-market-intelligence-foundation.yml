@@ -1,0 +1,37 @@
+name: Validate Market Intelligence Foundation
+
+on:
+  push:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - market-intelligence/**
+      - .github/workflows/validate-market-intelligence-foundation.yml
+  pull_request:
+    paths:
+      - market-intelligence/**
+      - .github/workflows/validate-market-intelligence-foundation.yml
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run deterministic intelligence tests
+        working-directory: market-intelligence
+        run: npm test
+      - name: Parse JSON schemas
+        working-directory: market-intelligence
+        run: |
+          node - <<'NODE'
+          import fs from 'node:fs';
+          for (const file of fs.readdirSync('schemas').filter((name) => name.endsWith('.json'))) {
+            JSON.parse(fs.readFileSync(`schemas/${file}`, 'utf8'));
+            console.log(`PASS ${file}`);
+          }
+          NODE
