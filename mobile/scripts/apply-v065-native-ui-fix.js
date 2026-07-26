@@ -22,12 +22,9 @@ function replaceRequired(content, from, to, label) {
 function patchDecisionOverlay() {
   let source = read('DecisionOverlay.js');
 
-  source = replaceRequired(
-    source,
-    "  SafeAreaView,\n  ScrollView,",
-    "  ScrollView,",
-    'React Native SafeAreaView import',
-  );
+  // SafeAreaView must come only from react-native-safe-area-context. The old
+  // core React Native import does not apply Android insets reliably.
+  source = source.replace(/^  SafeAreaView,\r?\n/gm, '');
 
   source = replaceRequired(
     source,
@@ -60,6 +57,13 @@ function patchDecisionOverlay() {
   );
 
   source = replaceRequired(source, 'right: 14, bottom: 90,', 'right: 14, bottom: 92,', 'Decision Gate fallback bottom offset');
+
+  if (/^  SafeAreaView,\r?$/m.test(source)) {
+    throw new Error('v0.6.5 patch failed: core SafeAreaView import remains');
+  }
+  if (!source.includes("import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';")) {
+    throw new Error('v0.6.5 patch failed: safe-area-context import missing');
+  }
 
   write('DecisionOverlay.js', source);
 }
