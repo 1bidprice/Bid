@@ -3,6 +3,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { fetchSecRecentFilings } from './adapters/sec-submissions.js';
 import { fetchSecCompanyFacts } from './adapters/sec-companyfacts.js';
+import { fetchFinnhubQuote } from './adapters/finnhub-quote.js';
 import { fetchAllwynRegulatoryAnnouncements } from './adapters/allwyn-regulatory.js';
 import { hydrateEvidenceDocument } from './document-hydrator.js';
 import { extractDocumentObservations } from './document-observations.js';
@@ -79,7 +80,34 @@ function compactFundamentalSummary(snapshot) {
   };
 }
 
-function toSignalOutput(company, evidence, candidate, ranked, fundamentalSnapshot) {
+function compactMarketSummary(snapshot) {
+  if (!snapshot) return null;
+  return {
+    format: snapshot.format,
+    version: snapshot.version,
+    generatedAt: snapshot.generatedAt,
+    source: snapshot.source,
+    sourceUrl: snapshot.sourceUrl,
+    symbol: snapshot.symbol,
+    currency: snapshot.currency,
+    quoteAt: snapshot.quoteAt,
+    ageHours: snapshot.ageHours,
+    stale: snapshot.stale,
+    usable: snapshot.usable,
+    currentPrice: snapshot.currentPrice,
+    previousClose: snapshot.previousClose,
+    open: snapshot.open,
+    high: snapshot.high,
+    low: snapshot.low,
+    dailyChange: snapshot.dailyChange,
+    dailyChangePct: snapshot.dailyChangePct,
+    liquidityMetricsReady: snapshot.liquidityMetricsReady,
+    relativeStrengthMetricsReady: snapshot.relativeStrengthMetricsReady,
+    marketMetricsReady: snapshot.marketMetricsReady,
+  };
+}
+
+function toSignalOutput(company, evidence, candidate, ranked, fundamentalSnapshot, marketSnapshot) {
   const guarded = guardedSignal(candidate, ranked);
   const analysisStage = candidate.requiresDeepReview
     ? 'INDEX_DISCOVERY'
@@ -106,6 +134,7 @@ function toSignalOutput(company, evidence, candidate, ranked, fundamentalSnapsho
     document: evidence.document || null,
     observations: compactObservationSummary(evidence.observations),
     fundamentals: compactFundamentalSummary(fundamentalSnapshot),
+    market: compactMarketSummary(marketSnapshot),
     source: {
       evidenceId: evidence.id,
       sourceName: evidence.sourceName,
@@ -154,6 +183,20 @@ async function collectCompanyFundamentals(company, options) {
   };
 }
 
+async function collectCompanyMarketSnapshot(company, options) {
+  if (company.country === 'US') {
+    return fetchFinnhubQuote(company, {
+      fetchImpl: options.fetchImpl,
+      token: options.finnhubToken,
+      generatedAt: options.now,
+    });
+  }
+  return {
+    snapshot: null,
+    diagnostics: [{ code: 'MARKET_DATA_ADAPTER_PENDING', companyId: company.companyId }],
+  };
+}
+
 async function analyseEvidenceDocument(record, company, options) {
   const hydrated = await hydrateEvidenceDocument(record, {
     fetchImpl: options.fetchImpl,
@@ -178,12 +221,15 @@ export async function runDailyIntelligence(options = {}) {
   const evidence = [];
   const signals = [];
   const fundamentalSnapshots = [];
+  const marketSnapshots = [];
   const documentLimit = Math.max(0, Number(options.documentLimit ?? 5));
 
   for (const company of universe) {
     const fetchImpl = options.fetchImpl || globalThis.fetch;
     const secUserAgent = options.secUserAgent || process.env.SEC_USER_AGENT || '';
+    const finnhubToken = options.finnhubToken || process.env.FINNHUB_TOKEN || '';
     let fundamentalSnapshot = null;
+    let marketSnapshot = null;
 
     try {
       const fundamentalResult = await collectCompanyFundamentals(company, {
@@ -197,6 +243,23 @@ export async function runDailyIntelligence(options = {}) {
     } catch (error) {
       diagnostics.push({
         code: 'FUNDAMENTALS_ADAPTER_FAILED',
+        companyId: company.companyId,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    try {
+      const marketResult = await collectCompanyMarketSnapshot(company, {
+        fetchImpl,
+        finnhubToken,
+        now,
+      });
+      marketSnapshot = marketResult.snapshot || null;
+      diagnostics.push(...(marketResult.diagnostics || []));
+      if (marketSnapshot) marketSnapshots.push(marketSnapshot);
+    } catch (error) {
+      diagnostics.push({
+        code: 'MARKET_DATA_ADAPTER_FAILED',
         companyId: company.companyId,
         message: error instanceof Error ? error.message : String(error),
       });
@@ -234,13 +297,14 @@ export async function runDailyIntelligence(options = {}) {
         }
 
         evidence.push(record);
+        const metricsReady = fundamentalSnapshot?.metricsReady === true && marketSnapshot?.marketMetricsReady === true;
         const candidate = candidateFromEvidence(record, {
           hasPosition: ['company:allwyn-ag', 'company:virgin-galactic-holdings'].includes(company.companyId),
           personalisationScore: 80,
-          metricsReady: false,
+          metricsReady,
         });
         const ranked = rankSignalCandidate(candidate, now);
-        signals.push(toSignalOutput(company, record, candidate, ranked, fundamentalSnapshot));
+        signals.push(toSignalOutput(company, record, candidate, ranked, fundamentalSnapshot, marketSnapshot));
       }
     } catch (error) {
       diagnostics.push({
@@ -270,6 +334,8 @@ export async function runDailyIntelligence(options = {}) {
     documentPendingCount: evidence.filter((record) => record.document?.reviewed !== true).length,
     fundamentalSnapshotCount: fundamentalSnapshots.length,
     fundamentalSnapshots,
+    marketSnapshotCount: marketSnapshots.length,
+    marketSnapshots,
     signalCount: signals.length,
     diagnostics,
     signals,
@@ -284,6 +350,7 @@ async function main() {
   console.log(`Wrote ${report.signalCount} signal candidates to ${outputPath}`);
   console.log(`Reviewed ${report.documentReviewedCount} official source documents`);
   console.log(`Built ${report.fundamentalSnapshotCount} deterministic fundamental snapshots`);
+  console.log(`Built ${report.marketSnapshotCount} guarded market snapshots`);
   if (report.diagnostics.length) {
     console.warn(`Diagnostics: ${JSON.stringify(report.diagnostics)}`);
   }
