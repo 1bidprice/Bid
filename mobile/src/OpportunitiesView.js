@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,7 +11,10 @@ import {
 import {
   clearIntelligenceFeed,
   importIntelligenceFeedAsync,
+  intelligenceFeedFreshness,
   loadCachedIntelligenceFeed,
+  loadIntelligenceSyncState,
+  syncIntelligenceFeedAsync,
 } from './intelligence-feed-store';
 
 function money(referencePrice) {
@@ -27,6 +30,12 @@ function money(referencePrice) {
   } catch {
     return `${value.toLocaleString('el-GR')} ${referencePrice.currency || ''}`.trim();
   }
+}
+
+function when(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('el-GR');
 }
 
 function claimText(value) {
@@ -82,11 +91,9 @@ function IntelligenceCard({ item }) {
           {item.bullCase ? <><Text style={styles.detailTitle}>Θετικό σενάριο</Text><Text style={styles.detailText}>{item.bullCase}</Text></> : null}
           {item.bearCase ? <><Text style={styles.detailTitle}>Αρνητικό σενάριο</Text><Text style={styles.detailText}>{item.bearCase}</Text></> : null}
           {item.invalidationCondition ? <View style={styles.invalidation}><Text style={styles.invalidationTitle}>Τι ακυρώνει την υπόθεση</Text><Text style={styles.detailText}>{item.invalidationCondition}</Text></View> : null}
-
           {item.catalysts?.length ? <><Text style={styles.detailTitle}>Καταλύτες</Text>{item.catalysts.map((entry, index) => <Text key={`c-${index}`} style={styles.bullet}>• {claimText(entry)}</Text>)}</> : null}
           {item.risks?.length ? <><Text style={styles.detailTitle}>Κίνδυνοι</Text>{item.risks.map((entry, index) => <Text key={`r-${index}`} style={styles.bullet}>• {claimText(entry)}</Text>)}</> : null}
           {item.blockerLabels?.length ? <View style={styles.blockers}><Text style={styles.blockerTitle}>Γιατί δεν είναι ακόμη τελική πρόταση</Text>{item.blockerLabels.map((label, index) => <Text key={`b-${index}`} style={styles.blockerText}>• {label}</Text>)}</View> : null}
-
           <Text style={styles.detailTitle}>Πηγές</Text>
           {item.sources?.length ? item.sources.map((source, index) => (
             <Pressable key={`${source.sourceUrl}-${index}`} style={styles.sourceRow} onPress={() => Linking.openURL(source.sourceUrl).catch(() => Alert.alert('Πηγή', 'Δεν ήταν δυνατό να ανοίξει ο σύνδεσμος.'))}>
@@ -96,7 +103,7 @@ function IntelligenceCard({ item }) {
               </View>
               <Text style={styles.sourceState}>{source.reviewed ? 'Ελεγμένη' : 'Εντοπίστηκε'}</Text>
             </Pressable>
-          )) : <Text style={styles.muted}>Δεν υπάρχουν διαθέσιμες πηγές στην εισαγμένη ροή.</Text>}
+          )) : <Text style={styles.muted}>Δεν υπάρχουν διαθέσιμες πηγές στην τρέχουσα ροή.</Text>}
           <Text style={styles.reviewDate}>Επανεξέταση: {item.reviewDate || '—'}</Text>
         </View>
       ) : null}
@@ -117,15 +124,49 @@ function Section({ title, subtitle, items }) {
 
 export default function OpportunitiesView() {
   const [feed, setFeed] = useState(null);
+  const [syncState, setSyncState] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [syncError, setSyncError] = useState(null);
+
+  const sync = useCallback(async ({ manual = false } = {}) => {
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      const result = await syncIntelligenceFeedAsync();
+      setFeed(result.feed);
+      setSyncState(result.syncState);
+      if (manual) Alert.alert('Market Intelligence', result.changed ? 'Η συσκευή ενημερώθηκε με τη νεότερη έγκυρη ροή.' : 'Η συσκευή έχει ήδη την τελευταία διαθέσιμη έγκυρη ροή.');
+    } catch (error) {
+      setSyncState(error.syncState || await loadIntelligenceSyncState());
+      setSyncError(error.message);
+      if (manual) Alert.alert('Δεν ολοκληρώθηκε η ενημέρωση', `${error.message}\n\nΗ τελευταία έγκυρη αποθηκευμένη ροή παραμένει διαθέσιμη.`);
+    } finally {
+      setSyncing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    loadCachedIntelligenceFeed()
-      .then(setFeed)
-      .catch(() => setFeed(null))
-      .finally(() => setLoading(false));
-  }, []);
+    let mounted = true;
+    (async () => {
+      const [cached, previousSync] = await Promise.all([
+        loadCachedIntelligenceFeed(),
+        loadIntelligenceSyncState(),
+      ]);
+      if (!mounted) return;
+      setFeed(cached);
+      setSyncState(previousSync);
+      setLoading(false);
+      await sync();
+    })().catch((error) => {
+      if (mounted) {
+        setLoading(false);
+        setSyncError(error.message);
+      }
+    });
+    return () => { mounted = false; };
+  }, [sync]);
 
   const counts = useMemo(() => feed?.summary || {
     publishedCount: 0,
@@ -133,6 +174,7 @@ export default function OpportunitiesView() {
     researchCount: 0,
     urgentCount: 0,
   }, [feed]);
+  const freshness = useMemo(() => intelligenceFeedFreshness(feed), [feed]);
 
   const importFeed = async () => {
     setImporting(true);
@@ -140,7 +182,9 @@ export default function OpportunitiesView() {
       const imported = await importIntelligenceFeedAsync();
       if (imported) {
         setFeed(imported);
-        Alert.alert('Market Intelligence', 'Η νέα ροή ελέγχθηκε και αποθηκεύτηκε μόνο στη συσκευή.');
+        setSyncState(await loadIntelligenceSyncState());
+        setSyncError(null);
+        Alert.alert('Market Intelligence', 'Η χειροκίνητη ροή ελέγχθηκε και αποθηκεύτηκε μόνο στη συσκευή.');
       }
     } catch (error) {
       Alert.alert('Μη έγκυρη ροή', error.message);
@@ -151,7 +195,7 @@ export default function OpportunitiesView() {
 
   const clear = () => Alert.alert(
     'Διαγραφή ροής έρευνας',
-    'Θα διαγραφούν μόνο οι εισαγμένες αναλύσεις. Οι συναλλαγές και το χαρτοφυλάκιο δεν επηρεάζονται.',
+    'Θα διαγραφούν μόνο οι αναλύσεις και τα στοιχεία συγχρονισμού. Οι συναλλαγές και το χαρτοφυλάκιο δεν επηρεάζονται.',
     [
       { text: 'Άκυρο', style: 'cancel' },
       {
@@ -160,6 +204,8 @@ export default function OpportunitiesView() {
         onPress: async () => {
           await clearIntelligenceFeed();
           setFeed(null);
+          setSyncState(null);
+          setSyncError(null);
         },
       },
     ],
@@ -174,25 +220,42 @@ export default function OpportunitiesView() {
           <Text style={styles.title}>Ευκαιρίες</Text>
           <Text style={styles.subtitle}>Τεκμηριωμένη έρευνα, κίνδυνοι και επόμενες ενέργειες</Text>
         </View>
-        <Pressable style={styles.importSmall} onPress={importFeed} disabled={importing}>
-          {importing ? <ActivityIndicator color="#fff" /> : <Text style={styles.importSmallText}>Εισαγωγή</Text>}
+        <Pressable style={[styles.syncSmall, syncing && styles.disabled]} onPress={() => sync({ manual: true })} disabled={syncing}>
+          {syncing ? <ActivityIndicator color="#fff" /> : <Text style={styles.syncSmallText}>Ανανέωση</Text>}
         </Pressable>
+      </View>
+
+      <View style={[styles.connectionCard, freshness.state === 'stale' && styles.connectionBad]}>
+        <View style={styles.connectionTop}>
+          <View style={styles.grow}>
+            <Text style={styles.connectionTitle}>Αυτόματη ασφαλής ενημέρωση</Text>
+            <Text style={styles.connectionText}>{feed ? `${freshness.label} · δημιουργία ${when(feed.generatedAt)}` : 'Δεν έχει ληφθεί ακόμη έγκυρη ροή.'}</Text>
+          </View>
+          <View style={[styles.healthBadge, freshness.state === 'fresh' && styles.healthGood, freshness.state === 'stale' && styles.healthBad]}>
+            <Text style={[styles.healthText, freshness.state === 'fresh' && styles.healthGoodText, freshness.state === 'stale' && styles.healthBadText]}>{freshness.state === 'fresh' ? 'LIVE' : freshness.state === 'stale' ? 'ΠΑΛΙΑ' : 'ΕΛΕΓΧΟΣ'}</Text>
+          </View>
+        </View>
+        <Text style={styles.connectionMeta}>Τελευταίος επιτυχής συγχρονισμός: {when(syncState?.lastSuccessAt)}</Text>
+        {syncError ? <Text style={styles.syncWarning}>Η online ενημέρωση απέτυχε: {syncError} Προβάλλεται η τελευταία έγκυρη αποθηκευμένη ροή.</Text> : null}
       </View>
 
       {!feed ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>Η μηχανή έρευνας δεν έχει συνδεθεί ακόμη με τη συσκευή.</Text>
-          <Text style={styles.emptyText}>Εισήγαγε το αρχείο <Text style={styles.code}>mobile-intelligence-feed.json</Text>. Η εφαρμογή θα δείξει μόνο όσα πέρασαν τους αντίστοιχους ελέγχους και θα κρατήσει την πρόχειρη έρευνα ως «Παρακολούθηση».</Text>
-          <Pressable style={styles.primary} onPress={importFeed} disabled={importing}>
-            {importing ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Εισαγωγή ροής Market Intelligence</Text>}
+          <Text style={styles.emptyTitle}>Η εφαρμογή συνδέεται πλέον αυτόματα με τη μηχανή έρευνας.</Text>
+          <Text style={styles.emptyText}>Πάτησε «Σύνδεση και ενημέρωση». Η εφαρμογή αποδέχεται μόνο το εγκεκριμένο HTTPS κανάλι, ελέγχει τη δομή της ροής και δεν αντικαθιστά ποτέ νεότερα τοπικά δεδομένα με παλαιότερα.</Text>
+          <Pressable style={[styles.primary, syncing && styles.disabled]} onPress={() => sync({ manual: true })} disabled={syncing}>
+            {syncing ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Σύνδεση και ενημέρωση</Text>}
           </Pressable>
-          <Text style={styles.privacy}>Το αρχείο αποθηκεύεται σε ξεχωριστό τοπικό κλειδί. Δεν αλλάζει συναλλαγές, τιμές αγοράς ή λογιστικά δεδομένα.</Text>
+          <Pressable style={styles.secondary} onPress={importFeed} disabled={importing}>
+            {importing ? <ActivityIndicator color="#16345f" /> : <Text style={styles.secondaryText}>Εφεδρική εισαγωγή αρχείου JSON</Text>}
+          </Pressable>
+          <Text style={styles.privacy}>Η ροή αποθηκεύεται σε ξεχωριστό τοπικό κλειδί. Δεν αλλάζει συναλλαγές, τιμές αγοράς, Decision Gate ή λογιστικά δεδομένα.</Text>
         </View>
       ) : (
         <>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryHeadline}>{feed.today?.headline || 'Ημερήσια σύνοψη'}</Text>
-            <Text style={styles.updated}>Δημιουργία: {new Date(feed.generatedAt).toLocaleString('el-GR')}</Text>
+            <Text style={styles.updated}>Έγκυρη ροή: {when(feed.generatedAt)}</Text>
             <View style={styles.countRow}>
               <View style={styles.countBox}><Text style={styles.countValue}>{counts.publishedCount}</Text><Text style={styles.countLabel}>Δημοσιευμένες</Text></View>
               <View style={styles.countBox}><Text style={styles.countValue}>{counts.reviewReadyCount}</Text><Text style={styles.countLabel}>Για έλεγχο</Text></View>
@@ -203,11 +266,10 @@ export default function OpportunitiesView() {
           <Section title="Αυξημένη προτεραιότητα" subtitle="Κίνδυνοι ή εξελίξεις που χρειάζονται πρώτα προσοχή" items={feed.urgent || []} />
           <Section title="Δημοσιευμένες ευκαιρίες" subtitle="Φάκελοι που πέρασαν όλους τους ελέγχους και τη διαδικασία δημοσίευσης" items={feed.published || []} />
           <Section title="Έτοιμα για τελικό έλεγχο" subtitle="Πλήρεις φάκελοι που δεν έχουν ακόμη δημοσιευτεί" items={feed.reviewReady || []} />
-          <Section title="Έρευνα σε εξέλιξη" subtitle="Το σύστημα δείχνει ακριβώς τι λείπει πριν επιτρέψει κατεύθυνση αγοράς ή πώλησης" items={feed.research || []} />
-
-          {!feed.published?.length && !feed.reviewReady?.length && !feed.research?.length ? <View style={styles.empty}><Text style={styles.emptyTitle}>Η εισαγμένη ροή δεν περιέχει εταιρικούς φακέλους.</Text></View> : null}
+          <Section title="Έρευνα σε εξέλιξη" subtitle="Το σύστημα δείχνει καθαρά τι λείπει και δεν επιτρέπει πρόωρη κατεύθυνση αγοράς ή πώλησης" items={feed.research || []} />
+          {!feed.published?.length && !feed.reviewReady?.length && !feed.research?.length ? <View style={styles.empty}><Text style={styles.emptyTitle}>Η σύνδεση λειτουργεί, αλλά η τρέχουσα ροή δεν περιέχει ακόμη εταιρικούς φακέλους.</Text><Text style={styles.emptyText}>Αυτό είναι ασφαλέστερο από το να εμφανιστεί μη τεκμηριωμένη πρόταση. Η επόμενη επιτυχής ημερήσια εκτέλεση θα ενημερώσει αυτόματα την οθόνη.</Text></View> : null}
           <Text style={styles.disclosure}>{feed.disclosure}</Text>
-          <Pressable style={styles.secondary} onPress={importFeed}><Text style={styles.secondaryText}>Αντικατάσταση με νεότερη ροή</Text></Pressable>
+          <Pressable style={styles.secondary} onPress={importFeed} disabled={importing}><Text style={styles.secondaryText}>Εφεδρική εισαγωγή αρχείου</Text></Pressable>
           <Pressable style={styles.clearButton} onPress={clear}><Text style={styles.clearText}>Διαγραφή μόνο της ροής έρευνας</Text></Pressable>
         </>
       )}
@@ -217,16 +279,29 @@ export default function OpportunitiesView() {
 
 const styles = StyleSheet.create({
   loading: { minHeight: 220, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
   grow: { flex: 1, minWidth: 0 },
   title: { color: '#16345f', fontSize: 28, lineHeight: 34, fontWeight: '900' },
   subtitle: { color: '#718096', fontSize: 13, lineHeight: 19, marginTop: 3 },
-  importSmall: { minHeight: 44, minWidth: 86, borderRadius: 15, paddingHorizontal: 13, backgroundColor: '#0B66FF', alignItems: 'center', justifyContent: 'center' },
-  importSmallText: { color: '#fff', fontWeight: '900' },
+  syncSmall: { minHeight: 44, minWidth: 92, borderRadius: 15, paddingHorizontal: 12, backgroundColor: '#0B66FF', alignItems: 'center', justifyContent: 'center' },
+  syncSmallText: { color: '#fff', fontWeight: '900' },
+  disabled: { opacity: 0.62 },
+  connectionCard: { backgroundColor: '#eef7ff', borderWidth: 1, borderColor: '#bdd9ff', borderRadius: 20, padding: 15, marginBottom: 16 },
+  connectionBad: { backgroundColor: '#fff8e7', borderColor: '#efd8a3' },
+  connectionTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  connectionTitle: { color: '#16345f', fontSize: 16, fontWeight: '900' },
+  connectionText: { color: '#52647d', fontSize: 12, lineHeight: 18, marginTop: 3 },
+  connectionMeta: { color: '#718096', fontSize: 11, marginTop: 9 },
+  syncWarning: { color: '#8a5d00', fontSize: 12, lineHeight: 18, marginTop: 9, fontWeight: '700' },
+  healthBadge: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 6, backgroundColor: '#edf2f8' },
+  healthGood: { backgroundColor: '#e4f7ed' },
+  healthBad: { backgroundColor: '#fff0f2' },
+  healthText: { color: '#65758a', fontSize: 10, fontWeight: '900' },
+  healthGoodText: { color: '#087846' },
+  healthBadText: { color: '#b42336' },
   empty: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#d5dfec', borderRadius: 23, padding: 20, marginBottom: 16 },
   emptyTitle: { color: '#16345f', fontSize: 20, lineHeight: 26, fontWeight: '900' },
   emptyText: { color: '#5f6f84', fontSize: 15, lineHeight: 22, marginTop: 10 },
-  code: { color: '#0B66FF', fontWeight: '900' },
   primary: { minHeight: 56, borderRadius: 18, backgroundColor: '#0B66FF', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, marginTop: 18 },
   primaryText: { color: '#fff', fontWeight: '900', textAlign: 'center' },
   privacy: { color: '#718096', fontSize: 12, lineHeight: 18, marginTop: 13 },
@@ -278,7 +353,7 @@ const styles = StyleSheet.create({
   sourceState: { color: '#0B66FF', fontSize: 10, fontWeight: '900' },
   reviewDate: { color: '#718096', fontSize: 12, marginTop: 13 },
   disclosure: { color: '#718096', fontSize: 12, lineHeight: 18, marginTop: 4, marginBottom: 14 },
-  secondary: { minHeight: 54, borderRadius: 18, borderWidth: 1, borderColor: '#cbd7e6', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
+  secondary: { minHeight: 54, borderRadius: 18, borderWidth: 1, borderColor: '#cbd7e6', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', marginTop: 10 },
   secondaryText: { color: '#16345f', fontWeight: '900' },
   clearButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', marginTop: 6, marginBottom: 16 },
   clearText: { color: '#b42336', fontWeight: '800' },
