@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://investorcontrol.local/schemas/mobile-intelligence-feed.schema.json",
+  "title": "MobileIntelligenceFeed",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "version",
+    "generatedAt",
+    "summary",
+    "today",
+    "published",
+    "reviewReady",
+    "research",
+    "urgent",
+    "assistantContext",
+    "disclosure"
+  ],
+  "properties": {
+    "format": { "const": "investor-control-mobile-intelligence-feed" },
+    "version": { "type": "integer", "minimum": 1 },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["publishedCount", "reviewReadyCount", "researchCount", "urgentCount", "unresolvedDiagnosticCount"],
+      "properties": {
+        "publishedCount": { "type": "integer", "minimum": 0 },
+        "reviewReadyCount": { "type": "integer", "minimum": 0 },
+        "researchCount": { "type": "integer", "minimum": 0 },
+        "urgentCount": { "type": "integer", "minimum": 0 },
+        "unresolvedDiagnosticCount": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "today": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["headline", "primaryItem"],
+      "properties": {
+        "headline": { "type": "string", "minLength": 1 },
+        "primaryItem": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/feedItem" }] }
+      }
+    },
+    "published": { "type": "array", "items": { "$ref": "#/$defs/feedItem" } },
+    "reviewReady": { "type": "array", "items": { "$ref": "#/$defs/feedItem" } },
+    "research": { "type": "array", "items": { "$ref": "#/$defs/feedItem" } },
+    "urgent": { "type": "array", "items": { "$ref": "#/$defs/feedItem" } },
+    "assistantContext": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["companyId", "companyName", "symbol", "status", "category", "action", "thesis", "blockers", "nextStep", "reviewDate"],
+        "properties": {
+          "companyId": { "type": "string" },
+          "companyName": { "type": "string" },
+          "symbol": { "type": ["string", "null"] },
+          "status": { "type": "string" },
+          "category": { "type": "string" },
+          "action": { "type": "string" },
+          "thesis": { "type": ["string", "null"] },
+          "blockers": { "type": "array", "items": { "type": "string" } },
+          "nextStep": { "type": "string" },
+          "reviewDate": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "disclosure": { "type": "string", "minLength": 20 }
+  },
+  "$defs": {
+    "feedItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "companyId", "companyName", "symbol", "exchange", "status", "statusLabel",
+        "category", "categoryLabel", "action", "actionLabel", "timeHorizon", "referencePrice",
+        "thesis", "causalMechanism", "bullCase", "bearCase", "catalysts", "risks",
+        "invalidationCondition", "reviewDate", "blockers", "blockerLabels", "nextStep", "sources", "generatedAt"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "companyId": { "type": "string" },
+        "companyName": { "type": "string" },
+        "symbol": { "type": ["string", "null"] },
+        "exchange": { "type": ["string", "null"] },
+        "status": { "type": "string", "enum": ["DRAFT_RESEARCH", "REVIEW_READY", "PUBLISHED"] },
+        "statusLabel": { "type": "string" },
+        "category": { "type": "string" },
+        "categoryLabel": { "type": "string" },
+        "action": { "type": "string", "enum": ["WATCH", "CONSIDER_BUY", "HOLD", "CONSIDER_REDUCE", "AVOID"] },
+        "actionLabel": { "type": "string" },
+        "timeHorizon": { "type": "string" },
+        "referencePrice": { "type": ["object", "null"] },
+        "thesis": { "type": ["string", "null"] },
+        "causalMechanism": { "type": ["string", "null"] },
+        "bullCase": { "type": ["string", "null"] },
+        "bearCase": { "type": ["string", "null"] },
+        "catalysts": { "type": "array" },
+        "risks": { "type": "array" },
+        "invalidationCondition": { "type": ["string", "null"] },
+        "reviewDate": { "type": ["string", "null"] },
+        "blockers": { "type": "array", "items": { "type": "string" } },
+        "blockerLabels": { "type": "array", "items": { "type": "string" } },
+        "nextStep": { "type": "string" },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sourceName", "sourceType", "title", "sourceUrl", "publishedAt", "reviewed", "primary"],
+            "properties": {
+              "sourceName": { "type": "string" },
+              "sourceType": { "type": "string" },
+              "title": { "type": "string" },
+              "sourceUrl": { "type": "string", "format": "uri" },
+              "publishedAt": { "type": "string", "format": "date-time" },
+              "reviewed": { "type": "boolean" },
+              "primary": { "type": "boolean" }
+            }
+          }
+        },
+        "generatedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}
