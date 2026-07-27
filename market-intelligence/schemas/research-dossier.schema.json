@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://investorcontrol.local/schemas/research-dossier.schema.json",
+  "title": "ResearchDossier",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "dossierId",
+    "version",
+    "companyId",
+    "companyName",
+    "listing",
+    "generatedAt",
+    "status",
+    "category",
+    "proposedAction",
+    "timeHorizon",
+    "referencePrice",
+    "thesis",
+    "causalMechanism",
+    "catalysts",
+    "bullCase",
+    "bearCase",
+    "risks",
+    "invalidationCondition",
+    "evidence",
+    "metrics",
+    "readiness",
+    "reviewDate"
+  ],
+  "properties": {
+    "dossierId": { "type": "string", "minLength": 12 },
+    "version": { "type": "integer", "minimum": 1 },
+    "companyId": { "type": "string", "minLength": 3 },
+    "companyName": { "type": "string", "minLength": 1 },
+    "listing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exchange", "symbol"],
+      "properties": {
+        "exchange": { "type": "string", "minLength": 1 },
+        "symbol": { "type": "string", "minLength": 1 },
+        "mic": { "type": ["string", "null"] }
+      }
+    },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "status": {
+      "type": "string",
+      "enum": ["DRAFT_RESEARCH", "REVIEW_READY", "PUBLISHED", "REJECTED", "ARCHIVED"]
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "QUALITY_COMPOUNDER",
+        "VALUE_REPRICING",
+        "EVENT_DRIVEN",
+        "SPECULATIVE_CATALYST",
+        "MOMENTUM_CONFIRMED",
+        "TURNAROUND",
+        "INCOME_STABILITY",
+        "DETERIORATION",
+        "EVENT_RISK",
+        "INSUFFICIENT_EVIDENCE"
+      ]
+    },
+    "proposedAction": {
+      "type": "string",
+      "enum": ["WATCH", "CONSIDER_BUY", "HOLD", "CONSIDER_REDUCE", "AVOID"]
+    },
+    "timeHorizon": {
+      "type": "string",
+      "enum": ["INTRADAY", "DAYS", "WEEKS", "MONTHS", "YEARS", "UNDETERMINED"]
+    },
+    "referencePrice": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["value", "currency", "timestamp", "source"],
+      "properties": {
+        "value": { "type": "number", "exclusiveMinimum": 0 },
+        "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "source": { "type": "string", "minLength": 1 }
+      }
+    },
+    "thesis": { "type": ["string", "null"], "minLength": 80 },
+    "causalMechanism": { "type": ["string", "null"], "minLength": 40 },
+    "catalysts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/claim" }
+    },
+    "bullCase": { "type": ["string", "null"], "minLength": 40 },
+    "bearCase": { "type": ["string", "null"], "minLength": 40 },
+    "risks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/claim" }
+    },
+    "invalidationCondition": { "type": ["string", "null"], "minLength": 20 },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["evidenceId", "sourceName", "sourceType", "sourceUrl", "title", "publishedAt", "independenceGroup", "isPrimarySource"],
+        "properties": {
+          "evidenceId": { "type": "string" },
+          "sourceName": { "type": "string" },
+          "sourceType": { "type": "string" },
+          "sourceUrl": { "type": "string", "format": "uri" },
+          "title": { "type": "string" },
+          "publishedAt": { "type": "string", "format": "date-time" },
+          "independenceGroup": { "type": ["string", "null"] },
+          "isPrimarySource": { "type": "boolean" },
+          "documentStatus": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "readiness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["publishable", "blockers"],
+      "properties": {
+        "publishable": { "type": "boolean" },
+        "blockers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "reviewDate": { "type": ["string", "null"], "format": "date" },
+    "disclosure": { "type": "string" }
+  },
+  "$defs": {
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "evidenceIds", "confidence"],
+      "properties": {
+        "text": { "type": "string", "minLength": 10 },
+        "evidenceIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string" }
+        },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "inference": { "type": "boolean", "default": false }
+      }
+    }
+  }
+}
