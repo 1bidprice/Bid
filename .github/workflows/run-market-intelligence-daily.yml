@@ -1,0 +1,66 @@
+name: Run Market Intelligence Daily
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 5 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: market-intelligence-daily
+  cancel-in-progress: false
+
+jobs:
+  daily-intelligence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout intelligence branch
+        uses: actions/checkout@v4
+        with:
+          ref: investor-control-v1-market-intelligence-foundation
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run deterministic tests
+        working-directory: market-intelligence
+        run: npm test
+
+      - name: Collect official evidence and build guarded candidates
+        working-directory: market-intelligence
+        env:
+          SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+        run: npm run run:daily
+
+      - name: Verify report contract
+        working-directory: market-intelligence
+        run: |
+          node - <<'NODE'
+          const report = require('./out/daily-intelligence.json');
+          if (report.format !== 'investor-control-daily-intelligence') throw new Error('wrong report format');
+          if (report.version !== 1) throw new Error('wrong report version');
+          if (!Array.isArray(report.signals)) throw new Error('signals missing');
+          if (!Array.isArray(report.diagnostics)) throw new Error('diagnostics missing');
+          if (report.evidenceCount < 1) throw new Error('no official evidence collected');
+          for (const signal of report.signals) {
+            if (!signal.source?.sourceUrl) throw new Error('signal source missing');
+            if (signal.status !== 'DRAFT' || signal.suggestedAction !== 'WATCH') {
+              throw new Error('index-level evidence escaped the deep-review guard');
+            }
+          }
+          console.log(`PASS: ${report.evidenceCount} evidence records, ${report.signalCount} guarded candidates`);
+          NODE
+
+      - name: Upload daily intelligence report
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-daily-intelligence-${{ github.run_id }}
+          path: market-intelligence/out/daily-intelligence.json
+          if-no-files-found: error
+          retention-days: 90
