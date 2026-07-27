@@ -1,4 +1,5 @@
 import { contentHash } from '../content-hash.js';
+import { reviewTrustedNewsRecords } from '../trusted-news-review.js';
 
 const DEFAULT_PUBLISHERS = Object.freeze({
   reuters: { name: 'Reuters', reliabilityTier: 2 },
@@ -7,8 +8,8 @@ const DEFAULT_PUBLISHERS = Object.freeze({
   'the wall street journal': { name: 'The Wall Street Journal', reliabilityTier: 2 },
   'associated press': { name: 'Associated Press', reliabilityTier: 2 },
   cnbc: { name: 'CNBC', reliabilityTier: 3 },
-  'marketwatch': { name: 'MarketWatch', reliabilityTier: 3 },
-  'fortune': { name: 'Fortune', reliabilityTier: 3 },
+  marketwatch: { name: 'MarketWatch', reliabilityTier: 3 },
+  fortune: { name: 'Fortune', reliabilityTier: 3 },
 });
 
 function decodeXml(value) {
@@ -156,7 +157,7 @@ export async function fetchTrustedNewsEvidence(company, options = {}) {
   const response = await fetchImpl(url, {
     headers: {
       Accept: 'application/rss+xml, application/xml, text/xml',
-      'User-Agent': options.userAgent || 'Investor-Control-Market-Intelligence/0.4',
+      'User-Agent': options.userAgent || 'Investor-Control-Market-Intelligence/0.5',
     },
   });
   if (!response.ok) {
@@ -174,11 +175,28 @@ export async function fetchTrustedNewsEvidence(company, options = {}) {
     expiryDays: options.expiryDays,
     language: options.recordLanguage || 'en',
   });
+  let records = extracted.records;
+  const diagnostics = [...extracted.rejected.slice(0, 20)];
+
+  if (options.review !== false && records.length) {
+    const reviewed = await reviewTrustedNewsRecords(records, company, {
+      fetchImpl,
+      reviewedAt: options.retrievedAt,
+      limit: options.reviewLimit ?? 3,
+      userAgent: options.userAgent || 'Investor-Control-Market-Intelligence/0.5',
+      maxBytes: options.reviewMaxBytes,
+      minText: options.reviewMinText,
+      maxRetained: options.reviewMaxRetained,
+    });
+    records = reviewed.records;
+    diagnostics.push(...(reviewed.diagnostics || []));
+  }
+
   return {
-    records: extracted.records,
+    records,
     diagnostics: [
-      ...extracted.rejected.slice(0, 20),
-      ...(extracted.records.length ? [] : [{ code: 'NO_ALLOWLISTED_NEWS_MATCHES', companyId: company.companyId }]),
+      ...diagnostics,
+      ...(records.length ? [] : [{ code: 'NO_ALLOWLISTED_NEWS_MATCHES', companyId: company.companyId }]),
     ],
   };
 }
