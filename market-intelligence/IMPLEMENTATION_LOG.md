@@ -108,17 +108,39 @@ Completed on branch `investor-control-v1-market-intelligence-foundation`:
 - tests covering source adapters, event classification, schema discipline and guarded actions;
 - successful expanded CI on commit `272cdaf99f2a493473a905bb4fac5f905e8bcc1b`.
 
+## 2026-07-27 — Official document and deterministic metrics stage completed
+
+The pipeline now goes beyond index titles:
+
+- retrieves official HTML/XHTML/text source documents with size and content-type limits;
+- strips scripts, styles and executable markup before analysis;
+- refuses to mark PDF files as reviewed until a dedicated PDF text-extraction stage exists;
+- records document status, content type, byte length, text length and review state;
+- extracts auditable currency amounts, percentages, share counts, dates and recognised sections with source excerpts;
+- distinguishes `INDEX_DISCOVERY` from `DOCUMENT_REVIEWED` in every signal;
+- keeps reviewed documents at `DRAFT / WATCH` until fundamental and market requirements are satisfied;
+- retrieves SEC Company Facts for US issuers using the official companyfacts endpoint;
+- calculates provenance-backed annual revenue growth, net margin, diluted-share change and annual free cash flow;
+- records latest cash, assets, liabilities and equity with concept, unit, period, accession and filing date;
+- retrieves a current US quote through Finnhub when a backend token is configured;
+- records quote timestamp, age, current price, previous close and daily change;
+- explicitly keeps liquidity and relative-strength readiness false because a point-in-time quote cannot prove either metric;
+- expanded deterministic tests pass on commit `e1d8ca7b0aa571a50a0615bd3c99ddebda25c815`.
+
 Operational configuration still required:
 
-- repository variable `SEC_USER_AGENT` must contain an identifying SEC-compliant User-Agent before live SPCE EDGAR collection is considered production-ready.
+- repository variable `SEC_USER_AGENT` must contain an identifying SEC-compliant User-Agent;
+- repository secret `FINNHUB_TOKEN` must be configured for backend SPCE quotes;
+- Allwyn market data needs a lawful backend source separate from the current Android display feed.
 
 Next implementation target:
 
-- retrieve underlying filing and announcement documents, not only index metadata;
-- extract verified claims and numeric facts;
-- calculate deterministic market, valuation, liquidity and balance-sheet metrics;
-- cross-check independent evidence;
-- produce the first complete Allwyn and SPCE signal reports with thesis, bull case, bear case, risks, invalidation condition, confidence and review date.
+- dedicated PDF text extraction and page-level provenance for Allwyn annual reports and regulatory attachments;
+- daily historical price and volume series rather than a single quote;
+- deterministic volatility, liquidity and relative-strength metrics;
+- valuation and balance-sheet risk rules tied to source periods;
+- independent-source cross-checking and contradiction records;
+- first complete Allwyn and SPCE signal reports with thesis, bull case, bear case, catalysts, risks, invalidation, confidence and review date.
 
 ## Non-negotiable rules
 
