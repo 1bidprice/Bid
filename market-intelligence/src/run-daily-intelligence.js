@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { fetchSecRecentFilings } from './adapters/sec-submissions.js';
+import { fetchSecCompanyFacts } from './adapters/sec-companyfacts.js';
 import { fetchAllwynRegulatoryAnnouncements } from './adapters/allwyn-regulatory.js';
 import { hydrateEvidenceDocument } from './document-hydrator.js';
 import { extractDocumentObservations } from './document-observations.js';
@@ -55,7 +56,30 @@ function compactObservationSummary(observations) {
   };
 }
 
-function toSignalOutput(company, evidence, candidate, ranked) {
+function compactFundamentalSummary(snapshot) {
+  if (!snapshot) return null;
+  return {
+    format: snapshot.format,
+    version: snapshot.version,
+    generatedAt: snapshot.generatedAt,
+    sourceUrl: snapshot.sourceUrl,
+    coverage: snapshot.coverage,
+    metricsReady: snapshot.metricsReady,
+    metrics: snapshot.metrics,
+    latest: {
+      revenue: snapshot.annual?.revenue?.[0] || null,
+      netIncome: snapshot.annual?.netIncome?.[0] || null,
+      operatingCashFlow: snapshot.annual?.operatingCashFlow?.[0] || null,
+      dilutedShares: snapshot.annual?.dilutedShares?.[0] || null,
+      cash: snapshot.instant?.cash || null,
+      assets: snapshot.instant?.assets || null,
+      liabilities: snapshot.instant?.liabilities || null,
+      equity: snapshot.instant?.equity || null,
+    },
+  };
+}
+
+function toSignalOutput(company, evidence, candidate, ranked, fundamentalSnapshot) {
   const guarded = guardedSignal(candidate, ranked);
   const analysisStage = candidate.requiresDeepReview
     ? 'INDEX_DISCOVERY'
@@ -81,6 +105,7 @@ function toSignalOutput(company, evidence, candidate, ranked) {
     publishedAt: evidence.publishedAt,
     document: evidence.document || null,
     observations: compactObservationSummary(evidence.observations),
+    fundamentals: compactFundamentalSummary(fundamentalSnapshot),
     source: {
       evidenceId: evidence.id,
       sourceName: evidence.sourceName,
@@ -115,6 +140,20 @@ async function collectCompanyEvidence(company, options) {
   };
 }
 
+async function collectCompanyFundamentals(company, options) {
+  if (company.cik) {
+    return fetchSecCompanyFacts(company, {
+      fetchImpl: options.fetchImpl,
+      userAgent: options.secUserAgent,
+      generatedAt: options.now,
+    });
+  }
+  return {
+    snapshot: null,
+    diagnostics: [{ code: 'FUNDAMENTALS_ADAPTER_PENDING', companyId: company.companyId }],
+  };
+}
+
 async function analyseEvidenceDocument(record, company, options) {
   const hydrated = await hydrateEvidenceDocument(record, {
     fetchImpl: options.fetchImpl,
@@ -138,13 +177,35 @@ export async function runDailyIntelligence(options = {}) {
   const diagnostics = [];
   const evidence = [];
   const signals = [];
+  const fundamentalSnapshots = [];
   const documentLimit = Math.max(0, Number(options.documentLimit ?? 5));
 
   for (const company of universe) {
+    const fetchImpl = options.fetchImpl || globalThis.fetch;
+    const secUserAgent = options.secUserAgent || process.env.SEC_USER_AGENT || '';
+    let fundamentalSnapshot = null;
+
+    try {
+      const fundamentalResult = await collectCompanyFundamentals(company, {
+        fetchImpl,
+        secUserAgent,
+        now,
+      });
+      fundamentalSnapshot = fundamentalResult.snapshot || null;
+      diagnostics.push(...(fundamentalResult.diagnostics || []));
+      if (fundamentalSnapshot) fundamentalSnapshots.push(fundamentalSnapshot);
+    } catch (error) {
+      diagnostics.push({
+        code: 'FUNDAMENTALS_ADAPTER_FAILED',
+        companyId: company.companyId,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+
     try {
       const result = await collectCompanyEvidence(company, {
-        fetchImpl: options.fetchImpl || globalThis.fetch,
-        secUserAgent: options.secUserAgent || process.env.SEC_USER_AGENT || '',
+        fetchImpl,
+        secUserAgent,
         now,
         limit: Number(options.limit || 20),
       });
@@ -155,8 +216,8 @@ export async function runDailyIntelligence(options = {}) {
         let record = records[index];
         if (index < documentLimit) {
           const analysed = await analyseEvidenceDocument(record, company, {
-            fetchImpl: options.fetchImpl || globalThis.fetch,
-            secUserAgent: options.secUserAgent || process.env.SEC_USER_AGENT || '',
+            fetchImpl,
+            secUserAgent,
             documentUserAgent: options.documentUserAgent || 'Investor-Control-Market-Intelligence/0.2',
             now,
             maxDocumentBytes: options.maxDocumentBytes,
@@ -179,7 +240,7 @@ export async function runDailyIntelligence(options = {}) {
           metricsReady: false,
         });
         const ranked = rankSignalCandidate(candidate, now);
-        signals.push(toSignalOutput(company, record, candidate, ranked));
+        signals.push(toSignalOutput(company, record, candidate, ranked, fundamentalSnapshot));
       }
     } catch (error) {
       diagnostics.push({
@@ -207,6 +268,8 @@ export async function runDailyIntelligence(options = {}) {
     evidenceCount: evidence.length,
     documentReviewedCount: evidence.filter((record) => record.document?.reviewed === true).length,
     documentPendingCount: evidence.filter((record) => record.document?.reviewed !== true).length,
+    fundamentalSnapshotCount: fundamentalSnapshots.length,
+    fundamentalSnapshots,
     signalCount: signals.length,
     diagnostics,
     signals,
@@ -220,6 +283,7 @@ async function main() {
   await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   console.log(`Wrote ${report.signalCount} signal candidates to ${outputPath}`);
   console.log(`Reviewed ${report.documentReviewedCount} official source documents`);
+  console.log(`Built ${report.fundamentalSnapshotCount} deterministic fundamental snapshots`);
   if (report.diagnostics.length) {
     console.warn(`Diagnostics: ${JSON.stringify(report.diagnostics)}`);
   }
