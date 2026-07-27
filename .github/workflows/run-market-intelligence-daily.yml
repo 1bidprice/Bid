@@ -1,6 +1,12 @@
 name: Run Market Intelligence Daily
 
 on:
+  push:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - market-intelligence/**
+      - .github/workflows/run-market-intelligence-daily.yml
   workflow_dispatch:
   schedule:
     - cron: '30 5 * * *'
