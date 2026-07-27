@@ -140,7 +140,7 @@ test('daily runner reviews documents but blocks advice until all independent gat
   assert.equal(report.documentReviewedCount, 1);
   assert.equal(report.researchDossierCount, 1);
   assert.equal(report.researchDossiers[0].status, 'DRAFT_RESEARCH');
-  assert.ok(report.researchDossiers[0].thesis?.includes('share-buyback'));
+  assert.ok(report.researchDossiers[0].thesis?.includes('επαναγοράς ιδίων μετοχών'));
   assert.equal(report.signals[0].analysisStage, 'DOCUMENT_REVIEWED');
   assert.equal(report.signals[0].status, 'DRAFT');
   assert.equal(report.signals[0].suggestedAction, 'WATCH');
