@@ -44,7 +44,7 @@ jobs:
         working-directory: market-intelligence
         run: npm test
 
-      - name: Collect official evidence and build guarded candidates
+      - name: Collect evidence and build guarded research dossiers
         working-directory: market-intelligence
         env:
           SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
@@ -57,18 +57,30 @@ jobs:
           node - <<'NODE'
           const report = require('./out/daily-intelligence.json');
           if (report.format !== 'investor-control-daily-intelligence') throw new Error('wrong report format');
-          if (report.version !== 3) throw new Error('wrong report version');
+          if (report.version !== 4) throw new Error('wrong report version');
           if (!Array.isArray(report.signals)) throw new Error('signals missing');
           if (!Array.isArray(report.diagnostics)) throw new Error('diagnostics missing');
           if (!Array.isArray(report.fundamentalSnapshots)) throw new Error('fundamental snapshots missing');
+          if (!Array.isArray(report.fundamentalRiskAssessments)) throw new Error('fundamental risk assessments missing');
           if (!Array.isArray(report.marketSnapshots)) throw new Error('market snapshots missing');
           if (!Array.isArray(report.historicalMarketMetrics)) throw new Error('historical market metrics missing');
-          if (report.evidenceCount < 1) throw new Error('no official evidence collected');
+          if (!Array.isArray(report.researchDossiers)) throw new Error('research dossiers missing');
+          if (!report.opportunitiesFeed || !Array.isArray(report.opportunitiesFeed.items)) throw new Error('opportunities feed missing');
+          if (report.evidenceCount < 1) throw new Error('no evidence collected');
+          if (!Number.isInteger(report.independentDiscoveryCount)) throw new Error('independent discovery count missing');
           if (!Number.isInteger(report.documentReviewedCount)) throw new Error('document review count missing');
           if (!Number.isInteger(report.pdfReviewedCount)) throw new Error('PDF review count missing');
           if (!Number.isInteger(report.fundamentalSnapshotCount)) throw new Error('fundamental snapshot count missing');
+          if (!Number.isInteger(report.fundamentalRiskAssessmentCount)) throw new Error('fundamental risk count missing');
           if (!Number.isInteger(report.marketSnapshotCount)) throw new Error('market snapshot count missing');
           if (!Number.isInteger(report.historicalMarketMetricsCount)) throw new Error('historical market metrics count missing');
+          if (!Number.isInteger(report.researchDossierCount)) throw new Error('research dossier count missing');
+          for (const dossier of report.researchDossiers) {
+            if (!['DRAFT_RESEARCH', 'REVIEW_READY', 'PUBLISHED'].includes(dossier.status)) throw new Error('invalid dossier status');
+            if (dossier.status === 'DRAFT_RESEARCH' && dossier.proposedAction !== 'WATCH') {
+              throw new Error('draft dossier leaked a directional action');
+            }
+          }
           for (const signal of report.signals) {
             if (!signal.source?.sourceUrl) throw new Error('signal source missing');
             if (!['INDEX_DISCOVERY', 'DOCUMENT_REVIEWED', 'METRICS_CONFIRMED'].includes(signal.analysisStage)) {
@@ -80,7 +92,7 @@ jobs:
               throw new Error('unconfirmed evidence escaped the publication guard');
             }
           }
-          console.log(`PASS: ${report.evidenceCount} evidence, ${report.documentReviewedCount} documents, ${report.pdfReviewedCount} PDFs, ${report.historicalMarketMetricsCount} historical metric sets, ${report.signalCount} guarded candidates`);
+          console.log(`PASS: ${report.evidenceCount} evidence, ${report.independentDiscoveryCount} news discoveries, ${report.documentReviewedCount} documents, ${report.pdfReviewedCount} PDFs, ${report.historicalMarketMetricsCount} historical metric sets, ${report.researchDossierCount} dossiers, ${report.signalCount} guarded candidates`);
           NODE
 
       - name: Upload daily intelligence report
