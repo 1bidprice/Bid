@@ -1,4 +1,4 @@
-name: Signed Investor Control v0.7.1 Live Sync APK
+name: Signed Investor Control v0.8.0 Autonomous Decisions APK
 
 on:
   push:
@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: investor-control-v071-live-sync-${{ github.ref }}
+  group: investor-control-v080-autonomous-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -28,7 +28,7 @@ jobs:
     timeout-minutes: 50
 
     steps:
-      - name: Checkout v0.7.1 source
+      - name: Checkout v0.8.0 source
         uses: actions/checkout@v4
         with:
           ref: investor-control-v1-market-intelligence-foundation
@@ -49,40 +49,40 @@ jobs:
         working-directory: mobile
         run: npm install --legacy-peer-deps --no-audit --no-fund
 
-      - name: Re-apply v0.7.1 patch idempotently
+      - name: Re-apply v0.8.0 patch idempotently
         working-directory: mobile
-        run: node scripts/apply-v071-live-sync.js
+        run: node scripts/apply-v080-autonomous-decisions.js
 
-      - name: Verify v0.7.1 source invariants
+      - name: Verify v0.8.0 source invariants
         working-directory: mobile
         shell: bash
         run: |
           set -euo pipefail
-          grep -q "const VERSION = '0.7.1';" PortfolioApp.js
-          grep -q "const VERSION = '0.7.1';" DecisionOverlay.js
+          grep -q "const VERSION = '0.8.0';" PortfolioApp.js
+          grep -q "const VERSION = '0.8.0';" DecisionOverlay.js
           grep -q "decisionVisible" App.js
           grep -q "onOpenDecisionGate" PortfolioApp.js
           grep -q "styles.decisionEntry" PortfolioApp.js
           grep -q "onRequestClose?.()" DecisionOverlay.js
           ! grep -q "useSafeAreaInsets" DecisionOverlay.js
-          ! grep -q "bottom: 92 + insets.bottom" DecisionOverlay.js
           grep -q "DEFAULT_INTELLIGENCE_FEED_URL" src/intelligence-feed-store.js
-          grep -q "investor-control-live-feed/mobile-intelligence-feed.json" src/intelligence-feed-store.js
-          grep -q "syncIntelligenceFeedAsync" src/OpportunitiesView.js
-          grep -q "Αυτόματη ασφαλής ενημέρωση" src/OpportunitiesView.js
+          grep -q "item.finalAction?.status === 'FINAL'" src/intelligence-feed-store.js
+          grep -q "import FinalDecisionCard from './FinalDecisionCard';" src/OpportunitiesView.js
+          grep -q "<FinalDecisionCard item={item} />" src/OpportunitiesView.js
+          grep -q "5 \* 60 \* 1000" src/OpportunitiesView.js
+          grep -q "ΤΕΛΙΚΟ ΣΥΜΠΕΡΑΣΜΑ ΓΙΑ ΕΣΕΝΑ" src/FinalDecisionCard.js
           node - <<'NODE'
           const app = require('./app.json');
           const pkg = require('./package.json');
-          if (app.expo.version !== '0.7.1') throw new Error('wrong Expo version');
+          if (app.expo.version !== '0.8.0') throw new Error('wrong Expo version');
           if (app.expo.android.package !== 'gr.investorcontrol.app') throw new Error('wrong package');
-          if (app.expo.android.versionCode !== 15) throw new Error('wrong versionCode');
-          if (pkg.version !== '0.7.1') throw new Error('wrong package version');
-          if (!pkg.scripts.postinstall.includes('apply-v071-live-sync.js')) throw new Error('v0.7.1 patch missing from postinstall');
-          console.log('PASS v0.7.1 automatic feed, Decision Gate and package invariants');
+          if (app.expo.android.versionCode !== 16) throw new Error('wrong versionCode');
+          if (pkg.version !== '0.8.0') throw new Error('wrong package version');
+          if (!pkg.scripts.postinstall.includes('apply-v080-autonomous-decisions.js')) throw new Error('v0.8.0 patch missing from postinstall');
+          console.log('PASS v0.8.0 autonomous feed, personalized decision and package invariants');
           NODE
 
       - name: Expo Doctor diagnostic
-        continue-on-error: true
         working-directory: mobile
         run: npx expo-doctor@latest
 
@@ -96,14 +96,14 @@ jobs:
         run: |
           set -o pipefail
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee ../gradle-v0.7.1.log
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee ../gradle-v0.8.0.log
 
       - name: Upload Gradle failure diagnostic
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: investor-control-v0.7.1-gradle-diagnostic
-          path: mobile/gradle-v0.7.1.log
+          name: investor-control-v0.8.0-gradle-diagnostic
+          path: mobile/gradle-v0.8.0.log
           if-no-files-found: warn
           retention-days: 30
 
@@ -113,8 +113,8 @@ jobs:
           set -euo pipefail
           UNSIGNED='mobile/android/app/build/outputs/apk/release/app-release.apk'
           KEYSTORE='mobile/android/app/debug.keystore'
-          OUTPUT='mobile/Investor-Control-v0.7.1.apk'
-          ALIGNED='mobile/Investor-Control-v0.7.1-aligned.apk'
+          OUTPUT='mobile/Investor-Control-v0.8.0.apk'
+          ALIGNED='mobile/Investor-Control-v0.8.0-aligned.apk'
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           ZIPALIGN="$BUILD_TOOLS/zipalign"
           APKSIGNER="$BUILD_TOOLS/apksigner"
@@ -130,18 +130,18 @@ jobs:
             --key-pass pass:android \
             --out "$OUTPUT" \
             "$ALIGNED"
-          "$APKSIGNER" verify --verbose --print-certs "$OUTPUT" | tee mobile/Investor-Control-v0.7.1-signature.txt
-          grep -qi 'fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c' mobile/Investor-Control-v0.7.1-signature.txt
+          "$APKSIGNER" verify --verbose --print-certs "$OUTPUT" | tee mobile/Investor-Control-v0.8.0-signature.txt
+          grep -qi 'fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c' mobile/Investor-Control-v0.8.0-signature.txt
           unzip -l "$OUTPUT" | grep -q 'assets/index.android.bundle'
-          sha256sum "$OUTPUT" | tee mobile/Investor-Control-v0.7.1.sha256
+          sha256sum "$OUTPUT" | tee mobile/Investor-Control-v0.8.0.sha256
 
-      - name: Upload signed v0.7.1 APK
+      - name: Upload signed v0.8.0 APK
         uses: actions/upload-artifact@v4
         with:
-          name: investor-control-v0.7.1-live-sync-signed-apk
+          name: investor-control-v0.8.0-autonomous-decisions-signed-apk
           path: |
-            mobile/Investor-Control-v0.7.1.apk
-            mobile/Investor-Control-v0.7.1.sha256
-            mobile/Investor-Control-v0.7.1-signature.txt
+            mobile/Investor-Control-v0.8.0.apk
+            mobile/Investor-Control-v0.8.0.sha256
+            mobile/Investor-Control-v0.8.0-signature.txt
           if-no-files-found: error
           retention-days: 90
