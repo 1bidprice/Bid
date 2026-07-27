@@ -57,7 +57,7 @@ export function normalizeFinnhubCandles(payload, options = {}) {
   };
 }
 
-export async function fetchhubCandlesForSymbol(symbolInput, options = {}) {
+export async function fetchFinnhubCandlesForSymbol(symbolInput, options = {}) {
   const fetchImpl = options.fetchImpl || globalThis.fetch;
   if (typeof fetchImpl !== 'function') throw new Error('Finnhub candles adapter requires fetch');
 
