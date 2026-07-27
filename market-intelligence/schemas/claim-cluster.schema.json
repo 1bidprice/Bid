@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://investorcontrol.local/schemas/claim-cluster.schema.json",
+  "title": "ClaimCluster",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "claimId",
+    "version",
+    "companyId",
+    "eventType",
+    "category",
+    "eventWindowStart",
+    "statement",
+    "evidenceIds",
+    "sourceGroups",
+    "reviewedSourceGroups",
+    "primaryEvidenceIds",
+    "reviewedEvidenceIds",
+    "contradictionEvidenceIds",
+    "status",
+    "recommendationGrade"
+  ],
+  "properties": {
+    "claimId": { "type": "string", "minLength": 12 },
+    "version": { "type": "integer", "minimum": 1 },
+    "companyId": { "type": "string", "minLength": 3 },
+    "eventType": { "type": "string", "minLength": 3 },
+    "category": { "type": "string", "minLength": 3 },
+    "eventWindowStart": { "type": "string" },
+    "statement": { "type": "string", "minLength": 10 },
+    "evidenceIds": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+    "sourceGroups": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+    "reviewedSourceGroups": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+    "primaryEvidenceIds": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+    "reviewedEvidenceIds": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+    "contradictionEvidenceIds": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+    "status": {
+      "type": "string",
+      "enum": ["DISCOVERY_ONLY", "PRIMARY_CONFIRMED", "CORROBORATED_DISCOVERY", "RECOMMENDATION_GRADE", "CONTRADICTED"]
+    },
+    "recommendationGrade": { "type": "boolean" }
+  }
+}
