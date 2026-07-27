@@ -133,10 +133,14 @@ test('daily runner reviews documents but blocks advice until all independent gat
     fetchImpl,
     now: NOW,
     documentLimit: 1,
+    collectTrustedNews: false,
   });
 
-  assert.equal(report.version, 3);
+  assert.equal(report.version, 4);
   assert.equal(report.documentReviewedCount, 1);
+  assert.equal(report.researchDossierCount, 1);
+  assert.equal(report.researchDossiers[0].status, 'DRAFT_RESEARCH');
+  assert.ok(report.researchDossiers[0].thesis?.includes('share-buyback'));
   assert.equal(report.signals[0].analysisStage, 'DOCUMENT_REVIEWED');
   assert.equal(report.signals[0].status, 'DRAFT');
   assert.equal(report.signals[0].suggestedAction, 'WATCH');
