@@ -12,7 +12,7 @@ on:
     - cron: '30 5 * * *'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: market-intelligence-daily
@@ -28,6 +28,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: investor-control-v1-market-intelligence-foundation
+          path: source
+          fetch-depth: 1
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -41,18 +43,18 @@ jobs:
           pdftotext -v
 
       - name: Run deterministic tests
-        working-directory: market-intelligence
+        working-directory: source/market-intelligence
         run: npm test
 
       - name: Collect evidence and build guarded research dossiers
-        working-directory: market-intelligence
+        working-directory: source/market-intelligence
         env:
           SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
           FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
         run: npm run run:daily
 
       - name: Verify report contract
-        working-directory: market-intelligence
+        working-directory: source/market-intelligence
         run: |
           node - <<'NODE'
           const report = require('./out/daily-intelligence.json');
@@ -80,41 +82,29 @@ jobs:
           if (report.claimClusterCount !== report.claimClusters.length) throw new Error('claim cluster count mismatch');
           for (const claim of report.claimClusters) {
             if (!claim.claimId || !Array.isArray(claim.evidenceIds)) throw new Error('invalid canonical claim');
-            if (claim.recommendationGrade && claim.status !== 'RECOMMENDATION_GRADE') {
-              throw new Error('recommendation-grade claim has wrong status');
-            }
+            if (claim.recommendationGrade && claim.status !== 'RECOMMENDATION_GRADE') throw new Error('recommendation-grade claim has wrong status');
           }
           for (const dossier of report.researchDossiers) {
             if (!['DRAFT_RESEARCH', 'REVIEW_READY', 'PUBLISHED'].includes(dossier.status)) throw new Error('invalid dossier status');
-            if (dossier.status === 'DRAFT_RESEARCH' && dossier.proposedAction !== 'WATCH') {
-              throw new Error('draft dossier leaked a directional action');
-            }
-            if (dossier.status === 'REVIEW_READY' && dossier.readiness?.publishable !== true) {
-              throw new Error('review-ready dossier is not publishable');
-            }
+            if (dossier.status === 'DRAFT_RESEARCH' && dossier.proposedAction !== 'WATCH') throw new Error('draft dossier leaked a directional action');
+            if (dossier.status === 'REVIEW_READY' && dossier.readiness?.publishable !== true) throw new Error('review-ready dossier is not publishable');
           }
           for (const signal of report.signals) {
             if (!signal.source?.sourceUrl) throw new Error('signal source missing');
             if (!signal.claim?.claimId) throw new Error('signal canonical claim missing');
-            if (!['INDEX_DISCOVERY', 'DOCUMENT_REVIEWED', 'METRICS_CONFIRMED'].includes(signal.analysisStage)) {
-              throw new Error('invalid analysis stage');
-            }
+            if (!['INDEX_DISCOVERY', 'DOCUMENT_REVIEWED', 'METRICS_CONFIRMED'].includes(signal.analysisStage)) throw new Error('invalid analysis stage');
             if (!signal.crossCheck || !signal.readiness) throw new Error('cross-check/readiness missing');
-            if (!signal.readiness.publishable) {
-              if (signal.status !== 'DRAFT' || signal.suggestedAction !== 'WATCH') {
-                throw new Error('unconfirmed evidence escaped the publication guard');
-              }
-            }
+            if (!signal.readiness.publishable && (signal.status !== 'DRAFT' || signal.suggestedAction !== 'WATCH')) throw new Error('unconfirmed evidence escaped the publication guard');
           }
           console.log(`PASS: ${report.evidenceCount} evidence, ${report.independentDiscoveryCount} news discoveries, ${report.claimClusterCount} claims, ${report.documentReviewedCount} documents, ${report.pdfReviewedCount} PDFs, ${report.historicalMarketMetricsCount} historical metric sets, ${report.researchDossierCount} dossiers, ${report.signalCount} guarded candidates`);
           NODE
 
       - name: Build Android-facing intelligence feed
-        working-directory: market-intelligence
+        working-directory: source/market-intelligence
         run: npm run build:mobile
 
       - name: Verify mobile feed contract
-        working-directory: market-intelligence
+        working-directory: source/market-intelligence
         run: |
           node - <<'NODE'
           const feed = require('./out/mobile-intelligence-feed.json');
@@ -133,12 +123,49 @@ jobs:
           console.log(`PASS mobile: ${feed.published.length} published, ${feed.reviewReady.length} review-ready, ${feed.research.length} research`);
           NODE
 
+      - name: Checkout stable live-feed channel
+        uses: actions/checkout@v4
+        with:
+          ref: investor-control-live-feed
+          path: live-feed
+          fetch-depth: 1
+
+      - name: Publish last verified feed
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp source/market-intelligence/out/mobile-intelligence-feed.json live-feed/mobile-intelligence-feed.json
+          node - <<'NODE'
+          const fs = require('fs');
+          const feed = require('./source/market-intelligence/out/mobile-intelligence-feed.json');
+          const status = {
+            format: 'investor-control-live-feed-status',
+            version: 1,
+            generatedAt: feed.generatedAt,
+            publishedAt: new Date().toISOString(),
+            sourceWorkflowRunId: process.env.GITHUB_RUN_ID,
+            sourceCommit: process.env.GITHUB_SHA,
+            counts: feed.summary,
+          };
+          fs.writeFileSync('./live-feed/status.json', `${JSON.stringify(status, null, 2)}\n`);
+          NODE
+          cd live-feed
+          git config user.name 'Investor Control Intelligence'
+          git config user.email 'actions@users.noreply.github.com'
+          git add mobile-intelligence-feed.json status.json
+          if git diff --cached --quiet; then
+            echo 'Live feed already current'
+          else
+            git commit -m "chore(feed): publish verified intelligence ${GITHUB_RUN_ID} [skip ci]"
+            git push origin HEAD:investor-control-live-feed
+          fi
+
       - name: Upload daily intelligence artifacts
         uses: actions/upload-artifact@v4
         with:
           name: investor-control-daily-intelligence-${{ github.run_id }}
           path: |
-            market-intelligence/out/daily-intelligence.json
-            market-intelligence/out/mobile-intelligence-feed.json
+            source/market-intelligence/out/daily-intelligence.json
+            source/market-intelligence/out/mobile-intelligence-feed.json
           if-no-files-found: error
           retention-days: 90
