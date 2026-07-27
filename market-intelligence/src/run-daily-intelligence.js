@@ -4,14 +4,20 @@ import path from 'node:path';
 import { fetchSecRecentFilings } from './adapters/sec-submissions.js';
 import { fetchSecCompanyFacts } from './adapters/sec-companyfacts.js';
 import { fetchFinnhubQuote } from './adapters/finnhub-quote.js';
+import { fetchFinnhubCandlesForSymbol, fetchFinnhubCompanyCandles } from './adapters/finnhub-candles.js';
 import { fetchAllwynRegulatoryAnnouncements } from './adapters/allwyn-regulatory.js';
 import { hydrateEvidenceDocument } from './document-hydrator.js';
 import { extractDocumentObservations } from './document-observations.js';
+import { extractPdfText } from './pdf-extractor.js';
+import { calculateMarketMetrics } from './market-metrics.js';
+import { assessIndependentEvidence } from './cross-check.js';
+import { evaluateSignalReadiness } from './signal-readiness.js';
 import { candidateFromEvidence } from './event-classifier.js';
 import { rankSignalCandidate } from './rank-signal.js';
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_UNIVERSE_PATH = path.resolve(MODULE_DIR, '../config/universe.seed.json');
+const POSITION_COMPANY_IDS = new Set(['company:allwyn-ag', 'company:virgin-galactic-holdings']);
 
 async function loadUniverse(universePath = DEFAULT_UNIVERSE_PATH) {
   const raw = await readFile(universePath, 'utf8');
@@ -20,24 +26,18 @@ async function loadUniverse(universePath = DEFAULT_UNIVERSE_PATH) {
   return universe.filter((company) => company?.active === true);
 }
 
-function guardedSignal(candidate, ranked) {
-  if (candidate.requiresDeepReview) {
-    return {
-      ...ranked,
-      status: 'DRAFT',
-      suggestedAction: 'WATCH',
-      reasons: [...new Set([...(ranked.reasons || []), 'DOCUMENT_REVIEW_REQUIRED'])],
-    };
-  }
-  if (!candidate.metricsReady) {
-    return {
-      ...ranked,
-      status: 'DRAFT',
-      suggestedAction: 'WATCH',
-      reasons: [...new Set([...(ranked.reasons || []), 'FUNDAMENTAL_AND_MARKET_METRICS_REQUIRED'])],
-    };
-  }
-  return ranked;
+function unique(values) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function guardedSignal(ranked, readiness) {
+  if (readiness.publishable) return ranked;
+  return {
+    ...ranked,
+    status: 'DRAFT',
+    suggestedAction: 'WATCH',
+    reasons: unique([...(ranked.reasons || []), ...(readiness.blockers || [])]),
+  };
 }
 
 function compactObservationSummary(observations) {
@@ -101,17 +101,45 @@ function compactMarketSummary(snapshot) {
     low: snapshot.low,
     dailyChange: snapshot.dailyChange,
     dailyChangePct: snapshot.dailyChangePct,
-    liquidityMetricsReady: snapshot.liquidityMetricsReady,
-    relativeStrengthMetricsReady: snapshot.relativeStrengthMetricsReady,
-    marketMetricsReady: snapshot.marketMetricsReady,
   };
 }
 
-function toSignalOutput(company, evidence, candidate, ranked, fundamentalSnapshot, marketSnapshot) {
-  const guarded = guardedSignal(candidate, ranked);
-  const analysisStage = candidate.requiresDeepReview
+function compactHistoricalMetrics(metrics) {
+  if (!metrics) return null;
+  return {
+    format: metrics.format,
+    version: metrics.version,
+    generatedAt: metrics.generatedAt,
+    symbol: metrics.symbol,
+    benchmarkSymbol: metrics.benchmarkSymbol,
+    currency: metrics.currency,
+    observationCount: metrics.observationCount,
+    latestTimestamp: metrics.latestTimestamp,
+    latestClose: metrics.latestClose,
+    returnsPct: metrics.returnsPct,
+    trend: metrics.trend,
+    risk: metrics.risk,
+    liquidity: metrics.liquidity,
+    relativeStrength: metrics.relativeStrength,
+    readiness: metrics.readiness,
+  };
+}
+
+function toSignalOutput(
+  company,
+  evidence,
+  candidate,
+  ranked,
+  fundamentalSnapshot,
+  marketSnapshot,
+  marketMetrics,
+  crossCheck,
+  readiness,
+) {
+  const guarded = guardedSignal(ranked, readiness);
+  const analysisStage = !readiness.checks.documentReviewed
     ? 'INDEX_DISCOVERY'
-    : candidate.metricsReady
+    : readiness.checks.fundamentalsReady && readiness.checks.marketMetricsReady
       ? 'METRICS_CONFIRMED'
       : 'DOCUMENT_REVIEWED';
 
@@ -135,6 +163,9 @@ function toSignalOutput(company, evidence, candidate, ranked, fundamentalSnapsho
     observations: compactObservationSummary(evidence.observations),
     fundamentals: compactFundamentalSummary(fundamentalSnapshot),
     market: compactMarketSummary(marketSnapshot),
+    historicalMarketMetrics: compactHistoricalMetrics(marketMetrics),
+    crossCheck,
+    readiness,
     source: {
       evidenceId: evidence.id,
       sourceName: evidence.sourceName,
@@ -197,15 +228,59 @@ async function collectCompanyMarketSnapshot(company, options) {
   };
 }
 
+async function collectCompanyHistoricalMetrics(company, options) {
+  if (company.country !== 'US') {
+    return {
+      series: null,
+      metrics: null,
+      diagnostics: [{ code: 'HISTORICAL_MARKET_DATA_ADAPTER_PENDING', companyId: company.companyId }],
+    };
+  }
+
+  const companyResult = await fetchFinnhubCompanyCandles(company, {
+    fetchImpl: options.fetchImpl,
+    token: options.finnhubToken,
+    generatedAt: options.now,
+    lookbackDays: options.lookbackDays,
+  });
+  const diagnostics = [...(companyResult.diagnostics || [])];
+  if (!companyResult.series?.usable) {
+    return { series: companyResult.series || null, metrics: null, diagnostics };
+  }
+
+  let benchmarkSeries = options.benchmarkCache.get('SPY') || null;
+  if (!benchmarkSeries) {
+    const benchmarkResult = await fetchFinnhubCandlesForSymbol('SPY', {
+      fetchImpl: options.fetchImpl,
+      token: options.finnhubToken,
+      generatedAt: options.now,
+      lookbackDays: options.lookbackDays,
+      currency: 'USD',
+    });
+    diagnostics.push(...(benchmarkResult.diagnostics || []).map((item) => ({ ...item, benchmark: true })));
+    benchmarkSeries = benchmarkResult.series || null;
+    if (benchmarkSeries) options.benchmarkCache.set('SPY', benchmarkSeries);
+  }
+
+  const metrics = calculateMarketMetrics(companyResult.series, benchmarkSeries, {
+    companyId: company.companyId,
+    symbol: company.primaryListing?.symbol,
+    benchmarkSymbol: 'SPY',
+    currency: company.currency || company.listings?.[0]?.currency || null,
+    generatedAt: options.now,
+  });
+  return { series: companyResult.series, metrics, diagnostics };
+}
+
 async function analyseEvidenceDocument(record, company, options) {
   const hydrated = await hydrateEvidenceDocument(record, {
     fetchImpl: options.fetchImpl,
     retrievedAt: options.now,
-    userAgent: company.cik
-      ? options.secUserAgent
-      : options.documentUserAgent,
+    userAgent: company.cik ? options.secUserAgent : options.documentUserAgent,
     maxBytes: options.maxDocumentBytes,
     minReviewedText: options.minReviewedText,
+    pdfExtractor: options.pdfExtractor,
+    pdfTimeoutMs: options.pdfTimeoutMs,
   });
   const enriched = {
     ...hydrated.record,
@@ -222,7 +297,10 @@ export async function runDailyIntelligence(options = {}) {
   const signals = [];
   const fundamentalSnapshots = [];
   const marketSnapshots = [];
+  const historicalMarketMetrics = [];
   const documentLimit = Math.max(0, Number(options.documentLimit ?? 5));
+  const benchmarkCache = new Map();
+  const pdfExtractor = options.pdfExtractor === undefined ? extractPdfText : options.pdfExtractor;
 
   for (const company of universe) {
     const fetchImpl = options.fetchImpl || globalThis.fetch;
@@ -230,6 +308,7 @@ export async function runDailyIntelligence(options = {}) {
     const finnhubToken = options.finnhubToken || process.env.FINNHUB_TOKEN || '';
     let fundamentalSnapshot = null;
     let marketSnapshot = null;
+    let marketMetrics = null;
 
     try {
       const fundamentalResult = await collectCompanyFundamentals(company, {
@@ -266,6 +345,25 @@ export async function runDailyIntelligence(options = {}) {
     }
 
     try {
+      const historyResult = await collectCompanyHistoricalMetrics(company, {
+        fetchImpl,
+        finnhubToken,
+        now,
+        lookbackDays: options.lookbackDays,
+        benchmarkCache,
+      });
+      marketMetrics = historyResult.metrics || null;
+      diagnostics.push(...(historyResult.diagnostics || []));
+      if (marketMetrics) historicalMarketMetrics.push(marketMetrics);
+    } catch (error) {
+      diagnostics.push({
+        code: 'HISTORICAL_MARKET_DATA_FAILED',
+        companyId: company.companyId,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    try {
       const result = await collectCompanyEvidence(company, {
         fetchImpl,
         secUserAgent,
@@ -274,6 +372,7 @@ export async function runDailyIntelligence(options = {}) {
       });
       diagnostics.push(...(result.diagnostics || []));
 
+      const companyRecords = [];
       const records = result.records || [];
       for (let index = 0; index < records.length; index += 1) {
         let record = records[index];
@@ -281,10 +380,12 @@ export async function runDailyIntelligence(options = {}) {
           const analysed = await analyseEvidenceDocument(record, company, {
             fetchImpl,
             secUserAgent,
-            documentUserAgent: options.documentUserAgent || 'Investor-Control-Market-Intelligence/0.2',
+            documentUserAgent: options.documentUserAgent || 'Investor-Control-Market-Intelligence/0.3',
             now,
             maxDocumentBytes: options.maxDocumentBytes,
             minReviewedText: options.minReviewedText,
+            pdfExtractor,
+            pdfTimeoutMs: options.pdfTimeoutMs,
           });
           record = analysed.record;
           diagnostics.push(...analysed.diagnostics);
@@ -295,16 +396,42 @@ export async function runDailyIntelligence(options = {}) {
             observations: extractDocumentObservations(record),
           };
         }
-
+        companyRecords.push(record);
         evidence.push(record);
-        const metricsReady = fundamentalSnapshot?.metricsReady === true && marketSnapshot?.marketMetricsReady === true;
+      }
+
+      const crossCheck = assessIndependentEvidence(companyRecords, now);
+      for (const record of companyRecords) {
+        const metricsReady =
+          fundamentalSnapshot?.metricsReady === true &&
+          marketMetrics?.readiness?.marketMetricsReady === true;
         const candidate = candidateFromEvidence(record, {
-          hasPosition: ['company:allwyn-ag', 'company:virgin-galactic-holdings'].includes(company.companyId),
+          hasPosition: POSITION_COMPANY_IDS.has(company.companyId),
           personalisationScore: 80,
+          liquidityScore: marketMetrics?.liquidity?.score ?? 50,
           metricsReady,
         });
+        const readiness = evaluateSignalReadiness({
+          evidence: record,
+          fundamentals: fundamentalSnapshot,
+          marketMetrics,
+          crossCheck,
+          thesis: null,
+          invalidationCondition: null,
+          risks: marketMetrics?.risk?.flags || [],
+        });
         const ranked = rankSignalCandidate(candidate, now);
-        signals.push(toSignalOutput(company, record, candidate, ranked, fundamentalSnapshot, marketSnapshot));
+        signals.push(toSignalOutput(
+          company,
+          record,
+          candidate,
+          ranked,
+          fundamentalSnapshot,
+          marketSnapshot,
+          marketMetrics,
+          crossCheck,
+          readiness,
+        ));
       }
     } catch (error) {
       diagnostics.push({
@@ -322,7 +449,7 @@ export async function runDailyIntelligence(options = {}) {
 
   return {
     format: 'investor-control-daily-intelligence',
-    version: 2,
+    version: 3,
     generatedAt: now,
     universe: universe.map((company) => ({
       companyId: company.companyId,
@@ -332,10 +459,13 @@ export async function runDailyIntelligence(options = {}) {
     evidenceCount: evidence.length,
     documentReviewedCount: evidence.filter((record) => record.document?.reviewed === true).length,
     documentPendingCount: evidence.filter((record) => record.document?.reviewed !== true).length,
+    pdfReviewedCount: evidence.filter((record) => record.document?.status === 'REVIEWED_PDF').length,
     fundamentalSnapshotCount: fundamentalSnapshots.length,
     fundamentalSnapshots,
     marketSnapshotCount: marketSnapshots.length,
     marketSnapshots,
+    historicalMarketMetricsCount: historicalMarketMetrics.length,
+    historicalMarketMetrics,
     signalCount: signals.length,
     diagnostics,
     signals,
@@ -348,9 +478,10 @@ async function main() {
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   console.log(`Wrote ${report.signalCount} signal candidates to ${outputPath}`);
-  console.log(`Reviewed ${report.documentReviewedCount} official source documents`);
+  console.log(`Reviewed ${report.documentReviewedCount} official source documents (${report.pdfReviewedCount} PDFs)`);
   console.log(`Built ${report.fundamentalSnapshotCount} deterministic fundamental snapshots`);
   console.log(`Built ${report.marketSnapshotCount} guarded market snapshots`);
+  console.log(`Built ${report.historicalMarketMetricsCount} historical market metric sets`);
   if (report.diagnostics.length) {
     console.warn(`Diagnostics: ${JSON.stringify(report.diagnostics)}`);
   }
