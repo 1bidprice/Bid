@@ -21,6 +21,12 @@ function compactExcerpt(text, index, length, radius = 90) {
   return text.slice(start, end).replace(/\s+/g, ' ').trim();
 }
 
+function pageNumberForIndex(record, index) {
+  const pages = Array.isArray(record?.document?.pages) ? record.document.pages : [];
+  const page = pages.find((item) => index >= Number(item.textStart) && index < Number(item.textEnd));
+  return page?.pageNumber || null;
+}
+
 function parseLocalizedNumber(raw) {
   const cleaned = String(raw || '').replace(/\s/g, '');
   if (!cleaned) return null;
@@ -45,6 +51,15 @@ function parseLocalizedNumber(raw) {
   return Number.isFinite(value) ? value : null;
 }
 
+function numericObservation(record, text, match) {
+  return {
+    raw: match[0],
+    value: parseLocalizedNumber(match[0]),
+    excerpt: compactExcerpt(text, match.index, match[0].length),
+    pageNumber: pageNumberForIndex(record, match.index),
+  };
+}
+
 export function extractDocumentObservations(record, options = {}) {
   const text = String(record?.rawText || '');
   const maxPerType = Number(options.maxPerType || 40);
@@ -56,29 +71,17 @@ export function extractDocumentObservations(record, options = {}) {
   const currencyPattern = /(?:€|\$|£|EUR|USD|GBP)\s?[-+]?\d[\d.,]*(?:\s?(?:million|billion|thousand|m|bn|k))?|[-+]?\d[\d.,]*(?:\s?(?:million|billion|thousand|m|bn|k))?\s?(?:€|\$|£|EUR|USD|GBP)/gi;
   let match;
   while ((match = currencyPattern.exec(text)) && currencies.length < maxPerType) {
-    currencies.push({
-      raw: match[0],
-      value: parseLocalizedNumber(match[0]),
-      excerpt: compactExcerpt(text, match.index, match[0].length),
-    });
+    currencies.push(numericObservation(record, text, match));
   }
 
   const percentPattern = /[-+]?\d+(?:[.,]\d+)?\s?%/g;
   while ((match = percentPattern.exec(text)) && percentages.length < maxPerType) {
-    percentages.push({
-      raw: match[0],
-      value: parseLocalizedNumber(match[0]),
-      excerpt: compactExcerpt(text, match.index, match[0].length),
-    });
+    percentages.push(numericObservation(record, text, match));
   }
 
   const sharesPattern = /\b\d[\d.,]*(?:\s?(?:million|billion|thousand|m|bn|k))?\s+(?:ordinary\s+|common\s+|registered\s+|voting\s+|treasury\s+)?shares\b/gi;
   while ((match = sharesPattern.exec(text)) && shareCounts.length < maxPerType) {
-    shareCounts.push({
-      raw: match[0],
-      value: parseLocalizedNumber(match[0]),
-      excerpt: compactExcerpt(text, match.index, match[0].length),
-    });
+    shareCounts.push(numericObservation(record, text, match));
   }
 
   const datePattern = new RegExp(`\\b(?:\\d{1,2}\\s+(?:${MONTH_NAMES.join('|')})\\s+\\d{4}|(?:${MONTH_NAMES.join('|')})\\s+\\d{1,2},?\\s+\\d{4}|\\d{4}-\\d{2}-\\d{2})\\b`, 'gi');
@@ -86,6 +89,7 @@ export function extractDocumentObservations(record, options = {}) {
     dates.push({
       raw: match[0],
       excerpt: compactExcerpt(text, match.index, match[0].length),
+      pageNumber: pageNumberForIndex(record, match.index),
     });
   }
 
@@ -96,13 +100,13 @@ export function extractDocumentObservations(record, options = {}) {
   }
 
   return {
-    extractionVersion: 1,
+    extractionVersion: 2,
     documentReviewed: record?.document?.reviewed === true,
     textLength: text.length,
-    currencyAmounts: uniqueBy(currencies, (item) => `${item.raw}|${item.excerpt}`).slice(0, maxPerType),
-    percentages: uniqueBy(percentages, (item) => `${item.raw}|${item.excerpt}`).slice(0, maxPerType),
-    shareCounts: uniqueBy(shareCounts, (item) => `${item.raw}|${item.excerpt}`).slice(0, maxPerType),
-    dates: uniqueBy(dates, (item) => `${item.raw}|${item.excerpt}`).slice(0, maxPerType),
+    currencyAmounts: uniqueBy(currencies, (item) => `${item.raw}|${item.excerpt}|${item.pageNumber}`).slice(0, maxPerType),
+    percentages: uniqueBy(percentages, (item) => `${item.raw}|${item.excerpt}|${item.pageNumber}`).slice(0, maxPerType),
+    shareCounts: uniqueBy(shareCounts, (item) => `${item.raw}|${item.excerpt}|${item.pageNumber}`).slice(0, maxPerType),
+    dates: uniqueBy(dates, (item) => `${item.raw}|${item.excerpt}|${item.pageNumber}`).slice(0, maxPerType),
     sections: [...new Set(sections.map((value) => value.toLowerCase()))],
   };
 }
