@@ -19,6 +19,7 @@ function record(overrides = {}) {
     supportsClaimIds: [],
     contradictsClaimIds: [],
     expiresAt: null,
+    document: { reviewed: true, status: 'REVIEWED_TEXT' },
     ...overrides,
   };
 }
@@ -30,7 +31,7 @@ test('one primary source supports discovery but not an autonomous recommendation
   assert.ok(result.blockers.includes('INDEPENDENT_CORROBORATION_REQUIRED'));
 });
 
-test('primary evidence plus independent reliable corroboration passes cross-check', () => {
+test('primary evidence plus independent reliable reviewed corroboration passes cross-check', () => {
   const result = assessIndependentEvidence([
     record(),
     record({
@@ -45,7 +46,28 @@ test('primary evidence plus independent reliable corroboration passes cross-chec
     }),
   ], NOW);
   assert.equal(result.independentGroupCount, 2);
+  assert.equal(result.reviewedIndependentGroupCount, 2);
   assert.equal(result.recommendationReady, true);
+});
+
+test('unreviewed independent discovery does not pass recommendation cross-check', () => {
+  const result = assessIndependentEvidence([
+    record(),
+    record({
+      id: 'evidence:unreviewed',
+      sourceType: 'FINANCIAL_NEWS',
+      sourceName: 'Independent wire',
+      sourceUrl: 'https://wire.test/story',
+      contentHash: 'fedcba9876543210fedcba9876543210',
+      isPrimarySource: false,
+      reliabilityTier: 2,
+      independenceGroup: 'wire',
+      document: undefined,
+    }),
+  ], NOW);
+  assert.equal(result.discoveryReady, true);
+  assert.equal(result.recommendationReady, false);
+  assert.ok(result.blockers.includes('REVIEWED_INDEPENDENT_CORROBORATION_REQUIRED'));
 });
 
 test('explicit contradiction blocks recommendation readiness', () => {
