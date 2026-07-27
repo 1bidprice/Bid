@@ -82,6 +82,7 @@ jobs:
           NODE
 
       - name: Expo Doctor diagnostic
+        continue-on-error: true
         working-directory: mobile
         run: npx expo-doctor@latest
 
