@@ -20,6 +20,23 @@ function compactEvidence(record) {
   };
 }
 
+function compactClaim(claim) {
+  if (!claim) return null;
+  return {
+    claimId: claim.claimId,
+    eventType: claim.eventType,
+    category: claim.category,
+    eventWindowStart: claim.eventWindowStart,
+    statement: claim.statement,
+    evidenceIds: claim.evidenceIds,
+    sourceGroups: claim.sourceGroups,
+    reviewedSourceGroups: claim.reviewedSourceGroups,
+    contradictionEvidenceIds: claim.contradictionEvidenceIds,
+    status: claim.status,
+    recommendationGrade: claim.recommendationGrade,
+  };
+}
+
 function validClaim(claim) {
   return claim &&
     typeof claim.text === 'string' &&
@@ -70,6 +87,10 @@ function synthesisBlockers(input) {
   if (normalizeClaims(input.catalysts).length < 1) blockers.push('VERIFIED_CATALYST_REQUIRED');
   if (normalizeClaims(input.risks).length < 2) blockers.push('MATERIAL_RISKS_REQUIRED');
   if (!input.reviewDate) blockers.push('REVIEW_DATE_REQUIRED');
+  if (input.requireCanonicalClaim === true) {
+    if (!input.leadClaim) blockers.push('CANONICAL_CLAIM_REQUIRED');
+    else if (input.leadClaim.recommendationGrade !== true) blockers.push('CLAIM_CORROBORATION_REQUIRED');
+  }
   return blockers;
 }
 
@@ -101,13 +122,14 @@ export function buildResearchDossier(input = {}) {
   const identity = {
     companyId: company.companyId,
     generatedAt,
+    leadClaimId: input.leadClaim?.claimId || null,
     evidenceHashes: records.map((record) => record.contentHash).filter(Boolean),
     category,
   };
 
   return {
     dossierId: `dossier:${company.companyId || 'unknown'}:${contentHash(identity).slice(0, 20)}`,
-    version: 1,
+    version: 2,
     companyId: company.companyId || 'company:unknown',
     companyName: company.displayName || company.legalName || 'Unknown company',
     listing: company.primaryListing || { exchange: 'Unknown', symbol: 'UNKNOWN', mic: null },
@@ -126,6 +148,7 @@ export function buildResearchDossier(input = {}) {
     invalidationCondition: input.invalidationCondition?.trim() || null,
     evidence: records.map(compactEvidence),
     metrics: {
+      leadClaim: compactClaim(input.leadClaim),
       fundamentals: input.fundamentals || null,
       market: input.historicalMarketMetrics || null,
       fundamentalRisk: input.fundamentalRisk || null,
