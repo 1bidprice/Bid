@@ -56,12 +56,13 @@ const RULES = [
 ];
 
 function normalizedText(record) {
-  return `${record?.title || ''} ${record?.notes || ''}`.toLowerCase();
+  return `${record?.title || ''} ${record?.notes || ''} ${record?.rawText || ''}`.toLowerCase();
 }
 
 export function classifyEvidenceEvent(record) {
   const text = normalizedText(record);
   const rule = RULES.find((candidate) => candidate.terms.some((term) => text.includes(term)));
+  const documentReviewed = record?.document?.reviewed === true;
 
   if (!rule) {
     return {
@@ -72,8 +73,11 @@ export function classifyEvidenceEvent(record) {
       priceConfirmationScore: 0,
       liquidityScore: 50,
       riskScore: 55,
-      requiresDeepReview: true,
-      rationale: 'Official event detected, but its investment effect is not established from the index-level evidence.',
+      requiresDeepReview: !documentReviewed,
+      metricsReady: false,
+      rationale: documentReviewed
+        ? 'Official document reviewed, but its investment effect is not established by deterministic rules.'
+        : 'Official event detected, but its investment effect is not established from the index-level evidence.',
     };
   }
 
@@ -85,8 +89,11 @@ export function classifyEvidenceEvent(record) {
     priceConfirmationScore: 0,
     liquidityScore: 50,
     riskScore: rule.riskScore,
-    requiresDeepReview: true,
-    rationale: rule.rationale,
+    requiresDeepReview: !documentReviewed,
+    metricsReady: false,
+    rationale: documentReviewed
+      ? `${rule.rationale} The official source document was retrieved and text-normalized; market and fundamental confirmation remains required.`
+      : rule.rationale,
   };
 }
 
@@ -107,6 +114,7 @@ export function candidateFromEvidence(record, options = {}) {
     hasPosition: options.hasPosition === true,
     eventType: classification.eventType,
     requiresDeepReview: classification.requiresDeepReview,
+    metricsReady: options.metricsReady === true && classification.metricsReady === true,
     rationale: classification.rationale,
   };
 }
