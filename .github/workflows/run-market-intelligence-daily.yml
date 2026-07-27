@@ -42,6 +42,7 @@ jobs:
         working-directory: market-intelligence
         env:
           SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
         run: npm run run:daily
 
       - name: Verify report contract
@@ -53,9 +54,13 @@ jobs:
           if (report.version !== 2) throw new Error('wrong report version');
           if (!Array.isArray(report.signals)) throw new Error('signals missing');
           if (!Array.isArray(report.diagnostics)) throw new Error('diagnostics missing');
+          if (!Array.isArray(report.fundamentalSnapshots)) throw new Error('fundamental snapshots missing');
+          if (!Array.isArray(report.marketSnapshots)) throw new Error('market snapshots missing');
           if (report.evidenceCount < 1) throw new Error('no official evidence collected');
           if (!Number.isInteger(report.documentReviewedCount)) throw new Error('document review count missing');
           if (!Number.isInteger(report.documentPendingCount)) throw new Error('document pending count missing');
+          if (!Number.isInteger(report.fundamentalSnapshotCount)) throw new Error('fundamental snapshot count missing');
+          if (!Number.isInteger(report.marketSnapshotCount)) throw new Error('market snapshot count missing');
           for (const signal of report.signals) {
             if (!signal.source?.sourceUrl) throw new Error('signal source missing');
             if (!['INDEX_DISCOVERY', 'DOCUMENT_REVIEWED', 'METRICS_CONFIRMED'].includes(signal.analysisStage)) {
@@ -68,7 +73,7 @@ jobs:
               throw new Error('reviewed document escaped the metric guard');
             }
           }
-          console.log(`PASS: ${report.evidenceCount} evidence records, ${report.documentReviewedCount} reviewed documents, ${report.signalCount} guarded candidates`);
+          console.log(`PASS: ${report.evidenceCount} evidence, ${report.documentReviewedCount} documents, ${report.fundamentalSnapshotCount} fundamental snapshots, ${report.marketSnapshotCount} market snapshots, ${report.signalCount} guarded candidates`);
           NODE
 
       - name: Upload daily intelligence report
