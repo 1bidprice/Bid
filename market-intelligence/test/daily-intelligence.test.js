@@ -74,7 +74,7 @@ test('event classification recognises dilution and buyback events', () => {
   assert.equal(buyback.eventType, 'SHARE_BUYBACK');
 });
 
-test('daily runner keeps title-only findings in WATCH draft state', async () => {
+test('daily runner emits guarded signals, draft dossiers and an empty production feed', async () => {
   const allwynHtml = `
     <div>20 July 2026</div>
     <a href="/regulatory-announcements/company-purchased-own-shares">Company purchased its own shares under share buyback programme</a>
@@ -93,7 +93,7 @@ test('daily runner keeps title-only findings in WATCH draft state', async () => 
   };
   const fetchImpl = async (url) => {
     if (String(url).includes('data.sec.gov')) return { ok: true, json: async () => secPayload };
-    return { ok: true, text: async () => allwynHtml };
+    return { ok: true, headers: { get: () => 'text/html' }, text: async () => allwynHtml };
   };
 
   const report = await runDailyIntelligence({
@@ -101,10 +101,15 @@ test('daily runner keeps title-only findings in WATCH draft state', async () => 
     fetchImpl,
     secUserAgent: 'Investor Control test test@example.com',
     now: NOW,
+    collectTrustedNews: false,
   });
 
+  assert.equal(report.version, 4);
   assert.equal(report.evidenceCount, 2);
   assert.equal(report.signalCount, 2);
+  assert.equal(report.researchDossierCount, 2);
+  assert.equal(report.opportunitiesFeed.itemCount, 0);
+  assert.ok(report.researchDossiers.every((dossier) => dossier.status === 'DRAFT_RESEARCH'));
   assert.ok(report.signals.every((signal) => signal.status === 'DRAFT'));
   assert.ok(report.signals.every((signal) => signal.suggestedAction === 'WATCH'));
   assert.ok(report.signals.every((signal) => signal.reasons.includes('DOCUMENT_REVIEW_REQUIRED')));
