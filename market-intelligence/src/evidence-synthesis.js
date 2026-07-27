@@ -37,8 +37,8 @@ function metricSummary(fundamentals, marketMetrics) {
   const revenueGrowth = fundamentals?.metrics?.annualRevenueGrowthPct;
   const netMargin = fundamentals?.metrics?.annualNetMarginPct;
   const dilution = fundamentals?.metrics?.dilutedSharesChangePct;
-  const return60 = marketMetrics?.returnsPct?.sessions60;
-  const relative60 = marketMetrics?.relativeStrength?.sessions60Pct;
+  const return60 = marketMetrics?.returnsPct?.d60;
+  const relative60 = marketMetrics?.relativeStrength?.excessReturnPct;
   if (Number.isFinite(revenueGrowth)) parts.push(`annual revenue growth ${revenueGrowth}%`);
   if (Number.isFinite(netMargin)) parts.push(`annual net margin ${netMargin}%`);
   if (Number.isFinite(dilution)) parts.push(`diluted-share change ${dilution}%`);
@@ -164,7 +164,7 @@ function actionFromMetrics(baseAction, eventType, fundamentals, marketMetrics, f
   if (eventType === 'FINANCIAL_RESULTS') {
     const growth = fundamentals?.metrics?.annualRevenueGrowthPct;
     const margin = fundamentals?.metrics?.annualNetMarginPct;
-    const relative = marketMetrics?.relativeStrength?.sessions60Pct;
+    const relative = marketMetrics?.relativeStrength?.excessReturnPct;
     if (growth > 10 && margin > 0 && relative > 0 && fundamentalRisk?.riskScore < 55) return 'CONSIDER_BUY';
     if ((margin < -50 || fundamentalRisk?.riskScore >= 80) && relative < 0) return 'CONSIDER_REDUCE';
   }
@@ -202,7 +202,7 @@ export function synthesizeEvidenceOnlyResearch(input = {}) {
     ? ` Deterministic metrics currently report ${metrics.join(', ')}; these figures are calculation inputs and do not replace the evidence gates.`
     : '';
   const riskClaims = fundamentalRiskClaims(input.fundamentalRisk, evidenceIds);
-  const reviewDays = ['WEEKS'].includes(narrative.horizon) ? 30 : narrative.horizon === 'MONTHS' ? 90 : 60;
+  const reviewDays = narrative.horizon === 'WEEKS' ? 30 : narrative.horizon === 'MONTHS' ? 90 : 60;
   const generatedAt = new Date(input.generatedAt || Date.now());
   const reviewDate = new Date(generatedAt.getTime() + reviewDays * 86_400_000).toISOString().slice(0, 10);
 
