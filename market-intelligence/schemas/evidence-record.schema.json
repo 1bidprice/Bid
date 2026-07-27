@@ -75,14 +75,17 @@
     "document": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status", "fetchedAt", "contentType", "byteLength", "textLength", "reviewed"],
+      "required": ["status", "fetchedAt", "contentType", "byteLength", "textLength", "reviewed", "pages"],
       "properties": {
         "status": {
           "type": "string",
           "enum": [
             "REVIEWED_TEXT",
+            "REVIEWED_PDF",
             "TEXT_TOO_SHORT",
+            "PDF_TEXT_TOO_SHORT",
             "PDF_EXTRACTION_REQUIRED",
+            "PDF_EXTRACTION_FAILED",
             "UNSUPPORTED_CONTENT_TYPE",
             "TOO_LARGE",
             "FETCH_FAILED"
@@ -92,7 +95,22 @@
         "contentType": { "type": ["string", "null"] },
         "byteLength": { "type": ["integer", "null"], "minimum": 0 },
         "textLength": { "type": "integer", "minimum": 0 },
-        "reviewed": { "type": "boolean" }
+        "reviewed": { "type": "boolean" },
+        "pages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["pageNumber", "textStart", "textEnd", "textLength", "contentHash"],
+            "properties": {
+              "pageNumber": { "type": "integer", "minimum": 1 },
+              "textStart": { "type": "integer", "minimum": 0 },
+              "textEnd": { "type": "integer", "minimum": 0 },
+              "textLength": { "type": "integer", "minimum": 0 },
+              "contentHash": { "type": "string", "minLength": 16 }
+            }
+          }
+        }
       }
     },
     "observations": {
@@ -120,10 +138,11 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["raw", "excerpt"],
+            "required": ["raw", "excerpt", "pageNumber"],
             "properties": {
               "raw": { "type": "string" },
-              "excerpt": { "type": "string" }
+              "excerpt": { "type": "string" },
+              "pageNumber": { "type": ["integer", "null"], "minimum": 1 }
             }
           }
         },
@@ -141,11 +160,12 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["raw", "value", "excerpt"],
+        "required": ["raw", "value", "excerpt", "pageNumber"],
         "properties": {
           "raw": { "type": "string" },
           "value": { "type": ["number", "null"] },
-          "excerpt": { "type": "string" }
+          "excerpt": { "type": "string" },
+          "pageNumber": { "type": ["integer", "null"], "minimum": 1 }
         }
       }
     }
