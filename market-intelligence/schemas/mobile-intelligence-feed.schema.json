@@ -8,8 +8,10 @@
     "format",
     "version",
     "generatedAt",
+    "policyVersion",
     "summary",
     "today",
+    "decisions",
     "published",
     "reviewReady",
     "research",
@@ -21,16 +23,37 @@
     "format": { "const": "investor-control-mobile-intelligence-feed" },
     "version": { "type": "integer", "minimum": 1 },
     "generatedAt": { "type": "string", "format": "date-time" },
+    "policyVersion": { "type": ["string", "null"] },
     "summary": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["publishedCount", "reviewReadyCount", "researchCount", "urgentCount", "unresolvedDiagnosticCount"],
+      "required": [
+        "publishedCount",
+        "reviewReadyCount",
+        "researchCount",
+        "urgentCount",
+        "unresolvedDiagnosticCount",
+        "finalActionCount",
+        "buyNowCount",
+        "sellNowCount",
+        "holdCount",
+        "doNotBuyCount",
+        "avoidCount",
+        "blockedDecisionCount"
+      ],
       "properties": {
         "publishedCount": { "type": "integer", "minimum": 0 },
         "reviewReadyCount": { "type": "integer", "minimum": 0 },
         "researchCount": { "type": "integer", "minimum": 0 },
         "urgentCount": { "type": "integer", "minimum": 0 },
-        "unresolvedDiagnosticCount": { "type": "integer", "minimum": 0 }
+        "unresolvedDiagnosticCount": { "type": "integer", "minimum": 0 },
+        "finalActionCount": { "type": "integer", "minimum": 0 },
+        "buyNowCount": { "type": "integer", "minimum": 0 },
+        "sellNowCount": { "type": "integer", "minimum": 0 },
+        "holdCount": { "type": "integer", "minimum": 0 },
+        "doNotBuyCount": { "type": "integer", "minimum": 0 },
+        "avoidCount": { "type": "integer", "minimum": 0 },
+        "blockedDecisionCount": { "type": "integer", "minimum": 0 }
       }
     },
     "today": {
@@ -42,6 +65,7 @@
         "primaryItem": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/feedItem" }] }
       }
     },
+    "decisions": { "type": "array", "items": { "$ref": "#/$defs/feedItem" } },
     "published": { "type": "array", "items": { "$ref": "#/$defs/feedItem" } },
     "reviewReady": { "type": "array", "items": { "$ref": "#/$defs/feedItem" } },
     "research": { "type": "array", "items": { "$ref": "#/$defs/feedItem" } },
@@ -51,7 +75,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["companyId", "companyName", "symbol", "status", "category", "action", "thesis", "blockers", "nextStep", "reviewDate"],
+        "required": ["companyId", "companyName", "symbol", "status", "category", "action", "finalAction", "thesis", "blockers", "nextStep", "reviewDate"],
         "properties": {
           "companyId": { "type": "string" },
           "companyName": { "type": "string" },
@@ -59,6 +83,7 @@
           "status": { "type": "string" },
           "category": { "type": "string" },
           "action": { "type": "string" },
+          "finalAction": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/finalAction" }] },
           "thesis": { "type": ["string", "null"] },
           "blockers": { "type": "array", "items": { "type": "string" } },
           "nextStep": { "type": "string" },
@@ -69,6 +94,63 @@
     "disclosure": { "type": "string", "minLength": 20 }
   },
   "$defs": {
+    "finalAction": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "format",
+        "version",
+        "policyVersion",
+        "generatedAt",
+        "validUntil",
+        "status",
+        "marketAction",
+        "marketActionLabel",
+        "holderAction",
+        "holderActionLabel",
+        "nonHolderAction",
+        "nonHolderActionLabel",
+        "urgency",
+        "urgencyLabel",
+        "confidenceScore",
+        "dataQualityScore",
+        "reasons",
+        "blockers",
+        "execution"
+      ],
+      "properties": {
+        "format": { "const": "investor-control-final-action" },
+        "version": { "type": "integer", "minimum": 1 },
+        "policyVersion": { "type": "string" },
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "validUntil": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["FINAL", "BLOCKED"] },
+        "marketAction": { "$ref": "#/$defs/finalActionCode" },
+        "marketActionLabel": { "type": "string" },
+        "holderAction": { "$ref": "#/$defs/finalActionCode" },
+        "holderActionLabel": { "type": "string" },
+        "nonHolderAction": { "$ref": "#/$defs/finalActionCode" },
+        "nonHolderActionLabel": { "type": "string" },
+        "urgency": { "type": "string", "enum": ["IMMEDIATE", "TODAY", "NORMAL", "NONE"] },
+        "urgencyLabel": { "type": "string" },
+        "confidenceScore": { "type": "number", "minimum": 0, "maximum": 100 },
+        "dataQualityScore": { "type": "number", "minimum": 0, "maximum": 100 },
+        "reasons": { "type": "array", "items": { "type": "string" } },
+        "blockers": { "type": "array", "items": { "type": "string" } },
+        "execution": {
+          "type": "object",
+          "required": ["automaticBrokerOrder", "requiresUserExecution"],
+          "properties": {
+            "automaticBrokerOrder": { "const": false },
+            "requiresUserExecution": { "const": true }
+          }
+        }
+      }
+    },
+    "finalActionCode": {
+      "type": "string",
+      "enum": ["BUY_NOW", "SELL_NOW", "HOLD", "DO_NOT_BUY", "AVOID", "WATCH"]
+    },
     "feedItem": {
       "type": "object",
       "additionalProperties": false,
@@ -76,7 +158,8 @@
         "id", "companyId", "companyName", "symbol", "exchange", "status", "statusLabel",
         "category", "categoryLabel", "action", "actionLabel", "timeHorizon", "referencePrice",
         "thesis", "causalMechanism", "bullCase", "bearCase", "catalysts", "risks",
-        "invalidationCondition", "reviewDate", "blockers", "blockerLabels", "nextStep", "sources", "generatedAt"
+        "invalidationCondition", "reviewDate", "blockers", "blockerLabels", "nextStep", "sources", "generatedAt",
+        "publicationMode", "finalAction"
       ],
       "properties": {
         "id": { "type": "string" },
@@ -120,7 +203,9 @@
             }
           }
         },
-        "generatedAt": { "type": "string", "format": "date-time" }
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "publicationMode": { "type": ["string", "null"] },
+        "finalAction": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/finalAction" }] }
       }
     }
   }
