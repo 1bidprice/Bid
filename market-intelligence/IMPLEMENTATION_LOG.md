@@ -90,27 +90,35 @@ Every signal will eventually be measured at 1 day, 1 week, 1 month, 3 months, 6 
 
 - additional exchanges only where lawful, reliable and economically sustainable data access exists.
 
-## Current implementation state
+## 2026-07-27 — First working pipeline completed
 
-Completed:
+Completed on branch `investor-control-v1-market-intelligence-foundation`:
 
-- company identity schema;
-- evidence-record schema;
-- market-signal schema;
-- evidence publication gate;
-- deterministic signal ranking;
-- tests blocking social-only and unsupported recommendations;
-- draft PR #14;
-- successful foundation CI.
-
-In progress:
-
-- canonical seed registry for Allwyn and Virgin Galactic;
-- official source adapters;
+- company identity, evidence-record and market-signal schemas;
+- canonical seed registry for Allwyn AG and Virgin Galactic;
+- evidence publication gate and deterministic signal ranking;
+- official Allwyn regulatory-announcement adapter;
+- official SEC EDGAR recent-filings adapter;
 - deterministic event classification;
-- daily intelligence runner;
-- first source-backed signal candidates;
-- daily GitHub Actions execution and archived output.
+- end-to-end daily intelligence runner;
+- deep-document-review guard that forces index/title-level discoveries to remain `DRAFT / WATCH`;
+- scheduled daily GitHub Actions execution at 05:30 UTC;
+- manual and branch-triggered pipeline execution;
+- archived JSON output for every successful run;
+- tests covering source adapters, event classification, schema discipline and guarded actions;
+- successful expanded CI on commit `272cdaf99f2a493473a905bb4fac5f905e8bcc1b`.
+
+Operational configuration still required:
+
+- repository variable `SEC_USER_AGENT` must contain an identifying SEC-compliant User-Agent before live SPCE EDGAR collection is considered production-ready.
+
+Next implementation target:
+
+- retrieve underlying filing and announcement documents, not only index metadata;
+- extract verified claims and numeric facts;
+- calculate deterministic market, valuation, liquidity and balance-sheet metrics;
+- cross-check independent evidence;
+- produce the first complete Allwyn and SPCE signal reports with thesis, bull case, bear case, risks, invalidation condition, confidence and review date.
 
 ## Non-negotiable rules
 
