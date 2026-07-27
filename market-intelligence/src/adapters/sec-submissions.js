@@ -52,6 +52,7 @@ export async function fetchSecRecentFilings(company, options = {}) {
     const filingDate = recent.filingDate?.[index];
     const reportDate = recent.reportDate?.[index] || filingDate;
     const primaryDocument = recent.primaryDocument?.[index];
+    const items = recent.items?.[index] || '';
     if (!accession || !form || !filingDate || !primaryDocument) continue;
 
     const accessionCompact = String(accession).replace(/-/g, '');
@@ -67,6 +68,7 @@ export async function fetchSecRecentFilings(company, options = {}) {
       filingDate,
       reportDate,
       primaryDocument,
+      items,
     };
 
     records.push({
@@ -90,15 +92,9 @@ export async function fetchSecRecentFilings(company, options = {}) {
       supportsClaimIds: [],
       contradictsClaimIds: [],
       expiresAt: null,
-      notes: `Official SEC filing. Form ${form}.`,
-      metadata: {
-        form,
-        accession,
-        filingDate,
-        reportDate,
-        primaryDocument,
-        items: recent.items?.[index] || '',
-      },
+      notes: items
+        ? `Official SEC filing. Form ${form}. Reported items: ${items}.`
+        : `Official SEC filing. Form ${form}.`,
     });
   }
 
