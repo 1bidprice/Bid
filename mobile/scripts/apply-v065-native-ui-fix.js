@@ -106,7 +106,7 @@ function patchJsonFiles() {
   const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
   packageJson.version = '0.6.5';
   packageJson.scripts = packageJson.scripts || {};
-  packageJson.scripts.postinstall = 'node scripts/apply-v065-native-ui-fix.js';
+  packageJson.scripts.postinstall = 'node scripts/apply-v065-native-ui-fix.js && node scripts/apply-v070-opportunities.js';
   fs.writeFileSync(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
 }
 
