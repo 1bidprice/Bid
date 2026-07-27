@@ -6,12 +6,17 @@ import { fetchSecCompanyFacts } from './adapters/sec-companyfacts.js';
 import { fetchFinnhubQuote } from './adapters/finnhub-quote.js';
 import { fetchFinnhubCandlesForSymbol, fetchFinnhubCompanyCandles } from './adapters/finnhub-candles.js';
 import { fetchAllwynRegulatoryAnnouncements } from './adapters/allwyn-regulatory.js';
+import { fetchTrustedNewsEvidence } from './adapters/trusted-news-rss.js';
 import { hydrateEvidenceDocument } from './document-hydrator.js';
 import { extractDocumentObservations } from './document-observations.js';
 import { extractPdfText } from './pdf-extractor.js';
 import { calculateMarketMetrics } from './market-metrics.js';
+import { assessFundamentalRisk } from './fundamental-risk.js';
 import { assessIndependentEvidence } from './cross-check.js';
 import { evaluateSignalReadiness } from './signal-readiness.js';
+import { synthesizeEvidenceOnlyResearch } from './evidence-synthesis.js';
+import { buildResearchDossier } from './research-dossier.js';
+import { buildOpportunitiesFeed } from './opportunities-feed.js';
 import { candidateFromEvidence } from './event-classifier.js';
 import { rankSignalCandidate } from './rank-signal.js';
 
@@ -289,6 +294,14 @@ async function analyseEvidenceDocument(record, company, options) {
   return { record: enriched, diagnostics: hydrated.diagnostics || [] };
 }
 
+function referencePriceForRisk(marketSnapshot, marketMetrics) {
+  if (marketSnapshot?.usable && !marketSnapshot.stale && Number(marketSnapshot.currentPrice) > 0) {
+    return Number(marketSnapshot.currentPrice);
+  }
+  if (Number(marketMetrics?.latestClose) > 0) return Number(marketMetrics.latestClose);
+  return null;
+}
+
 export async function runDailyIntelligence(options = {}) {
   const now = new Date(options.now || Date.now()).toISOString();
   const universe = options.universe || await loadUniverse(options.universePath);
@@ -298,6 +311,8 @@ export async function runDailyIntelligence(options = {}) {
   const fundamentalSnapshots = [];
   const marketSnapshots = [];
   const historicalMarketMetrics = [];
+  const fundamentalRiskAssessments = [];
+  const researchDossiers = [];
   const documentLimit = Math.max(0, Number(options.documentLimit ?? 5));
   const benchmarkCache = new Map();
   const pdfExtractor = options.pdfExtractor === undefined ? extractPdfText : options.pdfExtractor;
@@ -309,6 +324,7 @@ export async function runDailyIntelligence(options = {}) {
     let fundamentalSnapshot = null;
     let marketSnapshot = null;
     let marketMetrics = null;
+    let fundamentalRisk = null;
 
     try {
       const fundamentalResult = await collectCompanyFundamentals(company, {
@@ -363,6 +379,19 @@ export async function runDailyIntelligence(options = {}) {
       });
     }
 
+    if (fundamentalSnapshot) {
+      fundamentalRisk = assessFundamentalRisk(
+        fundamentalSnapshot,
+        referencePriceForRisk(marketSnapshot, marketMetrics),
+        {
+          generatedAt: now,
+          companyId: company.companyId,
+          currency: company.currency || company.listings?.[0]?.currency || 'USD',
+        },
+      );
+      fundamentalRiskAssessments.push(fundamentalRisk);
+    }
+
     try {
       const result = await collectCompanyEvidence(company, {
         fetchImpl,
@@ -372,7 +401,7 @@ export async function runDailyIntelligence(options = {}) {
       });
       diagnostics.push(...(result.diagnostics || []));
 
-      const companyRecords = [];
+      const officialRecords = [];
       const records = result.records || [];
       for (let index = 0; index < records.length; index += 1) {
         let record = records[index];
@@ -380,7 +409,7 @@ export async function runDailyIntelligence(options = {}) {
           const analysed = await analyseEvidenceDocument(record, company, {
             fetchImpl,
             secUserAgent,
-            documentUserAgent: options.documentUserAgent || 'Investor-Control-Market-Intelligence/0.3',
+            documentUserAgent: options.documentUserAgent || 'Investor-Control-Market-Intelligence/0.4',
             now,
             maxDocumentBytes: options.maxDocumentBytes,
             minReviewedText: options.minReviewedText,
@@ -396,12 +425,66 @@ export async function runDailyIntelligence(options = {}) {
             observations: extractDocumentObservations(record),
           };
         }
-        companyRecords.push(record);
+        officialRecords.push(record);
         evidence.push(record);
       }
 
+      let independentRecords = [];
+      if (options.collectTrustedNews !== false) {
+        try {
+          const newsResult = await fetchTrustedNewsEvidence(company, {
+            fetchImpl,
+            retrievedAt: now,
+            limit: Number(options.newsLimit || 12),
+            userAgent: options.newsUserAgent || 'Investor-Control-Market-Intelligence/0.4',
+          });
+          independentRecords = newsResult.records || [];
+          diagnostics.push(...(newsResult.diagnostics || []).map((item) => ({ ...item, companyId: item.companyId || company.companyId })));
+          evidence.push(...independentRecords);
+        } catch (error) {
+          diagnostics.push({
+            code: 'TRUSTED_NEWS_ADAPTER_FAILED',
+            companyId: company.companyId,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      const companyRecords = [...officialRecords, ...independentRecords];
       const crossCheck = assessIndependentEvidence(companyRecords, now);
-      for (const record of companyRecords) {
+      const synthesis = synthesizeEvidenceOnlyResearch({
+        company,
+        evidence: companyRecords,
+        fundamentals: fundamentalSnapshot,
+        historicalMarketMetrics: marketMetrics,
+        fundamentalRisk,
+        generatedAt: now,
+      });
+
+      const dossier = buildResearchDossier({
+        company,
+        generatedAt: now,
+        category: synthesis.category,
+        proposedAction: synthesis.proposedAction,
+        timeHorizon: synthesis.timeHorizon,
+        evidence: companyRecords,
+        fundamentals: fundamentalSnapshot,
+        marketSnapshot,
+        historicalMarketMetrics: marketMetrics,
+        fundamentalRisk,
+        crossCheck,
+        thesis: synthesis.thesis,
+        causalMechanism: synthesis.causalMechanism,
+        catalysts: synthesis.catalysts,
+        bullCase: synthesis.bullCase,
+        bearCase: synthesis.bearCase,
+        risks: synthesis.risks,
+        invalidationCondition: synthesis.invalidationCondition,
+        reviewDate: synthesis.reviewDate,
+      });
+      researchDossiers.push(dossier);
+
+      for (const record of officialRecords) {
         const metricsReady =
           fundamentalSnapshot?.metricsReady === true &&
           marketMetrics?.readiness?.marketMetricsReady === true;
@@ -416,9 +499,9 @@ export async function runDailyIntelligence(options = {}) {
           fundamentals: fundamentalSnapshot,
           marketMetrics,
           crossCheck,
-          thesis: null,
-          invalidationCondition: null,
-          risks: marketMetrics?.risk?.flags || [],
+          thesis: synthesis.thesis,
+          invalidationCondition: synthesis.invalidationCondition,
+          risks: synthesis.risks?.map((item) => item.text) || [],
         });
         const ranked = rankSignalCandidate(candidate, now);
         signals.push(toSignalOutput(
@@ -447,9 +530,11 @@ export async function runDailyIntelligence(options = {}) {
     return String(b.publishedAt).localeCompare(String(a.publishedAt));
   });
 
+  const opportunitiesFeed = buildOpportunitiesFeed(researchDossiers, { generatedAt: now });
+
   return {
     format: 'investor-control-daily-intelligence',
-    version: 3,
+    version: 4,
     generatedAt: now,
     universe: universe.map((company) => ({
       companyId: company.companyId,
@@ -457,15 +542,21 @@ export async function runDailyIntelligence(options = {}) {
       primaryListing: company.primaryListing,
     })),
     evidenceCount: evidence.length,
+    independentDiscoveryCount: evidence.filter((record) => record.sourceType === 'FINANCIAL_NEWS').length,
     documentReviewedCount: evidence.filter((record) => record.document?.reviewed === true).length,
     documentPendingCount: evidence.filter((record) => record.document?.reviewed !== true).length,
     pdfReviewedCount: evidence.filter((record) => record.document?.status === 'REVIEWED_PDF').length,
     fundamentalSnapshotCount: fundamentalSnapshots.length,
     fundamentalSnapshots,
+    fundamentalRiskAssessmentCount: fundamentalRiskAssessments.length,
+    fundamentalRiskAssessments,
     marketSnapshotCount: marketSnapshots.length,
     marketSnapshots,
     historicalMarketMetricsCount: historicalMarketMetrics.length,
     historicalMarketMetrics,
+    researchDossierCount: researchDossiers.length,
+    researchDossiers,
+    opportunitiesFeed,
     signalCount: signals.length,
     diagnostics,
     signals,
@@ -479,9 +570,11 @@ async function main() {
   await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   console.log(`Wrote ${report.signalCount} signal candidates to ${outputPath}`);
   console.log(`Reviewed ${report.documentReviewedCount} official source documents (${report.pdfReviewedCount} PDFs)`);
+  console.log(`Collected ${report.independentDiscoveryCount} trusted-publisher discovery records`);
   console.log(`Built ${report.fundamentalSnapshotCount} deterministic fundamental snapshots`);
   console.log(`Built ${report.marketSnapshotCount} guarded market snapshots`);
   console.log(`Built ${report.historicalMarketMetricsCount} historical market metric sets`);
+  console.log(`Built ${report.researchDossierCount} guarded research dossiers`);
   if (report.diagnostics.length) {
     console.warn(`Diagnostics: ${JSON.stringify(report.diagnostics)}`);
   }
