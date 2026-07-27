@@ -74,7 +74,7 @@ This is a permanent boundary unless a separate, explicitly designed and legally 
 
 ## Required production data configuration
 
-Final decisions cannot be created from missing data. Production still requires:
+Final decisions cannot be created from missing data. Production requires:
 
 - repository variable `SEC_USER_AGENT` for compliant SEC access;
 - repository secret `FINNHUB_TOKEN` for US quote access;
@@ -82,3 +82,7 @@ Final decisions cannot be created from missing data. Production still requires:
 - a lawful backend source and licence for Allwyn/Athens historical and current market data plus structured fundamentals.
 
 Missing configuration remains visible as blockers. The engine must never invent prices, fundamentals, sources or final actions.
+
+## 2026-07-27 — Live credentials activation check
+
+The repository owner confirmed that `SEC_USER_AGENT` and `FINNHUB_TOKEN` were added to GitHub Actions configuration. This commit intentionally triggers a fresh production pipeline run so the live source-health report can confirm which adapters are now active and which remaining blockers are data-entitlement or market-coverage issues rather than missing credentials.
