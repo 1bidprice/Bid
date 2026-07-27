@@ -64,6 +64,7 @@ jobs:
           if (!Array.isArray(report.fundamentalRiskAssessments)) throw new Error('fundamental risk assessments missing');
           if (!Array.isArray(report.marketSnapshots)) throw new Error('market snapshots missing');
           if (!Array.isArray(report.historicalMarketMetrics)) throw new Error('historical market metrics missing');
+          if (!Array.isArray(report.claimClusters)) throw new Error('claim clusters missing');
           if (!Array.isArray(report.researchDossiers)) throw new Error('research dossiers missing');
           if (!report.opportunitiesFeed || !Array.isArray(report.opportunitiesFeed.items)) throw new Error('opportunities feed missing');
           if (report.evidenceCount < 1) throw new Error('no evidence collected');
@@ -74,25 +75,38 @@ jobs:
           if (!Number.isInteger(report.fundamentalRiskAssessmentCount)) throw new Error('fundamental risk count missing');
           if (!Number.isInteger(report.marketSnapshotCount)) throw new Error('market snapshot count missing');
           if (!Number.isInteger(report.historicalMarketMetricsCount)) throw new Error('historical market metrics count missing');
+          if (!Number.isInteger(report.claimClusterCount)) throw new Error('claim cluster count missing');
           if (!Number.isInteger(report.researchDossierCount)) throw new Error('research dossier count missing');
+          if (report.claimClusterCount !== report.claimClusters.length) throw new Error('claim cluster count mismatch');
+          for (const claim of report.claimClusters) {
+            if (!claim.claimId || !Array.isArray(claim.evidenceIds)) throw new Error('invalid canonical claim');
+            if (claim.recommendationGrade && claim.status !== 'RECOMMENDATION_GRADE') {
+              throw new Error('recommendation-grade claim has wrong status');
+            }
+          }
           for (const dossier of report.researchDossiers) {
             if (!['DRAFT_RESEARCH', 'REVIEW_READY', 'PUBLISHED'].includes(dossier.status)) throw new Error('invalid dossier status');
             if (dossier.status === 'DRAFT_RESEARCH' && dossier.proposedAction !== 'WATCH') {
               throw new Error('draft dossier leaked a directional action');
             }
+            if (dossier.status === 'REVIEW_READY' && dossier.readiness?.publishable !== true) {
+              throw new Error('review-ready dossier is not publishable');
+            }
           }
           for (const signal of report.signals) {
             if (!signal.source?.sourceUrl) throw new Error('signal source missing');
+            if (!signal.claim?.claimId) throw new Error('signal canonical claim missing');
             if (!['INDEX_DISCOVERY', 'DOCUMENT_REVIEWED', 'METRICS_CONFIRMED'].includes(signal.analysisStage)) {
               throw new Error('invalid analysis stage');
             }
             if (!signal.crossCheck || !signal.readiness) throw new Error('cross-check/readiness missing');
-            if (signal.readiness.publishable !== false) throw new Error('premature signal marked publishable');
-            if (signal.status !== 'DRAFT' || signal.suggestedAction !== 'WATCH') {
-              throw new Error('unconfirmed evidence escaped the publication guard');
+            if (!signal.readiness.publishable) {
+              if (signal.status !== 'DRAFT' || signal.suggestedAction !== 'WATCH') {
+                throw new Error('unconfirmed evidence escaped the publication guard');
+              }
             }
           }
-          console.log(`PASS: ${report.evidenceCount} evidence, ${report.independentDiscoveryCount} news discoveries, ${report.documentReviewedCount} documents, ${report.pdfReviewedCount} PDFs, ${report.historicalMarketMetricsCount} historical metric sets, ${report.researchDossierCount} dossiers, ${report.signalCount} guarded candidates`);
+          console.log(`PASS: ${report.evidenceCount} evidence, ${report.independentDiscoveryCount} news discoveries, ${report.claimClusterCount} claims, ${report.documentReviewedCount} documents, ${report.pdfReviewedCount} PDFs, ${report.historicalMarketMetricsCount} historical metric sets, ${report.researchDossierCount} dossiers, ${report.signalCount} guarded candidates`);
           NODE
 
       - name: Upload daily intelligence report
