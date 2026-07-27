@@ -104,10 +104,14 @@ test('short or economically unclassified pages remain discovery evidence', async
     headers: headers(),
     text: async () => longButUnclassified,
   });
-  const unclassified = await reviewTrustedNewsRecord(discovery(), COMPANY, {
-    fetchImpl: unclassifiedFetch,
-    reviewedAt: NOW,
-  });
+  const unclassified = await reviewTrustedNewsRecord(
+    discovery({ title: 'Virgin Galactic community profile - Reuters' }),
+    COMPANY,
+    {
+      fetchImpl: unclassifiedFetch,
+      reviewedAt: NOW,
+    },
+  );
   assert.equal(unclassified.record.claimType, 'ESTIMATE');
   assert.ok(unclassified.diagnostics.some((item) => item.code === 'TRUSTED_NEWS_REVIEW_EVENT_NOT_ESTABLISHED'));
 });
