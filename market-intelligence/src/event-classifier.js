@@ -114,7 +114,7 @@ export function candidateFromEvidence(record, options = {}) {
     hasPosition: options.hasPosition === true,
     eventType: classification.eventType,
     requiresDeepReview: classification.requiresDeepReview,
-    metricsReady: options.metricsReady === true && classification.metricsReady === true,
+    metricsReady: options.metricsReady === true,
     rationale: classification.rationale,
   };
 }
