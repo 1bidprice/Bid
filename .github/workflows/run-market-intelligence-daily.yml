@@ -109,10 +109,36 @@ jobs:
           console.log(`PASS: ${report.evidenceCount} evidence, ${report.independentDiscoveryCount} news discoveries, ${report.claimClusterCount} claims, ${report.documentReviewedCount} documents, ${report.pdfReviewedCount} PDFs, ${report.historicalMarketMetricsCount} historical metric sets, ${report.researchDossierCount} dossiers, ${report.signalCount} guarded candidates`);
           NODE
 
-      - name: Upload daily intelligence report
+      - name: Build Android-facing intelligence feed
+        working-directory: market-intelligence
+        run: npm run build:mobile
+
+      - name: Verify mobile feed contract
+        working-directory: market-intelligence
+        run: |
+          node - <<'NODE'
+          const feed = require('./out/mobile-intelligence-feed.json');
+          if (feed.format !== 'investor-control-mobile-intelligence-feed') throw new Error('wrong mobile feed format');
+          if (feed.version !== 1) throw new Error('wrong mobile feed version');
+          for (const key of ['published', 'reviewReady', 'research', 'urgent', 'assistantContext']) {
+            if (!Array.isArray(feed[key])) throw new Error(`${key} missing`);
+          }
+          if (feed.summary.publishedCount !== feed.published.length) throw new Error('published count mismatch');
+          if (feed.summary.reviewReadyCount !== feed.reviewReady.length) throw new Error('review-ready count mismatch');
+          if (feed.summary.researchCount !== feed.research.length) throw new Error('research count mismatch');
+          for (const item of feed.research) {
+            if (item.action !== 'WATCH') throw new Error('draft research leaked directional action to mobile');
+            if (!Array.isArray(item.blockers) || !item.nextStep) throw new Error('research blocker guidance missing');
+          }
+          console.log(`PASS mobile: ${feed.published.length} published, ${feed.reviewReady.length} review-ready, ${feed.research.length} research`);
+          NODE
+
+      - name: Upload daily intelligence artifacts
         uses: actions/upload-artifact@v4
         with:
           name: investor-control-daily-intelligence-${{ github.run_id }}
-          path: market-intelligence/out/daily-intelligence.json
+          path: |
+            market-intelligence/out/daily-intelligence.json
+            market-intelligence/out/mobile-intelligence-feed.json
           if-no-files-found: error
           retention-days: 90
