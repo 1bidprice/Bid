@@ -45,7 +45,8 @@ test('synthesis converts reviewed dilution evidence into a grounded risk dossier
   assert.equal(result.proposedAction, 'CONSIDER_REDUCE');
   assert.equal(result.timeHorizon, 'WEEKS');
   assert.ok(result.thesis.length >= 80);
-  assert.ok(result.thesis.includes('diluted-share change 35%'));
+  assert.ok(result.thesis.includes('μεταβολή απομειωμένου αριθμού μετοχών 35%'));
+  assert.ok(result.thesis.includes('δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης'));
   assert.ok(result.catalysts[0].evidenceIds.includes('evidence:sec:dilution'));
   assert.ok(result.risks.length >= 2);
   assert.equal(result.reviewDate, '2026-08-26');
