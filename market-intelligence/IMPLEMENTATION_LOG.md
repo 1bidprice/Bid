@@ -127,20 +127,44 @@ The pipeline now goes beyond index titles:
 - explicitly keeps liquidity and relative-strength readiness false because a point-in-time quote cannot prove either metric;
 - expanded deterministic tests pass on commit `e1d8ca7b0aa571a50a0615bd3c99ddebda25c815`.
 
-Operational configuration still required:
+## 2026-07-27 — PDF, historical-market and recommendation-readiness stage completed
 
-- repository variable `SEC_USER_AGENT` must contain an identifying SEC-compliant User-Agent;
-- repository secret `FINNHUB_TOKEN` must be configured for backend SPCE quotes;
-- Allwyn market data needs a lawful backend source separate from the current Android display feed.
+The next evidence and metrics layer is now implemented:
+
+- PDF text extraction uses a controlled `pdftotext` runtime with file-size, execution-time and output-size limits;
+- page boundaries are preserved with page number, text offsets, text length and content hash;
+- extracted currency amounts, percentages, share counts and dates carry page-level provenance;
+- PDFs remain unreviewed when the extractor is unavailable, fails or returns insufficient text;
+- a guarded Finnhub daily-candle adapter normalises OHLCV arrays and reports premium, rate-limit and no-data failures explicitly;
+- historical metrics calculate 20/60/120-session returns, 20/50/200-session moving averages, 60-session annualised volatility and 120-session maximum drawdown;
+- liquidity is measured from average daily traded value, median volume and volume coverage;
+- 60-session relative strength is calculated only against timestamp-aligned benchmark observations;
+- a point-in-time quote can no longer satisfy historical-market readiness;
+- independent evidence cross-checking distinguishes discovery support from recommendation-grade corroboration;
+- duplicate content does not count as an independent source;
+- unresolved contradiction links block recommendation readiness;
+- the recommendation contract now requires reviewed documents, fundamental readiness, historical-market readiness, independent corroboration, thesis, material risks and an explicit invalidation condition;
+- deterministic valuation and balance-sheet risk rules calculate market capitalisation, price-to-sales, price-to-book, liabilities-to-assets, cash runway, dilution, margins and risk flags where source coverage permits;
+- the daily report contract is now version 3 and archives PDF review counts, historical metric sets, cross-check results and readiness blockers;
+- the daily workflow installs the PDF extraction runtime before collection;
+- the complete deterministic test suite passes on commit `593b3ecd46ee6f9e2b3df7e8e780cb06eab1b174`.
+
+Operational configuration and data entitlements still required:
+
+- repository variable `SEC_USER_AGENT` for compliant SEC access;
+- repository secret `FINNHUB_TOKEN` for backend US quotes;
+- Finnhub historical stock candles require an entitled plan; absence or rejection remains a visible diagnostic rather than silently fabricated history;
+- Allwyn still needs a lawful backend source for historical price and volume data;
+- recommendation-grade corroboration still needs an independent high-quality source adapter in addition to issuer/regulatory evidence.
 
 Next implementation target:
 
-- dedicated PDF text extraction and page-level provenance for Allwyn annual reports and regulatory attachments;
-- daily historical price and volume series rather than a single quote;
-- deterministic volatility, liquidity and relative-strength metrics;
-- valuation and balance-sheet risk rules tied to source periods;
-- independent-source cross-checking and contradiction records;
-- first complete Allwyn and SPCE signal reports with thesis, bull case, bear case, catalysts, risks, invalidation, confidence and review date.
+- lawful historical data source for Allwyn and a production-entitled historical source for SPCE;
+- independent financial-news/economic-source ingestion with canonical claim linking;
+- structured thesis, bull case, bear case, catalysts, risks and invalidation synthesis from verified records only;
+- first complete, source-backed Allwyn and SPCE research dossiers;
+- backend Opportunities feed contract for later Android integration;
+- outcome ledger for 1-day through 12-month signal evaluation.
 
 ## Non-negotiable rules
 
