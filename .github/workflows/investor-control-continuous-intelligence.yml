@@ -1,0 +1,170 @@
+name: Investor Control Continuous Intelligence
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * 1-5'
+    - cron: '37 */3 * * 0,6'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: investor-control-continuous-intelligence
+  cancel-in-progress: true
+
+jobs:
+  autonomous-intelligence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout production intelligence source
+        uses: actions/checkout@v4
+        with:
+          ref: investor-control-v1-market-intelligence-foundation
+          path: source
+          fetch-depth: 1
+
+      - name: Checkout live feed channel
+        uses: actions/checkout@v4
+        with:
+          ref: investor-control-live-feed
+          path: live-feed
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install controlled PDF extraction runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y poppler-utils
+          pdftotext -v
+
+      - name: Run production policy smoke tests
+        working-directory: source/market-intelligence
+        run: node --test test/final-action-policy.test.js test/mobile-intelligence-feed.test.js
+
+      - name: Build autonomous evidence and decision report
+        working-directory: source/market-intelligence
+        env:
+          SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+        run: |
+          npm run run:autonomous
+          npm run build:autonomous-mobile
+
+      - name: Verify autonomous publication boundary
+        working-directory: source/market-intelligence
+        run: |
+          node - <<'NODE'
+          const report = require('./out/autonomous-intelligence.json');
+          const feed = require('./out/mobile-intelligence-feed.json');
+          const allowed = new Set(['BUY_NOW', 'SELL_NOW', 'HOLD', 'DO_NOT_BUY', 'AVOID', 'WATCH']);
+          if (report.format !== 'investor-control-daily-intelligence' || report.version !== 5) throw new Error('wrong autonomous report contract');
+          if (!report.policyVersion || !report.finalActionCounts) throw new Error('final action policy metadata missing');
+          if (feed.format !== 'investor-control-mobile-intelligence-feed' || feed.version !== 1) throw new Error('wrong mobile feed contract');
+          if (!Array.isArray(feed.decisions)) throw new Error('decisions list missing');
+          for (const dossier of report.researchDossiers) {
+            const finalAction = dossier.finalAction;
+            if (!finalAction || !allowed.has(finalAction.marketAction)) throw new Error('invalid final action');
+            if (finalAction.execution?.automaticBrokerOrder !== false || finalAction.execution?.requiresUserExecution !== true) throw new Error('broker execution boundary broken');
+            if (finalAction.status === 'BLOCKED' && finalAction.marketAction !== 'WATCH') throw new Error('blocked dossier leaked a direction');
+            if (dossier.publicationMode === 'AUTOMATED_POLICY') {
+              if (dossier.status !== 'PUBLISHED' || finalAction.status !== 'FINAL' || finalAction.marketAction === 'WATCH') throw new Error('invalid automated publication');
+            }
+          }
+          for (const item of feed.research) {
+            if (item.action !== 'WATCH') throw new Error('draft research leaked directional action');
+          }
+          console.log(`PASS autonomous feed: ${feed.summary.finalActionCount} final, ${feed.summary.buyNowCount} buy, ${feed.summary.sellNowCount} sell, ${feed.summary.blockedDecisionCount} blocked`);
+          NODE
+
+      - name: Publish verified live channel and audit history
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp source/market-intelligence/out/mobile-intelligence-feed.json live-feed/mobile-intelligence-feed.json
+          cp source/market-intelligence/out/autonomous-intelligence.json live-feed/autonomous-intelligence.json
+          node - <<'NODE'
+          const fs = require('fs');
+          const crypto = require('crypto');
+          const feedPath = './live-feed/mobile-intelligence-feed.json';
+          const reportPath = './live-feed/autonomous-intelligence.json';
+          const feed = JSON.parse(fs.readFileSync(feedPath, 'utf8'));
+          const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+          const feedSha256 = crypto.createHash('sha256').update(fs.readFileSync(feedPath)).digest('hex');
+          const now = new Date().toISOString();
+          const status = {
+            format: 'investor-control-live-feed-status',
+            version: 2,
+            generatedAt: feed.generatedAt,
+            publishedAt: now,
+            policyVersion: feed.policyVersion,
+            sourceWorkflowRunId: process.env.GITHUB_RUN_ID,
+            sourceCommit: process.env.GITHUB_SHA,
+            feedSha256,
+            counts: feed.summary,
+            sourceHealth: {
+              evidenceCount: report.evidenceCount,
+              documentReviewedCount: report.documentReviewedCount,
+              independentDiscoveryCount: report.independentDiscoveryCount,
+              fundamentalSnapshotCount: report.fundamentalSnapshotCount,
+              marketSnapshotCount: report.marketSnapshotCount,
+              historicalMarketMetricsCount: report.historicalMarketMetricsCount,
+              diagnosticCount: Array.isArray(report.diagnostics) ? report.diagnostics.length : 0,
+            },
+          };
+          fs.writeFileSync('./live-feed/status.json', `${JSON.stringify(status, null, 2)}\n`);
+
+          let history = [];
+          try {
+            const parsed = JSON.parse(fs.readFileSync('./live-feed/decision-history.json', 'utf8'));
+            history = Array.isArray(parsed.items) ? parsed.items : [];
+          } catch {}
+          const current = (feed.decisions || []).map((item) => ({
+            recordedAt: now,
+            feedGeneratedAt: feed.generatedAt,
+            policyVersion: feed.policyVersion,
+            dossierId: item.id,
+            companyId: item.companyId,
+            companyName: item.companyName,
+            symbol: item.symbol,
+            marketAction: item.finalAction?.marketAction,
+            holderAction: item.finalAction?.holderAction,
+            nonHolderAction: item.finalAction?.nonHolderAction,
+            urgency: item.finalAction?.urgency,
+            confidenceScore: item.finalAction?.confidenceScore,
+            dataQualityScore: item.finalAction?.dataQualityScore,
+            referencePrice: item.referencePrice,
+            validUntil: item.finalAction?.validUntil,
+          }));
+          const identity = (item) => `${item.dossierId}|${item.marketAction}|${item.referencePrice?.timestamp || ''}`;
+          const seen = new Set(current.map(identity));
+          const merged = [...current, ...history.filter((item) => !seen.has(identity(item)))].slice(0, 500);
+          fs.writeFileSync('./live-feed/decision-history.json', `${JSON.stringify({ format: 'investor-control-decision-history', version: 1, updatedAt: now, items: merged }, null, 2)}\n`);
+          NODE
+          cd live-feed
+          git config user.name 'Investor Control Intelligence'
+          git config user.email 'actions@users.noreply.github.com'
+          git add mobile-intelligence-feed.json autonomous-intelligence.json status.json decision-history.json
+          if git diff --cached --quiet; then
+            echo 'Live intelligence channel already current'
+          else
+            git commit -m "chore(feed): autonomous intelligence ${GITHUB_RUN_ID} [skip ci]"
+            git pull --rebase origin investor-control-live-feed
+            git push origin HEAD:investor-control-live-feed
+          fi
+
+      - name: Upload production evidence package
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-autonomous-intelligence-${{ github.run_id }}
+          path: |
+            source/market-intelligence/out/autonomous-intelligence.json
+            source/market-intelligence/out/mobile-intelligence-feed.json
+          if-no-files-found: error
+          retention-days: 90
