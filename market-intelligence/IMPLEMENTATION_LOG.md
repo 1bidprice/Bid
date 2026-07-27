@@ -57,18 +57,24 @@ No recommendation may be published as a bare BUY or SELL. Every signal must incl
 
 ## Publication gate
 
-A material signal needs either:
+Discovery may begin from one reliable primary source or two independent reliable sources. Directional recommendation-grade output is stricter and now requires all of the following:
 
-- at least one primary, high-reliability factual source; or
-- at least two independent reliable sources.
+- a reviewed primary factual source;
+- a reviewed independent factual source from a separate source group;
+- canonical claim-level linking between the sources;
+- no unresolved contradiction;
+- sufficient fundamental coverage;
+- sufficient historical price, volume, liquidity and relative-strength coverage;
+- a reference price with timestamp;
+- a complete thesis, causal mechanism, bull case, bear case, verified catalyst, material risks, invalidation condition and review date.
 
-The system must block publication when evidence is stale, social-only, materially contradictory without resolution, or not connected to the canonical company identity.
+Unreviewed RSS snippets, duplicate reports, social-only evidence, stale evidence and attractive scores cannot satisfy the publication gate.
 
 ## Training strategy
 
 Initial development uses deterministic calculations, retrieval of current evidence, structured outputs and continuous evaluation. Fine-tuning is deferred until a sufficiently large, reviewed history of signals and outcomes exists.
 
-Every signal will eventually be measured at 1 day, 1 week, 1 month, 3 months, 6 months and 12 months, including maximum adverse excursion, maximum favourable excursion and catalyst confirmation/failure.
+Every published dossier is measured at 1 day, 1 week, 1 month, 3 months, 6 months and 12 months, including action-aligned return, maximum adverse excursion, maximum favourable excursion and catalyst confirmation/failure.
 
 ## Coverage sequence
 
@@ -114,7 +120,6 @@ The pipeline now goes beyond index titles:
 
 - retrieves official HTML/XHTML/text source documents with size and content-type limits;
 - strips scripts, styles and executable markup before analysis;
-- refuses to mark PDF files as reviewed until a dedicated PDF text-extraction stage exists;
 - records document status, content type, byte length, text length and review state;
 - extracts auditable currency amounts, percentages, share counts, dates and recognised sections with source excerpts;
 - distinguishes `INDEX_DISCOVERY` from `DOCUMENT_REVIEWED` in every signal;
@@ -135,36 +140,56 @@ The next evidence and metrics layer is now implemented:
 - page boundaries are preserved with page number, text offsets, text length and content hash;
 - extracted currency amounts, percentages, share counts and dates carry page-level provenance;
 - PDFs remain unreviewed when the extractor is unavailable, fails or returns insufficient text;
-- a guarded Finnhub daily-candle adapter normalises OHLCV arrays and reports premium, rate-limit and no-data failures explicitly;
+- a guarded Finnhub daily-candle adapter normalises OHLCV arrays and reports entitlement, rate-limit and no-data failures explicitly;
 - historical metrics calculate 20/60/120-session returns, 20/50/200-session moving averages, 60-session annualised volatility and 120-session maximum drawdown;
 - liquidity is measured from average daily traded value, median volume and volume coverage;
 - 60-session relative strength is calculated only against timestamp-aligned benchmark observations;
-- a point-in-time quote can no longer satisfy historical-market readiness;
-- independent evidence cross-checking distinguishes discovery support from recommendation-grade corroboration;
+- a point-in-time quote cannot satisfy historical-market readiness;
 - duplicate content does not count as an independent source;
 - unresolved contradiction links block recommendation readiness;
-- the recommendation contract now requires reviewed documents, fundamental readiness, historical-market readiness, independent corroboration, thesis, material risks and an explicit invalidation condition;
 - deterministic valuation and balance-sheet risk rules calculate market capitalisation, price-to-sales, price-to-book, liabilities-to-assets, cash runway, dilution, margins and risk flags where source coverage permits;
-- the daily report contract is now version 3 and archives PDF review counts, historical metric sets, cross-check results and readiness blockers;
 - the daily workflow installs the PDF extraction runtime before collection;
 - the complete deterministic test suite passes on commit `593b3ecd46ee6f9e2b3df7e8e780cb06eab1b174`.
 
-Operational configuration and data entitlements still required:
+## 2026-07-27 — Claim intelligence, dossiers and learning loop completed
 
-- repository variable `SEC_USER_AGENT` for compliant SEC access;
-- repository secret `FINNHUB_TOKEN` for backend US quotes;
-- Finnhub historical stock candles require an entitled plan; absence or rejection remains a visible diagnostic rather than silently fabricated history;
-- Allwyn still needs a lawful backend source for historical price and volume data;
-- recommendation-grade corroboration still needs an independent high-quality source adapter in addition to issuer/regulatory evidence.
+The pipeline now produces a controlled research product rather than isolated signal scores:
 
-Next implementation target:
+- trusted financial-publisher RSS discovery supports Reuters, Bloomberg, Financial Times, Wall Street Journal, Associated Press, CNBC, MarketWatch and Fortune through an explicit allowlist;
+- RSS items are company-resolved through canonical names, aliases and tickers and remain `ESTIMATE / discovery only` until the underlying article is reviewed;
+- bounded trusted-news review follows redirects, removes executable markup, enforces byte and text limits, verifies the company and a material event, retains only limited factual excerpts and records `REVIEWED_NEWS` provenance;
+- unreviewed articles, paywalls, short pages, unsupported content and failed redirects remain visible diagnostics and cannot silently become facts;
+- evidence cross-check version 2 requires reviewed primary and reviewed independent factual evidence for recommendation readiness;
+- canonical claim clusters link evidence by company, event type and event window and classify each claim as `DISCOVERY_ONLY`, `PRIMARY_CONFIRMED`, `CORROBORATED_DISCOVERY`, `RECOMMENDATION_GRADE` or `CONTRADICTED`;
+- company-level source counts can no longer falsely corroborate unrelated events because each dossier and signal is evaluated against its own claim cluster;
+- deterministic evidence-only synthesis creates category, proposed action, time horizon, thesis, causal mechanism, catalyst, bull case, bear case, risks, invalidation and review date from reviewed records and deterministic metrics;
+- incomplete research cannot leak a directional action: the Research Dossier builder forces `DRAFT_RESEARCH / WATCH` until every gate passes;
+- dossier states are explicit: `DRAFT_RESEARCH → REVIEW_READY → PUBLISHED`;
+- daily intelligence report contract version 4 includes evidence, trusted-news discoveries, claim clusters, fundamental risk, historical metrics, research dossiers, Opportunities feed and diagnostics;
+- the production Opportunities feed accepts only `PUBLISHED` dossiers;
+- the outcome ledger creates 1-day, 1-week, 1-month, 3-month, 6-month and 12-month checkpoints and tracks action-aligned performance and close-based favourable/adverse excursion;
+- reviewed publication is a separate audited pipeline: an identified `APPROVE` decision, fresh reference price, fresh dossier and valid review date are required before a dossier enters Opportunities and outcome tracking;
+- no publication step executes a broker order;
+- deterministic tests and schema parsing pass in GitHub Actions on workflow run `30261503308`.
 
-- lawful historical data source for Allwyn and a production-entitled historical source for SPCE;
-- independent financial-news/economic-source ingestion with canonical claim linking;
-- structured thesis, bull case, bear case, catalysts, risks and invalidation synthesis from verified records only;
-- first complete, source-backed Allwyn and SPCE research dossiers;
-- backend Opportunities feed contract for later Android integration;
-- outcome ledger for 1-day through 12-month signal evaluation.
+## Current operational constraints
+
+- repository variable `SEC_USER_AGENT` must contain an identifying SEC-compliant User-Agent;
+- repository secret `FINNHUB_TOKEN` is required for backend US quote access;
+- historical US candles require an entitled source; rejection remains a visible diagnostic rather than fabricated history;
+- Allwyn still needs a lawful backend source for historical price and volume data and structured fundamental coverage;
+- independent article review depends on lawful access to the underlying publisher page and may remain discovery-only when blocked;
+- no Allwyn or SPCE dossier is yet claimed as live `REVIEW_READY` or `PUBLISHED` without a successful evidence-and-data run.
+
+## Next implementation target
+
+- configure and validate the live SEC and market-data environment;
+- obtain lawful historical price/volume coverage for Allwyn and production-entitled history for SPCE;
+- run claim-level independent corroboration against current Allwyn and SPCE developments;
+- generate the first populated source-backed dossiers and inspect every blocker;
+- publish only a dossier that actually reaches `REVIEW_READY` and receives an explicit review decision;
+- expose draft research, review blockers and published Opportunities through an Android-facing backend contract;
+- then integrate the Opportunities screen and the specialised AI Assistant without touching existing local transaction/accounting keys.
 
 ## Non-negotiable rules
 
