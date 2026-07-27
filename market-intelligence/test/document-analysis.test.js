@@ -12,6 +12,8 @@ const ALLWYN = {
   legalName: 'Allwyn AG',
   displayName: 'Allwyn',
   primaryListing: { exchange: 'Euronext Athens', symbol: 'ALWN', mic: 'XATH' },
+  country: 'CH',
+  currency: 'EUR',
   active: true,
 };
 
@@ -80,13 +82,16 @@ test('official HTML document becomes reviewed evidence with deterministic observ
   assert.equal(hydrated.diagnostics.length, 0);
   assert.equal(hydrated.record.document.status, 'REVIEWED_TEXT');
   assert.equal(hydrated.record.document.reviewed, true);
+  assert.deepEqual(hydrated.record.document.pages, []);
   assert.ok(hydrated.record.rawText.length >= 400);
 
   const observations = extractDocumentObservations(hydrated.record);
   assert.equal(observations.documentReviewed, true);
+  assert.equal(observations.extractionVersion, 2);
   assert.ok(observations.currencyAmounts.some((item) => item.raw.includes('47,600')));
   assert.ok(observations.percentages.some((item) => item.raw.includes('0.04%')));
   assert.ok(observations.shareCounts.some((item) => item.raw.includes('3,500 shares')));
+  assert.ok(observations.currencyAmounts.every((item) => item.pageNumber === null));
 
   const candidate = candidateFromEvidence({ ...hydrated.record, observations }, { hasPosition: true });
   assert.equal(candidate.requiresDeepReview, false);
@@ -109,7 +114,7 @@ test('PDF source is never treated as reviewed without a PDF extraction stage', a
   assert.ok(hydrated.diagnostics.some((item) => item.code === 'PDF_TEXT_EXTRACTION_REQUIRED'));
 });
 
-test('daily runner distinguishes reviewed documents from index-only discoveries but still blocks advice without metrics', async () => {
+test('daily runner reviews documents but blocks advice until all independent gates pass', async () => {
   const indexHtml = `
     <div>20 July 2026</div>
     <a href="/regulatory-announcements/company-purchased-own-shares">Company purchased its own shares under share buyback programme</a>
@@ -130,12 +135,15 @@ test('daily runner distinguishes reviewed documents from index-only discoveries 
     documentLimit: 1,
   });
 
-  assert.equal(report.version, 2);
+  assert.equal(report.version, 3);
   assert.equal(report.documentReviewedCount, 1);
   assert.equal(report.signals[0].analysisStage, 'DOCUMENT_REVIEWED');
   assert.equal(report.signals[0].status, 'DRAFT');
   assert.equal(report.signals[0].suggestedAction, 'WATCH');
-  assert.ok(report.signals[0].reasons.includes('FUNDAMENTAL_AND_MARKET_METRICS_REQUIRED'));
+  assert.equal(report.signals[0].readiness.publishable, false);
+  assert.ok(report.signals[0].reasons.includes('FUNDAMENTALS_REQUIRED'));
+  assert.ok(report.signals[0].reasons.includes('HISTORICAL_MARKET_METRICS_REQUIRED'));
+  assert.ok(report.signals[0].reasons.includes('INDEPENDENT_CROSS_CHECK_REQUIRED'));
   assert.ok(!report.signals[0].reasons.includes('DOCUMENT_REVIEW_REQUIRED'));
   assert.ok(report.signals[0].observations.currencyAmountCount >= 1);
 });
