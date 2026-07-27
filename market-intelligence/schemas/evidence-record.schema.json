@@ -71,6 +71,83 @@
       "default": []
     },
     "expiresAt": { "type": ["string", "null"], "format": "date-time" },
-    "notes": { "type": ["string", "null"] }
+    "notes": { "type": ["string", "null"] },
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "fetchedAt", "contentType", "byteLength", "textLength", "reviewed"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "REVIEWED_TEXT",
+            "TEXT_TOO_SHORT",
+            "PDF_EXTRACTION_REQUIRED",
+            "UNSUPPORTED_CONTENT_TYPE",
+            "TOO_LARGE",
+            "FETCH_FAILED"
+          ]
+        },
+        "fetchedAt": { "type": "string", "format": "date-time" },
+        "contentType": { "type": ["string", "null"] },
+        "byteLength": { "type": ["integer", "null"], "minimum": 0 },
+        "textLength": { "type": "integer", "minimum": 0 },
+        "reviewed": { "type": "boolean" }
+      }
+    },
+    "observations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "extractionVersion",
+        "documentReviewed",
+        "textLength",
+        "currencyAmounts",
+        "percentages",
+        "shareCounts",
+        "dates",
+        "sections"
+      ],
+      "properties": {
+        "extractionVersion": { "type": "integer", "minimum": 1 },
+        "documentReviewed": { "type": "boolean" },
+        "textLength": { "type": "integer", "minimum": 0 },
+        "currencyAmounts": { "$ref": "#/$defs/numericObservations" },
+        "percentages": { "$ref": "#/$defs/numericObservations" },
+        "shareCounts": { "$ref": "#/$defs/numericObservations" },
+        "dates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["raw", "excerpt"],
+            "properties": {
+              "raw": { "type": "string" },
+              "excerpt": { "type": "string" }
+            }
+          }
+        },
+        "sections": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "numericObservations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["raw", "value", "excerpt"],
+        "properties": {
+          "raw": { "type": "string" },
+          "value": { "type": ["number", "null"] },
+          "excerpt": { "type": "string" }
+        }
+      }
+    }
   }
 }
