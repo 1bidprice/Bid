@@ -108,13 +108,50 @@ function compactDossier(dossier) {
     nextStep: status === 'REVIEW_READY' ? 'Τελικός έλεγχος και απόφαση δημοσίευσης' : nextStep(blockers),
     sources: compactSources(dossier.evidence),
     generatedAt: dossier.generatedAt,
+    publicationMode: dossier.publicationMode || null,
+    finalAction: dossier.finalAction || null,
   };
 }
 
 function priority(item) {
   const statusScore = { PUBLISHED: 300, REVIEW_READY: 200, DRAFT_RESEARCH: 100 }[item.status] || 0;
+  const finalActionScore = {
+    SELL_NOW: 90,
+    BUY_NOW: 85,
+    AVOID: 80,
+    DO_NOT_BUY: 70,
+    HOLD: 50,
+    WATCH: 0,
+  }[item.finalAction?.marketAction] || 0;
+  const urgencyScore = { IMMEDIATE: 40, TODAY: 25, NORMAL: 10, NONE: 0 }[item.finalAction?.urgency] || 0;
   const categoryScore = { EVENT_RISK: 50, DETERIORATION: 45, SPECULATIVE_CATALYST: 35, EVENT_DRIVEN: 30 }[item.category] || 10;
-  return statusScore + categoryScore - item.blockers.length;
+  return statusScore + finalActionScore + urgencyScore + categoryScore - item.blockers.length;
+}
+
+function countFinalActions(items) {
+  const counts = {
+    finalActionCount: 0,
+    buyNowCount: 0,
+    sellNowCount: 0,
+    holdCount: 0,
+    doNotBuyCount: 0,
+    avoidCount: 0,
+    blockedDecisionCount: 0,
+  };
+  for (const item of items) {
+    const finalAction = item.finalAction;
+    if (!finalAction || finalAction.status !== 'FINAL') {
+      counts.blockedDecisionCount += 1;
+      continue;
+    }
+    counts.finalActionCount += 1;
+    if (finalAction.marketAction === 'BUY_NOW') counts.buyNowCount += 1;
+    if (finalAction.marketAction === 'SELL_NOW') counts.sellNowCount += 1;
+    if (finalAction.marketAction === 'HOLD') counts.holdCount += 1;
+    if (finalAction.marketAction === 'DO_NOT_BUY') counts.doNotBuyCount += 1;
+    if (finalAction.marketAction === 'AVOID') counts.avoidCount += 1;
+  }
+  return counts;
 }
 
 export function buildMobileIntelligenceFeed(report = {}, options = {}) {
@@ -123,28 +160,39 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
   const published = dossiers.filter((item) => item.status === 'PUBLISHED');
   const reviewReady = dossiers.filter((item) => item.status === 'REVIEW_READY');
   const research = dossiers.filter((item) => item.status === 'DRAFT_RESEARCH');
-  const urgent = dossiers.filter((item) => ['EVENT_RISK', 'DETERIORATION'].includes(item.category)).slice(0, 5);
+  const decisions = dossiers.filter((item) => item.finalAction?.status === 'FINAL');
+  const urgent = dossiers.filter((item) => item.finalAction?.urgency === 'IMMEDIATE' || ['EVENT_RISK', 'DETERIORATION'].includes(item.category)).slice(0, 5);
   const generatedAt = new Date(options.generatedAt || report.generatedAt || Date.now()).toISOString();
+  const actionCounts = countFinalActions(dossiers);
 
   return {
     format: 'investor-control-mobile-intelligence-feed',
     version: 1,
     generatedAt,
+    policyVersion: report.policyVersion || null,
     summary: {
       publishedCount: published.length,
       reviewReadyCount: reviewReady.length,
       researchCount: research.length,
       urgentCount: urgent.length,
       unresolvedDiagnosticCount: Array.isArray(report.diagnostics) ? report.diagnostics.length : 0,
+      ...actionCounts,
     },
     today: {
-      headline: urgent.length
-        ? `${urgent.length} υπόθεση${urgent.length === 1 ? '' : 'εις'} αυξημένης προτεραιότητας`
-        : reviewReady.length
-          ? `${reviewReady.length} φάκελο${reviewReady.length === 1 ? 'ς' : 'ι'} έτοιμο για έλεγχο`
-          : 'Δεν υπάρχει ακόμη δημοσιεύσιμη επενδυτική πρόταση',
-      primaryItem: urgent[0] || reviewReady[0] || research[0] || null,
+      headline: actionCounts.sellNowCount
+        ? `${actionCounts.sellNowCount} σήμα άμεσης πώλησης ή μείωσης`
+        : actionCounts.buyNowCount
+          ? `${actionCounts.buyNowCount} επιβεβαιωμένο σήμα άμεσης αγοράς`
+          : actionCounts.avoidCount
+            ? `${actionCounts.avoidCount} περίπτωση για αποφυγή`
+            : urgent.length
+              ? `${urgent.length} υπόθεση${urgent.length === 1 ? '' : 'εις'} αυξημένης προτεραιότητας`
+              : reviewReady.length
+                ? `${reviewReady.length} φάκελο${reviewReady.length === 1 ? 'ς' : 'ι'} έτοιμο για έλεγχο`
+                : 'Δεν υπάρχει ακόμη δημοσιεύσιμη επενδυτική πρόταση',
+      primaryItem: urgent[0] || decisions[0] || reviewReady[0] || research[0] || null,
     },
+    decisions,
     published,
     reviewReady,
     research,
@@ -156,11 +204,12 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
       status: item.status,
       category: item.category,
       action: item.action,
+      finalAction: item.finalAction,
       thesis: item.thesis,
       blockers: item.blockers,
       nextStep: item.nextStep,
       reviewDate: item.reviewDate,
     })),
-    disclosure: 'Οι αναλύσεις βασίζονται σε καταγεγραμμένες πηγές και υπολογισμούς. Δεν αποτελούν εγγύηση αποτελέσματος και δεν εκτελούν συναλλαγές.',
+    disclosure: 'Οι τελικές ενέργειες παράγονται μόνο όταν περνούν όλοι οι έλεγχοι πηγών, θεμελιωδών, αγοράς, ρευστότητας, φρεσκότητας και αντιφάσεων. Δεν αποτελούν εγγύηση αποτελέσματος και δεν εκτελούν συναλλαγές.',
   };
 }
