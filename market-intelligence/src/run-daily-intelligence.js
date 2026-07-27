@@ -13,6 +13,7 @@ import { extractPdfText } from './pdf-extractor.js';
 import { calculateMarketMetrics } from './market-metrics.js';
 import { assessFundamentalRisk } from './fundamental-risk.js';
 import { assessIndependentEvidence } from './cross-check.js';
+import { linkEvidenceClaims, selectLeadClaim } from './claim-linker.js';
 import { evaluateSignalReadiness } from './signal-readiness.js';
 import { synthesizeEvidenceOnlyResearch } from './evidence-synthesis.js';
 import { buildResearchDossier } from './research-dossier.js';
@@ -138,6 +139,7 @@ function toSignalOutput(
   fundamentalSnapshot,
   marketSnapshot,
   marketMetrics,
+  claim,
   crossCheck,
   readiness,
 ) {
@@ -169,6 +171,7 @@ function toSignalOutput(
     fundamentals: compactFundamentalSummary(fundamentalSnapshot),
     market: compactMarketSummary(marketSnapshot),
     historicalMarketMetrics: compactHistoricalMetrics(marketMetrics),
+    claim: claim || null,
     crossCheck,
     readiness,
     source: {
@@ -302,6 +305,12 @@ function referencePriceForRisk(marketSnapshot, marketMetrics) {
   return null;
 }
 
+function recordsForClaim(records, claim) {
+  if (!claim?.evidenceIds?.length) return records;
+  const ids = new Set(claim.evidenceIds);
+  return records.filter((record) => ids.has(record.id));
+}
+
 export async function runDailyIntelligence(options = {}) {
   const now = new Date(options.now || Date.now()).toISOString();
   const universe = options.universe || await loadUniverse(options.universePath);
@@ -312,6 +321,7 @@ export async function runDailyIntelligence(options = {}) {
   const marketSnapshots = [];
   const historicalMarketMetrics = [];
   const fundamentalRiskAssessments = [];
+  const claimClusters = [];
   const researchDossiers = [];
   const documentLimit = Math.max(0, Number(options.documentLimit ?? 5));
   const benchmarkCache = new Map();
@@ -409,7 +419,7 @@ export async function runDailyIntelligence(options = {}) {
           const analysed = await analyseEvidenceDocument(record, company, {
             fetchImpl,
             secUserAgent,
-            documentUserAgent: options.documentUserAgent || 'Investor-Control-Market-Intelligence/0.4',
+            documentUserAgent: options.documentUserAgent || 'Investor-Control-Market-Intelligence/0.5',
             now,
             maxDocumentBytes: options.maxDocumentBytes,
             minReviewedText: options.minReviewedText,
@@ -436,7 +446,7 @@ export async function runDailyIntelligence(options = {}) {
             fetchImpl,
             retrievedAt: now,
             limit: Number(options.newsLimit || 12),
-            userAgent: options.newsUserAgent || 'Investor-Control-Market-Intelligence/0.4',
+            userAgent: options.newsUserAgent || 'Investor-Control-Market-Intelligence/0.5',
           });
           independentRecords = newsResult.records || [];
           diagnostics.push(...(newsResult.diagnostics || []).map((item) => ({ ...item, companyId: item.companyId || company.companyId })));
@@ -451,10 +461,14 @@ export async function runDailyIntelligence(options = {}) {
       }
 
       const companyRecords = [...officialRecords, ...independentRecords];
-      const crossCheck = assessIndependentEvidence(companyRecords, now);
+      const companyClaims = linkEvidenceClaims(companyRecords, { now });
+      claimClusters.push(...companyClaims);
+      const leadClaim = selectLeadClaim(companyClaims);
+      const leadRecords = recordsForClaim(companyRecords, leadClaim);
+      const crossCheck = assessIndependentEvidence(leadRecords, now);
       const synthesis = synthesizeEvidenceOnlyResearch({
         company,
-        evidence: companyRecords,
+        evidence: leadRecords,
         fundamentals: fundamentalSnapshot,
         historicalMarketMetrics: marketMetrics,
         fundamentalRisk,
@@ -467,7 +481,9 @@ export async function runDailyIntelligence(options = {}) {
         category: synthesis.category,
         proposedAction: synthesis.proposedAction,
         timeHorizon: synthesis.timeHorizon,
-        evidence: companyRecords,
+        evidence: leadRecords,
+        leadClaim,
+        requireCanonicalClaim: true,
         fundamentals: fundamentalSnapshot,
         marketSnapshot,
         historicalMarketMetrics: marketMetrics,
@@ -485,6 +501,17 @@ export async function runDailyIntelligence(options = {}) {
       researchDossiers.push(dossier);
 
       for (const record of officialRecords) {
+        const signalClaim = companyClaims.find((claim) => claim.evidenceIds.includes(record.id)) || leadClaim;
+        const signalRecords = recordsForClaim(companyRecords, signalClaim);
+        const signalCrossCheck = assessIndependentEvidence(signalRecords, now);
+        const signalSynthesis = synthesizeEvidenceOnlyResearch({
+          company,
+          evidence: signalRecords,
+          fundamentals: fundamentalSnapshot,
+          historicalMarketMetrics: marketMetrics,
+          fundamentalRisk,
+          generatedAt: now,
+        });
         const metricsReady =
           fundamentalSnapshot?.metricsReady === true &&
           marketMetrics?.readiness?.marketMetricsReady === true;
@@ -498,10 +525,10 @@ export async function runDailyIntelligence(options = {}) {
           evidence: record,
           fundamentals: fundamentalSnapshot,
           marketMetrics,
-          crossCheck,
-          thesis: synthesis.thesis,
-          invalidationCondition: synthesis.invalidationCondition,
-          risks: synthesis.risks?.map((item) => item.text) || [],
+          crossCheck: signalCrossCheck,
+          thesis: signalSynthesis.thesis,
+          invalidationCondition: signalSynthesis.invalidationCondition,
+          risks: signalSynthesis.risks?.map((item) => item.text) || [],
         });
         const ranked = rankSignalCandidate(candidate, now);
         signals.push(toSignalOutput(
@@ -512,7 +539,8 @@ export async function runDailyIntelligence(options = {}) {
           fundamentalSnapshot,
           marketSnapshot,
           marketMetrics,
-          crossCheck,
+          signalClaim,
+          signalCrossCheck,
           readiness,
         ));
       }
@@ -554,6 +582,8 @@ export async function runDailyIntelligence(options = {}) {
     marketSnapshots,
     historicalMarketMetricsCount: historicalMarketMetrics.length,
     historicalMarketMetrics,
+    claimClusterCount: claimClusters.length,
+    claimClusters,
     researchDossierCount: researchDossiers.length,
     researchDossiers,
     opportunitiesFeed,
@@ -571,6 +601,7 @@ async function main() {
   console.log(`Wrote ${report.signalCount} signal candidates to ${outputPath}`);
   console.log(`Reviewed ${report.documentReviewedCount} official source documents (${report.pdfReviewedCount} PDFs)`);
   console.log(`Collected ${report.independentDiscoveryCount} trusted-publisher discovery records`);
+  console.log(`Linked ${report.claimClusterCount} canonical claim clusters`);
   console.log(`Built ${report.fundamentalSnapshotCount} deterministic fundamental snapshots`);
   console.log(`Built ${report.marketSnapshotCount} guarded market snapshots`);
   console.log(`Built ${report.historicalMarketMetricsCount} historical market metric sets`);
