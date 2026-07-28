@@ -90,3 +90,18 @@ The repository owner confirmed that `SEC_USER_AGENT` and `FINNHUB_TOKEN` were ad
 ## 2026-07-28 — Regenerated Finnhub secret verification
 
 The exposed Finnhub key was revoked and replaced with a newly generated repository secret named exactly `FINNHUB_TOKEN`. This commit intentionally triggers a new production run to verify quote access and distinguish credential activation from any remaining subscription or historical-data entitlement limits.
+
+## 2026-07-28 — Android v0.8.1 purchase-performance display
+
+The position card now places the daily market move and the return from every open purchase in the circled performance area:
+
+- `Ημέρα` is the market move versus the previous close;
+- one open purchase appears as `Από αγορά · ημερομηνία`;
+- multiple open purchases appear separately as `1η αγορά · ημερομηνία`, `2η αγορά · ημερομηνία`, and so on;
+- each row has its own positive or negative percentage calculated from that purchase's all-in price, including its recorded fees.
+
+Expanding the position opens `Επιμέρους αγορές`, where each open lot retains its own transaction identity, purchase date, broker, original and remaining quantity, execution price, fees, all-in basis, monetary P/L and percentage return.
+
+No stored transaction is merged, rewritten or migrated. FIFO allocation is used only to show which purchase lots remain open after a sale. Aggregate position cost, average all-in and total P/L remain controlled by accounting model v2.
+
+Signed Android build verification completed successfully for version `0.8.1`, Android versionCode `17`, package `gr.investorcontrol.app`. APK SHA-256: `4c736e7fd2aaed1f4c447a2e3a1b9c426df680879696634e5f9807ffd169e566`.
