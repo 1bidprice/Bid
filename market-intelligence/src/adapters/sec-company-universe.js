@@ -27,10 +27,31 @@ function parseRows(payload) {
   return [];
 }
 
+function looksLikeNonCommonInstrument(symbol) {
+  const value = String(symbol || '').toUpperCase();
+  if (!/^[A-Z0-9.-]+$/.test(value)) return true;
+  if (/[.-]/.test(value)) return true;
+  if (value.length > 5) return true;
+  if (value.length >= 4 && /[WUR]$/.test(value)) return true;
+  return false;
+}
+
+function listingRank(listing) {
+  let score = 0;
+  if (looksLikeNonCommonInstrument(listing.symbol)) score += 100;
+  if (listing.exchange === 'NYSE' || listing.exchange === 'Nasdaq') score -= 10;
+  score += String(listing.symbol || '').length;
+  return score;
+}
+
+function selectCanonicalListing(listings) {
+  const ordered = [...listings].sort((a, b) => listingRank(a) - listingRank(b) || a.symbol.localeCompare(b.symbol));
+  return ordered.find((listing) => !looksLikeNonCommonInstrument(listing.symbol)) || null;
+}
+
 export function normalizeSecCompanyUniverse(payload, options = {}) {
   const allowed = new Set(options.exchanges || SUPPORTED_EXCHANGES);
-  const seen = new Set();
-  const companies = [];
+  const issuers = new Map();
   const rejected = [];
 
   for (const row of parseRows(payload)) {
@@ -46,28 +67,35 @@ export function normalizeSecCompanyUniverse(payload, options = {}) {
       rejected.push({ code: 'SEC_UNIVERSE_EXCHANGE_EXCLUDED', cik, symbol, exchange });
       continue;
     }
-    const key = `${cik}:${symbol}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    const listing = {
+      exchange: exchange || 'US listed market',
+      symbol,
+      mic: exchange === 'NYSE' || exchange === 'NYSE American' ? 'XNYS' : 'XNAS',
+      currency: 'USD',
+      active: true,
+    };
+    const issuer = issuers.get(cik) || { cik, legalName, listings: [] };
+    if (!issuer.listings.some((item) => item.symbol === symbol && item.exchange === listing.exchange)) issuer.listings.push(listing);
+    if (legalName.length > issuer.legalName.length) issuer.legalName = legalName;
+    issuers.set(cik, issuer);
+  }
+
+  const companies = [];
+  for (const issuer of issuers.values()) {
+    const primaryListing = selectCanonicalListing(issuer.listings);
+    if (!primaryListing) {
+      rejected.push({ code: 'SEC_UNIVERSE_NO_COMMON_EQUITY_LISTING', cik: issuer.cik, symbols: issuer.listings.map((item) => item.symbol) });
+      continue;
+    }
     companies.push({
-      companyId: companyId(cik),
-      legalName,
-      displayName: legalName.replace(/\s+(inc\.?|corp\.?|corporation|plc|ltd\.?)$/i, '').trim(),
-      aliases: [symbol, legalName],
-      primaryListing: {
-        exchange: exchange || 'US listed market',
-        symbol,
-        mic: exchange === 'NYSE' || exchange === 'NYSE American' ? 'XNYS' : 'XNAS',
-      },
-      listings: [{
-        exchange: exchange || 'US listed market',
-        symbol,
-        mic: exchange === 'NYSE' || exchange === 'NYSE American' ? 'XNYS' : 'XNAS',
-        currency: 'USD',
-        active: true,
-      }],
+      companyId: companyId(issuer.cik),
+      legalName: issuer.legalName,
+      displayName: issuer.legalName.replace(/\s+(inc\.?|corp\.?|corporation|plc|ltd\.?)$/i, '').replace(/\s+\/DE\/$/i, '').trim(),
+      aliases: [...new Set([primaryListing.symbol, issuer.legalName, ...issuer.listings.map((item) => item.symbol)])],
+      primaryListing,
+      listings: issuer.listings,
       isin: null,
-      cik,
+      cik: issuer.cik,
       lei: null,
       country: 'US',
       currency: 'USD',
@@ -105,7 +133,7 @@ export async function fetchSecCompanyUniverse(options = {}) {
   const normalized = normalizeSecCompanyUniverse(payload, options);
   return {
     companies: normalized.companies,
-    diagnostics: normalized.rejected.slice(0, 50),
+    diagnostics: normalized.rejected.slice(0, 100),
     sourceUrl: options.url || DEFAULT_URL,
   };
 }
