@@ -85,4 +85,8 @@ Missing configuration remains visible as blockers. The engine must never invent 
 
 ## 2026-07-27 — Live credentials activation check
 
-The repository owner confirmed that `SEC_USER_AGENT` and `FINNHUB_TOKEN` were added to GitHub Actions configuration. This commit intentionally triggers a fresh production pipeline run so the live source-health report can confirm which adapters are now active and which remaining blockers are data-entitlement or market-coverage issues rather than missing credentials.
+The repository owner confirmed that `SEC_USER_AGENT` and `FINNHUB_TOKEN` were added to GitHub Actions configuration. The first live check confirmed SEC fundamentals but reported the Finnhub credential missing.
+
+## 2026-07-28 — Regenerated Finnhub secret verification
+
+The exposed Finnhub key was revoked and replaced with a newly generated repository secret named exactly `FINNHUB_TOKEN`. This commit intentionally triggers a new production run to verify quote access and distinguish credential activation from any remaining subscription or historical-data entitlement limits.
