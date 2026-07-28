@@ -1,16 +1,8 @@
 import { contentHash } from '../content-hash.js';
 import { reviewTrustedNewsRecords } from '../trusted-news-review.js';
+import { independentPublisherPolicies } from '../source-policy.js';
 
-const DEFAULT_PUBLISHERS = Object.freeze({
-  reuters: { name: 'Reuters', reliabilityTier: 2 },
-  bloomberg: { name: 'Bloomberg', reliabilityTier: 2 },
-  'financial times': { name: 'Financial Times', reliabilityTier: 2 },
-  'the wall street journal': { name: 'The Wall Street Journal', reliabilityTier: 2 },
-  'associated press': { name: 'Associated Press', reliabilityTier: 2 },
-  cnbc: { name: 'CNBC', reliabilityTier: 3 },
-  marketwatch: { name: 'MarketWatch', reliabilityTier: 3 },
-  fortune: { name: 'Fortune', reliabilityTier: 3 },
-});
+const DEFAULT_PUBLISHERS = Object.freeze(independentPublisherPolicies());
 
 function decodeXml(value) {
   return String(value || '')
@@ -149,7 +141,7 @@ export async function fetchTrustedNewsEvidence(company, options = {}) {
   const fetchImpl = options.fetchImpl || globalThis.fetch;
   if (typeof fetchImpl !== 'function') throw new Error('Trusted news adapter requires fetch');
 
-  const query = options.query || `\"${company.displayName || company.legalName}\" ${company.primaryListing?.symbol || ''}`.trim();
+  const query = options.query || `"${company.displayName || company.legalName}" ${company.primaryListing?.symbol || ''}`.trim();
   const language = options.language || 'en-US';
   const country = options.country || 'US';
   const edition = options.edition || 'US:en';
