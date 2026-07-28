@@ -59,6 +59,7 @@ jobs:
           node scripts/apply-v081-position-performance.js
           node scripts/apply-v081b-fix-source-newline.js
           node scripts/apply-v090-discovery-clarity.js
+          node scripts/apply-v090b-background-intelligence.js
 
       - name: Verify purchase-lot calculations
         working-directory: mobile
@@ -84,6 +85,8 @@ jobs:
           grep -q "Ποιος επιλέγει τις πηγές" src/OpportunitiesView.js
           grep -q "SUPPORTED_FEED_VERSIONS" src/intelligence-feed-store.js
           grep -q "discoveryRadar" src/intelligence-feed-store.js
+          grep -q "syncBackgroundIntelligenceTask(true)" App.js
+          grep -q "BACKGROUND_INTELLIGENCE_TASK" src/background-intelligence-task.js
           grep -q "decisionVisible" App.js
           grep -q "onOpenDecisionGate" PortfolioApp.js
           grep -q "DEFAULT_INTELLIGENCE_FEED_URL" src/intelligence-feed-store.js
@@ -98,10 +101,11 @@ jobs:
           if (app.expo.android.package !== 'gr.investorcontrol.app') throw new Error('wrong package');
           if (app.expo.android.versionCode !== 18) throw new Error('wrong versionCode');
           if (pkg.version !== '0.9.0') throw new Error('wrong package version');
-          if (!pkg.scripts.postinstall.includes('apply-v090-discovery-clarity.js')) throw new Error('v0.9.0 patch missing from postinstall');
+          if (!pkg.scripts.postinstall.includes('apply-v090-discovery-clarity.js')) throw new Error('v0.9.0 clarity patch missing from postinstall');
+          if (!pkg.scripts.postinstall.includes('apply-v090b-background-intelligence.js')) throw new Error('background intelligence patch missing from postinstall');
           if (!portfolio.includes("quotePrice(item.average, item.currency, 4)")) throw new Error('four-decimal average all-in missing');
           if (!store.includes('new Set([1, 2])')) throw new Error('feed backward compatibility missing');
-          console.log('PASS v0.9.0 clarity, source policy and autonomous discovery radar invariants');
+          console.log('PASS v0.9.0 clarity, source policy, autonomous discovery and background sync invariants');
           NODE
 
       - name: Verify Android JavaScript bundle
