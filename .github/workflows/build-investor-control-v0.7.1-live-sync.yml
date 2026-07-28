@@ -81,7 +81,8 @@ jobs:
           grep -q "const VERSION = '0.8.1';" PortfolioApp.js
           grep -q "const VERSION = '0.8.1';" DecisionOverlay.js
           grep -q "require('./src/position-lots')" PortfolioApp.js
-          grep -q "Από θέση" PortfolioApp.js
+          grep -q "Από αγορά ·" PortfolioApp.js
+          grep -q "lot.purchaseNumber + 'η αγορά · '" PortfolioApp.js
           grep -q "Επιμέρους αγορές" PortfolioApp.js
           grep -q "Κάθε αγορά κρατά το δικό της all-in και πρόσημο" PortfolioApp.js
           grep -q "lotSummary.openLots" PortfolioApp.js
@@ -99,7 +100,7 @@ jobs:
           if (app.expo.android.versionCode !== 17) throw new Error('wrong versionCode');
           if (pkg.version !== '0.8.1') throw new Error('wrong package version');
           if (!pkg.scripts.postinstall.includes('apply-v081-position-performance.js')) throw new Error('v0.8.1 patch missing from postinstall');
-          console.log('PASS v0.8.1 daily change, aggregate position performance and separate purchase lots');
+          console.log('PASS v0.8.1 daily change and separate return sign for every open purchase');
           NODE
 
       - name: Expo Doctor diagnostic
