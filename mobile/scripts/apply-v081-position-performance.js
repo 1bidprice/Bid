@@ -54,7 +54,26 @@ function patchPortfolio() {
     );
   }
 
-  const cardReplacement = `function PositionLotRow({ lot, currency, stale }) {
+  const cardReplacement = `function lotShortDate(value) {
+  if (!value) return '—';
+  const date = new Date(String(value) + 'T12:00:00');
+  return Number.isNaN(date.getTime())
+    ? String(value)
+    : date.toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+
+function PositionPerformanceLine({ label, value, stale, primary = false }) {
+  const numeric = Number(value);
+  const valueStyle = numeric < 0 ? styles.red : numeric > 0 ? styles.green : styles.muted;
+  return (
+    <View style={styles.performanceLine}>
+      <Text style={styles.performanceLabel} numberOfLines={1}>{label}</Text>
+      <Text style={[styles.performanceValue, primary && styles.performanceValuePrimary, valueStyle]}>{stale || !Number.isFinite(numeric) ? '—' : pct(numeric)}</Text>
+    </View>
+  );
+}
+
+function PositionLotRow({ lot, currency, stale }) {
   const performance = Number(lot.performancePct);
   const performanceStyle = performance < 0 ? styles.red : performance > 0 ? styles.green : styles.muted;
   const date = lot.date ? new Date(String(lot.date) + 'T12:00:00').toLocaleDateString('el-GR') : '—';
@@ -82,8 +101,7 @@ function PositionCard({ item, compact, expanded, onToggle, onAlert }) {
   const stale = item.quote && !item.quote.usable;
   const dayChange = Number(item.quote?.changePct);
   const positionChange = Number(item.nativePct);
-  const dayStyle = dayChange < 0 ? styles.red : dayChange > 0 ? styles.green : styles.muted;
-  const positionStyle = positionChange < 0 ? styles.red : positionChange > 0 ? styles.green : styles.muted;
+  const openLots = Array.isArray(item.lots) ? item.lots : [];
   return (
     <View style={styles.card}>
       <Pressable onPress={onToggle}>
@@ -101,9 +119,20 @@ function PositionCard({ item, compact, expanded, onToggle, onAlert }) {
             {item.currency === 'USD' && !stale ? <Text style={styles.muted}>≈ {quotePrice(item.eurPrice, 'EUR')}</Text> : null}
           </View>
           <View style={styles.performanceStack}>
-            <View style={styles.performanceLine}><Text style={styles.performanceLabel}>Ημέρα</Text><Text style={[styles.performanceValue, dayStyle]}>{stale ? '—' : pct(dayChange)}</Text></View>
-            <View style={styles.performanceDivider} />
-            <View style={styles.performanceLine}><Text style={styles.performanceLabel}>Από θέση</Text><Text style={[styles.performanceValue, positionStyle]}>{stale ? '—' : pct(positionChange)}</Text></View>
+            <PositionPerformanceLine label="Ημέρα" value={dayChange} stale={stale} primary />
+            {openLots.length ? openLots.map((lot) => (
+              <React.Fragment key={lot.lotId}>
+                <View style={styles.performanceDivider} />
+                <PositionPerformanceLine
+                  label={openLots.length === 1 ? 'Από αγορά · ' + lotShortDate(lot.date) : lot.purchaseNumber + 'η αγορά · ' + lotShortDate(lot.date)}
+                  value={lot.performancePct}
+                  stale={stale}
+                />
+              </React.Fragment>
+            )) : <>
+              <View style={styles.performanceDivider} />
+              <PositionPerformanceLine label="Από θέση" value={positionChange} stale={stale} />
+            </>}
           </View>
         </View>
         <View style={styles.grid}>
@@ -125,7 +154,7 @@ function PositionCard({ item, compact, expanded, onToggle, onAlert }) {
             {item.hadLotSales ? <Text style={styles.lotMethodNote}>Οι πωλήσεις κατανέμονται FIFO μόνο για την απεικόνιση των ανοιχτών αγορών. Το συνολικό κόστος της κάρτας παραμένει στο λογιστικό μοντέλο v2.</Text> : null}
             {item.unmatchedSellQuantity > 0 ? <Text style={styles.warning}>Υπάρχει πώληση {item.unmatchedSellQuantity.toLocaleString('el-GR')} μετοχών που δεν αντιστοιχεί σε καταγεγραμμένη αγορά.</Text> : null}
           </View>
-          <Text style={styles.source}>Πηγή: {item.quote?.source || '—'}{item.quote?.updatedAt ? '\\nΤιμή: ' + when(item.quote.updatedAt) + ' · Έλεγχος: ' + when(item.quote.checkedAt) : ''}</Text>
+          <Text style={styles.source}>Πηγή: {item.quote?.source || '—'}{item.quote?.updatedAt ? '\nΤιμή: ' + when(item.quote.updatedAt) + ' · Έλεγχος: ' + when(item.quote.checkedAt) : ''}</Text>
           {stale ? <Text style={styles.warning}>Η τιμή είναι παρωχημένη και δεν χρησιμοποιείται στη συνολική αποτίμηση.</Text> : null}
           <Pressable style={styles.secondaryActionFull} onPress={onAlert}><Text style={styles.secondaryStrong}>Ρύθμιση ειδοποιήσεων</Text></Pressable>
         </View>
@@ -134,7 +163,7 @@ function PositionCard({ item, compact, expanded, onToggle, onAlert }) {
   );
 }`;
 
-  if (!source.includes('function PositionLotRow(')) {
+  if (!source.includes('function PositionPerformanceLine(')) {
     source = replaceBetween(
       source,
       'function PositionCard({ item, compact, expanded, onToggle, onAlert }) {',
@@ -150,7 +179,7 @@ function PositionCard({ item, compact, expanded, onToggle, onAlert }) {
     const start = source.indexOf(styleStart);
     const end = source.indexOf(styleEnd, start + styleStart.length);
     if (start < 0 || end < 0) throw new Error('v0.8.1 patch failed: missing position-card style block');
-    const styles = "  priceRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 18, gap: 10 }, big: { color: '#16345f', fontSize: 39, lineHeight: 45, fontWeight: '900', marginTop: 2 }, performanceStack: { width: 142, borderRadius: 16, borderWidth: 1, borderColor: '#d8e2ee', backgroundColor: '#f8fbff', paddingHorizontal: 11, paddingVertical: 8 }, performanceLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }, performanceLabel: { color: '#7b889d', fontSize: 11, fontWeight: '800' }, performanceValue: { fontSize: 17, fontWeight: '900', textAlign: 'right' }, performanceDivider: { height: 1, backgroundColor: '#e4ebf4', marginVertical: 7 }, note: { color: '#67768c', fontSize: 15, lineHeight: 23, marginTop: 10 }, source: { color: '#8591a3', fontSize: 13, lineHeight: 20, marginTop: 10 }, tapHint: { color: '#0B66FF', fontWeight: '800', marginTop: 15, fontSize: 13 }, detailPanel: { borderTopWidth: 1, borderTopColor: '#e5ebf3', marginTop: 16, paddingTop: 14 }, lotsSection: { marginTop: 14 }, lotsHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 }, lotsTitle: { color: '#16345f', fontSize: 18, fontWeight: '900' }, lotsSubtitle: { color: '#7b889d', fontSize: 12, lineHeight: 17, marginTop: 2 }, lotsCountBadge: { minWidth: 34, height: 34, borderRadius: 17, backgroundColor: '#edf4ff', alignItems: 'center', justifyContent: 'center' }, lotsCountText: { color: '#0B66FF', fontWeight: '900' }, lotCard: { borderRadius: 17, borderWidth: 1, borderColor: '#d7e1ed', backgroundColor: '#f9fbfe', padding: 13, marginBottom: 9 }, lotTitle: { color: '#16345f', fontSize: 16, fontWeight: '900' }, lotDate: { color: '#8490a2', fontSize: 11, lineHeight: 16, marginTop: 2 }, lotPerformance: { fontSize: 17, fontWeight: '900' }, lotMeta: { color: '#62738a', fontSize: 12, lineHeight: 18, marginTop: 8 }, lotResultRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 9, paddingTop: 9, borderTopWidth: 1, borderTopColor: '#e3eaf3' }, lotResultLabel: { color: '#7b889d', fontSize: 11, flex: 1 }, lotResultValue: { fontSize: 14, fontWeight: '900', textAlign: 'right' }, lotMethodNote: { color: '#6d7b8e', backgroundColor: '#f1f5fa', borderRadius: 13, padding: 10, fontSize: 11, lineHeight: 16, marginTop: 2 },";
+    const styles = "  priceRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 18, gap: 10 }, big: { color: '#16345f', fontSize: 39, lineHeight: 45, fontWeight: '900', marginTop: 2 }, performanceStack: { width: 158, borderRadius: 16, borderWidth: 1, borderColor: '#d8e2ee', backgroundColor: '#f8fbff', paddingHorizontal: 11, paddingVertical: 8 }, performanceLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 7 }, performanceLabel: { color: '#7b889d', fontSize: 10, lineHeight: 13, fontWeight: '800', flex: 1 }, performanceValue: { fontSize: 15, lineHeight: 19, fontWeight: '900', textAlign: 'right' }, performanceValuePrimary: { fontSize: 18, lineHeight: 22 }, performanceDivider: { height: 1, backgroundColor: '#e4ebf4', marginVertical: 7 }, note: { color: '#67768c', fontSize: 15, lineHeight: 23, marginTop: 10 }, source: { color: '#8591a3', fontSize: 13, lineHeight: 20, marginTop: 10 }, tapHint: { color: '#0B66FF', fontWeight: '800', marginTop: 15, fontSize: 13 }, detailPanel: { borderTopWidth: 1, borderTopColor: '#e5ebf3', marginTop: 16, paddingTop: 14 }, lotsSection: { marginTop: 14 }, lotsHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 }, lotsTitle: { color: '#16345f', fontSize: 18, fontWeight: '900' }, lotsSubtitle: { color: '#7b889d', fontSize: 12, lineHeight: 17, marginTop: 2 }, lotsCountBadge: { minWidth: 34, height: 34, borderRadius: 17, backgroundColor: '#edf4ff', alignItems: 'center', justifyContent: 'center' }, lotsCountText: { color: '#0B66FF', fontWeight: '900' }, lotCard: { borderRadius: 17, borderWidth: 1, borderColor: '#d7e1ed', backgroundColor: '#f9fbfe', padding: 13, marginBottom: 9 }, lotTitle: { color: '#16345f', fontSize: 16, fontWeight: '900' }, lotDate: { color: '#8490a2', fontSize: 11, lineHeight: 16, marginTop: 2 }, lotPerformance: { fontSize: 17, fontWeight: '900' }, lotMeta: { color: '#62738a', fontSize: 12, lineHeight: 18, marginTop: 8 }, lotResultRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 9, paddingTop: 9, borderTopWidth: 1, borderTopColor: '#e3eaf3' }, lotResultLabel: { color: '#7b889d', fontSize: 11, flex: 1 }, lotResultValue: { fontSize: 14, fontWeight: '900', textAlign: 'right' }, lotMethodNote: { color: '#6d7b8e', backgroundColor: '#f1f5fa', borderRadius: 13, padding: 10, fontSize: 11, lineHeight: 16, marginTop: 2 },";
     source = `${source.slice(0, start)}${styles}${source.slice(end)}`;
   }
 
@@ -185,7 +214,8 @@ patchVersions();
 const portfolio = read('PortfolioApp.js');
 if (!portfolio.includes("const VERSION = '0.8.1';")) throw new Error('v0.8.1 verification failed: Portfolio version');
 if (!portfolio.includes("require('./src/position-lots')")) throw new Error('v0.8.1 verification failed: lot engine import');
-if (!portfolio.includes('Από θέση')) throw new Error('v0.8.1 verification failed: position performance label');
+if (!portfolio.includes('Από αγορά ·')) throw new Error('v0.8.1 verification failed: single-purchase performance label');
+if (!portfolio.includes("lot.purchaseNumber + 'η αγορά · '")) throw new Error('v0.8.1 verification failed: separate purchase performance lines');
 if (!portfolio.includes('Επιμέρους αγορές')) throw new Error('v0.8.1 verification failed: separate purchase lots');
 if (!portfolio.includes('lotSummary.openLots')) throw new Error('v0.8.1 verification failed: open lots not attached');
-console.log('Investor Control v0.8.1 position performance and purchase-lot patch applied.');
+console.log('Investor Control v0.8.1 daily and separate purchase performance patch applied.');
