@@ -90,7 +90,6 @@ jobs:
           grep -q "Επιμέρους αγορές" PortfolioApp.js
           grep -q "Κάθε αγορά κρατά το δικό της all-in και πρόσημο" PortfolioApp.js
           grep -q "lotSummary.openLots" PortfolioApp.js
-          grep -Fq "\\nΤιμή:" PortfolioApp.js
           grep -q "FIFO" src/position-lots.js
           grep -q "decisionVisible" App.js
           grep -q "onOpenDecisionGate" PortfolioApp.js
@@ -98,8 +97,14 @@ jobs:
           grep -q "DEFAULT_INTELLIGENCE_FEED_URL" src/intelligence-feed-store.js
           grep -q "ΤΕΛΙΚΟ ΣΥΜΠΕΡΑΣΜΑ ΓΙΑ ΕΣΕΝΑ" src/FinalDecisionCard.js
           node - <<'NODE'
+          const fs = require('fs');
           const app = require('./app.json');
           const pkg = require('./package.json');
+          const portfolio = fs.readFileSync('./PortfolioApp.js', 'utf8');
+          const brokenQuoteSource = "item.quote?.updatedAt ? '" + '\n' + "Τιμή: ' +";
+          const safeQuoteSource = "item.quote?.updatedAt ? '\\nΤιμή: ' +";
+          if (portfolio.includes(brokenQuoteSource)) throw new Error('generated PortfolioApp still contains a physical newline inside a string');
+          if (!portfolio.includes(safeQuoteSource)) throw new Error('bundle-safe quote timestamp string missing');
           if (app.expo.version !== '0.8.1') throw new Error('wrong Expo version');
           if (app.expo.android.package !== 'gr.investorcontrol.app') throw new Error('wrong package');
           if (app.expo.android.versionCode !== 17) throw new Error('wrong versionCode');
@@ -108,6 +113,10 @@ jobs:
           if (!pkg.scripts.postinstall.includes('apply-v081b-fix-source-newline.js')) throw new Error('v0.8.1 source repair missing from postinstall');
           console.log('PASS v0.8.1 daily change and separate return sign for every open purchase');
           NODE
+
+      - name: Verify Android JavaScript bundle
+        working-directory: mobile
+        run: npx expo export --platform android --output-dir dist-v0.8.1
 
       - name: Expo Doctor diagnostic
         continue-on-error: true
