@@ -45,11 +45,27 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Install dependencies and apply native patches
+      - name: Install dependencies without lifecycle scripts
         working-directory: mobile
-        run: npm install --legacy-peer-deps --no-audit --no-fund
+        run: npm install --legacy-peer-deps --no-audit --no-fund --ignore-scripts
 
-      - name: Re-apply v0.8.1 patch idempotently
+      - name: Apply v0.6.5 native baseline patch
+        working-directory: mobile
+        run: node scripts/apply-v065-native-ui-fix.js
+
+      - name: Apply v0.7.0 Opportunities patch
+        working-directory: mobile
+        run: node scripts/apply-v070-opportunities.js
+
+      - name: Apply v0.7.1 live-sync patch
+        working-directory: mobile
+        run: node scripts/apply-v071-live-sync.js
+
+      - name: Apply v0.8.0 autonomous decisions patch
+        working-directory: mobile
+        run: node scripts/apply-v080-autonomous-decisions.js
+
+      - name: Apply v0.8.1 position-performance patch
         working-directory: mobile
         run: node scripts/apply-v081-position-performance.js
 
