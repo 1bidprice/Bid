@@ -2,37 +2,37 @@ import { fetchSecCompanyUniverse } from './adapters/sec-company-universe.js';
 import { fetchSecCurrentFilings } from './adapters/sec-current-filings.js';
 import { sourcePolicySummary } from './source-policy.js';
 
-export const DISCOVERY_POLICY_VERSION = '2026-07-28.1';
+export const DISCOVERY_POLICY_VERSION = '2026-07-28.2';
 
 const FORM_SCORES = Object.freeze({
-  '8-K': 82,
-  '6-K': 78,
-  '10-Q': 72,
-  '10-K': 70,
-  '20-F': 70,
-  'S-1': 58,
-  'S-3': 62,
-  'S-3ASR': 65,
-  '424B2': 55,
-  '424B3': 58,
-  '424B5': 60,
-  'SC 13D': 76,
-  'SC 13G': 64,
-  'SC TO-I': 85,
-  'SC TO-T': 85,
-  'DEFM14A': 80,
-  'PREM14A': 72,
-  'DEF 14A': 50,
+  '8-K': 55,
+  '6-K': 52,
+  '10-Q': 60,
+  '10-K': 58,
+  '20-F': 58,
+  'S-1': 45,
+  'S-3': 48,
+  'S-3ASR': 52,
+  '424B2': 42,
+  '424B3': 45,
+  '424B5': 48,
+  'SC 13D': 66,
+  'SC 13G': 50,
+  'SC TO-I': 76,
+  'SC TO-T': 76,
+  'DEFM14A': 70,
+  'PREM14A': 62,
+  'DEF 14A': 38,
 });
 
 const TITLE_BOOSTS = Object.freeze([
-  { pattern: /merger|acquisition|tender offer|strategic alternatives/i, score: 18, reason: 'Συγχώνευση, εξαγορά ή στρατηγική συναλλαγή' },
-  { pattern: /bankruptcy|chapter 11|going concern/i, score: 22, reason: 'Οξύς κίνδυνος χρηματοδότησης ή συνέχισης δραστηριότητας' },
-  { pattern: /guidance|earnings|results|revenue|profit/i, score: 12, reason: 'Νέα αποτελέσματα ή καθοδήγηση διοίκησης' },
-  { pattern: /offering|registration|prospectus|dilution/i, score: 14, reason: 'Πιθανή χρηματοδότηση ή αραίωση μετοχών' },
-  { pattern: /buyback|repurchase|dividend/i, score: 10, reason: 'Αλλαγή στην κατανομή κεφαλαίου' },
-  { pattern: /clinical|trial|fda|approval/i, score: 16, reason: 'Ρυθμιστικός ή κλινικός καταλύτης' },
-  { pattern: /contract|award|order|partnership/i, score: 10, reason: 'Νέα εμπορική συμφωνία ή ανάθεση' },
+  { pattern: /merger|acquisition|tender offer|strategic alternatives/i, score: 24, reason: 'Συγχώνευση, εξαγορά ή στρατηγική συναλλαγή' },
+  { pattern: /bankruptcy|chapter 11|going concern/i, score: 28, reason: 'Οξύς κίνδυνος χρηματοδότησης ή συνέχισης δραστηριότητας' },
+  { pattern: /guidance|earnings|results|revenue|profit/i, score: 17, reason: 'Νέα αποτελέσματα ή καθοδήγηση διοίκησης' },
+  { pattern: /offering|registration|prospectus|dilution/i, score: 20, reason: 'Πιθανή χρηματοδότηση ή αραίωση μετοχών' },
+  { pattern: /buyback|repurchase|dividend/i, score: 15, reason: 'Αλλαγή στην κατανομή κεφαλαίου' },
+  { pattern: /clinical|trial|fda|approval/i, score: 22, reason: 'Ρυθμιστικός ή κλινικός καταλύτης' },
+  { pattern: /contract|award|order|partnership/i, score: 15, reason: 'Νέα εμπορική συμφωνία ή ανάθεση' },
 ]);
 
 function unique(values) {
@@ -45,18 +45,20 @@ function hoursOld(now, value) {
 }
 
 function eventScore(record, now) {
-  const formScore = FORM_SCORES[record.form] ?? 40;
+  const formScore = FORM_SCORES[record.form] ?? 32;
   const text = `${record.title || ''} ${record.summary || ''}`;
   const boosts = TITLE_BOOSTS.filter((item) => item.pattern.test(text));
   const freshnessHours = hoursOld(now, record.publishedAt);
-  const freshnessScore = freshnessHours <= 2 ? 18 : freshnessHours <= 8 ? 12 : freshnessHours <= 24 ? 6 : 0;
-  const score = Math.max(0, Math.min(100, formScore + freshnessScore + boosts.reduce((sum, item) => sum + item.score, 0)));
+  const freshnessScore = freshnessHours <= 2 ? 10 : freshnessHours <= 8 ? 7 : freshnessHours <= 24 ? 3 : 0;
+  const multiSignalBonus = boosts.length >= 2 ? 6 : 0;
+  const score = Math.max(0, Math.min(100, formScore + freshnessScore + multiSignalBonus + boosts.reduce((sum, item) => sum + item.score, 0)));
   return {
     score,
     reasons: unique([
       `Νέα επίσημη κατάθεση ${record.form} στη SEC`,
       ...boosts.map((item) => item.reason),
       freshnessHours <= 8 ? 'Το γεγονός είναι πολύ πρόσφατο' : null,
+      boosts.length === 0 ? 'Απαιτείται ανάγνωση της κατάθεσης για να προσδιοριστεί η ουσία του γεγονότος' : null,
     ]),
     freshnessHours,
   };
@@ -134,7 +136,7 @@ export async function discoverAutonomousCandidates(options = {}) {
   const grouped = mergeEventsByCompany(recentRecords, companyByCik, now)
     .sort((a, b) => b.discoveryScore - a.discoveryScore || String(b.latestEventAt).localeCompare(String(a.latestEventAt)));
 
-  const minimumScore = Math.max(0, Number(options.minimumScore ?? 62));
+  const minimumScore = Math.max(0, Number(options.minimumScore ?? 58));
   const shortlistLimit = Math.max(1, Number(options.shortlistLimit ?? 12));
   const deepAnalysisLimit = Math.max(0, Number(options.deepAnalysisLimit ?? 5));
   const shortlist = grouped
