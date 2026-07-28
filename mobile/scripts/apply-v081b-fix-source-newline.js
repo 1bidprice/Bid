@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const filePath = path.resolve(__dirname, '..', 'PortfolioApp.js');
+const root = path.resolve(__dirname, '..');
+const filePath = path.join(root, 'PortfolioApp.js');
 let source = fs.readFileSync(filePath, 'utf8');
 
 const broken = "item.quote?.updatedAt ? '\nΤιμή: '";
@@ -16,4 +17,11 @@ if (!source.includes(fixed)) {
 }
 
 fs.writeFileSync(filePath, source);
-console.log('Investor Control v0.8.1 generated-source newline fixed.');
+
+const packagePath = path.join(root, 'package.json');
+const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+packageJson.scripts = packageJson.scripts || {};
+packageJson.scripts.postinstall = 'node scripts/apply-v065-native-ui-fix.js && node scripts/apply-v070-opportunities.js && node scripts/apply-v071-live-sync.js && node scripts/apply-v080-autonomous-decisions.js && node scripts/apply-v081-position-performance.js && node scripts/apply-v081b-fix-source-newline.js';
+fs.writeFileSync(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
+
+console.log('Investor Control v0.8.1 generated-source newline fixed and postinstall chain preserved.');
