@@ -1,4 +1,7 @@
-function categoryLabel(category) {
+function categoryLabel(category, status) {
+  if (status === 'DRAFT_RESEARCH' && ['EVENT_DRIVEN', 'SPECULATIVE_CATALYST'].includes(category)) {
+    return 'Υπόθεση καταλύτη υπό έλεγχο';
+  }
   return {
     QUALITY_COMPOUNDER: 'Μακροχρόνια ποιοτική ανάπτυξη',
     VALUE_REPRICING: 'Πιθανή επανατιμολόγηση αξίας',
@@ -74,7 +77,23 @@ function compactSources(evidence = []) {
   }));
 }
 
-function compactDossier(dossier) {
+function ageHours(value, generatedAt) {
+  const time = new Date(value).getTime();
+  const now = new Date(generatedAt).getTime();
+  return Number.isFinite(time) && Number.isFinite(now) ? Math.max(0, (now - time) / 3_600_000) : null;
+}
+
+function metricNotes(dossier) {
+  const notes = [];
+  const metrics = dossier?.metrics?.fundamentals?.metrics || dossier?.metrics?.fundamentals || {};
+  const margin = Number(metrics.netMarginPct ?? metrics.annualNetMarginPct);
+  if (Number.isFinite(margin) && Math.abs(margin) > 1000) {
+    notes.push('Το ακραίο καθαρό περιθώριο επηρεάζεται από πολύ χαμηλή βάση εσόδων σε σχέση με τις ζημίες και χρειάζεται ανάγνωση μαζί με τα απόλυτα ποσά.');
+  }
+  return notes;
+}
+
+function compactDossier(dossier, generatedAt) {
   const blockers = Array.isArray(dossier?.readiness?.blockers) ? dossier.readiness.blockers : [];
   const status = dossier.status;
   return {
@@ -83,18 +102,23 @@ function compactDossier(dossier) {
     companyName: dossier.companyName,
     symbol: dossier.listing?.symbol || null,
     exchange: dossier.listing?.exchange || null,
+    origin: dossier.origin || 'FOCUS_UNIVERSE',
+    discovery: dossier.discovery || null,
     status,
     statusLabel: status === 'PUBLISHED'
       ? 'Δημοσιευμένη ανάλυση'
       : status === 'REVIEW_READY'
         ? 'Έτοιμο για τελικό έλεγχο'
-        : 'Έρευνα σε εξέλιξη',
+        : dossier.origin === 'AUTONOMOUS_DISCOVERY'
+          ? 'Αυτόματη ανακάλυψη · έρευνα σε εξέλιξη'
+          : 'Έρευνα σε εξέλιξη',
     category: dossier.category,
-    categoryLabel: categoryLabel(dossier.category),
+    categoryLabel: categoryLabel(dossier.category, status),
     action: status === 'DRAFT_RESEARCH' ? 'WATCH' : dossier.proposedAction,
     actionLabel: actionLabel(status === 'DRAFT_RESEARCH' ? 'WATCH' : dossier.proposedAction),
     timeHorizon: dossier.timeHorizon,
     referencePrice: dossier.referencePrice,
+    referencePriceAgeHours: ageHours(dossier.referencePrice?.timestamp, generatedAt),
     thesis: dossier.thesis,
     causalMechanism: dossier.causalMechanism,
     bullCase: dossier.bullCase,
@@ -107,9 +131,28 @@ function compactDossier(dossier) {
     blockerLabels: blockers.map(blockerLabel),
     nextStep: status === 'REVIEW_READY' ? 'Τελικός έλεγχος και απόφαση δημοσίευσης' : nextStep(blockers),
     sources: compactSources(dossier.evidence),
+    metricNotes: metricNotes(dossier),
     generatedAt: dossier.generatedAt,
     publicationMode: dossier.publicationMode || null,
     finalAction: dossier.finalAction || null,
+  };
+}
+
+function compactDiscovery(candidate) {
+  return {
+    discoveryId: candidate.discoveryId,
+    companyId: candidate.companyId,
+    companyName: candidate.companyName,
+    symbol: candidate.symbol,
+    exchange: candidate.exchange,
+    discoveryScore: candidate.discoveryScore,
+    status: candidate.status,
+    suggestedAction: 'WATCH',
+    suggestedActionLabel: 'Παρακολούθηση μέχρι πλήρη ανάλυση',
+    reasons: candidate.reasons || [],
+    latestEventAt: candidate.latestEventAt,
+    events: candidate.events || [],
+    isExistingFocusCompany: candidate.isExistingFocusCompany === true,
   };
 }
 
@@ -124,8 +167,9 @@ function priority(item) {
     WATCH: 0,
   }[item.finalAction?.marketAction] || 0;
   const urgencyScore = { IMMEDIATE: 40, TODAY: 25, NORMAL: 10, NONE: 0 }[item.finalAction?.urgency] || 0;
+  const discoveryScore = item.origin === 'AUTONOMOUS_DISCOVERY' ? Number(item.discovery?.discoveryScore || 0) / 4 : 0;
   const categoryScore = { EVENT_RISK: 50, DETERIORATION: 45, SPECULATIVE_CATALYST: 35, EVENT_DRIVEN: 30 }[item.category] || 10;
-  return statusScore + finalActionScore + urgencyScore + categoryScore - item.blockers.length;
+  return statusScore + finalActionScore + urgencyScore + discoveryScore + categoryScore - item.blockers.length;
 }
 
 function countFinalActions(items) {
@@ -155,26 +199,30 @@ function countFinalActions(items) {
 }
 
 export function buildMobileIntelligenceFeed(report = {}, options = {}) {
-  const dossiers = (Array.isArray(report.researchDossiers) ? report.researchDossiers : []).map(compactDossier);
+  const generatedAt = new Date(options.generatedAt || report.generatedAt || Date.now()).toISOString();
+  const dossiers = (Array.isArray(report.researchDossiers) ? report.researchDossiers : []).map((item) => compactDossier(item, generatedAt));
   dossiers.sort((a, b) => priority(b) - priority(a) || String(b.generatedAt).localeCompare(String(a.generatedAt)));
   const published = dossiers.filter((item) => item.status === 'PUBLISHED');
   const reviewReady = dossiers.filter((item) => item.status === 'REVIEW_READY');
   const research = dossiers.filter((item) => item.status === 'DRAFT_RESEARCH');
   const decisions = dossiers.filter((item) => item.finalAction?.status === 'FINAL');
   const urgent = dossiers.filter((item) => item.finalAction?.urgency === 'IMMEDIATE' || ['EVENT_RISK', 'DETERIORATION'].includes(item.category)).slice(0, 5);
-  const generatedAt = new Date(options.generatedAt || report.generatedAt || Date.now()).toISOString();
+  const discoveryRadar = (report.discovery?.shortlist || []).filter((item) => !item.isExistingFocusCompany).map(compactDiscovery).slice(0, 12);
   const actionCounts = countFinalActions(dossiers);
 
   return {
     format: 'investor-control-mobile-intelligence-feed',
-    version: 1,
+    version: 2,
     generatedAt,
     policyVersion: report.policyVersion || null,
+    sourceSelection: report.discovery?.sourcePolicy || null,
     summary: {
       publishedCount: published.length,
       reviewReadyCount: reviewReady.length,
       researchCount: research.length,
       urgentCount: urgent.length,
+      discoveryCandidateCount: discoveryRadar.length,
+      discoveryDeepAnalysisCount: Number(report.discovery?.deepAnalysisCompanyCount || 0),
       unresolvedDiagnosticCount: Array.isArray(report.diagnostics) ? report.diagnostics.length : 0,
       ...actionCounts,
     },
@@ -185,13 +233,16 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
           ? `${actionCounts.buyNowCount} επιβεβαιωμένο σήμα άμεσης αγοράς`
           : actionCounts.avoidCount
             ? `${actionCounts.avoidCount} περίπτωση για αποφυγή`
-            : urgent.length
-              ? `${urgent.length} υπόθεση${urgent.length === 1 ? '' : 'εις'} αυξημένης προτεραιότητας`
-              : reviewReady.length
-                ? `${reviewReady.length} φάκελο${reviewReady.length === 1 ? 'ς' : 'ι'} έτοιμο για έλεγχο`
-                : 'Δεν υπάρχει ακόμη δημοσιεύσιμη επενδυτική πρόταση',
+            : discoveryRadar.length
+              ? `${discoveryRadar.length} νέες μετοχές εντοπίστηκαν αυτόματα για έλεγχο`
+              : urgent.length
+                ? `${urgent.length} υπόθεση${urgent.length === 1 ? '' : 'εις'} αυξημένης προτεραιότητας`
+                : reviewReady.length
+                  ? `${reviewReady.length} φάκελο${reviewReady.length === 1 ? 'ς' : 'ι'} έτοιμο για έλεγχο`
+                  : 'Δεν υπάρχει ακόμη δημοσιεύσιμη επενδυτική πρόταση',
       primaryItem: urgent[0] || decisions[0] || reviewReady[0] || research[0] || null,
     },
+    discoveryRadar,
     decisions,
     published,
     reviewReady,
@@ -201,6 +252,8 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
       companyId: item.companyId,
       companyName: item.companyName,
       symbol: item.symbol,
+      origin: item.origin,
+      discovery: item.discovery,
       status: item.status,
       category: item.category,
       action: item.action,
@@ -210,6 +263,6 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
       nextStep: item.nextStep,
       reviewDate: item.reviewDate,
     })),
-    disclosure: 'Οι τελικές ενέργειες παράγονται μόνο όταν περνούν όλοι οι έλεγχοι πηγών, θεμελιωδών, αγοράς, ρευστότητας, φρεσκότητας και αντιφάσεων. Δεν αποτελούν εγγύηση αποτελέσματος και δεν εκτελούν συναλλαγές.',
+    disclosure: 'Οι νέες μετοχές εντοπίζονται αυτόματα από επίσημα γεγονότα και περνούν σε βαθιά ανάλυση. Καμία ανακάλυψη δεν γίνεται πρόταση αγοράς πριν περάσουν όλοι οι έλεγχοι πηγών, θεμελιωδών, αγοράς, ρευστότητας, φρεσκότητας και αντιφάσεων. Δεν εκτελούνται συναλλαγές.',
   };
 }
