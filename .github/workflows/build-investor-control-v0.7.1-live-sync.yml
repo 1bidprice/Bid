@@ -69,6 +69,10 @@ jobs:
         working-directory: mobile
         run: node scripts/apply-v081-position-performance.js
 
+      - name: Repair v0.8.1 generated source
+        working-directory: mobile
+        run: node scripts/apply-v081b-fix-source-newline.js
+
       - name: Verify purchase-lot calculations
         working-directory: mobile
         run: npm run test:lots
@@ -86,6 +90,7 @@ jobs:
           grep -q "Επιμέρους αγορές" PortfolioApp.js
           grep -q "Κάθε αγορά κρατά το δικό της all-in και πρόσημο" PortfolioApp.js
           grep -q "lotSummary.openLots" PortfolioApp.js
+          grep -Fq "\\nΤιμή:" PortfolioApp.js
           grep -q "FIFO" src/position-lots.js
           grep -q "decisionVisible" App.js
           grep -q "onOpenDecisionGate" PortfolioApp.js
@@ -100,6 +105,7 @@ jobs:
           if (app.expo.android.versionCode !== 17) throw new Error('wrong versionCode');
           if (pkg.version !== '0.8.1') throw new Error('wrong package version');
           if (!pkg.scripts.postinstall.includes('apply-v081-position-performance.js')) throw new Error('v0.8.1 patch missing from postinstall');
+          if (!pkg.scripts.postinstall.includes('apply-v081b-fix-source-newline.js')) throw new Error('v0.8.1 source repair missing from postinstall');
           console.log('PASS v0.8.1 daily change and separate return sign for every open purchase');
           NODE
 
