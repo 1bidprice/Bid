@@ -1,7 +1,7 @@
 {
   "format": "investor-control-daily-intelligence",
   "version": 5,
-  "generatedAt": "2026-07-27T19:26:09.230Z",
+  "generatedAt": "2026-07-28T12:06:02.764Z",
   "universe": [
     {
       "companyId": "company:allwyn-ag",
@@ -35,7 +35,7 @@
       "companyId": "company:virgin-galactic-holdings",
       "companyName": "Virgin Galactic",
       "cik": "0001706946",
-      "generatedAt": "2026-07-27T19:26:09.230Z",
+      "generatedAt": "2026-07-28T12:06:02.764Z",
       "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
       "annual": {
         "revenue": [
@@ -447,19 +447,19 @@
     {
       "format": "investor-control-fundamental-risk",
       "version": 1,
-      "generatedAt": "2026-07-27T19:26:09.230Z",
+      "generatedAt": "2026-07-28T12:06:02.764Z",
       "companyId": "company:virgin-galactic-holdings",
       "currency": "USD",
-      "referencePrice": 0,
+      "referencePrice": 2.53,
       "coverage": {
         "available": 8,
         "expected": 8,
         "score": 100
       },
       "valuation": {
-        "marketCapitalization": 0,
-        "priceToSales": 0,
-        "priceToBook": 0
+        "marketCapitalization": 129642260,
+        "priceToSales": 83.97,
+        "priceToBook": 0.58
       },
       "balanceSheet": {
         "cash": 124837000,
@@ -483,14 +483,46 @@
         "NEGATIVE_FREE_CASH_FLOW",
         "CASH_RUNWAY_UNDER_ONE_YEAR",
         "SEVERE_DILUTION",
+        "EXTREME_PRICE_TO_SALES",
         "SEVERE_NEGATIVE_NET_MARGIN"
       ],
-      "riskScore": 98,
+      "riskScore": 100,
       "metricsReady": true
     }
   ],
-  "marketSnapshotCount": 0,
-  "marketSnapshots": [],
+  "marketSnapshotCount": 1,
+  "marketSnapshots": [
+    {
+      "format": "investor-control-market-snapshot",
+      "version": 1,
+      "companyId": "company:virgin-galactic-holdings",
+      "companyName": "Virgin Galactic",
+      "listing": {
+        "exchange": "New York Stock Exchange",
+        "symbol": "SPCE",
+        "mic": "XNYS"
+      },
+      "symbol": "SPCE",
+      "currency": "USD",
+      "source": "Finnhub Quote API",
+      "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+      "generatedAt": "2026-07-28T12:06:02.764Z",
+      "quoteAt": "2026-07-27T20:00:00.000Z",
+      "ageHours": 16.1,
+      "stale": false,
+      "usable": true,
+      "currentPrice": 2.53,
+      "previousClose": 2.49,
+      "open": 2.53,
+      "high": 2.595,
+      "low": 2.5,
+      "dailyChange": 0.04,
+      "dailyChangePct": 1.61,
+      "liquidityMetricsReady": false,
+      "relativeStrengthMetricsReady": false,
+      "marketMetricsReady": false
+    }
+  ],
   "historicalMarketMetricsCount": 0,
   "historicalMarketMetrics": [],
   "claimClusterCount": 16,
@@ -903,7 +935,7 @@
   "researchDossierCount": 2,
   "researchDossiers": [
     {
-      "dossierId": "dossier:company:allwyn-ag:b3545fa9f5a011da62cc",
+      "dossierId": "dossier:company:allwyn-ag:1abdfed31ca153afa58f",
       "version": 2,
       "companyId": "company:allwyn-ag",
       "companyName": "Allwyn",
@@ -912,7 +944,7 @@
         "symbol": "ALWN",
         "mic": "XATH"
       },
-      "generatedAt": "2026-07-27T19:26:09.230Z",
+      "generatedAt": "2026-07-28T12:06:02.764Z",
       "status": "DRAFT_RESEARCH",
       "category": "EVENT_DRIVEN",
       "proposedAction": "WATCH",
@@ -1025,15 +1057,15 @@
           "REFERENCE_PRICE_REQUIRED"
         ]
       },
-      "reviewDate": "2026-10-25",
+      "reviewDate": "2026-10-26",
       "disclosure": "System-generated research assessment based on cited evidence. It is not a guarantee of outcome and does not execute orders.",
       "publicationMode": null,
       "finalAction": {
         "format": "investor-control-final-action",
         "version": 1,
         "policyVersion": "2026-07-27.1",
-        "generatedAt": "2026-07-27T19:26:09.230Z",
-        "validUntil": "2026-07-28T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "validUntil": "2026-07-29T12:06:02.764Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -1075,7 +1107,7 @@
       }
     },
     {
-      "dossierId": "dossier:company:virgin-galactic-holdings:55c4348863e0d92ba87c",
+      "dossierId": "dossier:company:virgin-galactic-holdings:48c2c2311b4e5b44d6ed",
       "version": 2,
       "companyId": "company:virgin-galactic-holdings",
       "companyName": "Virgin Galactic",
@@ -1084,12 +1116,17 @@
         "symbol": "SPCE",
         "mic": "XNYS"
       },
-      "generatedAt": "2026-07-27T19:26:09.230Z",
+      "generatedAt": "2026-07-28T12:06:02.764Z",
       "status": "DRAFT_RESEARCH",
       "category": "EVENT_DRIVEN",
       "proposedAction": "WATCH",
       "timeHorizon": "MONTHS",
-      "referencePrice": null,
+      "referencePrice": {
+        "value": 2.53,
+        "currency": "USD",
+        "timestamp": "2026-07-27T20:00:00.000Z",
+        "source": "Finnhub Quote API"
+      },
       "thesis": "Τα επιβεβαιωμένα οικονομικά αποτελέσματα της Virgin Galactic αποτελούν νέο έλεγχο της ποιότητας εσόδων, των περιθωρίων, των ταμειακών ροών, της αραίωσης και της ανθεκτικότητας του ισολογισμού. Θετικό συμπέρασμα απαιτεί βελτίωση σε περισσότερες από μία μετρήσεις και όχι έναν μόνο τίτλο. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: ετήσια μεταβολή εσόδων -78.06%, ετήσιο καθαρό περιθώριο -18063.92%, μεταβολή απομειωμένου αριθμού μετοχών 105.34%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
       "causalMechanism": "Διατηρήσιμες μεταβολές στα έσοδα, στα περιθώρια και στην παραγωγή μετρητών αλλάζουν τις αναμενόμενες μελλοντικές ταμειακές ροές και συνεπώς την αποτίμηση που μπορεί να υποστηριχθεί ορθολογικά.",
       "catalysts": [
@@ -1131,6 +1168,14 @@
         },
         {
           "text": "Ο καταγεγραμμένος απομειωμένος αριθμός μετοχών αυξήθηκε αρκετά ώστε να δημιουργεί σοβαρό κίνδυνο αραίωσης ανά μετοχή.",
+          "evidenceIds": [
+            "evidence:sec:0001706946-26-000119"
+          ],
+          "confidence": 0.88,
+          "inference": true
+        },
+        {
+          "text": "Η ντετερμινιστική εκτίμηση τιμής προς πωλήσεις είναι ακραία, αφήνοντας ελάχιστο περιθώριο για απογοήτευση στην εκτέλεση.",
           "evidenceIds": [
             "evidence:sec:0001706946-26-000119"
           ],
@@ -1194,7 +1239,7 @@
           "companyId": "company:virgin-galactic-holdings",
           "companyName": "Virgin Galactic",
           "cik": "0001706946",
-          "generatedAt": "2026-07-27T19:26:09.230Z",
+          "generatedAt": "2026-07-28T12:06:02.764Z",
           "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
           "annual": {
             "revenue": [
@@ -1604,19 +1649,19 @@
         "fundamentalRisk": {
           "format": "investor-control-fundamental-risk",
           "version": 1,
-          "generatedAt": "2026-07-27T19:26:09.230Z",
+          "generatedAt": "2026-07-28T12:06:02.764Z",
           "companyId": "company:virgin-galactic-holdings",
           "currency": "USD",
-          "referencePrice": 0,
+          "referencePrice": 2.53,
           "coverage": {
             "available": 8,
             "expected": 8,
             "score": 100
           },
           "valuation": {
-            "marketCapitalization": 0,
-            "priceToSales": 0,
-            "priceToBook": 0
+            "marketCapitalization": 129642260,
+            "priceToSales": 83.97,
+            "priceToBook": 0.58
           },
           "balanceSheet": {
             "cash": 124837000,
@@ -1640,9 +1685,10 @@
             "NEGATIVE_FREE_CASH_FLOW",
             "CASH_RUNWAY_UNDER_ONE_YEAR",
             "SEVERE_DILUTION",
+            "EXTREME_PRICE_TO_SALES",
             "SEVERE_NEGATIVE_NET_MARGIN"
           ],
-          "riskScore": 98,
+          "riskScore": 100,
           "metricsReady": true
         },
         "crossCheck": {
@@ -1678,19 +1724,18 @@
         "blockers": [
           "HISTORICAL_MARKET_METRICS_REQUIRED",
           "INDEPENDENT_CROSS_CHECK_REQUIRED",
-          "CLAIM_CORROBORATION_REQUIRED",
-          "REFERENCE_PRICE_REQUIRED"
+          "CLAIM_CORROBORATION_REQUIRED"
         ]
       },
-      "reviewDate": "2026-10-25",
+      "reviewDate": "2026-10-26",
       "disclosure": "System-generated research assessment based on cited evidence. It is not a guarantee of outcome and does not execute orders.",
       "publicationMode": null,
       "finalAction": {
         "format": "investor-control-final-action",
         "version": 1,
         "policyVersion": "2026-07-27.1",
-        "generatedAt": "2026-07-27T19:26:09.230Z",
-        "validUntil": "2026-07-28T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "validUntil": "2026-07-29T12:06:02.764Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -1701,7 +1746,7 @@
         "urgency": "NONE",
         "urgencyLabel": "Χωρίς τελική ενέργεια",
         "confidenceScore": 31,
-        "dataQualityScore": 20,
+        "dataQualityScore": 30,
         "reasons": [
           "FINAL_ACTION_BLOCKED"
         ],
@@ -1710,21 +1755,21 @@
           "DOSSIER_NOT_READY",
           "CROSS_CHECK_NOT_READY",
           "MARKET_METRICS_NOT_READY",
-          "REFERENCE_PRICE_REQUIRED",
           "REFERENCE_PRICE_STALE",
           "MARKET_HISTORY_STALE"
         ],
         "freshness": {
-          "referencePriceAgeHours": null,
+          "referencePriceAgeHours": 16.10076777777778,
           "dossierAgeHours": 0,
           "latestMarketAgeHours": null
         },
         "risk": {
-          "riskScore": 98,
+          "riskScore": 100,
           "fundamentalFlags": [
             "NEGATIVE_FREE_CASH_FLOW",
             "CASH_RUNWAY_UNDER_ONE_YEAR",
             "SEVERE_DILUTION",
+            "EXTREME_PRICE_TO_SALES",
             "SEVERE_NEGATIVE_NET_MARGIN"
           ],
           "marketFlags": []
@@ -1739,16 +1784,16 @@
   "opportunitiesFeed": {
     "format": "investor-control-opportunities-feed",
     "version": 1,
-    "generatedAt": "2026-07-27T19:26:09.230Z",
+    "generatedAt": "2026-07-28T12:06:02.764Z",
     "itemCount": 0,
     "items": [],
     "rejected": [
       {
-        "dossierId": "dossier:company:allwyn-ag:b3545fa9f5a011da62cc",
+        "dossierId": "dossier:company:allwyn-ag:1abdfed31ca153afa58f",
         "reason": "DOSSIER_NOT_PUBLISHED"
       },
       {
-        "dossierId": "dossier:company:virgin-galactic-holdings:55c4348863e0d92ba87c",
+        "dossierId": "dossier:company:virgin-galactic-holdings:48c2c2311b4e5b44d6ed",
         "reason": "DOSSIER_NOT_PUBLISHED"
       }
     ]
@@ -1836,7 +1881,7 @@
     {
       "code": "PUBLISHER_NOT_ALLOWLISTED",
       "sourceName": "Yahoo! Finance Canada",
-      "title": "Allwyn AG (ALWN.AT) Stock Price, News, Quote & History - Yahoo! Finance Canada",
+      "title": "Allwyn AG (ALWN.AT) Analyst Ratings, Estimates & Forecasts - Yahoo! Finance Canada",
       "companyId": "company:allwyn-ag"
     },
     {
@@ -1859,12 +1904,6 @@
     },
     {
       "code": "PUBLISHER_NOT_ALLOWLISTED",
-      "sourceName": "Yahoo! Finance Canada",
-      "title": "Allwyn AG (ALWN.AT) Analyst Ratings, Estimates & Forecasts - Yahoo! Finance Canada",
-      "companyId": "company:allwyn-ag"
-    },
-    {
-      "code": "PUBLISHER_NOT_ALLOWLISTED",
       "sourceName": "TradingView",
       "title": "Allwyn AG Dividends – ATHEX:ALWN - TradingView",
       "companyId": "company:allwyn-ag"
@@ -1873,6 +1912,12 @@
       "code": "PUBLISHER_NOT_ALLOWLISTED",
       "sourceName": "gamingintelligence.com",
       "title": "Allwyn brings in Khalid Jones to lead Allwyn North America - gamingintelligence.com",
+      "companyId": "company:allwyn-ag"
+    },
+    {
+      "code": "PUBLISHER_NOT_ALLOWLISTED",
+      "sourceName": "Crunchbase",
+      "title": "Allwyn - Financial Details - Crunchbase",
       "companyId": "company:allwyn-ag"
     },
     {
@@ -1886,12 +1931,9 @@
       "companyId": "company:allwyn-ag"
     },
     {
-      "code": "FINNHUB_TOKEN_MISSING",
-      "companyId": "company:virgin-galactic-holdings"
-    },
-    {
-      "code": "FINNHUB_TOKEN_MISSING",
-      "symbol": "SPCE"
+      "code": "FINNHUB_CANDLES_PREMIUM_REQUIRED",
+      "symbol": "SPCE",
+      "status": 403
     },
     {
       "code": "DOCUMENT_REVIEW_DEFERRED_BY_LIMIT",
@@ -2010,7 +2052,7 @@
     {
       "code": "PUBLISHER_NOT_ALLOWLISTED",
       "sourceName": "Yahoo Finance",
-      "title": "A Look At Virgin Galactic (SPCE) Valuation After A Sharp Short Term Share Price Surge - Yahoo Finance",
+      "title": "Virgin Galactic surges as flight-testing restart and SpaceX IPO excitement fuel rally (SPCE) - Yahoo Finance",
       "companyId": "company:virgin-galactic-holdings"
     },
     {
@@ -2022,7 +2064,13 @@
     {
       "code": "PUBLISHER_NOT_ALLOWLISTED",
       "sourceName": "Yahoo Finance",
-      "title": "Virgin Galactic surges as flight-testing restart and SpaceX IPO excitement fuel rally (SPCE) - Yahoo Finance",
+      "title": "Virgin Galactic stock pops ahead of SpaceX IPO - Yahoo Finance",
+      "companyId": "company:virgin-galactic-holdings"
+    },
+    {
+      "code": "PUBLISHER_NOT_ALLOWLISTED",
+      "sourceName": "Yahoo Finance",
+      "title": "A Look At Virgin Galactic (SPCE) Valuation After A Sharp Short Term Share Price Surge - Yahoo Finance",
       "companyId": "company:virgin-galactic-holdings"
     },
     {
@@ -2034,19 +2082,13 @@
     {
       "code": "PUBLISHER_NOT_ALLOWLISTED",
       "sourceName": "Yahoo Finance",
-      "title": "Virgin Galactic (SPCE) Says VSS Unity Preparing for New Flight Test Program - Yahoo Finance",
+      "title": "Virgin Galactic Shares Slide After Debt Redemption Plan Involving New Stock Issuance (SPCE) - Yahoo Finance",
       "companyId": "company:virgin-galactic-holdings"
     },
     {
       "code": "PUBLISHER_NOT_ALLOWLISTED",
       "sourceName": "Yahoo Finance",
       "title": "Can Virgin Galactic (SPCE) Turn Pricey Ticket Sales And Delta Ships Into A Durable Business Model? - Yahoo Finance",
-      "companyId": "company:virgin-galactic-holdings"
-    },
-    {
-      "code": "PUBLISHER_NOT_ALLOWLISTED",
-      "sourceName": "Yahoo Finance",
-      "title": "Virgin Galactic stock pops ahead of SpaceX IPO - Yahoo Finance",
       "companyId": "company:virgin-galactic-holdings"
     },
     {
@@ -2064,13 +2106,13 @@
     {
       "code": "PUBLISHER_NOT_ALLOWLISTED",
       "sourceName": "Yahoo Finance",
-      "title": "Virgin Galactic Shares Slide After Debt Redemption Plan Involving New Stock Issuance (SPCE) - Yahoo Finance",
+      "title": "Virgin Galactic (SPCE) Says VSS Unity Preparing for New Flight Test Program - Yahoo Finance",
       "companyId": "company:virgin-galactic-holdings"
     },
     {
       "code": "PUBLISHER_NOT_ALLOWLISTED",
       "sourceName": "Yahoo Finance",
-      "title": "SPCE Stock Gains Premarket: Virgin Galactic Gives Astronauts A Preview Of Its Commercial Spaceflight Future - Yahoo Finance",
+      "title": "Virgin Galactic (SPCE) Is Up 40.4% After Delta Progress And $750k Tickets Return - Has The Bull Case Changed? - Yahoo Finance",
       "companyId": "company:virgin-galactic-holdings"
     },
     {
@@ -2119,9 +2161,9 @@
       "publishedAt": "2026-07-20T12:00:00.000Z",
       "document": {
         "status": "REVIEWED_TEXT",
-        "fetchedAt": "2026-07-27T19:26:09.230Z",
+        "fetchedAt": "2026-07-28T12:06:02.764Z",
         "contentType": "text/html",
-        "byteLength": 71762,
+        "byteLength": 71727,
         "textLength": 1199,
         "reviewed": true,
         "pages": []
@@ -2266,9 +2308,9 @@
       "publishedAt": "2026-07-13T12:00:00.000Z",
       "document": {
         "status": "REVIEWED_TEXT",
-        "fetchedAt": "2026-07-27T19:26:09.230Z",
+        "fetchedAt": "2026-07-28T12:06:02.764Z",
         "contentType": "text/html",
-        "byteLength": 71170,
+        "byteLength": 71178,
         "textLength": 1127,
         "reviewed": true,
         "pages": []
@@ -2416,9 +2458,9 @@
       "publishedAt": "2026-07-06T12:00:00.000Z",
       "document": {
         "status": "REVIEWED_TEXT",
-        "fetchedAt": "2026-07-27T19:26:09.230Z",
+        "fetchedAt": "2026-07-28T12:06:02.764Z",
         "contentType": "text/html",
-        "byteLength": 71562,
+        "byteLength": 71570,
         "textLength": 1196,
         "reviewed": true,
         "pages": []
@@ -2566,9 +2608,9 @@
       "publishedAt": "2026-06-29T12:00:00.000Z",
       "document": {
         "status": "REVIEWED_TEXT",
-        "fetchedAt": "2026-07-27T19:26:09.230Z",
+        "fetchedAt": "2026-07-28T12:06:02.764Z",
         "contentType": "text/html",
-        "byteLength": 75812,
+        "byteLength": 75820,
         "textLength": 1418,
         "reviewed": true,
         "pages": []
@@ -2716,9 +2758,9 @@
       "publishedAt": "2026-06-22T12:00:00.000Z",
       "document": {
         "status": "REVIEWED_TEXT",
-        "fetchedAt": "2026-07-27T19:26:09.230Z",
+        "fetchedAt": "2026-07-28T12:06:02.764Z",
         "contentType": "text/html",
-        "byteLength": 71608,
+        "byteLength": 71616,
         "textLength": 1211,
         "reviewed": true,
         "pages": []
@@ -2989,7 +3031,7 @@
       "publishedAt": "2026-07-17T12:00:00.000Z",
       "document": {
         "status": "REVIEWED_TEXT",
-        "fetchedAt": "2026-07-27T19:26:09.230Z",
+        "fetchedAt": "2026-07-28T12:06:02.764Z",
         "contentType": "text/html",
         "byteLength": 269442,
         "textLength": 102634,
@@ -3134,7 +3176,7 @@
       "fundamentals": {
         "format": "investor-control-sec-fundamentals",
         "version": 1,
-        "generatedAt": "2026-07-27T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
         "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
         "coverage": {
           "available": 6,
@@ -3255,7 +3297,26 @@
           }
         }
       },
-      "market": null,
+      "market": {
+        "format": "investor-control-market-snapshot",
+        "version": 1,
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+        "symbol": "SPCE",
+        "currency": "USD",
+        "quoteAt": "2026-07-27T20:00:00.000Z",
+        "ageHours": 16.1,
+        "stale": false,
+        "usable": true,
+        "currentPrice": 2.53,
+        "previousClose": 2.49,
+        "open": 2.53,
+        "high": 2.595,
+        "low": 2.5,
+        "dailyChange": 0.04,
+        "dailyChangePct": 1.61
+      },
       "historicalMarketMetrics": null,
       "claim": {
         "claimId": "claim:7d3917d39530b35dbb6d5dcc",
@@ -3363,7 +3424,7 @@
       "publishedAt": "2026-07-17T12:00:00.000Z",
       "document": {
         "status": "REVIEWED_TEXT",
-        "fetchedAt": "2026-07-27T19:26:09.230Z",
+        "fetchedAt": "2026-07-28T12:06:02.764Z",
         "contentType": "text/html",
         "byteLength": 54477,
         "textLength": 27324,
@@ -3518,7 +3579,7 @@
       "fundamentals": {
         "format": "investor-control-sec-fundamentals",
         "version": 1,
-        "generatedAt": "2026-07-27T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
         "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
         "coverage": {
           "available": 6,
@@ -3639,7 +3700,26 @@
           }
         }
       },
-      "market": null,
+      "market": {
+        "format": "investor-control-market-snapshot",
+        "version": 1,
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+        "symbol": "SPCE",
+        "currency": "USD",
+        "quoteAt": "2026-07-27T20:00:00.000Z",
+        "ageHours": 16.1,
+        "stale": false,
+        "usable": true,
+        "currentPrice": 2.53,
+        "previousClose": 2.49,
+        "open": 2.53,
+        "high": 2.595,
+        "low": 2.5,
+        "dailyChange": 0.04,
+        "dailyChangePct": 1.61
+      },
       "historicalMarketMetrics": null,
       "claim": {
         "claimId": "claim:ca0398d33b34e9eae6dc2bd8",
@@ -3749,7 +3829,7 @@
       "publishedAt": "2026-06-30T12:00:00.000Z",
       "document": {
         "status": "REVIEWED_TEXT",
-        "fetchedAt": "2026-07-27T19:26:09.230Z",
+        "fetchedAt": "2026-07-28T12:06:02.764Z",
         "contentType": "text/html",
         "byteLength": 18248,
         "textLength": 4754,
@@ -3810,7 +3890,7 @@
       "fundamentals": {
         "format": "investor-control-sec-fundamentals",
         "version": 1,
-        "generatedAt": "2026-07-27T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
         "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
         "coverage": {
           "available": 6,
@@ -3931,7 +4011,26 @@
           }
         }
       },
-      "market": null,
+      "market": {
+        "format": "investor-control-market-snapshot",
+        "version": 1,
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+        "symbol": "SPCE",
+        "currency": "USD",
+        "quoteAt": "2026-07-27T20:00:00.000Z",
+        "ageHours": 16.1,
+        "stale": false,
+        "usable": true,
+        "currentPrice": 2.53,
+        "previousClose": 2.49,
+        "open": 2.53,
+        "high": 2.595,
+        "low": 2.5,
+        "dailyChange": 0.04,
+        "dailyChangePct": 1.61
+      },
       "historicalMarketMetrics": null,
       "claim": {
         "claimId": "claim:899acfa1b6c236331ff37370",
@@ -4047,7 +4146,7 @@
       "publishedAt": "2026-06-30T12:00:00.000Z",
       "document": {
         "status": "REVIEWED_TEXT",
-        "fetchedAt": "2026-07-27T19:26:09.230Z",
+        "fetchedAt": "2026-07-28T12:06:02.764Z",
         "contentType": "text/html",
         "byteLength": 18248,
         "textLength": 4750,
@@ -4108,7 +4207,7 @@
       "fundamentals": {
         "format": "investor-control-sec-fundamentals",
         "version": 1,
-        "generatedAt": "2026-07-27T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
         "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
         "coverage": {
           "available": 6,
@@ -4229,7 +4328,26 @@
           }
         }
       },
-      "market": null,
+      "market": {
+        "format": "investor-control-market-snapshot",
+        "version": 1,
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+        "symbol": "SPCE",
+        "currency": "USD",
+        "quoteAt": "2026-07-27T20:00:00.000Z",
+        "ageHours": 16.1,
+        "stale": false,
+        "usable": true,
+        "currentPrice": 2.53,
+        "previousClose": 2.49,
+        "open": 2.53,
+        "high": 2.595,
+        "low": 2.5,
+        "dailyChange": 0.04,
+        "dailyChangePct": 1.61
+      },
       "historicalMarketMetrics": null,
       "claim": {
         "claimId": "claim:899acfa1b6c236331ff37370",
@@ -4345,7 +4463,7 @@
       "publishedAt": "2026-06-30T12:00:00.000Z",
       "document": {
         "status": "REVIEWED_TEXT",
-        "fetchedAt": "2026-07-27T19:26:09.230Z",
+        "fetchedAt": "2026-07-28T12:06:02.764Z",
         "contentType": "text/html",
         "byteLength": 19578,
         "textLength": 4901,
@@ -4406,7 +4524,7 @@
       "fundamentals": {
         "format": "investor-control-sec-fundamentals",
         "version": 1,
-        "generatedAt": "2026-07-27T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
         "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
         "coverage": {
           "available": 6,
@@ -4527,7 +4645,26 @@
           }
         }
       },
-      "market": null,
+      "market": {
+        "format": "investor-control-market-snapshot",
+        "version": 1,
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+        "symbol": "SPCE",
+        "currency": "USD",
+        "quoteAt": "2026-07-27T20:00:00.000Z",
+        "ageHours": 16.1,
+        "stale": false,
+        "usable": true,
+        "currentPrice": 2.53,
+        "previousClose": 2.49,
+        "open": 2.53,
+        "high": 2.595,
+        "low": 2.5,
+        "dailyChange": 0.04,
+        "dailyChangePct": 1.61
+      },
       "historicalMarketMetrics": null,
       "claim": {
         "claimId": "claim:899acfa1b6c236331ff37370",
@@ -4659,7 +4796,7 @@
       "fundamentals": {
         "format": "investor-control-sec-fundamentals",
         "version": 1,
-        "generatedAt": "2026-07-27T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
         "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
         "coverage": {
           "available": 6,
@@ -4780,7 +4917,26 @@
           }
         }
       },
-      "market": null,
+      "market": {
+        "format": "investor-control-market-snapshot",
+        "version": 1,
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+        "symbol": "SPCE",
+        "currency": "USD",
+        "quoteAt": "2026-07-27T20:00:00.000Z",
+        "ageHours": 16.1,
+        "stale": false,
+        "usable": true,
+        "currentPrice": 2.53,
+        "previousClose": 2.49,
+        "open": 2.53,
+        "high": 2.595,
+        "low": 2.5,
+        "dailyChange": 0.04,
+        "dailyChangePct": 1.61
+      },
       "historicalMarketMetrics": null,
       "claim": {
         "claimId": "claim:899acfa1b6c236331ff37370",
@@ -4913,7 +5069,7 @@
       "fundamentals": {
         "format": "investor-control-sec-fundamentals",
         "version": 1,
-        "generatedAt": "2026-07-27T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
         "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
         "coverage": {
           "available": 6,
@@ -5034,7 +5190,26 @@
           }
         }
       },
-      "market": null,
+      "market": {
+        "format": "investor-control-market-snapshot",
+        "version": 1,
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+        "symbol": "SPCE",
+        "currency": "USD",
+        "quoteAt": "2026-07-27T20:00:00.000Z",
+        "ageHours": 16.1,
+        "stale": false,
+        "usable": true,
+        "currentPrice": 2.53,
+        "previousClose": 2.49,
+        "open": 2.53,
+        "high": 2.595,
+        "low": 2.5,
+        "dailyChange": 0.04,
+        "dailyChangePct": 1.61
+      },
       "historicalMarketMetrics": null,
       "claim": {
         "claimId": "claim:899acfa1b6c236331ff37370",
@@ -5170,7 +5345,7 @@
       "fundamentals": {
         "format": "investor-control-sec-fundamentals",
         "version": 1,
-        "generatedAt": "2026-07-27T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
         "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
         "coverage": {
           "available": 6,
@@ -5291,7 +5466,26 @@
           }
         }
       },
-      "market": null,
+      "market": {
+        "format": "investor-control-market-snapshot",
+        "version": 1,
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+        "symbol": "SPCE",
+        "currency": "USD",
+        "quoteAt": "2026-07-27T20:00:00.000Z",
+        "ageHours": 16.1,
+        "stale": false,
+        "usable": true,
+        "currentPrice": 2.53,
+        "previousClose": 2.49,
+        "open": 2.53,
+        "high": 2.595,
+        "low": 2.5,
+        "dailyChange": 0.04,
+        "dailyChangePct": 1.61
+      },
       "historicalMarketMetrics": null,
       "claim": {
         "claimId": "claim:be5b163bc8d5761aa920d78f",
@@ -5427,7 +5621,7 @@
       "fundamentals": {
         "format": "investor-control-sec-fundamentals",
         "version": 1,
-        "generatedAt": "2026-07-27T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
         "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
         "coverage": {
           "available": 6,
@@ -5548,7 +5742,26 @@
           }
         }
       },
-      "market": null,
+      "market": {
+        "format": "investor-control-market-snapshot",
+        "version": 1,
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+        "symbol": "SPCE",
+        "currency": "USD",
+        "quoteAt": "2026-07-27T20:00:00.000Z",
+        "ageHours": 16.1,
+        "stale": false,
+        "usable": true,
+        "currentPrice": 2.53,
+        "previousClose": 2.49,
+        "open": 2.53,
+        "high": 2.595,
+        "low": 2.5,
+        "dailyChange": 0.04,
+        "dailyChangePct": 1.61
+      },
       "historicalMarketMetrics": null,
       "claim": {
         "claimId": "claim:be5b163bc8d5761aa920d78f",
@@ -5684,7 +5897,7 @@
       "fundamentals": {
         "format": "investor-control-sec-fundamentals",
         "version": 1,
-        "generatedAt": "2026-07-27T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
         "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
         "coverage": {
           "available": 6,
@@ -5805,7 +6018,26 @@
           }
         }
       },
-      "market": null,
+      "market": {
+        "format": "investor-control-market-snapshot",
+        "version": 1,
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+        "symbol": "SPCE",
+        "currency": "USD",
+        "quoteAt": "2026-07-27T20:00:00.000Z",
+        "ageHours": 16.1,
+        "stale": false,
+        "usable": true,
+        "currentPrice": 2.53,
+        "previousClose": 2.49,
+        "open": 2.53,
+        "high": 2.595,
+        "low": 2.5,
+        "dailyChange": 0.04,
+        "dailyChangePct": 1.61
+      },
       "historicalMarketMetrics": null,
       "claim": {
         "claimId": "claim:be5b163bc8d5761aa920d78f",
@@ -5941,7 +6173,7 @@
       "fundamentals": {
         "format": "investor-control-sec-fundamentals",
         "version": 1,
-        "generatedAt": "2026-07-27T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
         "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
         "coverage": {
           "available": 6,
@@ -6062,7 +6294,26 @@
           }
         }
       },
-      "market": null,
+      "market": {
+        "format": "investor-control-market-snapshot",
+        "version": 1,
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+        "symbol": "SPCE",
+        "currency": "USD",
+        "quoteAt": "2026-07-27T20:00:00.000Z",
+        "ageHours": 16.1,
+        "stale": false,
+        "usable": true,
+        "currentPrice": 2.53,
+        "previousClose": 2.49,
+        "open": 2.53,
+        "high": 2.595,
+        "low": 2.5,
+        "dailyChange": 0.04,
+        "dailyChangePct": 1.61
+      },
       "historicalMarketMetrics": null,
       "claim": {
         "claimId": "claim:be5b163bc8d5761aa920d78f",
@@ -6198,7 +6449,7 @@
       "fundamentals": {
         "format": "investor-control-sec-fundamentals",
         "version": 1,
-        "generatedAt": "2026-07-27T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
         "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
         "coverage": {
           "available": 6,
@@ -6319,7 +6570,26 @@
           }
         }
       },
-      "market": null,
+      "market": {
+        "format": "investor-control-market-snapshot",
+        "version": 1,
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+        "symbol": "SPCE",
+        "currency": "USD",
+        "quoteAt": "2026-07-27T20:00:00.000Z",
+        "ageHours": 16.1,
+        "stale": false,
+        "usable": true,
+        "currentPrice": 2.53,
+        "previousClose": 2.49,
+        "open": 2.53,
+        "high": 2.595,
+        "low": 2.5,
+        "dailyChange": 0.04,
+        "dailyChangePct": 1.61
+      },
       "historicalMarketMetrics": null,
       "claim": {
         "claimId": "claim:be5b163bc8d5761aa920d78f",
@@ -6455,7 +6725,7 @@
       "fundamentals": {
         "format": "investor-control-sec-fundamentals",
         "version": 1,
-        "generatedAt": "2026-07-27T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
         "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
         "coverage": {
           "available": 6,
@@ -6576,7 +6846,26 @@
           }
         }
       },
-      "market": null,
+      "market": {
+        "format": "investor-control-market-snapshot",
+        "version": 1,
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+        "symbol": "SPCE",
+        "currency": "USD",
+        "quoteAt": "2026-07-27T20:00:00.000Z",
+        "ageHours": 16.1,
+        "stale": false,
+        "usable": true,
+        "currentPrice": 2.53,
+        "previousClose": 2.49,
+        "open": 2.53,
+        "high": 2.595,
+        "low": 2.5,
+        "dailyChange": 0.04,
+        "dailyChangePct": 1.61
+      },
       "historicalMarketMetrics": null,
       "claim": {
         "claimId": "claim:be5b163bc8d5761aa920d78f",
@@ -6712,7 +7001,7 @@
       "fundamentals": {
         "format": "investor-control-sec-fundamentals",
         "version": 1,
-        "generatedAt": "2026-07-27T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
         "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
         "coverage": {
           "available": 6,
@@ -6833,7 +7122,26 @@
           }
         }
       },
-      "market": null,
+      "market": {
+        "format": "investor-control-market-snapshot",
+        "version": 1,
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+        "symbol": "SPCE",
+        "currency": "USD",
+        "quoteAt": "2026-07-27T20:00:00.000Z",
+        "ageHours": 16.1,
+        "stale": false,
+        "usable": true,
+        "currentPrice": 2.53,
+        "previousClose": 2.49,
+        "open": 2.53,
+        "high": 2.595,
+        "low": 2.5,
+        "dailyChange": 0.04,
+        "dailyChangePct": 1.61
+      },
       "historicalMarketMetrics": null,
       "claim": {
         "claimId": "claim:be5b163bc8d5761aa920d78f",
@@ -6969,7 +7277,7 @@
       "fundamentals": {
         "format": "investor-control-sec-fundamentals",
         "version": 1,
-        "generatedAt": "2026-07-27T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
         "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
         "coverage": {
           "available": 6,
@@ -7090,7 +7398,26 @@
           }
         }
       },
-      "market": null,
+      "market": {
+        "format": "investor-control-market-snapshot",
+        "version": 1,
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+        "symbol": "SPCE",
+        "currency": "USD",
+        "quoteAt": "2026-07-27T20:00:00.000Z",
+        "ageHours": 16.1,
+        "stale": false,
+        "usable": true,
+        "currentPrice": 2.53,
+        "previousClose": 2.49,
+        "open": 2.53,
+        "high": 2.595,
+        "low": 2.5,
+        "dailyChange": 0.04,
+        "dailyChangePct": 1.61
+      },
       "historicalMarketMetrics": null,
       "claim": {
         "claimId": "claim:be5b163bc8d5761aa920d78f",
@@ -7226,7 +7553,7 @@
       "fundamentals": {
         "format": "investor-control-sec-fundamentals",
         "version": 1,
-        "generatedAt": "2026-07-27T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
         "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
         "coverage": {
           "available": 6,
@@ -7347,7 +7674,26 @@
           }
         }
       },
-      "market": null,
+      "market": {
+        "format": "investor-control-market-snapshot",
+        "version": 1,
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+        "symbol": "SPCE",
+        "currency": "USD",
+        "quoteAt": "2026-07-27T20:00:00.000Z",
+        "ageHours": 16.1,
+        "stale": false,
+        "usable": true,
+        "currentPrice": 2.53,
+        "previousClose": 2.49,
+        "open": 2.53,
+        "high": 2.595,
+        "low": 2.5,
+        "dailyChange": 0.04,
+        "dailyChangePct": 1.61
+      },
       "historicalMarketMetrics": null,
       "claim": {
         "claimId": "claim:be5b163bc8d5761aa920d78f",
@@ -7483,7 +7829,7 @@
       "fundamentals": {
         "format": "investor-control-sec-fundamentals",
         "version": 1,
-        "generatedAt": "2026-07-27T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
         "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
         "coverage": {
           "available": 6,
@@ -7604,7 +7950,26 @@
           }
         }
       },
-      "market": null,
+      "market": {
+        "format": "investor-control-market-snapshot",
+        "version": 1,
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+        "symbol": "SPCE",
+        "currency": "USD",
+        "quoteAt": "2026-07-27T20:00:00.000Z",
+        "ageHours": 16.1,
+        "stale": false,
+        "usable": true,
+        "currentPrice": 2.53,
+        "previousClose": 2.49,
+        "open": 2.53,
+        "high": 2.595,
+        "low": 2.5,
+        "dailyChange": 0.04,
+        "dailyChangePct": 1.61
+      },
       "historicalMarketMetrics": null,
       "claim": {
         "claimId": "claim:be5b163bc8d5761aa920d78f",
@@ -7740,7 +8105,7 @@
       "fundamentals": {
         "format": "investor-control-sec-fundamentals",
         "version": 1,
-        "generatedAt": "2026-07-27T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
         "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
         "coverage": {
           "available": 6,
@@ -7861,7 +8226,26 @@
           }
         }
       },
-      "market": null,
+      "market": {
+        "format": "investor-control-market-snapshot",
+        "version": 1,
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+        "symbol": "SPCE",
+        "currency": "USD",
+        "quoteAt": "2026-07-27T20:00:00.000Z",
+        "ageHours": 16.1,
+        "stale": false,
+        "usable": true,
+        "currentPrice": 2.53,
+        "previousClose": 2.49,
+        "open": 2.53,
+        "high": 2.595,
+        "low": 2.5,
+        "dailyChange": 0.04,
+        "dailyChangePct": 1.61
+      },
       "historicalMarketMetrics": null,
       "claim": {
         "claimId": "claim:be5b163bc8d5761aa920d78f",
@@ -7997,7 +8381,7 @@
       "fundamentals": {
         "format": "investor-control-sec-fundamentals",
         "version": 1,
-        "generatedAt": "2026-07-27T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
         "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
         "coverage": {
           "available": 6,
@@ -8118,7 +8502,26 @@
           }
         }
       },
-      "market": null,
+      "market": {
+        "format": "investor-control-market-snapshot",
+        "version": 1,
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+        "symbol": "SPCE",
+        "currency": "USD",
+        "quoteAt": "2026-07-27T20:00:00.000Z",
+        "ageHours": 16.1,
+        "stale": false,
+        "usable": true,
+        "currentPrice": 2.53,
+        "previousClose": 2.49,
+        "open": 2.53,
+        "high": 2.595,
+        "low": 2.5,
+        "dailyChange": 0.04,
+        "dailyChangePct": 1.61
+      },
       "historicalMarketMetrics": null,
       "claim": {
         "claimId": "claim:be5b163bc8d5761aa920d78f",
@@ -8254,7 +8657,7 @@
       "fundamentals": {
         "format": "investor-control-sec-fundamentals",
         "version": 1,
-        "generatedAt": "2026-07-27T19:26:09.230Z",
+        "generatedAt": "2026-07-28T12:06:02.764Z",
         "sourceUrl": "https://data.sec.gov/api/xbrl/companyfacts/CIK0001706946.json",
         "coverage": {
           "available": 6,
@@ -8375,7 +8778,26 @@
           }
         }
       },
-      "market": null,
+      "market": {
+        "format": "investor-control-market-snapshot",
+        "version": 1,
+        "generatedAt": "2026-07-28T12:06:02.764Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+        "symbol": "SPCE",
+        "currency": "USD",
+        "quoteAt": "2026-07-27T20:00:00.000Z",
+        "ageHours": 16.1,
+        "stale": false,
+        "usable": true,
+        "currentPrice": 2.53,
+        "previousClose": 2.49,
+        "open": 2.53,
+        "high": 2.595,
+        "low": 2.5,
+        "dailyChange": 0.04,
+        "dailyChangePct": 1.61
+      },
       "historicalMarketMetrics": null,
       "claim": {
         "claimId": "claim:be5b163bc8d5761aa920d78f",
