@@ -1,12 +1,12 @@
 {
   "name": "investor-control-market-intelligence",
-  "version": "0.6.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test",
-    "run:daily": "node src/run-daily-intelligence.js out/daily-intelligence.json",
-    "run:autonomous": "node src/run-autonomous-intelligence.js out/autonomous-intelligence.json",
+    "test": "node scripts/apply-v100-production.js && node --test",
+    "run:daily": "node scripts/apply-v100-production.js && node src/run-daily-intelligence.js out/daily-intelligence.json",
+    "run:autonomous": "node scripts/apply-v100-production.js && node src/run-autonomous-intelligence.js out/autonomous-intelligence.json",
     "build:mobile": "node src/build-mobile-feed.js out/daily-intelligence.json out/mobile-intelligence-feed.json",
     "build:autonomous-mobile": "node src/build-mobile-feed.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json",
     "publish:reviewed": "node src/publish-reviewed-research.js out/daily-intelligence.json config/review-decisions.json out/reviewed-publication.json"
