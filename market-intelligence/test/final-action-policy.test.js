@@ -32,6 +32,7 @@ function dossier(overrides = {}) {
         liquidity: { score: 80 },
         relativeStrength: { excessReturnPct: 12 },
         risk: { flags: [] },
+        dataQuality: { sourceReady: true, crossCheckReady: true, benchmarkReady: true },
         readiness: { marketMetricsReady: true },
       },
       crossCheck: { recommendationReady: true, contradictionCount: 0 },
@@ -81,6 +82,22 @@ test('stale or incomplete dossier is blocked and cannot escape as a directional 
   assert.equal(result.marketAction, 'WATCH');
   assert.ok(result.blockers.includes('DOSSIER_NOT_PUBLISHABLE'));
   assert.ok(result.blockers.includes('REFERENCE_PRICE_REQUIRED'));
+});
+
+test('unverified historical source blocks a directional action', () => {
+  const input = dossier({
+    metrics: {
+      ...dossier().metrics,
+      market: {
+        ...dossier().metrics.market,
+        dataQuality: { sourceReady: true, crossCheckReady: false, benchmarkReady: true },
+      },
+    },
+  });
+  const result = evaluateFinalAction(input, { now: NOW });
+  assert.equal(result.status, 'BLOCKED');
+  assert.equal(result.marketAction, 'WATCH');
+  assert.ok(result.blockers.includes('MARKET_HISTORY_NOT_CROSSCHECKED'));
 });
 
 test('only a final non-WATCH action is automatically published', () => {
