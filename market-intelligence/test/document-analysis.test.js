@@ -136,7 +136,7 @@ test('daily runner reviews documents but blocks advice until all independent gat
     collectTrustedNews: false,
   });
 
-  assert.equal(report.version, 4);
+  assert.equal(report.version, 5);
   assert.equal(report.documentReviewedCount, 1);
   assert.equal(report.researchDossierCount, 1);
   assert.equal(report.researchDossiers[0].status, 'DRAFT_RESEARCH');
