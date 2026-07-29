@@ -104,7 +104,7 @@ test('daily runner emits guarded signals, draft dossiers and an empty production
     collectTrustedNews: false,
   });
 
-  assert.equal(report.version, 4);
+  assert.equal(report.version, 5);
   assert.equal(report.evidenceCount, 2);
   assert.equal(report.signalCount, 2);
   assert.equal(report.researchDossierCount, 2);
