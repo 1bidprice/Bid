@@ -87,7 +87,7 @@ jobs:
             if (dossier.publicationMode === 'AUTOMATED_POLICY' && (dossier.status !== 'PUBLISHED' || finalAction.status !== 'FINAL' || finalAction.marketAction === 'WATCH')) throw new Error('invalid automated publication');
           }
           for (const item of feed.research) if (item.action !== 'WATCH') throw new Error('draft research leaked directional action');
-          console.log(`PASS health=${report.operationalHealth.status}, market=${report.marketSnapshotCount}, history=${report.historicalMarketMetricsCount}, final=${feed.summary.finalActionCount}, blocked=${feed.summary.blockedDecisionCount}`);
+          console.log(`PASS health=${feed.operationalHealth?.status}, market=${report.marketSnapshotCount}, history=${report.historicalMarketMetricsCount}, readyHistory=${feed.sourceHealth?.readyHistoricalMarketMetricsCount}, final=${feed.summary.finalActionCount}, blocked=${feed.summary.blockedDecisionCount}`);
           NODE
 
       - name: Publish verified live channel and audit history
@@ -108,6 +108,7 @@ jobs:
           const now = new Date().toISOString();
           const sourceCommit = execFileSync('git', ['-C', 'source', 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
           const readyHistory = (report.historicalMarketMetrics || []).filter((item) => item?.readiness?.marketMetricsReady === true).length;
+          const operationalStatus = readyHistory > 0 && Number(report.marketSnapshotCount || 0) > 0 ? 'OPERATIONAL' : 'DEGRADED';
           const status = {
             format: 'investor-control-live-feed-status',
             version: 4,
@@ -120,7 +121,7 @@ jobs:
             feedSha256,
             operationalHealth: {
               ...(report.operationalHealth || {}),
-              status: report.operationalHealth?.status || 'DEGRADED',
+              status: operationalStatus,
               readyHistoricalMarketMetricsCount: readyHistory,
               lastSuccessfulPublicationAt: now,
             },
