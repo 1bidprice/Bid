@@ -1,4 +1,4 @@
-name: Run Market Intelligence Autonomous Discovery
+name: Deploy Investor Control v1 Production Intelligence
 
 on:
   push:
@@ -13,23 +13,23 @@ permissions:
   contents: write
 
 concurrency:
-  group: investor-control-continuous-intelligence
+  group: investor-control-v1-production-deployment
   cancel-in-progress: true
 
 jobs:
   autonomous-intelligence:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 55
 
     steps:
-      - name: Checkout intelligence branch
+      - name: Checkout production intelligence source
         uses: actions/checkout@v4
         with:
           ref: investor-control-v1-market-intelligence-foundation
           path: source
           fetch-depth: 1
 
-      - name: Checkout stable live-feed channel
+      - name: Checkout live feed channel
         uses: actions/checkout@v4
         with:
           ref: investor-control-live-feed
@@ -41,17 +41,17 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install PDF extraction runtime
+      - name: Install controlled PDF extraction runtime
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y poppler-utils
           pdftotext -v
 
-      - name: Run deterministic intelligence and discovery tests
+      - name: Run deterministic production tests
         working-directory: source/market-intelligence
         run: npm test
 
-      - name: Build autonomous discovery, evidence and decision report
+      - name: Build professional evidence, market data and decisions
         working-directory: source/market-intelligence
         env:
           SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
@@ -60,33 +60,36 @@ jobs:
           npm run run:autonomous
           npm run build:autonomous-mobile
 
-      - name: Verify autonomous discovery contracts
+      - name: Verify production contracts and execution boundary
         working-directory: source/market-intelligence
         run: |
           node - <<'NODE'
           const report = require('./out/autonomous-intelligence.json');
           const feed = require('./out/mobile-intelligence-feed.json');
           const allowed = new Set(['BUY_NOW', 'SELL_NOW', 'HOLD', 'DO_NOT_BUY', 'AVOID', 'WATCH']);
-          if (report.format !== 'investor-control-daily-intelligence' || report.version !== 6) throw new Error('wrong autonomous report contract');
-          if (!report.policyVersion || !report.finalActionCounts || !report.discovery) throw new Error('autonomous metadata missing');
-          if (report.discovery.sourcePolicy?.runtimeAiSourceSelection !== false) throw new Error('AI source selection boundary broken');
+          if (report.format !== 'investor-control-daily-intelligence' || report.version !== 7) throw new Error('wrong autonomous report contract');
+          if (!report.policyVersion || !report.finalActionCounts || !report.discovery || !report.operationalHealth) throw new Error('production metadata missing');
+          if (report.discovery.sourcePolicy?.runtimeAiSourceSelection !== false) throw new Error('runtime AI source selection boundary broken');
           if (feed.format !== 'investor-control-mobile-intelligence-feed' || feed.version !== 2) throw new Error('wrong mobile feed contract');
+          if (!feed.operationalHealth || !feed.sourceHealth) throw new Error('feed health metadata missing');
           if (!Array.isArray(feed.decisions) || !Array.isArray(feed.discoveryRadar)) throw new Error('decision or discovery list missing');
+          const generatedAt = new Date(report.generatedAt).getTime();
+          if (!Number.isFinite(generatedAt) || Math.abs(Date.now() - generatedAt) > 60 * 60 * 1000) throw new Error('production output is not fresh');
           for (const candidate of feed.discoveryRadar) {
-            if (candidate.suggestedAction !== 'WATCH') throw new Error('discovery candidate leaked a buy/sell direction');
+            if (candidate.suggestedAction !== 'WATCH') throw new Error('discovery candidate leaked a directional action');
           }
           for (const dossier of report.researchDossiers) {
             const finalAction = dossier.finalAction;
             if (!finalAction || !allowed.has(finalAction.marketAction)) throw new Error('invalid final action');
-            if (finalAction.status === 'BLOCKED' && finalAction.marketAction !== 'WATCH') throw new Error('blocked dossier leaked direction');
-            if (finalAction.execution?.automaticBrokerOrder !== false) throw new Error('broker execution boundary broken');
-            if (dossier.publicationMode === 'AUTOMATED_POLICY' && (dossier.status !== 'PUBLISHED' || finalAction.status !== 'FINAL' || finalAction.marketAction === 'WATCH')) throw new Error('invalid automatic publication');
+            if (finalAction.execution?.automaticBrokerOrder !== false || finalAction.execution?.requiresUserExecution !== true) throw new Error('broker execution boundary broken');
+            if (finalAction.status === 'BLOCKED' && finalAction.marketAction !== 'WATCH') throw new Error('blocked dossier leaked a direction');
+            if (dossier.publicationMode === 'AUTOMATED_POLICY' && (dossier.status !== 'PUBLISHED' || finalAction.status !== 'FINAL' || finalAction.marketAction === 'WATCH')) throw new Error('invalid automated publication');
           }
           for (const item of feed.research) if (item.action !== 'WATCH') throw new Error('draft research leaked directional action');
-          console.log(`PASS discovery=${feed.summary.discoveryCandidateCount}, deep=${feed.summary.discoveryDeepAnalysisCount}, final=${feed.summary.finalActionCount}`);
+          console.log(`PASS health=${feed.operationalHealth.status}, market=${report.marketSnapshotCount}, history=${report.historicalMarketMetricsCount}, readyHistory=${feed.sourceHealth.readyHistoricalMarketMetricsCount}, final=${feed.summary.finalActionCount}, blocked=${feed.summary.blockedDecisionCount}`);
           NODE
 
-      - name: Publish verified autonomous feed
+      - name: Publish verified production feed and audit history
         shell: bash
         run: |
           set -euo pipefail
@@ -95,20 +98,32 @@ jobs:
           node - <<'NODE'
           const fs = require('fs');
           const crypto = require('crypto');
+          const { execFileSync } = require('child_process');
           const feedPath = './live-feed/mobile-intelligence-feed.json';
+          const reportPath = './live-feed/autonomous-intelligence.json';
           const feed = JSON.parse(fs.readFileSync(feedPath, 'utf8'));
-          const report = JSON.parse(fs.readFileSync('./live-feed/autonomous-intelligence.json', 'utf8'));
+          const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+          const feedSha256 = crypto.createHash('sha256').update(fs.readFileSync(feedPath)).digest('hex');
           const now = new Date().toISOString();
+          const sourceCommit = execFileSync('git', ['-C', 'source', 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          const readyHistory = (report.historicalMarketMetrics || []).filter((item) => item?.readiness?.marketMetricsReady === true).length;
+          const operationalStatus = readyHistory > 0 && Number(report.marketSnapshotCount || 0) > 0 ? 'OPERATIONAL' : 'DEGRADED';
           const status = {
             format: 'investor-control-live-feed-status',
-            version: 3,
+            version: 4,
             generatedAt: feed.generatedAt,
             publishedAt: now,
             policyVersion: feed.policyVersion,
             sourcePolicyVersion: feed.sourceSelection?.version || null,
             sourceWorkflowRunId: process.env.GITHUB_RUN_ID,
-            sourceCommit: process.env.GITHUB_SHA,
-            feedSha256: crypto.createHash('sha256').update(fs.readFileSync(feedPath)).digest('hex'),
+            sourceCommit,
+            feedSha256,
+            operationalHealth: {
+              ...(report.operationalHealth || {}),
+              status: operationalStatus,
+              readyHistoricalMarketMetricsCount: readyHistory,
+              lastSuccessfulPublicationAt: now,
+            },
             counts: feed.summary,
             sourceHealth: {
               evidenceCount: report.evidenceCount,
@@ -117,16 +132,21 @@ jobs:
               fundamentalSnapshotCount: report.fundamentalSnapshotCount,
               marketSnapshotCount: report.marketSnapshotCount,
               historicalMarketMetricsCount: report.historicalMarketMetricsCount,
+              readyHistoricalMarketMetricsCount: readyHistory,
               registryCompanyCount: report.discovery?.registryCompanyCount || 0,
               filingEventCount: report.discovery?.filingEventCount || 0,
               discoveryCandidateCount: report.discovery?.candidateCount || 0,
               discoveryDeepAnalysisCount: report.discovery?.deepAnalysisCompanyCount || 0,
-              diagnosticCount: report.diagnostics.length + (report.discovery?.diagnostics?.length || 0),
+              diagnosticCount: (report.diagnostics?.length || 0) + (report.discovery?.diagnostics?.length || 0),
             },
           };
           fs.writeFileSync('./live-feed/status.json', `${JSON.stringify(status, null, 2)}\n`);
+
           let history = [];
-          try { history = JSON.parse(fs.readFileSync('./live-feed/decision-history.json', 'utf8')).items || []; } catch {}
+          try {
+            const parsed = JSON.parse(fs.readFileSync('./live-feed/decision-history.json', 'utf8'));
+            history = Array.isArray(parsed.items) ? parsed.items : [];
+          } catch {}
           const current = (feed.decisions || []).map((item) => ({
             recordedAt: now,
             feedGeneratedAt: feed.generatedAt,
@@ -156,19 +176,20 @@ jobs:
           git config user.email 'actions@users.noreply.github.com'
           git add mobile-intelligence-feed.json autonomous-intelligence.json status.json decision-history.json discovery-radar.json
           if git diff --cached --quiet; then
-            echo 'Live feed already current'
+            echo 'Live production feed already current'
           else
-            git commit -m "chore(feed): publish autonomous discovery ${GITHUB_RUN_ID} [skip ci]"
+            git commit -m "chore(feed): deploy v1 production intelligence ${GITHUB_RUN_ID} [skip ci]"
             git pull --rebase origin investor-control-live-feed
             git push origin HEAD:investor-control-live-feed
           fi
 
-      - name: Upload autonomous intelligence artifacts
+      - name: Upload production evidence package
         uses: actions/upload-artifact@v4
         with:
-          name: investor-control-autonomous-discovery-${{ github.run_id }}
+          name: investor-control-v1-production-intelligence-${{ github.run_id }}
           path: |
             source/market-intelligence/out/autonomous-intelligence.json
             source/market-intelligence/out/mobile-intelligence-feed.json
+            live-feed/status.json
           if-no-files-found: error
           retention-days: 90
