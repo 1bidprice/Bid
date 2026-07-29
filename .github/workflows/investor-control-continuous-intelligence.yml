@@ -1,9 +1,14 @@
 name: Investor Control Continuous Intelligence and Discovery
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/investor-control-continuous-intelligence.yml
   workflow_dispatch:
   schedule:
-    - cron: '17 * * 1-5'
+    - cron: '17,47 * * 1-5'
     - cron: '37 */3 * * 0,6'
 
 permissions:
@@ -11,12 +16,12 @@ permissions:
 
 concurrency:
   group: investor-control-continuous-intelligence
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   autonomous-intelligence:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 50
 
     steps:
       - name: Checkout production intelligence source
