@@ -105,6 +105,10 @@ function patchPortfolio() {
   );
 
   write('PortfolioApp.js', source);
+
+  source = read('DecisionOverlay.js');
+  source = source.replace("const VERSION = '0.9.0';", "const VERSION = '0.9.1';");
+  write('DecisionOverlay.js', source);
 }
 
 function patchFeedFreshness() {
