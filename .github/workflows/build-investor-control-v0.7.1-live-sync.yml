@@ -1,4 +1,4 @@
-name: Signed Investor Control v0.9.0 Discovery Radar APK
+name: Signed Investor Control v0.9.1 Reliability APK
 
 on:
   push:
@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: investor-control-v090-discovery-${{ github.ref }}
+  group: investor-control-v091-reliability-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -28,7 +28,7 @@ jobs:
     timeout-minutes: 55
 
     steps:
-      - name: Checkout v0.9.0 source
+      - name: Checkout v0.9.1 source
         uses: actions/checkout@v4
         with:
           ref: investor-control-v1-market-intelligence-foundation
@@ -60,57 +60,58 @@ jobs:
           node scripts/apply-v081b-fix-source-newline.js
           node scripts/apply-v090-discovery-clarity.js
           node scripts/apply-v090b-background-intelligence.js
+          node scripts/apply-v091-reliability.js
 
       - name: Verify purchase-lot calculations
         working-directory: mobile
         run: npm run test:lots
 
-      - name: Verify v0.9.0 source invariants
+      - name: Verify v0.9.1 source invariants
         working-directory: mobile
         shell: bash
         run: |
           set -euo pipefail
-          grep -q "const VERSION = '0.9.0';" PortfolioApp.js
-          grep -q "const VERSION = '0.9.0';" DecisionOverlay.js
+          grep -q "const VERSION = '0.9.1';" PortfolioApp.js
+          grep -q "const VERSION = '0.9.1';" DecisionOverlay.js
           grep -q "require('./src/position-lots')" PortfolioApp.js
-          grep -q "Από αγορά ·" PortfolioApp.js
-          grep -q "lot.purchaseNumber + 'η αγορά · '" PortfolioApp.js
-          grep -q "Επιμέρους αγορές" PortfolioApp.js
-          grep -q "performanceStack: { width: '100%'" PortfolioApp.js
-          grep -q "Διαφάνεια τιμής" PortfolioApp.js
-          grep -q "Μέση τιμή all-in" PortfolioApp.js
-          grep -q "ΝΕΑ ΑΓΟΡΑ: ΟΧΙ" DecisionOverlay.js
-          grep -q "Υπάρχουσα θέση" DecisionOverlay.js
+          grep -q "Ημέρα · μη επιβεβαιωμένη" PortfolioApp.js
+          grep -q "Χρόνος δεδομένου" PortfolioApp.js
+          grep -q "Τελευταίος έλεγχος" PortfolioApp.js
+          grep -q "dayChangeVerified" src/market-data.js
+          grep -q "priceTimestampVerified" src/market-data.js
+          grep -q "ageHours <= 4" src/intelligence-feed-store.js
+          grep -q "ageHours <= 12" src/intelligence-feed-store.js
+          grep -q "ηλικία.*ωρών" src/OpportunitiesView.js
           grep -q "Ραντάρ νέων μετοχών" src/OpportunitiesView.js
           grep -q "Ποιος επιλέγει τις πηγές" src/OpportunitiesView.js
           grep -q "SUPPORTED_FEED_VERSIONS" src/intelligence-feed-store.js
           grep -q "discoveryRadar" src/intelligence-feed-store.js
           grep -q "syncBackgroundIntelligenceTask(true)" App.js
           grep -q "BACKGROUND_INTELLIGENCE_TASK" src/background-intelligence-task.js
-          grep -q "decisionVisible" App.js
-          grep -q "onOpenDecisionGate" PortfolioApp.js
-          grep -q "DEFAULT_INTELLIGENCE_FEED_URL" src/intelligence-feed-store.js
-          grep -q "ΤΕΛΙΚΟ ΣΥΜΠΕΡΑΣΜΑ ΓΙΑ ΕΣΕΝΑ" src/FinalDecisionCard.js
+          grep -q "ΝΕΑ ΑΓΟΡΑ: ΟΧΙ" DecisionOverlay.js
+          grep -q "Υπάρχουσα θέση" DecisionOverlay.js
           node - <<'NODE'
           const fs = require('fs');
           const app = require('./app.json');
           const pkg = require('./package.json');
           const portfolio = fs.readFileSync('./PortfolioApp.js', 'utf8');
           const store = fs.readFileSync('./src/intelligence-feed-store.js', 'utf8');
-          if (app.expo.version !== '0.9.0') throw new Error('wrong Expo version');
+          const market = fs.readFileSync('./src/market-data.js', 'utf8');
+          if (app.expo.version !== '0.9.1') throw new Error('wrong Expo version');
           if (app.expo.android.package !== 'gr.investorcontrol.app') throw new Error('wrong package');
-          if (app.expo.android.versionCode !== 18) throw new Error('wrong versionCode');
-          if (pkg.version !== '0.9.0') throw new Error('wrong package version');
-          if (!pkg.scripts.postinstall.includes('apply-v090-discovery-clarity.js')) throw new Error('v0.9.0 clarity patch missing from postinstall');
-          if (!pkg.scripts.postinstall.includes('apply-v090b-background-intelligence.js')) throw new Error('background intelligence patch missing from postinstall');
+          if (app.expo.android.versionCode !== 19) throw new Error('wrong versionCode');
+          if (pkg.version !== '0.9.1') throw new Error('wrong package version');
+          if (!pkg.scripts.postinstall.includes('apply-v091-reliability.js')) throw new Error('v0.9.1 patch missing from postinstall');
           if (!portfolio.includes("quotePrice(item.average, item.currency, 4)")) throw new Error('four-decimal average all-in missing');
+          if (!portfolio.includes('marketSessionAt(item.symbol)')) throw new Error('current exchange session missing');
           if (!store.includes('new Set([1, 2])')) throw new Error('feed backward compatibility missing');
-          console.log('PASS v0.9.0 clarity, source policy, autonomous discovery and background sync invariants');
+          if (!market.includes("symbol.endsWith('.GR')")) throw new Error('Greek fallback gate missing');
+          console.log('PASS v0.9.1 quote reliability, daily-change verification and feed freshness invariants');
           NODE
 
       - name: Verify Android JavaScript bundle
         working-directory: mobile
-        run: npx expo export --platform android --output-dir dist-v0.9.0
+        run: npx expo export --platform android --output-dir dist-v0.9.1
 
       - name: Expo Doctor diagnostic
         continue-on-error: true
@@ -127,14 +128,14 @@ jobs:
         run: |
           set -o pipefail
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee ../gradle-v0.9.0.log
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee ../gradle-v0.9.1.log
 
       - name: Upload Gradle failure diagnostic
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: investor-control-v0.9.0-gradle-diagnostic
-          path: mobile/gradle-v0.9.0.log
+          name: investor-control-v0.9.1-gradle-diagnostic
+          path: mobile/gradle-v0.9.1.log
           if-no-files-found: warn
           retention-days: 30
 
@@ -144,8 +145,8 @@ jobs:
           set -euo pipefail
           UNSIGNED='mobile/android/app/build/outputs/apk/release/app-release.apk'
           KEYSTORE='mobile/android/app/debug.keystore'
-          OUTPUT='mobile/Investor-Control-v0.9.0.apk'
-          ALIGNED='mobile/Investor-Control-v0.9.0-aligned.apk'
+          OUTPUT='mobile/Investor-Control-v0.9.1.apk'
+          ALIGNED='mobile/Investor-Control-v0.9.1-aligned.apk'
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           ZIPALIGN="$BUILD_TOOLS/zipalign"
           APKSIGNER="$BUILD_TOOLS/apksigner"
@@ -161,18 +162,18 @@ jobs:
             --key-pass pass:android \
             --out "$OUTPUT" \
             "$ALIGNED"
-          "$APKSIGNER" verify --verbose --print-certs "$OUTPUT" | tee mobile/Investor-Control-v0.9.0-signature.txt
-          grep -qi 'fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c' mobile/Investor-Control-v0.9.0-signature.txt
+          "$APKSIGNER" verify --verbose --print-certs "$OUTPUT" | tee mobile/Investor-Control-v0.9.1-signature.txt
+          grep -qi 'fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c' mobile/Investor-Control-v0.9.1-signature.txt
           unzip -l "$OUTPUT" | grep -q 'assets/index.android.bundle'
-          sha256sum "$OUTPUT" | tee mobile/Investor-Control-v0.9.0.sha256
+          sha256sum "$OUTPUT" | tee mobile/Investor-Control-v0.9.1.sha256
 
-      - name: Upload signed v0.9.0 APK
+      - name: Upload signed v0.9.1 APK
         uses: actions/upload-artifact@v4
         with:
-          name: investor-control-v0.9.0-discovery-radar-signed-apk
+          name: investor-control-v0.9.1-reliability-signed-apk
           path: |
-            mobile/Investor-Control-v0.9.0.apk
-            mobile/Investor-Control-v0.9.0.sha256
-            mobile/Investor-Control-v0.9.0-signature.txt
+            mobile/Investor-Control-v0.9.1.apk
+            mobile/Investor-Control-v0.9.1.sha256
+            mobile/Investor-Control-v0.9.1-signature.txt
           if-no-files-found: error
           retention-days: 90
