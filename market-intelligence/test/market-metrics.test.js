@@ -29,12 +29,21 @@ test('historical metrics calculate volatility, liquidity, trend and relative str
     benchmarkSymbol: 'SPY',
     currency: 'USD',
     generatedAt: '2026-07-27T12:00:00.000Z',
+    sourceReady: true,
+    crossCheckReady: true,
+    benchmarkReady: true,
+    historySource: 'Deterministic test history',
+    historySourceQuality: 'TEST_VERIFIED',
+    benchmarkSource: 'Deterministic benchmark',
   });
 
   assert.equal(metrics.observationCount, 220);
   assert.equal(metrics.readiness.priceHistoryReady, true);
   assert.equal(metrics.readiness.liquidityReady, true);
   assert.equal(metrics.readiness.relativeStrengthReady, true);
+  assert.equal(metrics.readiness.sourceReady, true);
+  assert.equal(metrics.readiness.crossCheckReady, true);
+  assert.equal(metrics.readiness.benchmarkReady, true);
   assert.equal(metrics.readiness.marketMetricsReady, true);
   assert.ok(metrics.returnsPct.d60 > 0);
   assert.ok(metrics.relativeStrength.excessReturnPct > 0);
@@ -43,10 +52,27 @@ test('historical metrics calculate volatility, liquidity, trend and relative str
   assert.ok(metrics.risk.annualizedVolatility60Pct >= 0);
 });
 
+test('source or cross-check failure blocks otherwise complete market metrics', () => {
+  const company = series({ dailyGrowth: 0.002, volume: 2_000_000, symbol: 'SPCE' });
+  const benchmark = series({ dailyGrowth: 0.0006, volume: 50_000_000, symbol: 'SPY' });
+  const metrics = calculateMarketMetrics(company, benchmark, {
+    sourceReady: true,
+    crossCheckReady: false,
+    benchmarkReady: true,
+  });
+  assert.equal(metrics.readiness.priceHistoryReady, true);
+  assert.equal(metrics.readiness.liquidityReady, true);
+  assert.equal(metrics.readiness.relativeStrengthReady, true);
+  assert.equal(metrics.readiness.marketMetricsReady, false);
+});
+
 test('short history cannot pass autonomous market readiness', () => {
   const metrics = calculateMarketMetrics(series({ count: 40 }), null, {
     symbol: 'TEST',
     benchmarkSymbol: 'SPY',
+    sourceReady: true,
+    crossCheckReady: true,
+    benchmarkReady: false,
   });
   assert.equal(metrics.readiness.priceHistoryReady, false);
   assert.equal(metrics.readiness.relativeStrengthReady, false);
