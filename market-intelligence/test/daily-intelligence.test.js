@@ -65,13 +65,19 @@ test('SEC adapter normalizes recent filings without unsupported fields', async (
   assert.match(result.records[0].notes, /3\.02/);
 });
 
-test('event classification recognises dilution and buyback events', () => {
+test('event classification recognises dilution, buyback and ownership events', () => {
   const dilution = classifyEvidenceEvent({ title: '8-K — Unregistered Sales of Equity Securities' });
   const buyback = classifyEvidenceEvent({ title: 'Company purchased its own shares under share buyback programme' });
+  const ownership = classifyEvidenceEvent({
+    title: 'Notification of important changes concerning voting rights pursuant to L. 3556/2007',
+    rawText: 'Website navigation includes legal proceedings, litigation and settlement links unrelated to this announcement.',
+  });
   assert.equal(dilution.category, 'EVENT_RISK');
   assert.equal(dilution.eventType, 'EQUITY_ISSUANCE_OR_DILUTION');
   assert.equal(buyback.category, 'EVENT_DRIVEN');
   assert.equal(buyback.eventType, 'SHARE_BUYBACK');
+  assert.equal(ownership.category, 'EVENT_DRIVEN');
+  assert.equal(ownership.eventType, 'OWNERSHIP_OR_VOTING_RIGHTS');
 });
 
 test('daily runner emits guarded signals, draft dossiers and an empty production feed', async () => {
