@@ -21,6 +21,12 @@ function replaceRequired(content, from, to, label) {
 let classifier = read('src/event-classifier.js');
 classifier = replaceRequired(
   classifier,
+  "    terms: ['share buyback', 'own shares', 'repurchase programme', 'repurchase program'],",
+  "    terms: ['share buyback', 'share repurchase', 'repurchase of shares', 'repurchased its own shares', 'own shares', 'repurchase programme', 'repurchase program'],",
+  'complete share repurchase headline terms',
+);
+classifier = replaceRequired(
+  classifier,
   "  {\n    id: 'LEGAL_OR_SETTLEMENT',",
   "  {\n    id: 'SECURITIES_OFFERING_REGISTRATION',\n    terms: ['424b7 filing', '424b5 filing', '424b3 filing', 's-3asr filing', 's-3 filing', 'prospectus supplement'],\n    category: 'EVENT_RISK',\n    fundamentalsScore: 30,\n    catalystScore: 38,\n    riskScore: 72,\n    rationale: 'Securities-offering document that may enable issuance or resale and requires transaction-specific dilution and financing review.',\n  },\n  {\n    id: 'OWNERSHIP_OR_VOTING_RIGHTS',\n    terms: ['voting rights', 'major shareholder', 'major shareholding', 'shareholding notification', 'ownership threshold'],\n    category: 'EVENT_DRIVEN',\n    fundamentalsScore: 34,\n    catalystScore: 45,\n    riskScore: 42,\n    rationale: 'Ownership or voting-rights disclosure requiring holder identity, threshold and control-impact checks.',\n  },\n  {\n    id: 'LEGAL_OR_SETTLEMENT',",
   'offering and ownership event rules',
