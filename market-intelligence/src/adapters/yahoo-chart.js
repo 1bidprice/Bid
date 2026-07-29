@@ -86,6 +86,10 @@ export function normalizeYahooChart(payload, options = {}) {
     exchangeName: result.meta?.exchangeName || null,
     exchangeTimezoneName: result.meta?.exchangeTimezoneName || null,
     instrumentType: result.meta?.instrumentType || null,
+    regularMarketPrice: finite(result.meta?.regularMarketPrice),
+    previousClose: finite(result.meta?.previousClose ?? result.meta?.chartPreviousClose),
+    regularMarketTime: normalizeTimestamp(result.meta?.regularMarketTime),
+    currentTradingPeriod: result.meta?.currentTradingPeriod || null,
     candles,
     usable: candles.length > 0,
     status: candles.length ? 'ok' : 'no_data',
@@ -95,7 +99,7 @@ export function normalizeYahooChart(payload, options = {}) {
 async function fetchOne(host, providerSymbol, options) {
   const range = options.range || '2y';
   const interval = options.interval || '1d';
-  const url = `https://${host}/v8/finance/chart/${encodeURIComponent(providerSymbol)}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}&events=div%2Csplits&includePrePost=false`;
+  const url = `https://${host}/v8/finance/chart/${encodeURIComponent(providerSymbol)}?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}&events=div%2Csplits&includePrePost=${options.includePrePost === true ? 'true' : 'false'}`;
   const response = await options.fetchImpl(url, {
     headers: {
       Accept: 'application/json',
