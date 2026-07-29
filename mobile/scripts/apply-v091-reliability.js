@@ -17,6 +17,12 @@ function replaceRequired(content, from, to, label) {
   return content.replace(from, to);
 }
 
+function insertAfterRequired(content, marker, addition, sentinel, label) {
+  if (content.includes(sentinel)) return content;
+  if (!content.includes(marker)) throw new Error(`v0.9.1 patch failed: missing ${label}`);
+  return content.replace(marker, `${marker}${addition}`);
+}
+
 function patchMarketData() {
   let source = read('src/market-data.js');
 
@@ -34,18 +40,20 @@ function patchMarketData() {
     'Allwyn timestamp semantics',
   );
 
-  source = replaceRequired(
+  source = insertAfterRequired(
     source,
-    "    quality: 'unofficial',\n    session: point.session,",
-    "    quality: 'unofficial',\n    session: point.session,\n    timestampMeaning: 'provider-market-time',\n    priceTimestampVerified: true,\n    dayChangeVerified: finite(previousClose),",
-    'Yahoo timestamp metadata',
+    '    session: point.session,',
+    "\n    timestampMeaning: 'provider-market-time',\n    priceTimestampVerified: true,\n    dayChangeVerified: finite(previousClose),",
+    "timestampMeaning: 'provider-market-time'",
+    'Yahoo session metadata',
   );
 
-  source = replaceRequired(
+  source = insertAfterRequired(
     source,
-    "    quality: 'realtime',\n    session: marketSessionAt(`${ticker}.US`, new Date(timestamp * 1000)),",
-    "    quality: 'realtime',\n    session: marketSessionAt(`${ticker}.US`, new Date(timestamp * 1000)),\n    timestampMeaning: 'provider-market-time',\n    priceTimestampVerified: true,\n    dayChangeVerified: finite(payload.pc),",
-    'Finnhub timestamp metadata',
+    '    session: marketSessionAt(`${ticker}.US`, new Date(timestamp * 1000)),',
+    "\n    timestampMeaning: 'provider-market-time',\n    priceTimestampVerified: true,\n    dayChangeVerified: finite(payload.pc),",
+    'dayChangeVerified: finite(payload.pc)',
+    'Finnhub session metadata',
   );
 
   source = replaceRequired(
