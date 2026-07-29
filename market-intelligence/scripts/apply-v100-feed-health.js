@@ -27,4 +27,34 @@ source = replaceRequired(
 );
 
 fs.writeFileSync(file, source);
-console.log('Investor Control v1.0.0 mobile feed operational health applied.');
+
+const schemaPath = path.join(root, 'schemas/mobile-intelligence-feed.schema.json');
+const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
+for (const key of ['operationalHealth', 'sourceHealth']) {
+  if (!schema.required.includes(key)) schema.required.splice(schema.required.indexOf('summary'), 0, key);
+}
+schema.properties.operationalHealth = {
+  type: 'object',
+  additionalProperties: true,
+  required: ['status', 'generatedAt', 'staleOutput'],
+  properties: {
+    status: { type: 'string', enum: ['OPERATIONAL', 'DEGRADED'] },
+    generatedAt: { type: 'string', format: 'date-time' },
+    staleOutput: { type: 'boolean' },
+  },
+};
+schema.properties.sourceHealth = {
+  type: 'object',
+  additionalProperties: false,
+  required: [
+    'evidenceCount', 'documentReviewedCount', 'independentDiscoveryCount', 'fundamentalSnapshotCount',
+    'marketSnapshotCount', 'historicalMarketMetricsCount', 'readyHistoricalMarketMetricsCount', 'diagnosticCount',
+  ],
+  properties: Object.fromEntries([
+    'evidenceCount', 'documentReviewedCount', 'independentDiscoveryCount', 'fundamentalSnapshotCount',
+    'marketSnapshotCount', 'historicalMarketMetricsCount', 'readyHistoricalMarketMetricsCount', 'diagnosticCount',
+  ].map((key) => [key, { type: 'integer', minimum: 0 }])),
+};
+fs.writeFileSync(schemaPath, `${JSON.stringify(schema, null, 2)}\n`);
+
+console.log('Investor Control v1.0.0 mobile feed operational health and schema applied.');
