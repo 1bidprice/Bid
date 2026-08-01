@@ -8,8 +8,8 @@ on:
       - .github/workflows/investor-control-continuous-intelligence.yml
   workflow_dispatch:
   schedule:
-    - cron: '7,27,47 * * 1-5'
-    - cron: '17 */2 * * 0,6'
+    - cron: '17 */3 * * 1-5'
+    - cron: '37 */6 * * 0,6'
 
 permissions:
   contents: write
@@ -43,13 +43,17 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install controlled PDF extraction runtime
+      - name: Ensure controlled PDF extraction runtime
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y poppler-utils
+          set -euo pipefail
+          if ! command -v pdftotext >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y poppler-utils
+          fi
           pdftotext -v
 
-      - name: Run deterministic production tests
+      - name: Run deterministic tests on explicit deployment
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         working-directory: source/market-intelligence
         run: npm test
 
@@ -111,7 +115,7 @@ jobs:
           const operationalStatus = readyHistory > 0 && Number(report.marketSnapshotCount || 0) > 0 ? 'OPERATIONAL' : 'DEGRADED';
           const status = {
             format: 'investor-control-live-feed-status',
-            version: 4,
+            version: 5,
             generatedAt: feed.generatedAt,
             publishedAt: now,
             policyVersion: feed.policyVersion,
@@ -124,6 +128,7 @@ jobs:
               status: operationalStatus,
               readyHistoricalMarketMetricsCount: readyHistory,
               lastSuccessfulPublicationAt: now,
+              staleOutput: false,
             },
             counts: feed.summary,
             sourceHealth: {
@@ -184,7 +189,40 @@ jobs:
             git push origin HEAD:investor-control-live-feed
           fi
 
+      - name: Publish failure heartbeat
+        if: failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d live-feed/.git || exit 0
+          node - <<'NODE'
+          const fs = require('fs');
+          let status = { format: 'investor-control-live-feed-status', version: 5 };
+          try { status = JSON.parse(fs.readFileSync('./live-feed/status.json', 'utf8')); } catch {}
+          const now = new Date().toISOString();
+          status.publishedAt = now;
+          status.lastFailureAt = now;
+          status.lastFailureWorkflowRunId = process.env.GITHUB_RUN_ID;
+          status.operationalHealth = {
+            ...(status.operationalHealth || {}),
+            status: 'FAILED',
+            staleOutput: true,
+            lastFailureAt: now,
+          };
+          fs.writeFileSync('./live-feed/status.json', `${JSON.stringify(status, null, 2)}\n`);
+          NODE
+          cd live-feed
+          git config user.name 'Investor Control Intelligence'
+          git config user.email 'actions@users.noreply.github.com'
+          git add status.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(feed): record production failure ${GITHUB_RUN_ID} [skip ci]"
+            git pull --rebase origin investor-control-live-feed
+            git push origin HEAD:investor-control-live-feed
+          fi
+
       - name: Upload production evidence package
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: investor-control-production-intelligence-${{ github.run_id }}
@@ -192,5 +230,5 @@ jobs:
             source/market-intelligence/out/autonomous-intelligence.json
             source/market-intelligence/out/mobile-intelligence-feed.json
             live-feed/status.json
-          if-no-files-found: error
-          retention-days: 90
+          if-no-files-found: warn
+          retention-days: 30
