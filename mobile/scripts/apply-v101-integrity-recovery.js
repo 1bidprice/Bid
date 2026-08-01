@@ -86,13 +86,13 @@ function patchMarketData() {
       return await fetchOfficialAthensQuote(symbol);
     } catch (officialError) {
       const providerSymbol = symbol.replace(/\\.GR$/, '');
-      const fallback = await fetchYahooQuote(\`${providerSymbol}.AT\`);
+      const fallback = await fetchYahooQuote(\`\${providerSymbol}.AT\`);
       return {
         ...fallback,
         nativeCurrency: 'EUR',
         dayChangeVerified: false,
         dayChangeReason: 'Η εφεδρική πηγή δεν επιβεβαιώνει με ασφάλεια το προηγούμενο κλείσιμο για το Χρηματιστήριο Αθηνών.',
-        source: \`${fallback.source} · Euronext error: ${officialError.message}\`,
+        source: \`\${fallback.source} · Euronext error: \${officialError.message}\`,
       };
     }
   }
