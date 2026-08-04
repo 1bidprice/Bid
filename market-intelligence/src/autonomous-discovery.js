@@ -1,8 +1,9 @@
 import { fetchSecCompanyUniverse } from './adapters/sec-company-universe.js';
 import { fetchSecCurrentFilings } from './adapters/sec-current-filings.js';
+import { fetchAthensDiscovery } from './adapters/euronext-athens-discovery.js';
 import { sourcePolicySummary } from './source-policy.js';
 
-export const DISCOVERY_POLICY_VERSION = '2026-07-28.2';
+export const DISCOVERY_POLICY_VERSION = '2026-08-04.1';
 
 const FORM_SCORES = Object.freeze({
   '8-K': 55,
@@ -23,16 +24,17 @@ const FORM_SCORES = Object.freeze({
   'DEFM14A': 70,
   'PREM14A': 62,
   'DEF 14A': 38,
+  ATHEX_ANNOUNCEMENT: 55,
 });
 
 const TITLE_BOOSTS = Object.freeze([
-  { pattern: /merger|acquisition|tender offer|strategic alternatives/i, score: 24, reason: 'Συγχώνευση, εξαγορά ή στρατηγική συναλλαγή' },
-  { pattern: /bankruptcy|chapter 11|going concern/i, score: 28, reason: 'Οξύς κίνδυνος χρηματοδότησης ή συνέχισης δραστηριότητας' },
-  { pattern: /guidance|earnings|results|revenue|profit/i, score: 17, reason: 'Νέα αποτελέσματα ή καθοδήγηση διοίκησης' },
-  { pattern: /offering|registration|prospectus|dilution/i, score: 20, reason: 'Πιθανή χρηματοδότηση ή αραίωση μετοχών' },
-  { pattern: /buyback|repurchase|dividend/i, score: 15, reason: 'Αλλαγή στην κατανομή κεφαλαίου' },
-  { pattern: /clinical|trial|fda|approval/i, score: 22, reason: 'Ρυθμιστικός ή κλινικός καταλύτης' },
-  { pattern: /contract|award|order|partnership/i, score: 15, reason: 'Νέα εμπορική συμφωνία ή ανάθεση' },
+  { pattern: /merger|acquisition|tender offer|strategic alternatives|συγχώνευ|εξαγορ/i, score: 24, reason: 'Συγχώνευση, εξαγορά ή στρατηγική συναλλαγή' },
+  { pattern: /bankruptcy|chapter 11|going concern|πτώχευση|συνέχιση δραστηριότητας/i, score: 28, reason: 'Οξύς κίνδυνος χρηματοδότησης ή συνέχισης δραστηριότητας' },
+  { pattern: /guidance|earnings|results|revenue|profit|financial results|αποτελέσματα|έσοδα|κέρδ/i, score: 17, reason: 'Νέα αποτελέσματα ή καθοδήγηση διοίκησης' },
+  { pattern: /offering|registration|prospectus|dilution|capital increase|share capital|αύξηση κεφαλαίου|ενημερωτικό δελτίο/i, score: 20, reason: 'Πιθανή χρηματοδότηση ή αραίωση μετοχών' },
+  { pattern: /buyback|repurchase|treasury shares|own shares|dividend|ίδιων μετοχών|μέρισμα/i, score: 15, reason: 'Αλλαγή στην κατανομή κεφαλαίου' },
+  { pattern: /clinical|trial|fda|approval|κλινικ|έγκριση/i, score: 22, reason: 'Ρυθμιστικός ή κλινικός καταλύτης' },
+  { pattern: /contract|award|order|partnership|σύμβαση|ανάθεση|συνεργασία/i, score: 15, reason: 'Νέα εμπορική συμφωνία ή ανάθεση' },
 ]);
 
 function unique(values) {
@@ -42,6 +44,12 @@ function unique(values) {
 function hoursOld(now, value) {
   const time = new Date(value).getTime();
   return Number.isFinite(time) ? Math.max(0, (now.getTime() - time) / 3_600_000) : Number.POSITIVE_INFINITY;
+}
+
+function eventSourceLabel(record) {
+  return record.form === 'ATHEX_ANNOUNCEMENT'
+    ? 'Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens'
+    : `Νέα επίσημη κατάθεση ${record.form} στη SEC`;
 }
 
 function eventScore(record, now) {
@@ -55,19 +63,19 @@ function eventScore(record, now) {
   return {
     score,
     reasons: unique([
-      `Νέα επίσημη κατάθεση ${record.form} στη SEC`,
+      eventSourceLabel(record),
       ...boosts.map((item) => item.reason),
       freshnessHours <= 8 ? 'Το γεγονός είναι πολύ πρόσφατο' : null,
-      boosts.length === 0 ? 'Απαιτείται ανάγνωση της κατάθεσης για να προσδιοριστεί η ουσία του γεγονότος' : null,
+      boosts.length === 0 ? 'Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος' : null,
     ]),
     freshnessHours,
   };
 }
 
-function mergeEventsByCompany(records, companyByCik, now) {
+function mergeEventsByCompany(records, companyByIdentity, now) {
   const grouped = new Map();
   for (const record of records) {
-    const company = companyByCik.get(record.cik);
+    const company = companyByIdentity.get(record.companyId) || companyByIdentity.get(record.cik);
     if (!company) continue;
     const scored = eventScore(record, now);
     const current = grouped.get(company.companyId) || {
@@ -91,17 +99,24 @@ function mergeEventsByCompany(records, companyByCik, now) {
 }
 
 function candidateOutput(item, seedCompanyIds) {
+  const market = item.company.primaryListing?.mic === 'XATH' ? 'GR' : 'US';
+  const symbol = item.company.primaryListing?.symbol || null;
   return {
     discoveryId: `discovery:${item.company.companyId}:${String(item.latestEventAt || '').slice(0, 10)}`,
     companyId: item.company.companyId,
     companyName: item.company.displayName || item.company.legalName,
-    symbol: item.company.primaryListing?.symbol || null,
+    symbol,
     exchange: item.company.primaryListing?.exchange || null,
-    cik: item.company.cik,
+    mic: item.company.primaryListing?.mic || null,
+    market,
+    cik: item.company.cik || null,
+    issuerId: item.company.issuerId || null,
+    identityStatus: symbol ? 'CANONICAL_IDENTITY_READY' : 'SYMBOL_RESOLUTION_REQUIRED',
     discoveryScore: item.discoveryScore,
-    status: 'DISCOVERED_RESEARCH_REQUIRED',
+    scoreType: 'DISCOVERY_PRIORITY',
+    status: symbol ? 'DISCOVERED_RESEARCH_REQUIRED' : 'DISCOVERED_IDENTITY_REQUIRED',
     suggestedAction: 'WATCH',
-    suggestedActionLabel: 'Παρακολούθηση μέχρι πλήρη ανάλυση',
+    suggestedActionLabel: symbol ? 'Παρακολούθηση μέχρι πλήρη ανάλυση' : 'Αναμονή μέχρι επίσημη ταυτοποίηση συμβόλου',
     isExistingFocusCompany: seedCompanyIds.has(item.company.companyId),
     reasons: item.reasons,
     latestEventAt: item.latestEventAt,
@@ -110,6 +125,7 @@ function candidateOutput(item, seedCompanyIds) {
       title: event.title,
       publishedAt: event.publishedAt,
       sourceUrl: event.sourceUrl,
+      sourceName: event.sourceName || (event.form === 'ATHEX_ANNOUNCEMENT' ? 'Euronext Athens' : 'SEC EDGAR'),
       eventScore: event.eventScore,
     })),
   };
@@ -124,16 +140,40 @@ export async function discoverAutonomousCandidates(options = {}) {
   const fetchImpl = options.fetchImpl || globalThis.fetch;
   const secUserAgent = options.secUserAgent || process.env.SEC_USER_AGENT || '';
 
-  const [universeResult, filingsResult] = await Promise.all([
+  const [universeResult, filingsResult, athensResult] = await Promise.all([
     fetchSecCompanyUniverse({ fetchImpl, userAgent: secUserAgent, generatedAt }),
     fetchSecCurrentFilings({ fetchImpl, userAgent: secUserAgent, retrievedAt: generatedAt }),
+    options.enableAthensDiscovery === false
+      ? Promise.resolve({ companies: [], records: [], diagnostics: [] })
+      : fetchAthensDiscovery({
+        fetchImpl,
+        generatedAt,
+        userAgent: options.userAgent || secUserAgent || 'Investor-Control-Market-Intelligence/1.1',
+        identityResolutionLimit: options.athensIdentityResolutionLimit ?? 12,
+      }),
   ]);
-  diagnostics.push(...(universeResult.diagnostics || []), ...(filingsResult.diagnostics || []));
+  diagnostics.push(
+    ...(universeResult.diagnostics || []),
+    ...(filingsResult.diagnostics || []),
+    ...(athensResult.diagnostics || []),
+  );
 
-  const companyByCik = new Map((universeResult.companies || []).map((company) => [company.cik, company]));
+  const allCompanies = [
+    ...(universeResult.companies || []),
+    ...(athensResult.companies || []),
+  ];
+  const companyByIdentity = new Map();
+  for (const company of allCompanies) {
+    companyByIdentity.set(company.companyId, company);
+    if (company.cik) companyByIdentity.set(company.cik, company);
+  }
+
   const maxEventAgeHours = Math.max(1, Number(options.maxEventAgeHours ?? 36));
-  const recentRecords = (filingsResult.records || []).filter((record) => hoursOld(now, record.publishedAt) <= maxEventAgeHours);
-  const grouped = mergeEventsByCompany(recentRecords, companyByCik, now)
+  const recentRecords = [
+    ...(filingsResult.records || []),
+    ...(athensResult.records || []),
+  ].filter((record) => hoursOld(now, record.publishedAt) <= maxEventAgeHours);
+  const grouped = mergeEventsByCompany(recentRecords, companyByIdentity, now)
     .sort((a, b) => b.discoveryScore - a.discoveryScore || String(b.latestEventAt).localeCompare(String(a.latestEventAt)));
 
   const minimumScore = Math.max(0, Number(options.minimumScore ?? 58));
@@ -144,8 +184,11 @@ export async function discoverAutonomousCandidates(options = {}) {
     .slice(0, shortlistLimit)
     .map((item) => candidateOutput(item, seedCompanyIds));
 
-  const discoveredCompanyIds = new Set(shortlist.filter((item) => !item.isExistingFocusCompany).slice(0, deepAnalysisLimit).map((item) => item.companyId));
-  const discoveredCompanies = (universeResult.companies || [])
+  const discoveredCompanyIds = new Set(shortlist
+    .filter((item) => !item.isExistingFocusCompany && item.identityStatus === 'CANONICAL_IDENTITY_READY')
+    .slice(0, deepAnalysisLimit)
+    .map((item) => item.companyId));
+  const discoveredCompanies = allCompanies
     .filter((company) => discoveredCompanyIds.has(company.companyId))
     .map((company) => ({
       ...company,
@@ -154,13 +197,23 @@ export async function discoverAutonomousCandidates(options = {}) {
 
   return {
     format: 'investor-control-autonomous-discovery',
-    version: 1,
+    version: 2,
     policyVersion: DISCOVERY_POLICY_VERSION,
     generatedAt,
     sourcePolicy: sourcePolicySummary(),
-    registryCompanyCount: universeResult.companies?.length || 0,
+    marketsScanned: ['US', 'GR'],
+    sourceScanners: {
+      secEdgar: true,
+      euronextAthens: options.enableAthensDiscovery !== false,
+    },
+    registryCompanyCount: allCompanies.length,
+    secRegistryCompanyCount: universeResult.companies?.length || 0,
+    athensActiveIssuerCount: athensResult.companies?.length || 0,
     filingEventCount: recentRecords.length,
+    secFilingEventCount: (filingsResult.records || []).filter((record) => hoursOld(now, record.publishedAt) <= maxEventAgeHours).length,
+    athensAnnouncementEventCount: (athensResult.records || []).filter((record) => hoursOld(now, record.publishedAt) <= maxEventAgeHours).length,
     candidateCount: shortlist.length,
+    unresolvedIdentityCount: shortlist.filter((item) => item.identityStatus !== 'CANONICAL_IDENTITY_READY').length,
     deepAnalysisCompanyCount: discoveredCompanies.length,
     shortlist,
     discoveredCompanies,

@@ -34,10 +34,12 @@ const atom = `<?xml version="1.0"?><feed>
   </entry>
 </feed>`;
 
-test('source selection is controlled by a versioned policy and not runtime AI domain expansion', () => {
+test('source selection is controlled by the deterministic governor and not runtime AI approval', () => {
   const summary = sourcePolicySummary();
-  assert.equal(summary.selector, 'VERSIONED_CODE_POLICY');
+  assert.equal(summary.selector, 'DETERMINISTIC_SOURCE_GOVERNOR');
   assert.equal(summary.runtimeAiSourceSelection, false);
+  assert.equal(summary.runtimeAiMayProposeSources, true);
+  assert.equal(summary.rules.runtimeAiMayApproveSources, false);
   assert.equal(summary.rules.runtimeDomainExpansion, false);
   assert.equal(summary.rules.primarySourceRequiredForFinalAction, true);
 });
@@ -68,19 +70,20 @@ test('autonomous discovery ranks new companies and never calls discovery alone a
     }
     throw new Error(`unexpected url ${url}`);
   };
-  const result = await discoverAutonomousCandidates({
+
+  const report = await discoverAutonomousCandidates({
     now: NOW,
     fetchImpl,
-    secUserAgent: 'Investor Control test@example.com',
+    secUserAgent: 'Investor Control test test@example.com',
     seedUniverse: [],
-    minimumScore: 50,
-    shortlistLimit: 10,
-    deepAnalysisLimit: 2,
+    candidateLimit: 20,
+    deepAnalysisLimit: 10,
   });
-  assert.equal(result.candidateCount, 2);
-  assert.equal(result.deepAnalysisCompanyCount, 2);
-  assert.equal(result.shortlist[0].suggestedAction, 'WATCH');
-  assert.equal(result.shortlist[0].status, 'DISCOVERED_RESEARCH_REQUIRED');
-  assert.ok(result.shortlist[0].discoveryScore >= result.shortlist[1].discoveryScore);
-  assert.ok(result.shortlist.some((item) => item.symbol === 'EXM'));
+
+  assert.equal(report.candidateCount, 2);
+  assert.equal(report.deepAnalysisCompanyCount, 2);
+  assert.equal(report.shortlist[0].status, 'DISCOVERED_RESEARCH_REQUIRED');
+  assert.equal(report.shortlist[0].suggestedAction, 'WATCH');
+  assert.ok(report.shortlist.every((item) => item.suggestedAction === 'WATCH'));
+  assert.ok(report.discoveredCompanies.every((company) => company.active === true));
 });
