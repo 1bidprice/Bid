@@ -31,6 +31,22 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y poppler-utils
+      - name: Capture official Athens source HTML
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p market-intelligence/out/athens-source
+          curl --fail --location --silent --show-error \
+            -H 'Accept: text/html,application/xhtml+xml' \
+            -H 'User-Agent: Investor-Control-Market-Intelligence/1.2' \
+            'https://athens.euronext.com/en/market-data/issuers?letter=X' \
+            -o market-intelligence/out/athens-source/issuers.html
+          curl --fail --location --silent --show-error \
+            -H 'Accept: text/html,application/xhtml+xml' \
+            -H 'User-Agent: Investor-Control-Market-Intelligence/1.2' \
+            'https://athens.euronext.com/en/market-data/announcements' \
+            -o market-intelligence/out/athens-source/announcements.html
+          wc -c market-intelligence/out/athens-source/*.html
       - name: Apply contracts, test and run live autonomous intelligence
         working-directory: market-intelligence
         env:
@@ -52,10 +68,10 @@ jobs:
           const sourceHealth = feed.sourceHealth || {};
           if (report.version !== 8) throw new Error(`unexpected report version ${report.version}`);
           if (discovery.sourcePolicy?.selector !== 'DETERMINISTIC_SOURCE_GOVERNOR') throw new Error('source governor missing');
-          if (!Array.isArray(sourceHealth.marketsScanned) || !sourceHealth.marketsScanned.includes('US') || !sourceHealth.marketsScanned.includes('GR')) throw new Error('US/GR scanning not active');
-          if (Number(sourceHealth.secRegistryCompanyCount || 0) < 1000) throw new Error('SEC universe incomplete');
-          if (Number(sourceHealth.athensActiveIssuerCount || 0) < 1) throw new Error(`Athens issuer discovery empty: ${sourceHealth.athensActiveIssuerCount}`);
-          if (Number(sourceHealth.athensAnnouncementEventCount || 0) < 1) throw new Error(`Athens announcement discovery empty: ${sourceHealth.athensAnnouncementEventCount}`);
+          if (!Array.isArray(discovery.marketsScanned) || !discovery.marketsScanned.includes('US') || !discovery.marketsScanned.includes('GR')) throw new Error('US/GR scanning not active');
+          if (Number(discovery.secRegistryCompanyCount || 0) < 1000) throw new Error('SEC universe incomplete');
+          if (Number(discovery.athensActiveIssuerCount || 0) < 1) throw new Error(`Athens issuer discovery empty: ${discovery.athensActiveIssuerCount}`);
+          if (Number(discovery.athensAnnouncementEventCount || 0) < 1) throw new Error(`Athens announcement discovery empty: ${discovery.athensAnnouncementEventCount}`);
           for (const item of feed.discoveryRadar || []) {
             if (item.suggestedAction !== 'WATCH') throw new Error('discovery leaked directional action');
           }
@@ -64,9 +80,9 @@ jobs:
           }
           console.log(JSON.stringify({
             generatedAt: report.generatedAt,
-            secCompanies: sourceHealth.secRegistryCompanyCount,
-            athensIssuers: sourceHealth.athensActiveIssuerCount,
-            athensAnnouncements: sourceHealth.athensAnnouncementEventCount,
+            secCompanies: discovery.secRegistryCompanyCount,
+            athensIssuers: discovery.athensActiveIssuerCount,
+            athensAnnouncements: discovery.athensAnnouncementEventCount,
             marketSnapshots: sourceHealth.marketSnapshotCount,
             fundamentals: sourceHealth.fundamentalSnapshotCount,
             finalActions: feed.summary?.finalActionCount,
@@ -81,5 +97,6 @@ jobs:
           path: |
             market-intelligence/out/autonomous-intelligence.json
             market-intelligence/out/mobile-intelligence-feed.json
+            market-intelligence/out/athens-source/*.html
           if-no-files-found: warn
           retention-days: 30
