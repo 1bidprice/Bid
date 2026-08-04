@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  ATHENS_ISSUERS_URL,
   extractAthensAnnouncements,
   extractAthensIssuerUniverse,
   extractAthensRelatedInstrument,
@@ -17,12 +18,12 @@ const issuerHtml = `
 const announcementHtml = `
   <table><tbody>
     <tr>
-      <td>QUEST HOLDINGS S.A.</td>
+      <td><a href="/en/market-data/issuers/623">QUEST HOLDINGS S.A.</a></td>
       <td><a href="/en/node/968584">Purchase of own shares</a></td>
       <td>04-08-2026 12:03</td>
     </tr>
     <tr>
-      <td>ALPHA TRUST ANDROMEDA SA</td>
+      <td><a href="/en/market-data/issuers/410">ALPHA TRUST ANDROMEDA SA</a></td>
       <td><a href="/en/node/968600">ACQUISITION OF TREASURY SHARES</a></td>
       <td>04-08-2026 13:39</td>
     </tr>
@@ -43,6 +44,7 @@ test('issuer universe uses official issuer identifiers and no invented symbols',
   assert.equal(result.companies[0].companyId, 'company:xath:623');
   assert.equal(result.companies[0].primaryListing.mic, 'XATH');
   assert.equal(result.companies[0].primaryListing.symbol, null);
+  assert.ok(ATHENS_ISSUERS_URL.includes('letter='));
 });
 
 test('announcement rows become primary exchange evidence linked to canonical issuer identity', () => {
@@ -55,6 +57,14 @@ test('announcement rows become primary exchange evidence linked to canonical iss
   assert.equal(result.records[0].sourceUrl, 'https://athens.euronext.com/en/node/968584');
 });
 
+test('announcement issuer links recover canonical identities when the issuer index is empty', () => {
+  const result = extractAthensAnnouncements(announcementHtml, [], { retrievedAt: NOW });
+  assert.equal(result.records.length, 2);
+  assert.equal(result.companies.length, 2);
+  assert.equal(result.records[0].issuerId, '623');
+  assert.equal(result.diagnostics.length, 0);
+});
+
 test('related instruments resolves an official OASIS symbol before deep analysis', () => {
   const company = extractAthensIssuerUniverse(issuerHtml, { generatedAt: NOW }).companies[0];
   const resolved = extractAthensRelatedInstrument(relatedQuest, company);
@@ -65,7 +75,7 @@ test('related instruments resolves an official OASIS symbol before deep analysis
 test('Athens discovery fetches issuers, announcements and only then related instruments', async () => {
   const fetchImpl = async (url) => {
     const value = String(url);
-    if (value.endsWith('/market-data/issuers')) return { ok: true, text: async () => issuerHtml };
+    if (value.includes('/market-data/issuers?letter=')) return { ok: true, text: async () => issuerHtml };
     if (value.endsWith('/market-data/announcements')) return { ok: true, text: async () => announcementHtml };
     if (value.includes('/issuers/623/related-instruments')) return { ok: true, text: async () => relatedQuest };
     if (value.includes('/issuers/410/related-instruments')) return { ok: true, text: async () => relatedAndro };
@@ -73,6 +83,7 @@ test('Athens discovery fetches issuers, announcements and only then related inst
   };
 
   const result = await fetchAthensDiscovery({ fetchImpl, generatedAt: NOW });
+  assert.equal(result.version, 2);
   assert.equal(result.records.length, 2);
   assert.equal(result.companies.length, 2);
   assert.equal(result.companies.find((item) => item.issuerId === '623').primaryListing.symbol, 'QUEST');
