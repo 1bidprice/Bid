@@ -1,0 +1,84 @@
+name: Investor Control Live Intelligence Verification
+
+on:
+  pull_request:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - market-intelligence/**
+      - .github/workflows/verify-investor-control-live-intelligence.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-live-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-live-intelligence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install PDF extraction runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y poppler-utils
+      - name: Run deterministic and live autonomous intelligence
+        working-directory: market-intelligence
+        env:
+          SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          npm test
+          npm run run:autonomous
+          npm run build:autonomous-mobile
+      - name: Verify live Athens and source contracts
+        working-directory: market-intelligence
+        run: |
+          node - <<'NODE'
+          const report = require('./out/autonomous-intelligence.json');
+          const feed = require('./out/mobile-intelligence-feed.json');
+          const discovery = report.discovery || {};
+          const sourceHealth = feed.sourceHealth || {};
+          if (report.version !== 8) throw new Error(`unexpected report version ${report.version}`);
+          if (discovery.sourcePolicy?.selector !== 'DETERMINISTIC_SOURCE_GOVERNOR') throw new Error('source governor missing');
+          if (!Array.isArray(sourceHealth.marketsScanned) || !sourceHealth.marketsScanned.includes('US') || !sourceHealth.marketsScanned.includes('GR')) throw new Error('US/GR scanning not active');
+          if (Number(sourceHealth.secRegistryCompanyCount || 0) < 1000) throw new Error('SEC universe incomplete');
+          if (Number(sourceHealth.athensActiveIssuerCount || 0) < 1) throw new Error(`Athens issuer discovery empty: ${sourceHealth.athensActiveIssuerCount}`);
+          if (Number(sourceHealth.athensAnnouncementEventCount || 0) < 1) throw new Error(`Athens announcement discovery empty: ${sourceHealth.athensAnnouncementEventCount}`);
+          for (const item of feed.discoveryRadar || []) {
+            if (item.suggestedAction !== 'WATCH') throw new Error('discovery leaked directional action');
+          }
+          for (const item of feed.decisions || []) {
+            if (item.finalAction?.status === 'BLOCKED' && item.finalAction?.marketAction !== 'WATCH') throw new Error('blocked decision leaked direction');
+          }
+          console.log(JSON.stringify({
+            generatedAt: report.generatedAt,
+            secCompanies: sourceHealth.secRegistryCompanyCount,
+            athensIssuers: sourceHealth.athensActiveIssuerCount,
+            athensAnnouncements: sourceHealth.athensAnnouncementEventCount,
+            marketSnapshots: sourceHealth.marketSnapshotCount,
+            fundamentals: sourceHealth.fundamentalSnapshotCount,
+            finalActions: feed.summary?.finalActionCount,
+            blocked: feed.summary?.blockedDecisionCount,
+          }, null, 2));
+          NODE
+      - name: Upload live verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1.2.0-live-intelligence-evidence
+          path: |
+            market-intelligence/out/autonomous-intelligence.json
+            market-intelligence/out/mobile-intelligence-feed.json
+          if-no-files-found: warn
+          retention-days: 30
