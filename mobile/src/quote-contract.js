@@ -1,4 +1,4 @@
-export const MOBILE_QUOTE_CONTRACT_VERSION = '2026-08-04.1';
+export const MOBILE_QUOTE_CONTRACT_VERSION = '2026-08-04.2';
 
 const SOURCE_ROLES = Object.freeze({
   PRIMARY_EXCHANGE: 'PRIMARY_EXCHANGE',
@@ -51,19 +51,25 @@ export function buildMobileQuoteContract(symbol, quote = {}, options = {}) {
   const inherited = quote?.quoteContract && typeof quote.quoteContract === 'object'
     ? quote.quoteContract
     : null;
-  if (inherited?.version && inherited?.valuationEligible !== undefined) return inherited;
-
-  const role = sourceRole(quote);
+  const role = inherited?.sourceRole || sourceRole(quote);
   const price = positive(quote.nativePrice ?? quote.price);
   const ageHours = quoteAgeHours(quote, options.now || Date.now());
   const maxAgeHours = Number(options.maxAgeHours ?? (String(symbol).endsWith('.GR') ? 6 : 4));
-  const timestampVerified = quote.priceTimestampVerified !== false && ageHours !== null;
+  const timestampVerified = inherited?.timestampVerified !== false
+    && quote.priceTimestampVerified !== false
+    && ageHours !== null;
   const stale = quote.status === 'stale' || ageHours === null || ageHours > maxAgeHours;
-  const sourceApproved = [SOURCE_ROLES.PRIMARY_EXCHANGE, SOURCE_ROLES.LICENSED_MARKET_DATA].includes(role);
-  const valuationEligible = price !== null && !stale && sourceApproved;
-  const decisionEligible = valuationEligible && timestampVerified;
+  const sourceApproved = inherited?.sourceApproved === true
+    || [SOURCE_ROLES.PRIMARY_EXCHANGE, SOURCE_ROLES.LICENSED_MARKET_DATA].includes(role);
+  const valuationEligible = price !== null && !stale && sourceApproved
+    && role !== SOURCE_ROLES.FALLBACK_UNVERIFIED;
+  const decisionEligible = valuationEligible && timestampVerified
+    && inherited?.decisionEligible !== false;
   const previousClose = positive(quote.nativePreviousClose ?? quote.previousClose);
-  const dayChangeEligible = decisionEligible && quote.dayChangeVerified !== false && previousClose !== null;
+  const dayChangeEligible = decisionEligible
+    && quote.dayChangeVerified !== false
+    && inherited?.dayChangeEligible !== false
+    && previousClose !== null;
 
   const status = price === null
     ? 'UNAVAILABLE'
@@ -84,6 +90,7 @@ export function buildMobileQuoteContract(symbol, quote = {}, options = {}) {
   if (!sourceApproved) diagnosticCodes.push('QUOTE_SOURCE_NOT_APPROVED');
   if (!timestampVerified) diagnosticCodes.push('QUOTE_TIMESTAMP_NOT_VERIFIED');
   if (previousClose === null) diagnosticCodes.push('PREVIOUS_CLOSE_NOT_VERIFIED');
+  if (inherited?.diagnosticCodes) diagnosticCodes.push(...inherited.diagnosticCodes);
 
   return {
     version: MOBILE_QUOTE_CONTRACT_VERSION,
@@ -99,16 +106,15 @@ export function buildMobileQuoteContract(symbol, quote = {}, options = {}) {
   };
 }
 
-export function quoteFromRegistry(symbol, entry) {
+export function quoteFromRegistry(symbol, entry, options = {}) {
   if (!entry || typeof entry !== 'object') return null;
+  const nativePrice = positive(entry.price);
+  if (nativePrice === null || !entry.quoteAt) return null;
   const inherited = entry.quoteContract && typeof entry.quoteContract === 'object'
     ? entry.quoteContract
     : null;
-  if (inherited?.valuationEligible !== true) return null;
-  const nativePrice = positive(entry.price);
-  if (nativePrice === null || !entry.quoteAt) return null;
-  const role = inherited.sourceRole || SOURCE_ROLES.UNKNOWN;
-  return {
+  const role = inherited?.sourceRole || SOURCE_ROLES.UNKNOWN;
+  const candidate = {
     symbol,
     nativePrice,
     nativePreviousClose: positive(entry.previousClose),
@@ -121,11 +127,14 @@ export function quoteFromRegistry(symbol, entry) {
     providerSymbol: entry.appSymbol || symbol,
     quality: role === SOURCE_ROLES.PRIMARY_EXCHANGE ? 'delayed15' : 'realtime',
     session: 'regular-market',
-    priceTimestampVerified: inherited.timestampVerified !== false,
-    dayChangeVerified: inherited.dayChangeEligible === true,
+    priceTimestampVerified: inherited?.timestampVerified !== false,
+    dayChangeVerified: inherited?.dayChangeEligible === true,
     quoteContract: inherited,
     canonicalRegistry: true,
   };
+  const localContract = buildMobileQuoteContract(symbol, candidate, options);
+  if (localContract.valuationEligible !== true) return null;
+  return { ...candidate, quoteContract: localContract };
 }
 
 export function safeProviderDiagnostic(error, fallbackCode = 'PROVIDER_REQUEST_FAILED') {
