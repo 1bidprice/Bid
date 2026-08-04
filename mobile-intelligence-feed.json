@@ -1,1500 +1,214 @@
 {
   "format": "investor-control-mobile-intelligence-feed",
   "version": 2,
-  "generatedAt": "2026-08-04T11:34:06.670Z",
+  "generatedAt": "2026-08-04T14:28:02.539Z",
   "policyVersion": "2026-07-30.1",
   "sourceSelection": {
-    "version": "2026-07-28.1",
-    "selector": "VERSIONED_CODE_POLICY",
+    "version": "2026-08-04.1",
+    "selector": "DETERMINISTIC_SOURCE_GOVERNOR",
     "runtimeAiSourceSelection": false,
-    "officialSourceCount": 4,
+    "runtimeAiMayProposeSources": true,
+    "officialRuleCount": 4,
     "independentPublisherCount": 8,
     "rules": {
       "runtimeDomainExpansion": false,
+      "runtimeAiMayProposeSources": true,
+      "runtimeAiMayApproveSources": false,
       "socialMediaRecommendationEvidence": false,
       "primarySourceRequiredForFinalAction": true,
       "independentClaimConfirmationRequired": true,
       "unresolvedContradictionBlocksAction": true,
-      "staleReferencePriceBlocksAction": true
+      "staleReferencePriceBlocksAction": true,
+      "rawProviderErrorsHiddenFromUsers": true
+    }
+  },
+  "quoteRegistry": {
+    "ALWN.GR": {
+      "appSymbol": "ALWN.GR",
+      "companyId": "company:allwyn-ag",
+      "companyName": "Allwyn",
+      "price": 13.58,
+      "previousClose": 13.61,
+      "currency": "EUR",
+      "quoteAt": "2026-08-04T14:28:02.539Z",
+      "checkedAt": "2026-08-04T14:28:02.539Z",
+      "source": "Euronext Athens delayed market data",
+      "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/ALWN/related",
+      "sourceQuality": "OFFICIAL_DELAYED",
+      "quoteContract": {
+        "version": "2026-08-04.1",
+        "sourceRole": "PRIMARY_EXCHANGE",
+        "sourceTier": 1,
+        "sourceApproved": true,
+        "timestampVerified": false,
+        "valuationEligible": true,
+        "decisionEligible": false,
+        "dayChangeEligible": false,
+        "publicStatus": "TIMESTAMP_NOT_VERIFIED",
+        "publicMessage": "Η τιμή προέρχεται από επιτρεπόμενη πηγή, αλλά ο χρόνος της δεν έχει επιβεβαιωθεί επαρκώς.",
+        "diagnosticCodes": [
+          "QUOTE_TIMESTAMP_NOT_VERIFIED"
+        ]
+      }
+    },
+    "SPCE.US": {
+      "appSymbol": "SPCE.US",
+      "companyId": "company:virgin-galactic-holdings",
+      "companyName": "Virgin Galactic",
+      "price": 2.9,
+      "previousClose": 2.82,
+      "currency": "USD",
+      "quoteAt": "2026-08-04T14:27:37.000Z",
+      "checkedAt": "2026-08-04T14:28:02.539Z",
+      "source": "Finnhub Quote API",
+      "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+      "sourceQuality": null,
+      "quoteContract": {
+        "version": "2026-08-04.1",
+        "sourceRole": "LICENSED_MARKET_DATA",
+        "sourceTier": 1,
+        "sourceApproved": true,
+        "timestampVerified": true,
+        "valuationEligible": true,
+        "decisionEligible": true,
+        "dayChangeEligible": true,
+        "publicStatus": "VERIFIED",
+        "publicMessage": "Επαληθευμένη χρηματιστηριακή τιμή από εγκεκριμένη πηγή.",
+        "diagnosticCodes": []
+      }
+    },
+    "CREDIA.GR": {
+      "appSymbol": "CREDIA.GR",
+      "companyId": "company:crediabank",
+      "companyName": "CrediaBank",
+      "price": 0.994,
+      "previousClose": 1.004,
+      "currency": "EUR",
+      "quoteAt": "2026-08-04T14:28:02.539Z",
+      "checkedAt": "2026-08-04T14:28:02.539Z",
+      "source": "Euronext Athens delayed market data",
+      "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/CREDIA/related",
+      "sourceQuality": "OFFICIAL_DELAYED",
+      "quoteContract": {
+        "version": "2026-08-04.1",
+        "sourceRole": "PRIMARY_EXCHANGE",
+        "sourceTier": 1,
+        "sourceApproved": true,
+        "timestampVerified": false,
+        "valuationEligible": true,
+        "decisionEligible": false,
+        "dayChangeEligible": false,
+        "publicStatus": "TIMESTAMP_NOT_VERIFIED",
+        "publicMessage": "Η τιμή προέρχεται από επιτρεπόμενη πηγή, αλλά ο χρόνος της δεν έχει επιβεβαιωθεί επαρκώς.",
+        "diagnosticCodes": [
+          "QUOTE_TIMESTAMP_NOT_VERIFIED"
+        ]
+      }
+    },
+    "BTI.US": {
+      "appSymbol": "BTI.US",
+      "companyId": "company:sec:0001303523",
+      "companyName": "British American Tobacco p.l.c.",
+      "price": 59.71,
+      "previousClose": 59.56,
+      "currency": "USD",
+      "quoteAt": "2026-08-04T14:28:03.000Z",
+      "checkedAt": "2026-08-04T14:28:02.539Z",
+      "source": "Finnhub Quote API",
+      "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=BTI",
+      "sourceQuality": null,
+      "quoteContract": {
+        "version": "2026-08-04.1",
+        "sourceRole": "LICENSED_MARKET_DATA",
+        "sourceTier": 1,
+        "sourceApproved": true,
+        "timestampVerified": true,
+        "valuationEligible": true,
+        "decisionEligible": true,
+        "dayChangeEligible": true,
+        "publicStatus": "VERIFIED",
+        "publicMessage": "Επαληθευμένη χρηματιστηριακή τιμή από εγκεκριμένη πηγή.",
+        "diagnosticCodes": []
+      }
+    },
+    "KIM.US": {
+      "appSymbol": "KIM.US",
+      "companyId": "company:sec:0000879101",
+      "companyName": "KIMCO REALTY",
+      "price": 25.1,
+      "previousClose": 25.41,
+      "currency": "USD",
+      "quoteAt": "2026-08-04T14:28:02.000Z",
+      "checkedAt": "2026-08-04T14:28:02.539Z",
+      "source": "Finnhub Quote API",
+      "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=KIM",
+      "sourceQuality": null,
+      "quoteContract": {
+        "version": "2026-08-04.1",
+        "sourceRole": "LICENSED_MARKET_DATA",
+        "sourceTier": 1,
+        "sourceApproved": true,
+        "timestampVerified": true,
+        "valuationEligible": true,
+        "decisionEligible": true,
+        "dayChangeEligible": true,
+        "publicStatus": "VERIFIED",
+        "publicMessage": "Επαληθευμένη χρηματιστηριακή τιμή από εγκεκριμένη πηγή.",
+        "diagnosticCodes": []
+      }
     }
   },
   "operationalHealth": {
-    "status": "OPERATIONAL",
-    "generatedAt": "2026-08-04T11:34:06.670Z",
-    "analysedCompanyCount": 8,
-    "marketSnapshotCount": 8,
-    "historicalMarketMetricsCount": 8,
-    "fundamentalSnapshotCount": 6,
-    "unresolvedDiagnosticCount": 403,
+    "status": "DEGRADED",
+    "infrastructureStatus": "OPERATIONAL",
+    "marketDataStatus": "OPERATIONAL",
+    "fundamentalsStatus": "DEGRADED",
+    "researchStatus": "ACTIVE",
+    "decisionEngineStatus": "BLOCKED_BY_EVIDENCE",
+    "generatedAt": "2026-08-04T14:28:02.539Z",
+    "analysedCompanyCount": 5,
+    "marketSnapshotCount": 5,
+    "marketCoverageRatio": 1,
+    "historicalMarketMetricsCount": 5,
+    "readyHistoricalMarketMetricsCount": 5,
+    "historyCoverageRatio": 1,
+    "fundamentalSnapshotCount": 3,
+    "fundamentalCoverageRatio": 0.6,
+    "unresolvedDiagnosticCount": 296,
     "finalActionCount": 0,
+    "blockedDecisionCount": 5,
     "staleOutput": false
   },
   "sourceHealth": {
-    "evidenceCount": 163,
-    "documentReviewedCount": 40,
-    "independentDiscoveryCount": 11,
-    "fundamentalSnapshotCount": 6,
-    "marketSnapshotCount": 8,
-    "historicalMarketMetricsCount": 8,
-    "readyHistoricalMarketMetricsCount": 8,
-    "diagnosticCount": 403
+    "evidenceCount": 94,
+    "documentReviewedCount": 24,
+    "independentDiscoveryCount": 2,
+    "fundamentalSnapshotCount": 3,
+    "marketSnapshotCount": 5,
+    "historicalMarketMetricsCount": 5,
+    "readyHistoricalMarketMetricsCount": 5,
+    "diagnosticCount": 296
   },
   "summary": {
     "publishedCount": 0,
     "reviewReadyCount": 0,
-    "researchCount": 8,
+    "researchCount": 5,
     "urgentCount": 0,
-    "discoveryCandidateCount": 12,
-    "discoveryDeepAnalysisCount": 5,
-    "unresolvedDiagnosticCount": 303,
+    "discoveryCandidateCount": 2,
+    "discoveryDeepAnalysisCount": 2,
+    "unresolvedDiagnosticCount": 183,
     "finalActionCount": 0,
     "buyNowCount": 0,
     "sellNowCount": 0,
     "holdCount": 0,
     "doNotBuyCount": 0,
     "avoidCount": 0,
-    "blockedDecisionCount": 8
+    "blockedDecisionCount": 5
   },
   "today": {
-    "headline": "12 νέες μετοχές εντοπίστηκαν αυτόματα για έλεγχο",
+    "headline": "2 νέες μετοχές εντοπίστηκαν αυτόματα για έλεγχο",
     "primaryItem": {
-      "id": "dossier:company:sec:0001013871:28ade4fc2466b548a77f",
-      "companyId": "company:sec:0001013871",
-      "companyName": "NRG ENERGY,",
-      "symbol": "NRG",
-      "exchange": "NYSE",
-      "origin": "AUTONOMOUS_DISCOVERY",
-      "discovery": {
-        "discoveryId": "discovery:company:sec:0001013871:2026-08-04",
-        "companyId": "company:sec:0001013871",
-        "companyName": "NRG ENERGY,",
-        "symbol": "NRG",
-        "exchange": "NYSE",
-        "cik": "0001013871",
-        "discoveryScore": 82,
-        "status": "DISCOVERED_RESEARCH_REQUIRED",
-        "suggestedAction": "WATCH",
-        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-        "isExistingFocusCompany": false,
-        "reasons": [
-          "Νέα επίσημη κατάθεση 8-K στη SEC",
-          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-          "Το γεγονός είναι πολύ πρόσφατο"
-        ],
-        "latestEventAt": "2026-08-04T11:28:50.000Z",
-        "events": [
-          {
-            "form": "8-K",
-            "title": "8-K - NRG ENERGY, INC. (0001013871) (Filer)",
-            "publishedAt": "2026-08-04T11:28:50.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1013871/000101387126000018/0001013871-26-000018-index.htm",
-            "eventScore": 82
-          }
-        ]
-      },
-      "status": "DRAFT_RESEARCH",
-      "statusLabel": "Αυτόματη ανακάλυψη · έρευνα σε εξέλιξη",
-      "category": "INSUFFICIENT_EVIDENCE",
-      "categoryLabel": "Ανεπαρκή στοιχεία",
-      "action": "WATCH",
-      "actionLabel": "Παρακολούθηση",
-      "timeHorizon": "UNDETERMINED",
-      "referencePrice": {
-        "value": 138.47,
-        "currency": "USD",
-        "timestamp": "2026-08-03T20:00:00.000Z",
-        "source": "Finnhub Quote API"
-      },
-      "referencePriceAgeHours": 15.568519444444444,
-      "thesis": "Η NRG ENERGY, έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: ετήσια μεταβολή εσόδων 9.37%, ετήσιο καθαρό περιθώριο 2.85%, μεταβολή απομειωμένου αριθμού μετοχών -6.13%, απόδοση 60 συνεδριάσεων -14.7%, σχετική ισχύς 60 συνεδριάσεων -18.18%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
-      "causalMechanism": "Το γεγονός μπορεί να επηρεάσει την αξία μόνο μέσω μετρήσιμης αλλαγής στις ταμειακές ροές, στον κίνδυνο ισολογισμού, στον αριθμό μετοχών, στην πιθανότητα λειτουργικής επιτυχίας ή στις προσδοκίες αποτίμησης.",
-      "bullCase": "Μεταγενέστερα επαληθευμένα στοιχεία αποδεικνύουν ευνοϊκή και διατηρήσιμη οικονομική επίδραση που δεν έχει ήδη ενσωματωθεί στην αποτίμηση.",
-      "bearCase": "Το γεγονός αποδεικνύεται ασήμαντο, αναιρείται από νεότερα στοιχεία ή παράγει ασθενέστερα οικονομικά αποτελέσματα από όσα αναμένει η αγορά.",
-      "catalysts": [
-        {
-          "text": "Η επίσημη πηγή επιβεβαιώνει: 4 filing — NRG ENERGY,.",
-          "evidenceIds": [
-            "evidence:sec:0001225208-26-006657"
-          ],
-          "confidence": 0.94,
-          "inference": false
-        }
-      ],
-      "risks": [
-        {
-          "text": "Τα διαθέσιμα στοιχεία μπορεί να είναι πραγματικά αλλά όχι οικονομικά ουσιαστικά για τους μετόχους.",
-          "evidenceIds": [
-            "evidence:sec:0001225208-26-006657"
-          ],
-          "confidence": 0.82,
-          "inference": true
-        },
-        {
-          "text": "Οι καταγεγραμμένες υποχρεώσεις είναι υψηλές σε σχέση με τα περιουσιακά στοιχεία και μπορεί να περιορίζουν τη μελλοντική κατανομή κεφαλαίου.",
-          "evidenceIds": [
-            "evidence:sec:0001225208-26-006657",
-            "evidence:sec:0001974078-26-000271",
-            "evidence:sec:0001104659-26-083743"
-          ],
-          "confidence": 0.88,
-          "inference": true
-        },
-        {
-          "text": "Η τιμή και η ρευστότητα της μετοχής μπορεί να αντιδράσουν διαφορετικά από την υποκείμενη εταιρική εξέλιξη, ιδιαίτερα όταν οι προσδοκίες είχαν ήδη ενσωματωθεί πριν από τη δημοσίευση.",
-          "evidenceIds": [
-            "evidence:sec:0001225208-26-006657",
-            "evidence:sec:0001974078-26-000271",
-            "evidence:sec:0001104659-26-083743"
-          ],
-          "confidence": 0.72,
-          "inference": true
-        }
-      ],
-      "invalidationCondition": "Η υπόθεση παραμένει μη ταξινομημένη μέχρι να υποστηρίζονται από επαληθευμένα στοιχεία ένας μετρήσιμος αιτιώδης σύνδεσμος και σαφής συνθήκη ακύρωσης.",
-      "reviewDate": "2026-10-03",
-      "blockers": [
-        "INDEPENDENT_CROSS_CHECK_REQUIRED",
-        "CLAIM_CORROBORATION_REQUIRED"
-      ],
-      "blockerLabels": [
-        "Λείπει ανεξάρτητη διασταύρωση",
-        "Ο συγκεκριμένος ισχυρισμός δεν έχει επιβεβαιωθεί επαρκώς"
-      ],
-      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
-      "sources": [
-        {
-          "sourceName": "SEC EDGAR",
-          "sourceType": "REGULATORY_FILING",
-          "title": "4 filing — NRG ENERGY,",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1013871/000122520826006657/xslF345X06/doc4.xml",
-          "publishedAt": "2026-07-17T12:00:00.000Z",
-          "reviewed": true,
-          "primary": true
-        },
-        {
-          "sourceName": "SEC EDGAR",
-          "sourceType": "REGULATORY_FILING",
-          "title": "144 filing — NRG ENERGY,",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1013871/000197407826000271/xsl144X01/primary_doc.xml",
-          "publishedAt": "2026-07-15T12:00:00.000Z",
-          "reviewed": true,
-          "primary": true
-        },
-        {
-          "sourceName": "SEC EDGAR",
-          "sourceType": "REGULATORY_FILING",
-          "title": "8-K filing — NRG ENERGY,",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1013871/000110465926083743/tm2620335d1_8k.htm",
-          "publishedAt": "2026-07-15T12:00:00.000Z",
-          "reviewed": true,
-          "primary": true
-        }
-      ],
-      "metricNotes": [],
-      "generatedAt": "2026-08-04T11:34:06.670Z",
-      "publicationMode": null,
-      "finalAction": {
-        "format": "investor-control-final-action",
-        "version": 2,
-        "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-04T11:34:06.670Z",
-        "validUntil": "2026-08-05T11:34:06.670Z",
-        "status": "BLOCKED",
-        "marketAction": "WATCH",
-        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "holderAction": "WATCH",
-        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "nonHolderAction": "WATCH",
-        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "urgency": "NONE",
-        "urgencyLabel": "Χωρίς τελική ενέργεια",
-        "confidenceScore": 80,
-        "dataQualityScore": 55,
-        "reasons": [
-          "FINAL_ACTION_BLOCKED"
-        ],
-        "blockers": [
-          "DOSSIER_NOT_PUBLISHABLE",
-          "DOSSIER_NOT_READY",
-          "CROSS_CHECK_NOT_READY",
-          "REFERENCE_PRICE_STALE"
-        ],
-        "freshness": {
-          "referencePriceAgeHours": 15.568519444444444,
-          "dossierAgeHours": 0,
-          "latestMarketAgeHours": 94.06851944444445
-        },
-        "risk": {
-          "riskScore": 32,
-          "fundamentalFlags": [
-            "HIGH_LIABILITIES_TO_ASSETS"
-          ],
-          "marketFlags": [
-            "HIGH_VOLATILITY",
-            "MATERIAL_DRAWDOWN",
-            "BELOW_50_DAY_AVERAGE",
-            "WEAK_RELATIVE_STRENGTH"
-          ]
-        },
-        "execution": {
-          "automaticBrokerOrder": false,
-          "requiresUserExecution": true
-        }
-      }
-    }
-  },
-  "discoveryRadar": [
-    {
-      "discoveryId": "discovery:company:sec:0001556739:2026-08-04",
-      "companyId": "company:sec:0001556739",
-      "companyName": "Thryv Holdings,",
-      "symbol": "THRY",
-      "exchange": "Nasdaq",
-      "discoveryScore": 82,
-      "status": "DISCOVERED_RESEARCH_REQUIRED",
-      "suggestedAction": "WATCH",
-      "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-      "reasons": [
-        "Νέα επίσημη κατάθεση 10-Q στη SEC",
-        "Το γεγονός είναι πολύ πρόσφατο",
-        "Απαιτείται ανάγνωση της κατάθεσης για να προσδιοριστεί η ουσία του γεγονότος",
-        "Νέα επίσημη κατάθεση 8-K στη SEC",
-        "Νέα αποτελέσματα ή καθοδήγηση διοίκησης"
-      ],
-      "latestEventAt": "2026-08-04T11:31:40.000Z",
-      "events": [
-        {
-          "form": "8-K",
-          "title": "8-K - Thryv Holdings, Inc. (0001556739) (Filer)",
-          "publishedAt": "2026-08-04T11:30:24.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1556739/000155673926000039/0001556739-26-000039-index.htm",
-          "eventScore": 82
-        },
-        {
-          "form": "10-Q",
-          "title": "10-Q - Thryv Holdings, Inc. (0001556739) (Filer)",
-          "publishedAt": "2026-08-04T11:31:40.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1556739/000155673926000040/0001556739-26-000040-index.htm",
-          "eventScore": 70
-        }
-      ],
-      "isExistingFocusCompany": false
-    },
-    {
-      "discoveryId": "discovery:company:sec:0000819793:2026-08-04",
-      "companyId": "company:sec:0000819793",
-      "companyName": "ALBANY INTERNATIONAL CORP",
-      "symbol": "AIN",
-      "exchange": "NYSE",
-      "discoveryScore": 82,
-      "status": "DISCOVERED_RESEARCH_REQUIRED",
-      "suggestedAction": "WATCH",
-      "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-      "reasons": [
-        "Νέα επίσημη κατάθεση 8-K στη SEC",
-        "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-        "Το γεγονός είναι πολύ πρόσφατο"
-      ],
-      "latestEventAt": "2026-08-04T11:31:04.000Z",
-      "events": [
-        {
-          "form": "8-K",
-          "title": "8-K - ALBANY INTERNATIONAL CORP /DE/ (0000819793) (Filer)",
-          "publishedAt": "2026-08-04T11:31:04.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/819793/000162828026052156/0001628280-26-052156-index.htm",
-          "eventScore": 82
-        }
-      ],
-      "isExistingFocusCompany": false
-    },
-    {
-      "discoveryId": "discovery:company:sec:0001583648:2026-08-04",
-      "companyId": "company:sec:0001583648",
-      "companyName": "PALVELLA THERAPEUTICS,",
-      "symbol": "PVLA",
-      "exchange": "Nasdaq",
-      "discoveryScore": 82,
-      "status": "DISCOVERED_RESEARCH_REQUIRED",
-      "suggestedAction": "WATCH",
-      "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-      "reasons": [
-        "Νέα επίσημη κατάθεση 8-K στη SEC",
-        "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-        "Το γεγονός είναι πολύ πρόσφατο"
-      ],
-      "latestEventAt": "2026-08-04T11:30:19.000Z",
-      "events": [
-        {
-          "form": "8-K",
-          "title": "8-K - PALVELLA THERAPEUTICS, INC. (0001583648) (Filer)",
-          "publishedAt": "2026-08-04T11:30:19.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1583648/000119312526331556/0001193125-26-331556-index.htm",
-          "eventScore": 82
-        }
-      ],
-      "isExistingFocusCompany": false
-    },
-    {
-      "discoveryId": "discovery:company:sec:0001013871:2026-08-04",
-      "companyId": "company:sec:0001013871",
-      "companyName": "NRG ENERGY,",
-      "symbol": "NRG",
-      "exchange": "NYSE",
-      "discoveryScore": 82,
-      "status": "DISCOVERED_RESEARCH_REQUIRED",
-      "suggestedAction": "WATCH",
-      "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-      "reasons": [
-        "Νέα επίσημη κατάθεση 8-K στη SEC",
-        "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-        "Το γεγονός είναι πολύ πρόσφατο"
-      ],
-      "latestEventAt": "2026-08-04T11:28:50.000Z",
-      "events": [
-        {
-          "form": "8-K",
-          "title": "8-K - NRG ENERGY, INC. (0001013871) (Filer)",
-          "publishedAt": "2026-08-04T11:28:50.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1013871/000101387126000018/0001013871-26-000018-index.htm",
-          "eventScore": 82
-        }
-      ],
-      "isExistingFocusCompany": false
-    },
-    {
-      "discoveryId": "discovery:company:sec:0001262823:2026-08-04",
-      "companyId": "company:sec:0001262823",
-      "companyName": "WESTLAKE",
-      "symbol": "WLK",
-      "exchange": "NYSE",
-      "discoveryScore": 82,
-      "status": "DISCOVERED_RESEARCH_REQUIRED",
-      "suggestedAction": "WATCH",
-      "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-      "reasons": [
-        "Νέα επίσημη κατάθεση 8-K στη SEC",
-        "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-        "Το γεγονός είναι πολύ πρόσφατο"
-      ],
-      "latestEventAt": "2026-08-04T11:27:36.000Z",
-      "events": [
-        {
-          "form": "8-K",
-          "title": "8-K - WESTLAKE CORP (0001262823) (Filer)",
-          "publishedAt": "2026-08-04T11:27:36.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1262823/000126282326000026/0001262823-26-000026-index.htm",
-          "eventScore": 82
-        }
-      ],
-      "isExistingFocusCompany": false
-    },
-    {
-      "discoveryId": "discovery:company:sec:0001604665:2026-08-04",
-      "companyId": "company:sec:0001604665",
-      "companyName": "Westlake Chemical Partners LP",
-      "symbol": "WLKP",
-      "exchange": "NYSE",
-      "discoveryScore": 82,
-      "status": "DISCOVERED_RESEARCH_REQUIRED",
-      "suggestedAction": "WATCH",
-      "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-      "reasons": [
-        "Νέα επίσημη κατάθεση 8-K στη SEC",
-        "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-        "Το γεγονός είναι πολύ πρόσφατο"
-      ],
-      "latestEventAt": "2026-08-04T11:27:33.000Z",
-      "events": [
-        {
-          "form": "8-K",
-          "title": "8-K - Westlake Chemical Partners LP (0001604665) (Filer)",
-          "publishedAt": "2026-08-04T11:27:33.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1604665/000160466526000022/0001604665-26-000022-index.htm",
-          "eventScore": 82
-        }
-      ],
-      "isExistingFocusCompany": false
-    },
-    {
-      "discoveryId": "discovery:company:sec:0001766478:2026-08-04",
-      "companyId": "company:sec:0001766478",
-      "companyName": "Angel Oak Mortgage REIT,",
-      "symbol": "AOMD",
-      "exchange": "NYSE",
-      "discoveryScore": 82,
-      "status": "DISCOVERED_RESEARCH_REQUIRED",
-      "suggestedAction": "WATCH",
-      "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-      "reasons": [
-        "Νέα επίσημη κατάθεση 8-K στη SEC",
-        "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-        "Το γεγονός είναι πολύ πρόσφατο"
-      ],
-      "latestEventAt": "2026-08-04T11:23:37.000Z",
-      "events": [
-        {
-          "form": "8-K",
-          "title": "8-K - Angel Oak Mortgage REIT, Inc. (0001766478) (Filer)",
-          "publishedAt": "2026-08-04T11:23:37.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1766478/000162828026052154/0001628280-26-052154-index.htm",
-          "eventScore": 82
-        }
-      ],
-      "isExistingFocusCompany": false
-    },
-    {
-      "discoveryId": "discovery:company:sec:0001827090:2026-08-04",
-      "companyId": "company:sec:0001827090",
-      "companyName": "Certara,",
-      "symbol": "CERT",
-      "exchange": "Nasdaq",
-      "discoveryScore": 82,
-      "status": "DISCOVERED_RESEARCH_REQUIRED",
-      "suggestedAction": "WATCH",
-      "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-      "reasons": [
-        "Νέα επίσημη κατάθεση 10-Q στη SEC",
-        "Το γεγονός είναι πολύ πρόσφατο",
-        "Απαιτείται ανάγνωση της κατάθεσης για να προσδιοριστεί η ουσία του γεγονότος",
-        "Νέα επίσημη κατάθεση 8-K στη SEC",
-        "Νέα αποτελέσματα ή καθοδήγηση διοίκησης"
-      ],
-      "latestEventAt": "2026-08-04T11:19:08.000Z",
-      "events": [
-        {
-          "form": "8-K",
-          "title": "8-K - Certara, Inc. (0001827090) (Filer)",
-          "publishedAt": "2026-08-04T11:09:53.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1827090/000182709026000026/0001827090-26-000026-index.htm",
-          "eventScore": 82
-        },
-        {
-          "form": "10-Q",
-          "title": "10-Q - Certara, Inc. (0001827090) (Filer)",
-          "publishedAt": "2026-08-04T11:19:08.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1827090/000182709026000028/0001827090-26-000028-index.htm",
-          "eventScore": 70
-        },
-        {
-          "form": "8-K",
-          "title": "8-K - Certara, Inc. (0001827090) (Filer)",
-          "publishedAt": "2026-08-04T11:00:38.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1827090/000110465926090050/0001104659-26-090050-index.htm",
-          "eventScore": 65
-        }
-      ],
-      "isExistingFocusCompany": false
-    },
-    {
-      "discoveryId": "discovery:company:sec:0001260221:2026-08-04",
-      "companyId": "company:sec:0001260221",
-      "companyName": "TransDigm Group",
-      "symbol": "TDG",
-      "exchange": "NYSE",
-      "discoveryScore": 82,
-      "status": "DISCOVERED_RESEARCH_REQUIRED",
-      "suggestedAction": "WATCH",
-      "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-      "reasons": [
-        "Νέα επίσημη κατάθεση 8-K στη SEC",
-        "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-        "Το γεγονός είναι πολύ πρόσφατο"
-      ],
-      "latestEventAt": "2026-08-04T11:17:39.000Z",
-      "events": [
-        {
-          "form": "8-K",
-          "title": "8-K - TransDigm Group INC (0001260221) (Filer)",
-          "publishedAt": "2026-08-04T11:17:39.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1260221/000126022126000052/0001260221-26-000052-index.htm",
-          "eventScore": 82
-        }
-      ],
-      "isExistingFocusCompany": false
-    },
-    {
-      "discoveryId": "discovery:company:sec:0001831651:2026-08-04",
-      "companyId": "company:sec:0001831651",
-      "companyName": "Shoals Technologies Group,",
-      "symbol": "SHLS",
-      "exchange": "Nasdaq",
-      "discoveryScore": 82,
-      "status": "DISCOVERED_RESEARCH_REQUIRED",
-      "suggestedAction": "WATCH",
-      "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-      "reasons": [
-        "Νέα επίσημη κατάθεση 8-K στη SEC",
-        "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-        "Το γεγονός είναι πολύ πρόσφατο"
-      ],
-      "latestEventAt": "2026-08-04T11:14:30.000Z",
-      "events": [
-        {
-          "form": "8-K",
-          "title": "8-K - Shoals Technologies Group, Inc. (0001831651) (Filer)",
-          "publishedAt": "2026-08-04T11:14:30.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1831651/000183165126000105/0001831651-26-000105-index.htm",
-          "eventScore": 82
-        }
-      ],
-      "isExistingFocusCompany": false
-    },
-    {
-      "discoveryId": "discovery:company:sec:0001745999:2026-08-04",
-      "companyId": "company:sec:0001745999",
-      "companyName": "Beam Therapeutics",
-      "symbol": "BEAM",
-      "exchange": "Nasdaq",
-      "discoveryScore": 82,
-      "status": "DISCOVERED_RESEARCH_REQUIRED",
-      "suggestedAction": "WATCH",
-      "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-      "reasons": [
-        "Νέα επίσημη κατάθεση 10-Q στη SEC",
-        "Το γεγονός είναι πολύ πρόσφατο",
-        "Απαιτείται ανάγνωση της κατάθεσης για να προσδιοριστεί η ουσία του γεγονότος",
-        "Νέα επίσημη κατάθεση 8-K στη SEC",
-        "Νέα αποτελέσματα ή καθοδήγηση διοίκησης"
-      ],
-      "latestEventAt": "2026-08-04T11:13:59.000Z",
-      "events": [
-        {
-          "form": "8-K",
-          "title": "8-K - Beam Therapeutics Inc. (0001745999) (Filer)",
-          "publishedAt": "2026-08-04T11:09:08.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1745999/000119312526331522/0001193125-26-331522-index.htm",
-          "eventScore": 82
-        },
-        {
-          "form": "10-Q",
-          "title": "10-Q - Beam Therapeutics Inc. (0001745999) (Filer)",
-          "publishedAt": "2026-08-04T11:13:59.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1745999/000119312526331541/0001193125-26-331541-index.htm",
-          "eventScore": 70
-        }
-      ],
-      "isExistingFocusCompany": false
-    },
-    {
-      "discoveryId": "discovery:company:sec:0001779128:2026-08-04",
-      "companyId": "company:sec:0001779128",
-      "companyName": "Strata Critical Medical,",
-      "symbol": "SRTA",
-      "exchange": "Nasdaq",
-      "discoveryScore": 82,
-      "status": "DISCOVERED_RESEARCH_REQUIRED",
-      "suggestedAction": "WATCH",
-      "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-      "reasons": [
-        "Νέα επίσημη κατάθεση 8-K στη SEC",
-        "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-        "Το γεγονός είναι πολύ πρόσφατο"
-      ],
-      "latestEventAt": "2026-08-04T11:13:54.000Z",
-      "events": [
-        {
-          "form": "8-K",
-          "title": "8-K - Strata Critical Medical, Inc. (0001779128) (Filer)",
-          "publishedAt": "2026-08-04T11:13:54.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1779128/000162828026052152/0001628280-26-052152-index.htm",
-          "eventScore": 82
-        }
-      ],
-      "isExistingFocusCompany": false
-    }
-  ],
-  "decisions": [],
-  "published": [],
-  "reviewReady": [],
-  "research": [
-    {
-      "id": "dossier:company:sec:0001013871:28ade4fc2466b548a77f",
-      "companyId": "company:sec:0001013871",
-      "companyName": "NRG ENERGY,",
-      "symbol": "NRG",
-      "exchange": "NYSE",
-      "origin": "AUTONOMOUS_DISCOVERY",
-      "discovery": {
-        "discoveryId": "discovery:company:sec:0001013871:2026-08-04",
-        "companyId": "company:sec:0001013871",
-        "companyName": "NRG ENERGY,",
-        "symbol": "NRG",
-        "exchange": "NYSE",
-        "cik": "0001013871",
-        "discoveryScore": 82,
-        "status": "DISCOVERED_RESEARCH_REQUIRED",
-        "suggestedAction": "WATCH",
-        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-        "isExistingFocusCompany": false,
-        "reasons": [
-          "Νέα επίσημη κατάθεση 8-K στη SEC",
-          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-          "Το γεγονός είναι πολύ πρόσφατο"
-        ],
-        "latestEventAt": "2026-08-04T11:28:50.000Z",
-        "events": [
-          {
-            "form": "8-K",
-            "title": "8-K - NRG ENERGY, INC. (0001013871) (Filer)",
-            "publishedAt": "2026-08-04T11:28:50.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1013871/000101387126000018/0001013871-26-000018-index.htm",
-            "eventScore": 82
-          }
-        ]
-      },
-      "status": "DRAFT_RESEARCH",
-      "statusLabel": "Αυτόματη ανακάλυψη · έρευνα σε εξέλιξη",
-      "category": "INSUFFICIENT_EVIDENCE",
-      "categoryLabel": "Ανεπαρκή στοιχεία",
-      "action": "WATCH",
-      "actionLabel": "Παρακολούθηση",
-      "timeHorizon": "UNDETERMINED",
-      "referencePrice": {
-        "value": 138.47,
-        "currency": "USD",
-        "timestamp": "2026-08-03T20:00:00.000Z",
-        "source": "Finnhub Quote API"
-      },
-      "referencePriceAgeHours": 15.568519444444444,
-      "thesis": "Η NRG ENERGY, έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: ετήσια μεταβολή εσόδων 9.37%, ετήσιο καθαρό περιθώριο 2.85%, μεταβολή απομειωμένου αριθμού μετοχών -6.13%, απόδοση 60 συνεδριάσεων -14.7%, σχετική ισχύς 60 συνεδριάσεων -18.18%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
-      "causalMechanism": "Το γεγονός μπορεί να επηρεάσει την αξία μόνο μέσω μετρήσιμης αλλαγής στις ταμειακές ροές, στον κίνδυνο ισολογισμού, στον αριθμό μετοχών, στην πιθανότητα λειτουργικής επιτυχίας ή στις προσδοκίες αποτίμησης.",
-      "bullCase": "Μεταγενέστερα επαληθευμένα στοιχεία αποδεικνύουν ευνοϊκή και διατηρήσιμη οικονομική επίδραση που δεν έχει ήδη ενσωματωθεί στην αποτίμηση.",
-      "bearCase": "Το γεγονός αποδεικνύεται ασήμαντο, αναιρείται από νεότερα στοιχεία ή παράγει ασθενέστερα οικονομικά αποτελέσματα από όσα αναμένει η αγορά.",
-      "catalysts": [
-        {
-          "text": "Η επίσημη πηγή επιβεβαιώνει: 4 filing — NRG ENERGY,.",
-          "evidenceIds": [
-            "evidence:sec:0001225208-26-006657"
-          ],
-          "confidence": 0.94,
-          "inference": false
-        }
-      ],
-      "risks": [
-        {
-          "text": "Τα διαθέσιμα στοιχεία μπορεί να είναι πραγματικά αλλά όχι οικονομικά ουσιαστικά για τους μετόχους.",
-          "evidenceIds": [
-            "evidence:sec:0001225208-26-006657"
-          ],
-          "confidence": 0.82,
-          "inference": true
-        },
-        {
-          "text": "Οι καταγεγραμμένες υποχρεώσεις είναι υψηλές σε σχέση με τα περιουσιακά στοιχεία και μπορεί να περιορίζουν τη μελλοντική κατανομή κεφαλαίου.",
-          "evidenceIds": [
-            "evidence:sec:0001225208-26-006657",
-            "evidence:sec:0001974078-26-000271",
-            "evidence:sec:0001104659-26-083743"
-          ],
-          "confidence": 0.88,
-          "inference": true
-        },
-        {
-          "text": "Η τιμή και η ρευστότητα της μετοχής μπορεί να αντιδράσουν διαφορετικά από την υποκείμενη εταιρική εξέλιξη, ιδιαίτερα όταν οι προσδοκίες είχαν ήδη ενσωματωθεί πριν από τη δημοσίευση.",
-          "evidenceIds": [
-            "evidence:sec:0001225208-26-006657",
-            "evidence:sec:0001974078-26-000271",
-            "evidence:sec:0001104659-26-083743"
-          ],
-          "confidence": 0.72,
-          "inference": true
-        }
-      ],
-      "invalidationCondition": "Η υπόθεση παραμένει μη ταξινομημένη μέχρι να υποστηρίζονται από επαληθευμένα στοιχεία ένας μετρήσιμος αιτιώδης σύνδεσμος και σαφής συνθήκη ακύρωσης.",
-      "reviewDate": "2026-10-03",
-      "blockers": [
-        "INDEPENDENT_CROSS_CHECK_REQUIRED",
-        "CLAIM_CORROBORATION_REQUIRED"
-      ],
-      "blockerLabels": [
-        "Λείπει ανεξάρτητη διασταύρωση",
-        "Ο συγκεκριμένος ισχυρισμός δεν έχει επιβεβαιωθεί επαρκώς"
-      ],
-      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
-      "sources": [
-        {
-          "sourceName": "SEC EDGAR",
-          "sourceType": "REGULATORY_FILING",
-          "title": "4 filing — NRG ENERGY,",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1013871/000122520826006657/xslF345X06/doc4.xml",
-          "publishedAt": "2026-07-17T12:00:00.000Z",
-          "reviewed": true,
-          "primary": true
-        },
-        {
-          "sourceName": "SEC EDGAR",
-          "sourceType": "REGULATORY_FILING",
-          "title": "144 filing — NRG ENERGY,",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1013871/000197407826000271/xsl144X01/primary_doc.xml",
-          "publishedAt": "2026-07-15T12:00:00.000Z",
-          "reviewed": true,
-          "primary": true
-        },
-        {
-          "sourceName": "SEC EDGAR",
-          "sourceType": "REGULATORY_FILING",
-          "title": "8-K filing — NRG ENERGY,",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1013871/000110465926083743/tm2620335d1_8k.htm",
-          "publishedAt": "2026-07-15T12:00:00.000Z",
-          "reviewed": true,
-          "primary": true
-        }
-      ],
-      "metricNotes": [],
-      "generatedAt": "2026-08-04T11:34:06.670Z",
-      "publicationMode": null,
-      "finalAction": {
-        "format": "investor-control-final-action",
-        "version": 2,
-        "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-04T11:34:06.670Z",
-        "validUntil": "2026-08-05T11:34:06.670Z",
-        "status": "BLOCKED",
-        "marketAction": "WATCH",
-        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "holderAction": "WATCH",
-        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "nonHolderAction": "WATCH",
-        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "urgency": "NONE",
-        "urgencyLabel": "Χωρίς τελική ενέργεια",
-        "confidenceScore": 80,
-        "dataQualityScore": 55,
-        "reasons": [
-          "FINAL_ACTION_BLOCKED"
-        ],
-        "blockers": [
-          "DOSSIER_NOT_PUBLISHABLE",
-          "DOSSIER_NOT_READY",
-          "CROSS_CHECK_NOT_READY",
-          "REFERENCE_PRICE_STALE"
-        ],
-        "freshness": {
-          "referencePriceAgeHours": 15.568519444444444,
-          "dossierAgeHours": 0,
-          "latestMarketAgeHours": 94.06851944444445
-        },
-        "risk": {
-          "riskScore": 32,
-          "fundamentalFlags": [
-            "HIGH_LIABILITIES_TO_ASSETS"
-          ],
-          "marketFlags": [
-            "HIGH_VOLATILITY",
-            "MATERIAL_DRAWDOWN",
-            "BELOW_50_DAY_AVERAGE",
-            "WEAK_RELATIVE_STRENGTH"
-          ]
-        },
-        "execution": {
-          "automaticBrokerOrder": false,
-          "requiresUserExecution": true
-        }
-      }
-    },
-    {
-      "id": "dossier:company:sec:0001262823:6d1ce99cc60282759878",
-      "companyId": "company:sec:0001262823",
-      "companyName": "WESTLAKE",
-      "symbol": "WLK",
-      "exchange": "NYSE",
-      "origin": "AUTONOMOUS_DISCOVERY",
-      "discovery": {
-        "discoveryId": "discovery:company:sec:0001262823:2026-08-04",
-        "companyId": "company:sec:0001262823",
-        "companyName": "WESTLAKE",
-        "symbol": "WLK",
-        "exchange": "NYSE",
-        "cik": "0001262823",
-        "discoveryScore": 82,
-        "status": "DISCOVERED_RESEARCH_REQUIRED",
-        "suggestedAction": "WATCH",
-        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-        "isExistingFocusCompany": false,
-        "reasons": [
-          "Νέα επίσημη κατάθεση 8-K στη SEC",
-          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-          "Το γεγονός είναι πολύ πρόσφατο"
-        ],
-        "latestEventAt": "2026-08-04T11:27:36.000Z",
-        "events": [
-          {
-            "form": "8-K",
-            "title": "8-K - WESTLAKE CORP (0001262823) (Filer)",
-            "publishedAt": "2026-08-04T11:27:36.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1262823/000126282326000026/0001262823-26-000026-index.htm",
-            "eventScore": 82
-          }
-        ]
-      },
-      "status": "DRAFT_RESEARCH",
-      "statusLabel": "Αυτόματη ανακάλυψη · έρευνα σε εξέλιξη",
-      "category": "INSUFFICIENT_EVIDENCE",
-      "categoryLabel": "Ανεπαρκή στοιχεία",
-      "action": "WATCH",
-      "actionLabel": "Παρακολούθηση",
-      "timeHorizon": "UNDETERMINED",
-      "referencePrice": {
-        "value": 69.89,
-        "currency": "USD",
-        "timestamp": "2026-08-03T20:00:00.000Z",
-        "source": "Finnhub Quote API"
-      },
-      "referencePriceAgeHours": 15.568519444444444,
-      "thesis": "Η WESTLAKE έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: ετήσια μεταβολή εσόδων -8.01%, ετήσιο καθαρό περιθώριο -13.5%, μεταβολή απομειωμένου αριθμού μετοχών -0.73%, απόδοση 60 συνεδριάσεων -32.31%, σχετική ισχύς 60 συνεδριάσεων -35.79%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
-      "causalMechanism": "Το γεγονός μπορεί να επηρεάσει την αξία μόνο μέσω μετρήσιμης αλλαγής στις ταμειακές ροές, στον κίνδυνο ισολογισμού, στον αριθμό μετοχών, στην πιθανότητα λειτουργικής επιτυχίας ή στις προσδοκίες αποτίμησης.",
-      "bullCase": "Μεταγενέστερα επαληθευμένα στοιχεία αποδεικνύουν ευνοϊκή και διατηρήσιμη οικονομική επίδραση που δεν έχει ήδη ενσωματωθεί στην αποτίμηση.",
-      "bearCase": "Το γεγονός αποδεικνύεται ασήμαντο, αναιρείται από νεότερα στοιχεία ή παράγει ασθενέστερα οικονομικά αποτελέσματα από όσα αναμένει η αγορά.",
-      "catalysts": [
-        {
-          "text": "Η επίσημη πηγή επιβεβαιώνει: 8-K filing — WESTLAKE.",
-          "evidenceIds": [
-            "evidence:sec:0001262823-26-000026"
-          ],
-          "confidence": 0.94,
-          "inference": false
-        }
-      ],
-      "risks": [
-        {
-          "text": "Τα διαθέσιμα στοιχεία μπορεί να είναι πραγματικά αλλά όχι οικονομικά ουσιαστικά για τους μετόχους.",
-          "evidenceIds": [
-            "evidence:sec:0001262823-26-000026"
-          ],
-          "confidence": 0.82,
-          "inference": true
-        },
-        {
-          "text": "Η καταγεγραμμένη παραγωγή ελεύθερων ταμειακών ροών παραμένει αρνητική, αυξάνοντας την εξάρτηση από την υπάρχουσα ρευστότητα ή από νέα χρηματοδότηση.",
-          "evidenceIds": [
-            "evidence:sec:0001262823-26-000026"
-          ],
-          "confidence": 0.88,
-          "inference": true
-        },
-        {
-          "text": "Το τελευταίο ετήσιο καθαρό περιθώριο είναι αρνητικό, αφήνοντας την επενδυτική υπόθεση εξαρτημένη από μελλοντική λειτουργική βελτίωση.",
-          "evidenceIds": [
-            "evidence:sec:0001262823-26-000026"
-          ],
-          "confidence": 0.88,
-          "inference": true
-        },
-        {
-          "text": "Η τιμή και η ρευστότητα της μετοχής μπορεί να αντιδράσουν διαφορετικά από την υποκείμενη εταιρική εξέλιξη, ιδιαίτερα όταν οι προσδοκίες είχαν ήδη ενσωματωθεί πριν από τη δημοσίευση.",
-          "evidenceIds": [
-            "evidence:sec:0001262823-26-000026"
-          ],
-          "confidence": 0.72,
-          "inference": true
-        }
-      ],
-      "invalidationCondition": "Η υπόθεση παραμένει μη ταξινομημένη μέχρι να υποστηρίζονται από επαληθευμένα στοιχεία ένας μετρήσιμος αιτιώδης σύνδεσμος και σαφής συνθήκη ακύρωσης.",
-      "reviewDate": "2026-10-03",
-      "blockers": [
-        "INDEPENDENT_CROSS_CHECK_REQUIRED",
-        "CLAIM_CORROBORATION_REQUIRED"
-      ],
-      "blockerLabels": [
-        "Λείπει ανεξάρτητη διασταύρωση",
-        "Ο συγκεκριμένος ισχυρισμός δεν έχει επιβεβαιωθεί επαρκώς"
-      ],
-      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
-      "sources": [
-        {
-          "sourceName": "SEC EDGAR",
-          "sourceType": "REGULATORY_FILING",
-          "title": "8-K filing — WESTLAKE",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1262823/000126282326000026/wlk-20260804.htm",
-          "publishedAt": "2026-08-04T12:00:00.000Z",
-          "reviewed": true,
-          "primary": true
-        }
-      ],
-      "metricNotes": [],
-      "generatedAt": "2026-08-04T11:34:06.670Z",
-      "publicationMode": null,
-      "finalAction": {
-        "format": "investor-control-final-action",
-        "version": 2,
-        "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-04T11:34:06.670Z",
-        "validUntil": "2026-08-05T11:34:06.670Z",
-        "status": "BLOCKED",
-        "marketAction": "WATCH",
-        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "holderAction": "WATCH",
-        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "nonHolderAction": "WATCH",
-        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "urgency": "NONE",
-        "urgencyLabel": "Χωρίς τελική ενέργεια",
-        "confidenceScore": 80,
-        "dataQualityScore": 50,
-        "reasons": [
-          "FINAL_ACTION_BLOCKED"
-        ],
-        "blockers": [
-          "DOSSIER_NOT_PUBLISHABLE",
-          "DOSSIER_NOT_READY",
-          "CROSS_CHECK_NOT_READY",
-          "REFERENCE_PRICE_STALE"
-        ],
-        "freshness": {
-          "referencePriceAgeHours": 15.568519444444444,
-          "dossierAgeHours": 0,
-          "latestMarketAgeHours": 94.06851944444445
-        },
-        "risk": {
-          "riskScore": 40,
-          "fundamentalFlags": [
-            "NEGATIVE_FREE_CASH_FLOW",
-            "NEGATIVE_NET_MARGIN"
-          ],
-          "marketFlags": [
-            "MATERIAL_DRAWDOWN",
-            "BELOW_50_DAY_AVERAGE",
-            "WEAK_RELATIVE_STRENGTH"
-          ]
-        },
-        "execution": {
-          "automaticBrokerOrder": false,
-          "requiresUserExecution": true
-        }
-      }
-    },
-    {
-      "id": "dossier:company:sec:0000819793:58c5175bb6d20b35d036",
-      "companyId": "company:sec:0000819793",
-      "companyName": "ALBANY INTERNATIONAL CORP",
-      "symbol": "AIN",
-      "exchange": "NYSE",
-      "origin": "AUTONOMOUS_DISCOVERY",
-      "discovery": {
-        "discoveryId": "discovery:company:sec:0000819793:2026-08-04",
-        "companyId": "company:sec:0000819793",
-        "companyName": "ALBANY INTERNATIONAL CORP",
-        "symbol": "AIN",
-        "exchange": "NYSE",
-        "cik": "0000819793",
-        "discoveryScore": 82,
-        "status": "DISCOVERED_RESEARCH_REQUIRED",
-        "suggestedAction": "WATCH",
-        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-        "isExistingFocusCompany": false,
-        "reasons": [
-          "Νέα επίσημη κατάθεση 8-K στη SEC",
-          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-          "Το γεγονός είναι πολύ πρόσφατο"
-        ],
-        "latestEventAt": "2026-08-04T11:31:04.000Z",
-        "events": [
-          {
-            "form": "8-K",
-            "title": "8-K - ALBANY INTERNATIONAL CORP /DE/ (0000819793) (Filer)",
-            "publishedAt": "2026-08-04T11:31:04.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/819793/000162828026052156/0001628280-26-052156-index.htm",
-            "eventScore": 82
-          }
-        ]
-      },
-      "status": "DRAFT_RESEARCH",
-      "statusLabel": "Αυτόματη ανακάλυψη · έρευνα σε εξέλιξη",
-      "category": "INSUFFICIENT_EVIDENCE",
-      "categoryLabel": "Ανεπαρκή στοιχεία",
-      "action": "WATCH",
-      "actionLabel": "Παρακολούθηση",
-      "timeHorizon": "UNDETERMINED",
-      "referencePrice": {
-        "value": 75.12,
-        "currency": "USD",
-        "timestamp": "2026-08-03T20:00:00.000Z",
-        "source": "Finnhub Quote API"
-      },
-      "referencePriceAgeHours": 15.568519444444444,
-      "thesis": "Η ALBANY INTERNATIONAL CORP έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: ετήσια μεταβολή εσόδων -3.88%, ετήσιο καθαρό περιθώριο -4.85%, μεταβολή απομειωμένου αριθμού μετοχών -5.65%, απόδοση 60 συνεδριάσεων 27.93%, σχετική ισχύς 60 συνεδριάσεων 24.45%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
-      "causalMechanism": "Το γεγονός μπορεί να επηρεάσει την αξία μόνο μέσω μετρήσιμης αλλαγής στις ταμειακές ροές, στον κίνδυνο ισολογισμού, στον αριθμό μετοχών, στην πιθανότητα λειτουργικής επιτυχίας ή στις προσδοκίες αποτίμησης.",
-      "bullCase": "Μεταγενέστερα επαληθευμένα στοιχεία αποδεικνύουν ευνοϊκή και διατηρήσιμη οικονομική επίδραση που δεν έχει ήδη ενσωματωθεί στην αποτίμηση.",
-      "bearCase": "Το γεγονός αποδεικνύεται ασήμαντο, αναιρείται από νεότερα στοιχεία ή παράγει ασθενέστερα οικονομικά αποτελέσματα από όσα αναμένει η αγορά.",
-      "catalysts": [
-        {
-          "text": "Η επίσημη πηγή επιβεβαιώνει: 8-K filing — ALBANY INTERNATIONAL CORP.",
-          "evidenceIds": [
-            "evidence:sec:0001628280-26-052156"
-          ],
-          "confidence": 0.94,
-          "inference": false
-        }
-      ],
-      "risks": [
-        {
-          "text": "Τα διαθέσιμα στοιχεία μπορεί να είναι πραγματικά αλλά όχι οικονομικά ουσιαστικά για τους μετόχους.",
-          "evidenceIds": [
-            "evidence:sec:0001628280-26-052156"
-          ],
-          "confidence": 0.82,
-          "inference": true
-        },
-        {
-          "text": "Το τελευταίο ετήσιο καθαρό περιθώριο είναι αρνητικό, αφήνοντας την επενδυτική υπόθεση εξαρτημένη από μελλοντική λειτουργική βελτίωση.",
-          "evidenceIds": [
-            "evidence:sec:0001628280-26-052156"
-          ],
-          "confidence": 0.88,
-          "inference": true
-        },
-        {
-          "text": "Η τιμή και η ρευστότητα της μετοχής μπορεί να αντιδράσουν διαφορετικά από την υποκείμενη εταιρική εξέλιξη, ιδιαίτερα όταν οι προσδοκίες είχαν ήδη ενσωματωθεί πριν από τη δημοσίευση.",
-          "evidenceIds": [
-            "evidence:sec:0001628280-26-052156"
-          ],
-          "confidence": 0.72,
-          "inference": true
-        }
-      ],
-      "invalidationCondition": "Η υπόθεση παραμένει μη ταξινομημένη μέχρι να υποστηρίζονται από επαληθευμένα στοιχεία ένας μετρήσιμος αιτιώδης σύνδεσμος και σαφής συνθήκη ακύρωσης.",
-      "reviewDate": "2026-10-03",
-      "blockers": [
-        "INDEPENDENT_CROSS_CHECK_REQUIRED",
-        "CLAIM_CORROBORATION_REQUIRED"
-      ],
-      "blockerLabels": [
-        "Λείπει ανεξάρτητη διασταύρωση",
-        "Ο συγκεκριμένος ισχυρισμός δεν έχει επιβεβαιωθεί επαρκώς"
-      ],
-      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
-      "sources": [
-        {
-          "sourceName": "SEC EDGAR",
-          "sourceType": "REGULATORY_FILING",
-          "title": "8-K filing — ALBANY INTERNATIONAL CORP",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/819793/000162828026052156/ain-20260804.htm",
-          "publishedAt": "2026-08-04T12:00:00.000Z",
-          "reviewed": true,
-          "primary": true
-        }
-      ],
-      "metricNotes": [],
-      "generatedAt": "2026-08-04T11:34:06.670Z",
-      "publicationMode": null,
-      "finalAction": {
-        "format": "investor-control-final-action",
-        "version": 2,
-        "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-04T11:34:06.670Z",
-        "validUntil": "2026-08-05T11:34:06.670Z",
-        "status": "BLOCKED",
-        "marketAction": "WATCH",
-        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "holderAction": "WATCH",
-        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "nonHolderAction": "WATCH",
-        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "urgency": "NONE",
-        "urgencyLabel": "Χωρίς τελική ενέργεια",
-        "confidenceScore": 80,
-        "dataQualityScore": 50,
-        "reasons": [
-          "FINAL_ACTION_BLOCKED"
-        ],
-        "blockers": [
-          "DOSSIER_NOT_PUBLISHABLE",
-          "DOSSIER_NOT_READY",
-          "CROSS_CHECK_NOT_READY",
-          "REFERENCE_PRICE_STALE"
-        ],
-        "freshness": {
-          "referencePriceAgeHours": 15.568519444444444,
-          "dossierAgeHours": 0,
-          "latestMarketAgeHours": 94.06851944444445
-        },
-        "risk": {
-          "riskScore": 30,
-          "fundamentalFlags": [
-            "NEGATIVE_NET_MARGIN"
-          ],
-          "marketFlags": []
-        },
-        "execution": {
-          "automaticBrokerOrder": false,
-          "requiresUserExecution": true
-        }
-      }
-    },
-    {
-      "id": "dossier:company:sec:0001583648:744e02915b618357eb75",
-      "companyId": "company:sec:0001583648",
-      "companyName": "PALVELLA THERAPEUTICS,",
-      "symbol": "PVLA",
-      "exchange": "Nasdaq",
-      "origin": "AUTONOMOUS_DISCOVERY",
-      "discovery": {
-        "discoveryId": "discovery:company:sec:0001583648:2026-08-04",
-        "companyId": "company:sec:0001583648",
-        "companyName": "PALVELLA THERAPEUTICS,",
-        "symbol": "PVLA",
-        "exchange": "Nasdaq",
-        "cik": "0001583648",
-        "discoveryScore": 82,
-        "status": "DISCOVERED_RESEARCH_REQUIRED",
-        "suggestedAction": "WATCH",
-        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-        "isExistingFocusCompany": false,
-        "reasons": [
-          "Νέα επίσημη κατάθεση 8-K στη SEC",
-          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-          "Το γεγονός είναι πολύ πρόσφατο"
-        ],
-        "latestEventAt": "2026-08-04T11:30:19.000Z",
-        "events": [
-          {
-            "form": "8-K",
-            "title": "8-K - PALVELLA THERAPEUTICS, INC. (0001583648) (Filer)",
-            "publishedAt": "2026-08-04T11:30:19.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1583648/000119312526331556/0001193125-26-331556-index.htm",
-            "eventScore": 82
-          }
-        ]
-      },
-      "status": "DRAFT_RESEARCH",
-      "statusLabel": "Αυτόματη ανακάλυψη · έρευνα σε εξέλιξη",
-      "category": "INSUFFICIENT_EVIDENCE",
-      "categoryLabel": "Ανεπαρκή στοιχεία",
-      "action": "WATCH",
-      "actionLabel": "Παρακολούθηση",
-      "timeHorizon": "UNDETERMINED",
-      "referencePrice": {
-        "value": 140.78,
-        "currency": "USD",
-        "timestamp": "2026-08-03T20:00:00.000Z",
-        "source": "Finnhub Quote API"
-      },
-      "referencePriceAgeHours": 15.568519444444444,
-      "thesis": "Η PALVELLA THERAPEUTICS, έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: ετήσια μεταβολή εσόδων 60.18%, ετήσιο καθαρό περιθώριο -95.58%, μεταβολή απομειωμένου αριθμού μετοχών 405.46%, απόδοση 60 συνεδριάσεων 7.39%, σχετική ισχύς 60 συνεδριάσεων 3.91%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
-      "causalMechanism": "Το γεγονός μπορεί να επηρεάσει την αξία μόνο μέσω μετρήσιμης αλλαγής στις ταμειακές ροές, στον κίνδυνο ισολογισμού, στον αριθμό μετοχών, στην πιθανότητα λειτουργικής επιτυχίας ή στις προσδοκίες αποτίμησης.",
-      "bullCase": "Μεταγενέστερα επαληθευμένα στοιχεία αποδεικνύουν ευνοϊκή και διατηρήσιμη οικονομική επίδραση που δεν έχει ήδη ενσωματωθεί στην αποτίμηση.",
-      "bearCase": "Το γεγονός αποδεικνύεται ασήμαντο, αναιρείται από νεότερα στοιχεία ή παράγει ασθενέστερα οικονομικά αποτελέσματα από όσα αναμένει η αγορά.",
-      "catalysts": [
-        {
-          "text": "Η επίσημη πηγή επιβεβαιώνει: 8-K filing — PALVELLA THERAPEUTICS,.",
-          "evidenceIds": [
-            "evidence:sec:0001193125-26-331556"
-          ],
-          "confidence": 0.94,
-          "inference": false
-        }
-      ],
-      "risks": [
-        {
-          "text": "Τα διαθέσιμα στοιχεία μπορεί να είναι πραγματικά αλλά όχι οικονομικά ουσιαστικά για τους μετόχους.",
-          "evidenceIds": [
-            "evidence:sec:0001193125-26-331556"
-          ],
-          "confidence": 0.82,
-          "inference": true
-        },
-        {
-          "text": "Η καταγεγραμμένη παραγωγή ελεύθερων ταμειακών ροών παραμένει αρνητική, αυξάνοντας την εξάρτηση από την υπάρχουσα ρευστότητα ή από νέα χρηματοδότηση.",
-          "evidenceIds": [
-            "evidence:sec:0001193125-26-331556",
-            "evidence:sec:0000053417-26-000050"
-          ],
-          "confidence": 0.88,
-          "inference": true
-        },
-        {
-          "text": "Ο καταγεγραμμένος απομειωμένος αριθμός μετοχών αυξήθηκε αρκετά ώστε να δημιουργεί σοβαρό κίνδυνο αραίωσης ανά μετοχή.",
-          "evidenceIds": [
-            "evidence:sec:0001193125-26-331556",
-            "evidence:sec:0000053417-26-000050"
-          ],
-          "confidence": 0.88,
-          "inference": true
-        },
-        {
-          "text": "Η ντετερμινιστική εκτίμηση τιμής προς πωλήσεις είναι ακραία, αφήνοντας ελάχιστο περιθώριο για απογοήτευση στην εκτέλεση.",
-          "evidenceIds": [
-            "evidence:sec:0001193125-26-331556",
-            "evidence:sec:0000053417-26-000050"
-          ],
-          "confidence": 0.88,
-          "inference": true
-        },
-        {
-          "text": "Το τελευταίο ετήσιο καθαρό περιθώριο είναι έντονα αρνητικό, επομένως το λειτουργικό μοντέλο δεν έχει ακόμη αποδείξει κερδοφορία.",
-          "evidenceIds": [
-            "evidence:sec:0001193125-26-331556",
-            "evidence:sec:0000053417-26-000050"
-          ],
-          "confidence": 0.88,
-          "inference": true
-        },
-        {
-          "text": "Η τιμή και η ρευστότητα της μετοχής μπορεί να αντιδράσουν διαφορετικά από την υποκείμενη εταιρική εξέλιξη, ιδιαίτερα όταν οι προσδοκίες είχαν ήδη ενσωματωθεί πριν από τη δημοσίευση.",
-          "evidenceIds": [
-            "evidence:sec:0001193125-26-331556",
-            "evidence:sec:0000053417-26-000050"
-          ],
-          "confidence": 0.72,
-          "inference": true
-        }
-      ],
-      "invalidationCondition": "Η υπόθεση παραμένει μη ταξινομημένη μέχρι να υποστηρίζονται από επαληθευμένα στοιχεία ένας μετρήσιμος αιτιώδης σύνδεσμος και σαφής συνθήκη ακύρωσης.",
-      "reviewDate": "2026-10-03",
-      "blockers": [
-        "INDEPENDENT_CROSS_CHECK_REQUIRED",
-        "CLAIM_CORROBORATION_REQUIRED"
-      ],
-      "blockerLabels": [
-        "Λείπει ανεξάρτητη διασταύρωση",
-        "Ο συγκεκριμένος ισχυρισμός δεν έχει επιβεβαιωθεί επαρκώς"
-      ],
-      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
-      "sources": [
-        {
-          "sourceName": "SEC EDGAR",
-          "sourceType": "REGULATORY_FILING",
-          "title": "8-K filing — PALVELLA THERAPEUTICS,",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1583648/000119312526331556/pvla-20260804.htm",
-          "publishedAt": "2026-08-04T12:00:00.000Z",
-          "reviewed": true,
-          "primary": true
-        },
-        {
-          "sourceName": "SEC EDGAR",
-          "sourceType": "REGULATORY_FILING",
-          "title": "SCHEDULE 13G filing — PALVELLA THERAPEUTICS,",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1583648/000005341726000050/xslSCHEDULE_13G_X02/primary_doc.xml",
-          "publishedAt": "2026-08-03T12:00:00.000Z",
-          "reviewed": true,
-          "primary": true
-        }
-      ],
-      "metricNotes": [],
-      "generatedAt": "2026-08-04T11:34:06.670Z",
-      "publicationMode": null,
-      "finalAction": {
-        "format": "investor-control-final-action",
-        "version": 2,
-        "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-04T11:34:06.670Z",
-        "validUntil": "2026-08-05T11:34:06.670Z",
-        "status": "BLOCKED",
-        "marketAction": "WATCH",
-        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "holderAction": "WATCH",
-        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "nonHolderAction": "WATCH",
-        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "urgency": "NONE",
-        "urgencyLabel": "Χωρίς τελική ενέργεια",
-        "confidenceScore": 56,
-        "dataQualityScore": 55,
-        "reasons": [
-          "FINAL_ACTION_BLOCKED"
-        ],
-        "blockers": [
-          "DOSSIER_NOT_PUBLISHABLE",
-          "DOSSIER_NOT_READY",
-          "CROSS_CHECK_NOT_READY",
-          "REFERENCE_PRICE_STALE"
-        ],
-        "freshness": {
-          "referencePriceAgeHours": 15.568519444444444,
-          "dossierAgeHours": 0,
-          "latestMarketAgeHours": 94.06851944444445
-        },
-        "risk": {
-          "riskScore": 88,
-          "fundamentalFlags": [
-            "NEGATIVE_FREE_CASH_FLOW",
-            "SEVERE_DILUTION",
-            "EXTREME_PRICE_TO_SALES",
-            "SEVERE_NEGATIVE_NET_MARGIN"
-          ],
-          "marketFlags": [
-            "EXTREME_VOLATILITY",
-            "MATERIAL_DRAWDOWN"
-          ]
-        },
-        "execution": {
-          "automaticBrokerOrder": false,
-          "requiresUserExecution": true
-        }
-      }
-    },
-    {
-      "id": "dossier:company:sec:0001556739:66003bc23ebeec8c13eb",
-      "companyId": "company:sec:0001556739",
-      "companyName": "Thryv Holdings,",
-      "symbol": "THRY",
-      "exchange": "Nasdaq",
-      "origin": "AUTONOMOUS_DISCOVERY",
-      "discovery": {
-        "discoveryId": "discovery:company:sec:0001556739:2026-08-04",
-        "companyId": "company:sec:0001556739",
-        "companyName": "Thryv Holdings,",
-        "symbol": "THRY",
-        "exchange": "Nasdaq",
-        "cik": "0001556739",
-        "discoveryScore": 82,
-        "status": "DISCOVERED_RESEARCH_REQUIRED",
-        "suggestedAction": "WATCH",
-        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-        "isExistingFocusCompany": false,
-        "reasons": [
-          "Νέα επίσημη κατάθεση 10-Q στη SEC",
-          "Το γεγονός είναι πολύ πρόσφατο",
-          "Απαιτείται ανάγνωση της κατάθεσης για να προσδιοριστεί η ουσία του γεγονότος",
-          "Νέα επίσημη κατάθεση 8-K στη SEC",
-          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης"
-        ],
-        "latestEventAt": "2026-08-04T11:31:40.000Z",
-        "events": [
-          {
-            "form": "8-K",
-            "title": "8-K - Thryv Holdings, Inc. (0001556739) (Filer)",
-            "publishedAt": "2026-08-04T11:30:24.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1556739/000155673926000039/0001556739-26-000039-index.htm",
-            "eventScore": 82
-          },
-          {
-            "form": "10-Q",
-            "title": "10-Q - Thryv Holdings, Inc. (0001556739) (Filer)",
-            "publishedAt": "2026-08-04T11:31:40.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1556739/000155673926000040/0001556739-26-000040-index.htm",
-            "eventScore": 70
-          }
-        ]
-      },
-      "status": "DRAFT_RESEARCH",
-      "statusLabel": "Αυτόματη ανακάλυψη · έρευνα σε εξέλιξη",
-      "category": "INSUFFICIENT_EVIDENCE",
-      "categoryLabel": "Ανεπαρκή στοιχεία",
-      "action": "WATCH",
-      "actionLabel": "Παρακολούθηση",
-      "timeHorizon": "UNDETERMINED",
-      "referencePrice": {
-        "value": 4.26,
-        "currency": "USD",
-        "timestamp": "2026-08-03T20:00:00.000Z",
-        "source": "Finnhub Quote API"
-      },
-      "referencePriceAgeHours": 15.568519444444444,
-      "thesis": "Η Thryv Holdings, έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: ετήσια μεταβολή εσόδων -4.75%, ετήσιο καθαρό περιθώριο 0.04%, μεταβολή απομειωμένου αριθμού μετοχών 19.75%, απόδοση 60 συνεδριάσεων 6.3%, σχετική ισχύς 60 συνεδριάσεων 2.82%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
-      "causalMechanism": "Το γεγονός μπορεί να επηρεάσει την αξία μόνο μέσω μετρήσιμης αλλαγής στις ταμειακές ροές, στον κίνδυνο ισολογισμού, στον αριθμό μετοχών, στην πιθανότητα λειτουργικής επιτυχίας ή στις προσδοκίες αποτίμησης.",
-      "bullCase": "Μεταγενέστερα επαληθευμένα στοιχεία αποδεικνύουν ευνοϊκή και διατηρήσιμη οικονομική επίδραση που δεν έχει ήδη ενσωματωθεί στην αποτίμηση.",
-      "bearCase": "Το γεγονός αποδεικνύεται ασήμαντο, αναιρείται από νεότερα στοιχεία ή παράγει ασθενέστερα οικονομικά αποτελέσματα από όσα αναμένει η αγορά.",
-      "catalysts": [
-        {
-          "text": "Η επίσημη πηγή επιβεβαιώνει: 8-K filing — Thryv Holdings,.",
-          "evidenceIds": [
-            "evidence:sec:0001556739-26-000039"
-          ],
-          "confidence": 0.94,
-          "inference": false
-        }
-      ],
-      "risks": [
-        {
-          "text": "Τα διαθέσιμα στοιχεία μπορεί να είναι πραγματικά αλλά όχι οικονομικά ουσιαστικά για τους μετόχους.",
-          "evidenceIds": [
-            "evidence:sec:0001556739-26-000039"
-          ],
-          "confidence": 0.82,
-          "inference": true
-        },
-        {
-          "text": "Ο καταγεγραμμένος απομειωμένος αριθμός μετοχών αυξήθηκε αρκετά ώστε να δημιουργεί ουσιαστικό κίνδυνο αραίωσης ανά μετοχή.",
-          "evidenceIds": [
-            "evidence:sec:0001556739-26-000039"
-          ],
-          "confidence": 0.88,
-          "inference": true
-        },
-        {
-          "text": "Η τιμή και η ρευστότητα της μετοχής μπορεί να αντιδράσουν διαφορετικά από την υποκείμενη εταιρική εξέλιξη, ιδιαίτερα όταν οι προσδοκίες είχαν ήδη ενσωματωθεί πριν από τη δημοσίευση.",
-          "evidenceIds": [
-            "evidence:sec:0001556739-26-000039"
-          ],
-          "confidence": 0.72,
-          "inference": true
-        }
-      ],
-      "invalidationCondition": "Η υπόθεση παραμένει μη ταξινομημένη μέχρι να υποστηρίζονται από επαληθευμένα στοιχεία ένας μετρήσιμος αιτιώδης σύνδεσμος και σαφής συνθήκη ακύρωσης.",
-      "reviewDate": "2026-10-03",
-      "blockers": [
-        "INDEPENDENT_CROSS_CHECK_REQUIRED",
-        "CLAIM_CORROBORATION_REQUIRED"
-      ],
-      "blockerLabels": [
-        "Λείπει ανεξάρτητη διασταύρωση",
-        "Ο συγκεκριμένος ισχυρισμός δεν έχει επιβεβαιωθεί επαρκώς"
-      ],
-      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
-      "sources": [
-        {
-          "sourceName": "SEC EDGAR",
-          "sourceType": "REGULATORY_FILING",
-          "title": "8-K filing — Thryv Holdings,",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1556739/000155673926000039/thryv-20260804.htm",
-          "publishedAt": "2026-08-04T12:00:00.000Z",
-          "reviewed": true,
-          "primary": true
-        }
-      ],
-      "metricNotes": [],
-      "generatedAt": "2026-08-04T11:34:06.670Z",
-      "publicationMode": null,
-      "finalAction": {
-        "format": "investor-control-final-action",
-        "version": 2,
-        "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-04T11:34:06.670Z",
-        "validUntil": "2026-08-05T11:34:06.670Z",
-        "status": "BLOCKED",
-        "marketAction": "WATCH",
-        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "holderAction": "WATCH",
-        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "nonHolderAction": "WATCH",
-        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "urgency": "NONE",
-        "urgencyLabel": "Χωρίς τελική ενέργεια",
-        "confidenceScore": 75,
-        "dataQualityScore": 50,
-        "reasons": [
-          "FINAL_ACTION_BLOCKED"
-        ],
-        "blockers": [
-          "DOSSIER_NOT_PUBLISHABLE",
-          "DOSSIER_NOT_READY",
-          "CROSS_CHECK_NOT_READY",
-          "REFERENCE_PRICE_STALE"
-        ],
-        "freshness": {
-          "referencePriceAgeHours": 15.568519444444444,
-          "dossierAgeHours": 0,
-          "latestMarketAgeHours": 94.06851944444445
-        },
-        "risk": {
-          "riskScore": 34,
-          "fundamentalFlags": [
-            "MATERIAL_DILUTION"
-          ],
-          "marketFlags": [
-            "HIGH_VOLATILITY",
-            "MATERIAL_DRAWDOWN"
-          ]
-        },
-        "execution": {
-          "automaticBrokerOrder": false,
-          "requiresUserExecution": true
-        }
-      }
-    },
-    {
-      "id": "dossier:company:allwyn-ag:0607f4f82089a2d15b7e",
+      "id": "dossier:company:allwyn-ag:20ab2645efe628ecce23",
       "companyId": "company:allwyn-ag",
       "companyName": "Allwyn",
       "symbol": "ALWN",
@@ -1509,13 +223,41 @@
       "actionLabel": "Παρακολούθηση",
       "timeHorizon": "MONTHS",
       "referencePrice": {
-        "value": 13.645,
+        "value": 13.489999771118164,
         "currency": "EUR",
-        "timestamp": "2026-08-04T11:34:06.670Z",
-        "source": "Euronext Athens delayed market data"
+        "timestamp": "2026-08-04T07:30:00.000Z",
+        "source": "Historical market series"
       },
-      "referencePriceAgeHours": 0,
-      "thesis": "Το επιβεβαιωμένο πρόγραμμα επαναγοράς ιδίων μετοχών της Allwyn μπορεί να βελτιώσει την αξία ανά μετοχή μόνο εφόσον οι αγορές είναι ουσιαστικές, γίνονται σε ελκυστική αποτίμηση και χρηματοδοτούνται χωρίς αποδυνάμωση της ρευστότητας. Αποτελεί μετρήσιμο καταλύτη κατανομής κεφαλαίου, όχι αυτοτελή λόγο αγοράς. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων -1.36%, σχετική ισχύς 60 συνεδριάσεων -11.05%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
+      "referencePriceAgeHours": 6.967371944444444,
+      "marketQuote": {
+        "appSymbol": "ALWN.GR",
+        "companyId": "company:allwyn-ag",
+        "companyName": "Allwyn",
+        "price": 13.58,
+        "previousClose": 13.61,
+        "currency": "EUR",
+        "quoteAt": "2026-08-04T14:28:02.539Z",
+        "checkedAt": "2026-08-04T14:28:02.539Z",
+        "source": "Euronext Athens delayed market data",
+        "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/ALWN/related",
+        "sourceQuality": "OFFICIAL_DELAYED",
+        "quoteContract": {
+          "version": "2026-08-04.1",
+          "sourceRole": "PRIMARY_EXCHANGE",
+          "sourceTier": 1,
+          "sourceApproved": true,
+          "timestampVerified": false,
+          "valuationEligible": true,
+          "decisionEligible": false,
+          "dayChangeEligible": false,
+          "publicStatus": "TIMESTAMP_NOT_VERIFIED",
+          "publicMessage": "Η τιμή προέρχεται από επιτρεπόμενη πηγή, αλλά ο χρόνος της δεν έχει επιβεβαιωθεί επαρκώς.",
+          "diagnosticCodes": [
+            "QUOTE_TIMESTAMP_NOT_VERIFIED"
+          ]
+        }
+      },
+      "thesis": "Το επιβεβαιωμένο πρόγραμμα επαναγοράς ιδίων μετοχών της Allwyn μπορεί να βελτιώσει την αξία ανά μετοχή μόνο εφόσον οι αγορές είναι ουσιαστικές, γίνονται σε ελκυστική αποτίμηση και χρηματοδοτούνται χωρίς αποδυνάμωση της ρευστότητας. Αποτελεί μετρήσιμο καταλύτη κατανομής κεφαλαίου, όχι αυτοτελή λόγο αγοράς. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων 5.1%, σχετική ισχύς 60 συνεδριάσεων -15.05%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
       "causalMechanism": "Οι επαναγορές μειώνουν τον πραγματικό αριθμό μετοχών και μπορούν να αυξήσουν την οικονομική συμμετοχή κάθε εναπομείνασας μετοχής, μόνο όμως όταν η τιμή αγοράς και η πηγή χρηματοδότησης δημιουργούν καθαρή αξία.",
       "bullCase": "Η εταιρεία πραγματοποιεί ουσιαστικές επαναγορές κάτω από υποστηρίξιμη αποτίμηση, διατηρώντας λειτουργικές ταμειακές ροές και ευελιξία ισολογισμού.",
       "bearCase": "Οι επαναγορές είναι ασήμαντες, γίνονται σε υπερβολική αποτίμηση ή καταναλώνουν ρευστότητα που αργότερα χρειάζεται για λειτουργία, χρέος ή επενδύσεις.",
@@ -1572,14 +314,14 @@
         }
       ],
       "metricNotes": [],
-      "generatedAt": "2026-08-04T11:34:06.670Z",
+      "generatedAt": "2026-08-04T14:28:02.539Z",
       "publicationMode": null,
       "finalAction": {
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-04T11:34:06.670Z",
-        "validUntil": "2026-08-05T11:34:06.670Z",
+        "generatedAt": "2026-08-04T14:28:02.539Z",
+        "validUntil": "2026-08-05T14:28:02.539Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -1599,18 +341,654 @@
           "DOSSIER_NOT_READY",
           "CROSS_CHECK_NOT_READY",
           "FUNDAMENTALS_NOT_READY",
-          "MARKET_HISTORY_STALE"
+          "REFERENCE_PRICE_STALE"
         ],
         "freshness": {
-          "referencePriceAgeHours": 0,
+          "referencePriceAgeHours": 6.967371944444444,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 124.06851944444445
+          "latestMarketAgeHours": 6.967371944444444
         },
         "risk": {
           "riskScore": null,
           "fundamentalFlags": [],
           "marketFlags": [
             "MATERIAL_DRAWDOWN",
+            "WEAK_RELATIVE_STRENGTH"
+          ]
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      }
+    }
+  },
+  "discoveryRadar": [
+    {
+      "discoveryId": "discovery:company:sec:0000879101:2026-08-04",
+      "companyId": "company:sec:0000879101",
+      "companyName": "KIMCO REALTY",
+      "symbol": "KIM",
+      "exchange": "NYSE",
+      "discoveryScore": 70,
+      "scoreType": "DISCOVERY_PRIORITY",
+      "scoreLabel": "Προτεραιότητα διερεύνησης",
+      "investmentScore": null,
+      "status": "DISCOVERED_RESEARCH_REQUIRED",
+      "suggestedAction": "WATCH",
+      "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
+      "reasons": [
+        "Νέα επίσημη κατάθεση 10-Q στη SEC",
+        "Το γεγονός είναι πολύ πρόσφατο",
+        "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
+      ],
+      "latestEventAt": "2026-08-04T14:21:55.000Z",
+      "events": [
+        {
+          "form": "10-Q",
+          "title": "10-Q - KIMCO REALTY CORP (0000879101) (Filer)",
+          "publishedAt": "2026-08-04T14:21:55.000Z",
+          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/879101/000119312526331817/0001193125-26-331817-index.htm",
+          "sourceName": "SEC EDGAR Current Filings",
+          "eventScore": 70
+        }
+      ],
+      "isExistingFocusCompany": false
+    },
+    {
+      "discoveryId": "discovery:company:sec:0001303523:2026-08-04",
+      "companyId": "company:sec:0001303523",
+      "companyName": "British American Tobacco p.l.c.",
+      "symbol": "BTI",
+      "exchange": "NYSE",
+      "discoveryScore": 62,
+      "scoreType": "DISCOVERY_PRIORITY",
+      "scoreLabel": "Προτεραιότητα διερεύνησης",
+      "investmentScore": null,
+      "status": "DISCOVERED_RESEARCH_REQUIRED",
+      "suggestedAction": "WATCH",
+      "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
+      "reasons": [
+        "Νέα επίσημη κατάθεση 6-K στη SEC",
+        "Το γεγονός είναι πολύ πρόσφατο",
+        "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
+      ],
+      "latestEventAt": "2026-08-04T14:12:40.000Z",
+      "events": [
+        {
+          "form": "6-K",
+          "title": "6-K - British American Tobacco p.l.c. (0001303523) (Filer)",
+          "publishedAt": "2026-08-04T14:12:40.000Z",
+          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1303523/000095015726000833/0000950157-26-000833-index.htm",
+          "sourceName": "SEC EDGAR Current Filings",
+          "eventScore": 62
+        }
+      ],
+      "isExistingFocusCompany": false
+    }
+  ],
+  "decisions": [],
+  "published": [],
+  "reviewReady": [],
+  "research": [
+    {
+      "id": "dossier:company:allwyn-ag:20ab2645efe628ecce23",
+      "companyId": "company:allwyn-ag",
+      "companyName": "Allwyn",
+      "symbol": "ALWN",
+      "exchange": "Euronext Athens",
+      "origin": "FOCUS_UNIVERSE",
+      "discovery": null,
+      "status": "DRAFT_RESEARCH",
+      "statusLabel": "Έρευνα σε εξέλιξη",
+      "category": "EVENT_DRIVEN",
+      "categoryLabel": "Υπόθεση καταλύτη υπό έλεγχο",
+      "action": "WATCH",
+      "actionLabel": "Παρακολούθηση",
+      "timeHorizon": "MONTHS",
+      "referencePrice": {
+        "value": 13.489999771118164,
+        "currency": "EUR",
+        "timestamp": "2026-08-04T07:30:00.000Z",
+        "source": "Historical market series"
+      },
+      "referencePriceAgeHours": 6.967371944444444,
+      "marketQuote": {
+        "appSymbol": "ALWN.GR",
+        "companyId": "company:allwyn-ag",
+        "companyName": "Allwyn",
+        "price": 13.58,
+        "previousClose": 13.61,
+        "currency": "EUR",
+        "quoteAt": "2026-08-04T14:28:02.539Z",
+        "checkedAt": "2026-08-04T14:28:02.539Z",
+        "source": "Euronext Athens delayed market data",
+        "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/ALWN/related",
+        "sourceQuality": "OFFICIAL_DELAYED",
+        "quoteContract": {
+          "version": "2026-08-04.1",
+          "sourceRole": "PRIMARY_EXCHANGE",
+          "sourceTier": 1,
+          "sourceApproved": true,
+          "timestampVerified": false,
+          "valuationEligible": true,
+          "decisionEligible": false,
+          "dayChangeEligible": false,
+          "publicStatus": "TIMESTAMP_NOT_VERIFIED",
+          "publicMessage": "Η τιμή προέρχεται από επιτρεπόμενη πηγή, αλλά ο χρόνος της δεν έχει επιβεβαιωθεί επαρκώς.",
+          "diagnosticCodes": [
+            "QUOTE_TIMESTAMP_NOT_VERIFIED"
+          ]
+        }
+      },
+      "thesis": "Το επιβεβαιωμένο πρόγραμμα επαναγοράς ιδίων μετοχών της Allwyn μπορεί να βελτιώσει την αξία ανά μετοχή μόνο εφόσον οι αγορές είναι ουσιαστικές, γίνονται σε ελκυστική αποτίμηση και χρηματοδοτούνται χωρίς αποδυνάμωση της ρευστότητας. Αποτελεί μετρήσιμο καταλύτη κατανομής κεφαλαίου, όχι αυτοτελή λόγο αγοράς. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων 5.1%, σχετική ισχύς 60 συνεδριάσεων -15.05%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
+      "causalMechanism": "Οι επαναγορές μειώνουν τον πραγματικό αριθμό μετοχών και μπορούν να αυξήσουν την οικονομική συμμετοχή κάθε εναπομείνασας μετοχής, μόνο όμως όταν η τιμή αγοράς και η πηγή χρηματοδότησης δημιουργούν καθαρή αξία.",
+      "bullCase": "Η εταιρεία πραγματοποιεί ουσιαστικές επαναγορές κάτω από υποστηρίξιμη αποτίμηση, διατηρώντας λειτουργικές ταμειακές ροές και ευελιξία ισολογισμού.",
+      "bearCase": "Οι επαναγορές είναι ασήμαντες, γίνονται σε υπερβολική αποτίμηση ή καταναλώνουν ρευστότητα που αργότερα χρειάζεται για λειτουργία, χρέος ή επενδύσεις.",
+      "catalysts": [
+        {
+          "text": "Η επίσημη πηγή επιβεβαιώνει: Company purchased a total of 463,200 of its own shares on Euronext Athens.",
+          "evidenceIds": [
+            "evidence:allwyn:59ae0d0f1cc7710a4941d11b"
+          ],
+          "confidence": 0.94,
+          "inference": false
+        }
+      ],
+      "risks": [
+        {
+          "text": "Μια επαναγορά μπορεί να φαίνεται θετική αλλά να καταστρέφει αξία όταν είναι πολύ μικρή, χρηματοδοτείται με χρέος ή εκτελείται πάνω από υποστηρίξιμη αποτίμηση.",
+          "evidenceIds": [
+            "evidence:allwyn:59ae0d0f1cc7710a4941d11b"
+          ],
+          "confidence": 0.82,
+          "inference": true
+        },
+        {
+          "text": "Η τιμή και η ρευστότητα της μετοχής μπορεί να αντιδράσουν διαφορετικά από την υποκείμενη εταιρική εξέλιξη, ιδιαίτερα όταν οι προσδοκίες είχαν ήδη ενσωματωθεί πριν από τη δημοσίευση.",
+          "evidenceIds": [
+            "evidence:allwyn:59ae0d0f1cc7710a4941d11b"
+          ],
+          "confidence": 0.72,
+          "inference": true
+        }
+      ],
+      "invalidationCondition": "Η θετική ερμηνεία ακυρώνεται εάν οι επαναγορές σταματήσουν χωρίς ουσιαστική ολοκλήρωση, η ρευστότητα επιδεινωθεί σημαντικά ή ο πραγματικός αριθμός μετοχών δεν μειωθεί.",
+      "reviewDate": "2026-11-02",
+      "blockers": [
+        "FUNDAMENTALS_REQUIRED",
+        "INDEPENDENT_CROSS_CHECK_REQUIRED",
+        "CLAIM_CORROBORATION_REQUIRED"
+      ],
+      "blockerLabels": [
+        "Λείπουν επαρκή θεμελιώδη στοιχεία",
+        "Λείπει ανεξάρτητη διασταύρωση",
+        "Ο συγκεκριμένος ισχυρισμός δεν έχει επιβεβαιωθεί επαρκώς"
+      ],
+      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
+      "sources": [
+        {
+          "sourceName": "Allwyn Regulatory Announcements",
+          "sourceType": "ISSUER_IR",
+          "title": "Company purchased a total of 463,200 of its own shares on Euronext Athens",
+          "sourceUrl": "https://www.allwyn.com/regulatory-announcements/company-purchased-a-total-of-463-200-of-its-own-shares-on-euronext-athens",
+          "publishedAt": "2026-08-03T12:00:00.000Z",
+          "reviewed": true,
+          "primary": true
+        }
+      ],
+      "metricNotes": [],
+      "generatedAt": "2026-08-04T14:28:02.539Z",
+      "publicationMode": null,
+      "finalAction": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-07-30.1",
+        "generatedAt": "2026-08-04T14:28:02.539Z",
+        "validUntil": "2026-08-05T14:28:02.539Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 70,
+        "dataQualityScore": 30,
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY",
+          "REFERENCE_PRICE_STALE"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 6.967371944444444,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 6.967371944444444
+        },
+        "risk": {
+          "riskScore": null,
+          "fundamentalFlags": [],
+          "marketFlags": [
+            "MATERIAL_DRAWDOWN",
+            "WEAK_RELATIVE_STRENGTH"
+          ]
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      }
+    },
+    {
+      "id": "dossier:company:sec:0000879101:0d1df3e201bb0bb85150",
+      "companyId": "company:sec:0000879101",
+      "companyName": "KIMCO REALTY",
+      "symbol": "KIM",
+      "exchange": "NYSE",
+      "origin": "AUTONOMOUS_DISCOVERY",
+      "discovery": {
+        "discoveryId": "discovery:company:sec:0000879101:2026-08-04",
+        "companyId": "company:sec:0000879101",
+        "companyName": "KIMCO REALTY",
+        "symbol": "KIM",
+        "exchange": "NYSE",
+        "mic": "XNYS",
+        "market": "US",
+        "cik": "0000879101",
+        "issuerId": null,
+        "identityStatus": "CANONICAL_IDENTITY_READY",
+        "discoveryScore": 70,
+        "scoreType": "DISCOVERY_PRIORITY",
+        "status": "DISCOVERED_RESEARCH_REQUIRED",
+        "suggestedAction": "WATCH",
+        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
+        "isExistingFocusCompany": false,
+        "reasons": [
+          "Νέα επίσημη κατάθεση 10-Q στη SEC",
+          "Το γεγονός είναι πολύ πρόσφατο",
+          "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
+        ],
+        "latestEventAt": "2026-08-04T14:21:55.000Z",
+        "events": [
+          {
+            "form": "10-Q",
+            "title": "10-Q - KIMCO REALTY CORP (0000879101) (Filer)",
+            "publishedAt": "2026-08-04T14:21:55.000Z",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/879101/000119312526331817/0001193125-26-331817-index.htm",
+            "sourceName": "SEC EDGAR Current Filings",
+            "eventScore": 70
+          }
+        ]
+      },
+      "status": "DRAFT_RESEARCH",
+      "statusLabel": "Αυτόματη ανακάλυψη · έρευνα σε εξέλιξη",
+      "category": "INSUFFICIENT_EVIDENCE",
+      "categoryLabel": "Ανεπαρκή στοιχεία",
+      "action": "WATCH",
+      "actionLabel": "Παρακολούθηση",
+      "timeHorizon": "UNDETERMINED",
+      "referencePrice": {
+        "value": 25.1,
+        "currency": "USD",
+        "timestamp": "2026-08-04T14:28:02.000Z",
+        "source": "Finnhub Quote API"
+      },
+      "referencePriceAgeHours": 0.00014972222222222223,
+      "marketQuote": {
+        "appSymbol": "KIM.US",
+        "companyId": "company:sec:0000879101",
+        "companyName": "KIMCO REALTY",
+        "price": 25.1,
+        "previousClose": 25.41,
+        "currency": "USD",
+        "quoteAt": "2026-08-04T14:28:02.000Z",
+        "checkedAt": "2026-08-04T14:28:02.539Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=KIM",
+        "sourceQuality": null,
+        "quoteContract": {
+          "version": "2026-08-04.1",
+          "sourceRole": "LICENSED_MARKET_DATA",
+          "sourceTier": 1,
+          "sourceApproved": true,
+          "timestampVerified": true,
+          "valuationEligible": true,
+          "decisionEligible": true,
+          "dayChangeEligible": true,
+          "publicStatus": "VERIFIED",
+          "publicMessage": "Επαληθευμένη χρηματιστηριακή τιμή από εγκεκριμένη πηγή.",
+          "diagnosticCodes": []
+        }
+      },
+      "thesis": "Η KIMCO REALTY έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: ετήσια μεταβολή εσόδων 5.06%, ετήσιο καθαρό περιθώριο 27.32%, μεταβολή απομειωμένου αριθμού μετοχών 0.47%, απόδοση 60 συνεδριάσεων 7.93%, σχετική ισχύς 60 συνεδριάσεων 4.42%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
+      "causalMechanism": "Το γεγονός μπορεί να επηρεάσει την αξία μόνο μέσω μετρήσιμης αλλαγής στις ταμειακές ροές, στον κίνδυνο ισολογισμού, στον αριθμό μετοχών, στην πιθανότητα λειτουργικής επιτυχίας ή στις προσδοκίες αποτίμησης.",
+      "bullCase": "Μεταγενέστερα επαληθευμένα στοιχεία αποδεικνύουν ευνοϊκή και διατηρήσιμη οικονομική επίδραση που δεν έχει ήδη ενσωματωθεί στην αποτίμηση.",
+      "bearCase": "Το γεγονός αποδεικνύεται ασήμαντο, αναιρείται από νεότερα στοιχεία ή παράγει ασθενέστερα οικονομικά αποτελέσματα από όσα αναμένει η αγορά.",
+      "catalysts": [
+        {
+          "text": "Η επίσημη πηγή επιβεβαιώνει: 8-K filing — KIMCO REALTY.",
+          "evidenceIds": [
+            "evidence:sec:0001193125-26-331498"
+          ],
+          "confidence": 0.94,
+          "inference": false
+        }
+      ],
+      "risks": [
+        {
+          "text": "Τα διαθέσιμα στοιχεία μπορεί να είναι πραγματικά αλλά όχι οικονομικά ουσιαστικά για τους μετόχους.",
+          "evidenceIds": [
+            "evidence:sec:0001193125-26-331498"
+          ],
+          "confidence": 0.82,
+          "inference": true
+        },
+        {
+          "text": "Η τιμή και η ρευστότητα της μετοχής μπορεί να αντιδράσουν διαφορετικά από την υποκείμενη εταιρική εξέλιξη, ιδιαίτερα όταν οι προσδοκίες είχαν ήδη ενσωματωθεί πριν από τη δημοσίευση.",
+          "evidenceIds": [
+            "evidence:sec:0001193125-26-331498"
+          ],
+          "confidence": 0.72,
+          "inference": true
+        }
+      ],
+      "invalidationCondition": "Η υπόθεση παραμένει μη ταξινομημένη μέχρι να υποστηρίζονται από επαληθευμένα στοιχεία ένας μετρήσιμος αιτιώδης σύνδεσμος και σαφής συνθήκη ακύρωσης.",
+      "reviewDate": "2026-10-03",
+      "blockers": [
+        "INDEPENDENT_CROSS_CHECK_REQUIRED",
+        "CLAIM_CORROBORATION_REQUIRED"
+      ],
+      "blockerLabels": [
+        "Λείπει ανεξάρτητη διασταύρωση",
+        "Ο συγκεκριμένος ισχυρισμός δεν έχει επιβεβαιωθεί επαρκώς"
+      ],
+      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
+      "sources": [
+        {
+          "sourceName": "SEC EDGAR",
+          "sourceType": "REGULATORY_FILING",
+          "title": "8-K filing — KIMCO REALTY",
+          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/879101/000119312526331498/kim-20260804.htm",
+          "publishedAt": "2026-08-04T12:00:00.000Z",
+          "reviewed": true,
+          "primary": true
+        }
+      ],
+      "metricNotes": [],
+      "generatedAt": "2026-08-04T14:28:02.539Z",
+      "publicationMode": null,
+      "finalAction": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-07-30.1",
+        "generatedAt": "2026-08-04T14:28:02.539Z",
+        "validUntil": "2026-08-05T14:28:02.539Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 80,
+        "dataQualityScore": 50,
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 0.00014972222222222223,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 24.967371944444444
+        },
+        "risk": {
+          "riskScore": 20,
+          "fundamentalFlags": [],
+          "marketFlags": []
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      }
+    },
+    {
+      "id": "dossier:company:sec:0001303523:6c883fb3a081e3d3b89a",
+      "companyId": "company:sec:0001303523",
+      "companyName": "British American Tobacco p.l.c.",
+      "symbol": "BTI",
+      "exchange": "NYSE",
+      "origin": "AUTONOMOUS_DISCOVERY",
+      "discovery": {
+        "discoveryId": "discovery:company:sec:0001303523:2026-08-04",
+        "companyId": "company:sec:0001303523",
+        "companyName": "British American Tobacco p.l.c.",
+        "symbol": "BTI",
+        "exchange": "NYSE",
+        "mic": "XNYS",
+        "market": "US",
+        "cik": "0001303523",
+        "issuerId": null,
+        "identityStatus": "CANONICAL_IDENTITY_READY",
+        "discoveryScore": 62,
+        "scoreType": "DISCOVERY_PRIORITY",
+        "status": "DISCOVERED_RESEARCH_REQUIRED",
+        "suggestedAction": "WATCH",
+        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
+        "isExistingFocusCompany": false,
+        "reasons": [
+          "Νέα επίσημη κατάθεση 6-K στη SEC",
+          "Το γεγονός είναι πολύ πρόσφατο",
+          "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
+        ],
+        "latestEventAt": "2026-08-04T14:12:40.000Z",
+        "events": [
+          {
+            "form": "6-K",
+            "title": "6-K - British American Tobacco p.l.c. (0001303523) (Filer)",
+            "publishedAt": "2026-08-04T14:12:40.000Z",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1303523/000095015726000833/0000950157-26-000833-index.htm",
+            "sourceName": "SEC EDGAR Current Filings",
+            "eventScore": 62
+          }
+        ]
+      },
+      "status": "DRAFT_RESEARCH",
+      "statusLabel": "Αυτόματη ανακάλυψη · έρευνα σε εξέλιξη",
+      "category": "INSUFFICIENT_EVIDENCE",
+      "categoryLabel": "Ανεπαρκή στοιχεία",
+      "action": "WATCH",
+      "actionLabel": "Παρακολούθηση",
+      "timeHorizon": "UNDETERMINED",
+      "referencePrice": {
+        "value": 59.71,
+        "currency": "USD",
+        "timestamp": "2026-08-04T14:28:03.000Z",
+        "source": "Finnhub Quote API"
+      },
+      "referencePriceAgeHours": 0,
+      "marketQuote": {
+        "appSymbol": "BTI.US",
+        "companyId": "company:sec:0001303523",
+        "companyName": "British American Tobacco p.l.c.",
+        "price": 59.71,
+        "previousClose": 59.56,
+        "currency": "USD",
+        "quoteAt": "2026-08-04T14:28:03.000Z",
+        "checkedAt": "2026-08-04T14:28:02.539Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=BTI",
+        "sourceQuality": null,
+        "quoteContract": {
+          "version": "2026-08-04.1",
+          "sourceRole": "LICENSED_MARKET_DATA",
+          "sourceTier": 1,
+          "sourceApproved": true,
+          "timestampVerified": true,
+          "valuationEligible": true,
+          "decisionEligible": true,
+          "dayChangeEligible": true,
+          "publicStatus": "VERIFIED",
+          "publicMessage": "Επαληθευμένη χρηματιστηριακή τιμή από εγκεκριμένη πηγή.",
+          "diagnosticCodes": []
+        }
+      },
+      "thesis": "Η British American Tobacco p.l.c. έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων 1.39%, σχετική ισχύς 60 συνεδριάσεων -2.12%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
+      "causalMechanism": "Το γεγονός μπορεί να επηρεάσει την αξία μόνο μέσω μετρήσιμης αλλαγής στις ταμειακές ροές, στον κίνδυνο ισολογισμού, στον αριθμό μετοχών, στην πιθανότητα λειτουργικής επιτυχίας ή στις προσδοκίες αποτίμησης.",
+      "bullCase": "Μεταγενέστερα επαληθευμένα στοιχεία αποδεικνύουν ευνοϊκή και διατηρήσιμη οικονομική επίδραση που δεν έχει ήδη ενσωματωθεί στην αποτίμηση.",
+      "bearCase": "Το γεγονός αποδεικνύεται ασήμαντο, αναιρείται από νεότερα στοιχεία ή παράγει ασθενέστερα οικονομικά αποτελέσματα από όσα αναμένει η αγορά.",
+      "catalysts": [
+        {
+          "text": "Η επίσημη πηγή επιβεβαιώνει: FWP filing — British American Tobacco p.l.c..",
+          "evidenceIds": [
+            "evidence:sec:0001628280-26-052147"
+          ],
+          "confidence": 0.94,
+          "inference": false
+        }
+      ],
+      "risks": [
+        {
+          "text": "Τα διαθέσιμα στοιχεία μπορεί να είναι πραγματικά αλλά όχι οικονομικά ουσιαστικά για τους μετόχους.",
+          "evidenceIds": [
+            "evidence:sec:0001628280-26-052147"
+          ],
+          "confidence": 0.82,
+          "inference": true
+        },
+        {
+          "text": "Η τιμή και η ρευστότητα της μετοχής μπορεί να αντιδράσουν διαφορετικά από την υποκείμενη εταιρική εξέλιξη, ιδιαίτερα όταν οι προσδοκίες είχαν ήδη ενσωματωθεί πριν από τη δημοσίευση.",
+          "evidenceIds": [
+            "evidence:sec:0001628280-26-052147",
+            "evidence:sec:0001628280-26-052022",
+            "evidence:sec:0000950157-26-000833",
+            "evidence:sec:0000950157-26-000831",
+            "evidence:sec:0000950157-26-000830"
+          ],
+          "confidence": 0.72,
+          "inference": true
+        }
+      ],
+      "invalidationCondition": "Η υπόθεση παραμένει μη ταξινομημένη μέχρι να υποστηρίζονται από επαληθευμένα στοιχεία ένας μετρήσιμος αιτιώδης σύνδεσμος και σαφής συνθήκη ακύρωσης.",
+      "reviewDate": "2026-10-03",
+      "blockers": [
+        "FUNDAMENTALS_REQUIRED",
+        "INDEPENDENT_CROSS_CHECK_REQUIRED",
+        "CLAIM_CORROBORATION_REQUIRED"
+      ],
+      "blockerLabels": [
+        "Λείπουν επαρκή θεμελιώδη στοιχεία",
+        "Λείπει ανεξάρτητη διασταύρωση",
+        "Ο συγκεκριμένος ισχυρισμός δεν έχει επιβεβαιωθεί επαρκώς"
+      ],
+      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
+      "sources": [
+        {
+          "sourceName": "SEC EDGAR",
+          "sourceType": "REGULATORY_FILING",
+          "title": "FWP filing — British American Tobacco p.l.c.",
+          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1303523/000162828026052147/britishamericantobacco-fwp.htm",
+          "publishedAt": "2026-08-04T12:00:00.000Z",
+          "reviewed": true,
+          "primary": true
+        },
+        {
+          "sourceName": "SEC EDGAR",
+          "sourceType": "REGULATORY_FILING",
+          "title": "FWP filing — British American Tobacco p.l.c.",
+          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1303523/000162828026052022/britishamericantobacco-fwp.htm",
+          "publishedAt": "2026-08-04T12:00:00.000Z",
+          "reviewed": true,
+          "primary": true
+        },
+        {
+          "sourceName": "SEC EDGAR",
+          "sourceType": "REGULATORY_FILING",
+          "title": "6-K filing — British American Tobacco p.l.c.",
+          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1303523/000095015726000833/form6-k.htm",
+          "publishedAt": "2026-08-04T12:00:00.000Z",
+          "reviewed": true,
+          "primary": true
+        },
+        {
+          "sourceName": "SEC EDGAR",
+          "sourceType": "REGULATORY_FILING",
+          "title": "6-K filing — British American Tobacco p.l.c.",
+          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1303523/000095015726000831/form6-k.htm",
+          "publishedAt": "2026-08-03T12:00:00.000Z",
+          "reviewed": true,
+          "primary": true
+        },
+        {
+          "sourceName": "SEC EDGAR",
+          "sourceType": "REGULATORY_FILING",
+          "title": "6-K filing — British American Tobacco p.l.c.",
+          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1303523/000095015726000830/form6-k.htm",
+          "publishedAt": "2026-08-03T12:00:00.000Z",
+          "reviewed": true,
+          "primary": true
+        },
+        {
+          "sourceName": "SEC EDGAR",
+          "sourceType": "REGULATORY_FILING",
+          "title": "424B2 filing — British American Tobacco p.l.c.",
+          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1303523/000162828026051550/bat-prelim424bxaugust2026.htm",
+          "publishedAt": "2026-08-03T12:00:00.000Z",
+          "reviewed": false,
+          "primary": true
+        }
+      ],
+      "metricNotes": [],
+      "generatedAt": "2026-08-04T14:28:02.539Z",
+      "publicationMode": null,
+      "finalAction": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-07-30.1",
+        "generatedAt": "2026-08-04T14:28:02.539Z",
+        "validUntil": "2026-08-05T14:28:02.539Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 70,
+        "dataQualityScore": 35,
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 0,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 24.967371944444444
+        },
+        "risk": {
+          "riskScore": 20,
+          "fundamentalFlags": [],
+          "marketFlags": [
             "BELOW_50_DAY_AVERAGE"
           ]
         },
@@ -1621,7 +999,7 @@
       }
     },
     {
-      "id": "dossier:company:virgin-galactic-holdings:a863e1e9ea187b7d15fc",
+      "id": "dossier:company:virgin-galactic-holdings:6028161ac3d8f1903aed",
       "companyId": "company:virgin-galactic-holdings",
       "companyName": "Virgin Galactic",
       "symbol": "SPCE",
@@ -1636,13 +1014,39 @@
       "actionLabel": "Παρακολούθηση",
       "timeHorizon": "UNDETERMINED",
       "referencePrice": {
-        "value": 2.82,
+        "value": 2.9,
         "currency": "USD",
-        "timestamp": "2026-08-03T20:00:00.000Z",
+        "timestamp": "2026-08-04T14:27:37.000Z",
         "source": "Finnhub Quote API"
       },
-      "referencePriceAgeHours": 15.568519444444444,
-      "thesis": "Η Virgin Galactic έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: ετήσια μεταβολή εσόδων -78.06%, ετήσιο καθαρό περιθώριο -18063.92%, μεταβολή απομειωμένου αριθμού μετοχών 105.34%, απόδοση 60 συνεδριάσεων 4.08%, σχετική ισχύς 60 συνεδριάσεων 0.6%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
+      "referencePriceAgeHours": 0.007094166666666667,
+      "marketQuote": {
+        "appSymbol": "SPCE.US",
+        "companyId": "company:virgin-galactic-holdings",
+        "companyName": "Virgin Galactic",
+        "price": 2.9,
+        "previousClose": 2.82,
+        "currency": "USD",
+        "quoteAt": "2026-08-04T14:27:37.000Z",
+        "checkedAt": "2026-08-04T14:28:02.539Z",
+        "source": "Finnhub Quote API",
+        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
+        "sourceQuality": null,
+        "quoteContract": {
+          "version": "2026-08-04.1",
+          "sourceRole": "LICENSED_MARKET_DATA",
+          "sourceTier": 1,
+          "sourceApproved": true,
+          "timestampVerified": true,
+          "valuationEligible": true,
+          "decisionEligible": true,
+          "dayChangeEligible": true,
+          "publicStatus": "VERIFIED",
+          "publicMessage": "Επαληθευμένη χρηματιστηριακή τιμή από εγκεκριμένη πηγή.",
+          "diagnosticCodes": []
+        }
+      },
+      "thesis": "Η Virgin Galactic έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: ετήσια μεταβολή εσόδων -78.06%, ετήσιο καθαρό περιθώριο -18063.92%, μεταβολή απομειωμένου αριθμού μετοχών 105.34%, απόδοση 60 συνεδριάσεων 6.02%, σχετική ισχύς 60 συνεδριάσεων 2.5%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
       "causalMechanism": "Το γεγονός μπορεί να επηρεάσει την αξία μόνο μέσω μετρήσιμης αλλαγής στις ταμειακές ροές, στον κίνδυνο ισολογισμού, στον αριθμό μετοχών, στην πιθανότητα λειτουργικής επιτυχίας ή στις προσδοκίες αποτίμησης.",
       "bullCase": "Μεταγενέστερα επαληθευμένα στοιχεία αποδεικνύουν ευνοϊκή και διατηρήσιμη οικονομική επίδραση που δεν έχει ήδη ενσωματωθεί στην αποτίμηση.",
       "bearCase": "Το γεγονός αποδεικνύεται ασήμαντο, αναιρείται από νεότερα στοιχεία ή παράγει ασθενέστερα οικονομικά αποτελέσματα από όσα αναμένει η αγορά.",
@@ -1754,14 +1158,14 @@
       "metricNotes": [
         "Το ακραίο καθαρό περιθώριο επηρεάζεται από πολύ χαμηλή βάση εσόδων σε σχέση με τις ζημίες και χρειάζεται ανάγνωση μαζί με τα απόλυτα ποσά."
       ],
-      "generatedAt": "2026-08-04T11:34:06.670Z",
+      "generatedAt": "2026-08-04T14:28:02.539Z",
       "publicationMode": null,
       "finalAction": {
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-04T11:34:06.670Z",
-        "validUntil": "2026-08-05T11:34:06.670Z",
+        "generatedAt": "2026-08-04T14:28:02.539Z",
+        "validUntil": "2026-08-05T14:28:02.539Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -1779,13 +1183,12 @@
         "blockers": [
           "DOSSIER_NOT_PUBLISHABLE",
           "DOSSIER_NOT_READY",
-          "CROSS_CHECK_NOT_READY",
-          "REFERENCE_PRICE_STALE"
+          "CROSS_CHECK_NOT_READY"
         ],
         "freshness": {
-          "referencePriceAgeHours": 15.568519444444444,
+          "referencePriceAgeHours": 0.007094166666666667,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 94.06851944444445
+          "latestMarketAgeHours": 24.967371944444444
         },
         "risk": {
           "riskScore": 100,
@@ -1809,7 +1212,7 @@
       }
     },
     {
-      "id": "dossier:company:crediabank:395458b27072ebd4719f",
+      "id": "dossier:company:crediabank:f883361e904373748a32",
       "companyId": "company:crediabank",
       "companyName": "CrediaBank",
       "symbol": "CREDIA",
@@ -1824,13 +1227,41 @@
       "actionLabel": "Παρακολούθηση",
       "timeHorizon": "UNDETERMINED",
       "referencePrice": {
-        "value": 0.997,
+        "value": 0.9900000095367432,
         "currency": "EUR",
-        "timestamp": "2026-08-04T11:34:06.670Z",
-        "source": "Euronext Athens delayed market data"
+        "timestamp": "2026-08-04T07:30:00.000Z",
+        "source": "Historical market series"
       },
-      "referencePriceAgeHours": 0,
-      "thesis": "Η CrediaBank έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων -27.8%, σχετική ισχύς 60 συνεδριάσεων -34.68%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
+      "referencePriceAgeHours": 6.967371944444444,
+      "marketQuote": {
+        "appSymbol": "CREDIA.GR",
+        "companyId": "company:crediabank",
+        "companyName": "CrediaBank",
+        "price": 0.994,
+        "previousClose": 1.004,
+        "currency": "EUR",
+        "quoteAt": "2026-08-04T14:28:02.539Z",
+        "checkedAt": "2026-08-04T14:28:02.539Z",
+        "source": "Euronext Athens delayed market data",
+        "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/CREDIA/related",
+        "sourceQuality": "OFFICIAL_DELAYED",
+        "quoteContract": {
+          "version": "2026-08-04.1",
+          "sourceRole": "PRIMARY_EXCHANGE",
+          "sourceTier": 1,
+          "sourceApproved": true,
+          "timestampVerified": false,
+          "valuationEligible": true,
+          "decisionEligible": false,
+          "dayChangeEligible": false,
+          "publicStatus": "TIMESTAMP_NOT_VERIFIED",
+          "publicMessage": "Η τιμή προέρχεται από επιτρεπόμενη πηγή, αλλά ο χρόνος της δεν έχει επιβεβαιωθεί επαρκώς.",
+          "diagnosticCodes": [
+            "QUOTE_TIMESTAMP_NOT_VERIFIED"
+          ]
+        }
+      },
+      "thesis": "Η CrediaBank έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων -23.85%, σχετική ισχύς 60 συνεδριάσεων -40.65%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
       "causalMechanism": "Το γεγονός μπορεί να επηρεάσει την αξία μόνο μέσω μετρήσιμης αλλαγής στις ταμειακές ροές, στον κίνδυνο ισολογισμού, στον αριθμό μετοχών, στην πιθανότητα λειτουργικής επιτυχίας ή στις προσδοκίες αποτίμησης.",
       "bullCase": "Μεταγενέστερα επαληθευμένα στοιχεία αποδεικνύουν ευνοϊκή και διατηρήσιμη οικονομική επίδραση που δεν έχει ήδη ενσωματωθεί στην αποτίμηση.",
       "bearCase": "Το γεγονός αποδεικνύεται ασήμαντο, αναιρείται από νεότερα στοιχεία ή παράγει ασθενέστερα οικονομικά αποτελέσματα από όσα αναμένει η αγορά.",
@@ -1887,14 +1318,14 @@
         }
       ],
       "metricNotes": [],
-      "generatedAt": "2026-08-04T11:34:06.670Z",
+      "generatedAt": "2026-08-04T14:28:02.539Z",
       "publicationMode": null,
       "finalAction": {
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-04T11:34:06.670Z",
-        "validUntil": "2026-08-05T11:34:06.670Z",
+        "generatedAt": "2026-08-04T14:28:02.539Z",
+        "validUntil": "2026-08-05T14:28:02.539Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -1914,12 +1345,12 @@
           "DOSSIER_NOT_READY",
           "CROSS_CHECK_NOT_READY",
           "FUNDAMENTALS_NOT_READY",
-          "MARKET_HISTORY_STALE"
+          "REFERENCE_PRICE_STALE"
         ],
         "freshness": {
-          "referencePriceAgeHours": 0,
+          "referencePriceAgeHours": 6.967371944444444,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 124.06851944444445
+          "latestMarketAgeHours": 6.967371944444444
         },
         "risk": {
           "riskScore": null,
@@ -1940,469 +1371,6 @@
   "urgent": [],
   "assistantContext": [
     {
-      "companyId": "company:sec:0001013871",
-      "companyName": "NRG ENERGY,",
-      "symbol": "NRG",
-      "origin": "AUTONOMOUS_DISCOVERY",
-      "discovery": {
-        "discoveryId": "discovery:company:sec:0001013871:2026-08-04",
-        "companyId": "company:sec:0001013871",
-        "companyName": "NRG ENERGY,",
-        "symbol": "NRG",
-        "exchange": "NYSE",
-        "cik": "0001013871",
-        "discoveryScore": 82,
-        "status": "DISCOVERED_RESEARCH_REQUIRED",
-        "suggestedAction": "WATCH",
-        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-        "isExistingFocusCompany": false,
-        "reasons": [
-          "Νέα επίσημη κατάθεση 8-K στη SEC",
-          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-          "Το γεγονός είναι πολύ πρόσφατο"
-        ],
-        "latestEventAt": "2026-08-04T11:28:50.000Z",
-        "events": [
-          {
-            "form": "8-K",
-            "title": "8-K - NRG ENERGY, INC. (0001013871) (Filer)",
-            "publishedAt": "2026-08-04T11:28:50.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1013871/000101387126000018/0001013871-26-000018-index.htm",
-            "eventScore": 82
-          }
-        ]
-      },
-      "status": "DRAFT_RESEARCH",
-      "category": "INSUFFICIENT_EVIDENCE",
-      "action": "WATCH",
-      "finalAction": {
-        "format": "investor-control-final-action",
-        "version": 2,
-        "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-04T11:34:06.670Z",
-        "validUntil": "2026-08-05T11:34:06.670Z",
-        "status": "BLOCKED",
-        "marketAction": "WATCH",
-        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "holderAction": "WATCH",
-        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "nonHolderAction": "WATCH",
-        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "urgency": "NONE",
-        "urgencyLabel": "Χωρίς τελική ενέργεια",
-        "confidenceScore": 80,
-        "dataQualityScore": 55,
-        "reasons": [
-          "FINAL_ACTION_BLOCKED"
-        ],
-        "blockers": [
-          "DOSSIER_NOT_PUBLISHABLE",
-          "DOSSIER_NOT_READY",
-          "CROSS_CHECK_NOT_READY",
-          "REFERENCE_PRICE_STALE"
-        ],
-        "freshness": {
-          "referencePriceAgeHours": 15.568519444444444,
-          "dossierAgeHours": 0,
-          "latestMarketAgeHours": 94.06851944444445
-        },
-        "risk": {
-          "riskScore": 32,
-          "fundamentalFlags": [
-            "HIGH_LIABILITIES_TO_ASSETS"
-          ],
-          "marketFlags": [
-            "HIGH_VOLATILITY",
-            "MATERIAL_DRAWDOWN",
-            "BELOW_50_DAY_AVERAGE",
-            "WEAK_RELATIVE_STRENGTH"
-          ]
-        },
-        "execution": {
-          "automaticBrokerOrder": false,
-          "requiresUserExecution": true
-        }
-      },
-      "thesis": "Η NRG ENERGY, έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: ετήσια μεταβολή εσόδων 9.37%, ετήσιο καθαρό περιθώριο 2.85%, μεταβολή απομειωμένου αριθμού μετοχών -6.13%, απόδοση 60 συνεδριάσεων -14.7%, σχετική ισχύς 60 συνεδριάσεων -18.18%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
-      "blockers": [
-        "INDEPENDENT_CROSS_CHECK_REQUIRED",
-        "CLAIM_CORROBORATION_REQUIRED"
-      ],
-      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
-      "reviewDate": "2026-10-03"
-    },
-    {
-      "companyId": "company:sec:0001262823",
-      "companyName": "WESTLAKE",
-      "symbol": "WLK",
-      "origin": "AUTONOMOUS_DISCOVERY",
-      "discovery": {
-        "discoveryId": "discovery:company:sec:0001262823:2026-08-04",
-        "companyId": "company:sec:0001262823",
-        "companyName": "WESTLAKE",
-        "symbol": "WLK",
-        "exchange": "NYSE",
-        "cik": "0001262823",
-        "discoveryScore": 82,
-        "status": "DISCOVERED_RESEARCH_REQUIRED",
-        "suggestedAction": "WATCH",
-        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-        "isExistingFocusCompany": false,
-        "reasons": [
-          "Νέα επίσημη κατάθεση 8-K στη SEC",
-          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-          "Το γεγονός είναι πολύ πρόσφατο"
-        ],
-        "latestEventAt": "2026-08-04T11:27:36.000Z",
-        "events": [
-          {
-            "form": "8-K",
-            "title": "8-K - WESTLAKE CORP (0001262823) (Filer)",
-            "publishedAt": "2026-08-04T11:27:36.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1262823/000126282326000026/0001262823-26-000026-index.htm",
-            "eventScore": 82
-          }
-        ]
-      },
-      "status": "DRAFT_RESEARCH",
-      "category": "INSUFFICIENT_EVIDENCE",
-      "action": "WATCH",
-      "finalAction": {
-        "format": "investor-control-final-action",
-        "version": 2,
-        "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-04T11:34:06.670Z",
-        "validUntil": "2026-08-05T11:34:06.670Z",
-        "status": "BLOCKED",
-        "marketAction": "WATCH",
-        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "holderAction": "WATCH",
-        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "nonHolderAction": "WATCH",
-        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "urgency": "NONE",
-        "urgencyLabel": "Χωρίς τελική ενέργεια",
-        "confidenceScore": 80,
-        "dataQualityScore": 50,
-        "reasons": [
-          "FINAL_ACTION_BLOCKED"
-        ],
-        "blockers": [
-          "DOSSIER_NOT_PUBLISHABLE",
-          "DOSSIER_NOT_READY",
-          "CROSS_CHECK_NOT_READY",
-          "REFERENCE_PRICE_STALE"
-        ],
-        "freshness": {
-          "referencePriceAgeHours": 15.568519444444444,
-          "dossierAgeHours": 0,
-          "latestMarketAgeHours": 94.06851944444445
-        },
-        "risk": {
-          "riskScore": 40,
-          "fundamentalFlags": [
-            "NEGATIVE_FREE_CASH_FLOW",
-            "NEGATIVE_NET_MARGIN"
-          ],
-          "marketFlags": [
-            "MATERIAL_DRAWDOWN",
-            "BELOW_50_DAY_AVERAGE",
-            "WEAK_RELATIVE_STRENGTH"
-          ]
-        },
-        "execution": {
-          "automaticBrokerOrder": false,
-          "requiresUserExecution": true
-        }
-      },
-      "thesis": "Η WESTLAKE έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: ετήσια μεταβολή εσόδων -8.01%, ετήσιο καθαρό περιθώριο -13.5%, μεταβολή απομειωμένου αριθμού μετοχών -0.73%, απόδοση 60 συνεδριάσεων -32.31%, σχετική ισχύς 60 συνεδριάσεων -35.79%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
-      "blockers": [
-        "INDEPENDENT_CROSS_CHECK_REQUIRED",
-        "CLAIM_CORROBORATION_REQUIRED"
-      ],
-      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
-      "reviewDate": "2026-10-03"
-    },
-    {
-      "companyId": "company:sec:0000819793",
-      "companyName": "ALBANY INTERNATIONAL CORP",
-      "symbol": "AIN",
-      "origin": "AUTONOMOUS_DISCOVERY",
-      "discovery": {
-        "discoveryId": "discovery:company:sec:0000819793:2026-08-04",
-        "companyId": "company:sec:0000819793",
-        "companyName": "ALBANY INTERNATIONAL CORP",
-        "symbol": "AIN",
-        "exchange": "NYSE",
-        "cik": "0000819793",
-        "discoveryScore": 82,
-        "status": "DISCOVERED_RESEARCH_REQUIRED",
-        "suggestedAction": "WATCH",
-        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-        "isExistingFocusCompany": false,
-        "reasons": [
-          "Νέα επίσημη κατάθεση 8-K στη SEC",
-          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-          "Το γεγονός είναι πολύ πρόσφατο"
-        ],
-        "latestEventAt": "2026-08-04T11:31:04.000Z",
-        "events": [
-          {
-            "form": "8-K",
-            "title": "8-K - ALBANY INTERNATIONAL CORP /DE/ (0000819793) (Filer)",
-            "publishedAt": "2026-08-04T11:31:04.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/819793/000162828026052156/0001628280-26-052156-index.htm",
-            "eventScore": 82
-          }
-        ]
-      },
-      "status": "DRAFT_RESEARCH",
-      "category": "INSUFFICIENT_EVIDENCE",
-      "action": "WATCH",
-      "finalAction": {
-        "format": "investor-control-final-action",
-        "version": 2,
-        "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-04T11:34:06.670Z",
-        "validUntil": "2026-08-05T11:34:06.670Z",
-        "status": "BLOCKED",
-        "marketAction": "WATCH",
-        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "holderAction": "WATCH",
-        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "nonHolderAction": "WATCH",
-        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "urgency": "NONE",
-        "urgencyLabel": "Χωρίς τελική ενέργεια",
-        "confidenceScore": 80,
-        "dataQualityScore": 50,
-        "reasons": [
-          "FINAL_ACTION_BLOCKED"
-        ],
-        "blockers": [
-          "DOSSIER_NOT_PUBLISHABLE",
-          "DOSSIER_NOT_READY",
-          "CROSS_CHECK_NOT_READY",
-          "REFERENCE_PRICE_STALE"
-        ],
-        "freshness": {
-          "referencePriceAgeHours": 15.568519444444444,
-          "dossierAgeHours": 0,
-          "latestMarketAgeHours": 94.06851944444445
-        },
-        "risk": {
-          "riskScore": 30,
-          "fundamentalFlags": [
-            "NEGATIVE_NET_MARGIN"
-          ],
-          "marketFlags": []
-        },
-        "execution": {
-          "automaticBrokerOrder": false,
-          "requiresUserExecution": true
-        }
-      },
-      "thesis": "Η ALBANY INTERNATIONAL CORP έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: ετήσια μεταβολή εσόδων -3.88%, ετήσιο καθαρό περιθώριο -4.85%, μεταβολή απομειωμένου αριθμού μετοχών -5.65%, απόδοση 60 συνεδριάσεων 27.93%, σχετική ισχύς 60 συνεδριάσεων 24.45%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
-      "blockers": [
-        "INDEPENDENT_CROSS_CHECK_REQUIRED",
-        "CLAIM_CORROBORATION_REQUIRED"
-      ],
-      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
-      "reviewDate": "2026-10-03"
-    },
-    {
-      "companyId": "company:sec:0001583648",
-      "companyName": "PALVELLA THERAPEUTICS,",
-      "symbol": "PVLA",
-      "origin": "AUTONOMOUS_DISCOVERY",
-      "discovery": {
-        "discoveryId": "discovery:company:sec:0001583648:2026-08-04",
-        "companyId": "company:sec:0001583648",
-        "companyName": "PALVELLA THERAPEUTICS,",
-        "symbol": "PVLA",
-        "exchange": "Nasdaq",
-        "cik": "0001583648",
-        "discoveryScore": 82,
-        "status": "DISCOVERED_RESEARCH_REQUIRED",
-        "suggestedAction": "WATCH",
-        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-        "isExistingFocusCompany": false,
-        "reasons": [
-          "Νέα επίσημη κατάθεση 8-K στη SEC",
-          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-          "Το γεγονός είναι πολύ πρόσφατο"
-        ],
-        "latestEventAt": "2026-08-04T11:30:19.000Z",
-        "events": [
-          {
-            "form": "8-K",
-            "title": "8-K - PALVELLA THERAPEUTICS, INC. (0001583648) (Filer)",
-            "publishedAt": "2026-08-04T11:30:19.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1583648/000119312526331556/0001193125-26-331556-index.htm",
-            "eventScore": 82
-          }
-        ]
-      },
-      "status": "DRAFT_RESEARCH",
-      "category": "INSUFFICIENT_EVIDENCE",
-      "action": "WATCH",
-      "finalAction": {
-        "format": "investor-control-final-action",
-        "version": 2,
-        "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-04T11:34:06.670Z",
-        "validUntil": "2026-08-05T11:34:06.670Z",
-        "status": "BLOCKED",
-        "marketAction": "WATCH",
-        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "holderAction": "WATCH",
-        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "nonHolderAction": "WATCH",
-        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "urgency": "NONE",
-        "urgencyLabel": "Χωρίς τελική ενέργεια",
-        "confidenceScore": 56,
-        "dataQualityScore": 55,
-        "reasons": [
-          "FINAL_ACTION_BLOCKED"
-        ],
-        "blockers": [
-          "DOSSIER_NOT_PUBLISHABLE",
-          "DOSSIER_NOT_READY",
-          "CROSS_CHECK_NOT_READY",
-          "REFERENCE_PRICE_STALE"
-        ],
-        "freshness": {
-          "referencePriceAgeHours": 15.568519444444444,
-          "dossierAgeHours": 0,
-          "latestMarketAgeHours": 94.06851944444445
-        },
-        "risk": {
-          "riskScore": 88,
-          "fundamentalFlags": [
-            "NEGATIVE_FREE_CASH_FLOW",
-            "SEVERE_DILUTION",
-            "EXTREME_PRICE_TO_SALES",
-            "SEVERE_NEGATIVE_NET_MARGIN"
-          ],
-          "marketFlags": [
-            "EXTREME_VOLATILITY",
-            "MATERIAL_DRAWDOWN"
-          ]
-        },
-        "execution": {
-          "automaticBrokerOrder": false,
-          "requiresUserExecution": true
-        }
-      },
-      "thesis": "Η PALVELLA THERAPEUTICS, έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: ετήσια μεταβολή εσόδων 60.18%, ετήσιο καθαρό περιθώριο -95.58%, μεταβολή απομειωμένου αριθμού μετοχών 405.46%, απόδοση 60 συνεδριάσεων 7.39%, σχετική ισχύς 60 συνεδριάσεων 3.91%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
-      "blockers": [
-        "INDEPENDENT_CROSS_CHECK_REQUIRED",
-        "CLAIM_CORROBORATION_REQUIRED"
-      ],
-      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
-      "reviewDate": "2026-10-03"
-    },
-    {
-      "companyId": "company:sec:0001556739",
-      "companyName": "Thryv Holdings,",
-      "symbol": "THRY",
-      "origin": "AUTONOMOUS_DISCOVERY",
-      "discovery": {
-        "discoveryId": "discovery:company:sec:0001556739:2026-08-04",
-        "companyId": "company:sec:0001556739",
-        "companyName": "Thryv Holdings,",
-        "symbol": "THRY",
-        "exchange": "Nasdaq",
-        "cik": "0001556739",
-        "discoveryScore": 82,
-        "status": "DISCOVERED_RESEARCH_REQUIRED",
-        "suggestedAction": "WATCH",
-        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-        "isExistingFocusCompany": false,
-        "reasons": [
-          "Νέα επίσημη κατάθεση 10-Q στη SEC",
-          "Το γεγονός είναι πολύ πρόσφατο",
-          "Απαιτείται ανάγνωση της κατάθεσης για να προσδιοριστεί η ουσία του γεγονότος",
-          "Νέα επίσημη κατάθεση 8-K στη SEC",
-          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης"
-        ],
-        "latestEventAt": "2026-08-04T11:31:40.000Z",
-        "events": [
-          {
-            "form": "8-K",
-            "title": "8-K - Thryv Holdings, Inc. (0001556739) (Filer)",
-            "publishedAt": "2026-08-04T11:30:24.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1556739/000155673926000039/0001556739-26-000039-index.htm",
-            "eventScore": 82
-          },
-          {
-            "form": "10-Q",
-            "title": "10-Q - Thryv Holdings, Inc. (0001556739) (Filer)",
-            "publishedAt": "2026-08-04T11:31:40.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1556739/000155673926000040/0001556739-26-000040-index.htm",
-            "eventScore": 70
-          }
-        ]
-      },
-      "status": "DRAFT_RESEARCH",
-      "category": "INSUFFICIENT_EVIDENCE",
-      "action": "WATCH",
-      "finalAction": {
-        "format": "investor-control-final-action",
-        "version": 2,
-        "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-04T11:34:06.670Z",
-        "validUntil": "2026-08-05T11:34:06.670Z",
-        "status": "BLOCKED",
-        "marketAction": "WATCH",
-        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "holderAction": "WATCH",
-        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "nonHolderAction": "WATCH",
-        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "urgency": "NONE",
-        "urgencyLabel": "Χωρίς τελική ενέργεια",
-        "confidenceScore": 75,
-        "dataQualityScore": 50,
-        "reasons": [
-          "FINAL_ACTION_BLOCKED"
-        ],
-        "blockers": [
-          "DOSSIER_NOT_PUBLISHABLE",
-          "DOSSIER_NOT_READY",
-          "CROSS_CHECK_NOT_READY",
-          "REFERENCE_PRICE_STALE"
-        ],
-        "freshness": {
-          "referencePriceAgeHours": 15.568519444444444,
-          "dossierAgeHours": 0,
-          "latestMarketAgeHours": 94.06851944444445
-        },
-        "risk": {
-          "riskScore": 34,
-          "fundamentalFlags": [
-            "MATERIAL_DILUTION"
-          ],
-          "marketFlags": [
-            "HIGH_VOLATILITY",
-            "MATERIAL_DRAWDOWN"
-          ]
-        },
-        "execution": {
-          "automaticBrokerOrder": false,
-          "requiresUserExecution": true
-        }
-      },
-      "thesis": "Η Thryv Holdings, έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: ετήσια μεταβολή εσόδων -4.75%, ετήσιο καθαρό περιθώριο 0.04%, μεταβολή απομειωμένου αριθμού μετοχών 19.75%, απόδοση 60 συνεδριάσεων 6.3%, σχετική ισχύς 60 συνεδριάσεων 2.82%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
-      "blockers": [
-        "INDEPENDENT_CROSS_CHECK_REQUIRED",
-        "CLAIM_CORROBORATION_REQUIRED"
-      ],
-      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
-      "reviewDate": "2026-10-03"
-    },
-    {
       "companyId": "company:allwyn-ag",
       "companyName": "Allwyn",
       "symbol": "ALWN",
@@ -2415,8 +1383,8 @@
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-04T11:34:06.670Z",
-        "validUntil": "2026-08-05T11:34:06.670Z",
+        "generatedAt": "2026-08-04T14:28:02.539Z",
+        "validUntil": "2026-08-05T14:28:02.539Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -2436,18 +1404,202 @@
           "DOSSIER_NOT_READY",
           "CROSS_CHECK_NOT_READY",
           "FUNDAMENTALS_NOT_READY",
-          "MARKET_HISTORY_STALE"
+          "REFERENCE_PRICE_STALE"
         ],
         "freshness": {
-          "referencePriceAgeHours": 0,
+          "referencePriceAgeHours": 6.967371944444444,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 124.06851944444445
+          "latestMarketAgeHours": 6.967371944444444
         },
         "risk": {
           "riskScore": null,
           "fundamentalFlags": [],
           "marketFlags": [
             "MATERIAL_DRAWDOWN",
+            "WEAK_RELATIVE_STRENGTH"
+          ]
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "thesis": "Το επιβεβαιωμένο πρόγραμμα επαναγοράς ιδίων μετοχών της Allwyn μπορεί να βελτιώσει την αξία ανά μετοχή μόνο εφόσον οι αγορές είναι ουσιαστικές, γίνονται σε ελκυστική αποτίμηση και χρηματοδοτούνται χωρίς αποδυνάμωση της ρευστότητας. Αποτελεί μετρήσιμο καταλύτη κατανομής κεφαλαίου, όχι αυτοτελή λόγο αγοράς. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων 5.1%, σχετική ισχύς 60 συνεδριάσεων -15.05%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
+      "blockers": [
+        "FUNDAMENTALS_REQUIRED",
+        "INDEPENDENT_CROSS_CHECK_REQUIRED",
+        "CLAIM_CORROBORATION_REQUIRED"
+      ],
+      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
+      "reviewDate": "2026-11-02"
+    },
+    {
+      "companyId": "company:sec:0000879101",
+      "companyName": "KIMCO REALTY",
+      "symbol": "KIM",
+      "origin": "AUTONOMOUS_DISCOVERY",
+      "discovery": {
+        "discoveryId": "discovery:company:sec:0000879101:2026-08-04",
+        "companyId": "company:sec:0000879101",
+        "companyName": "KIMCO REALTY",
+        "symbol": "KIM",
+        "exchange": "NYSE",
+        "mic": "XNYS",
+        "market": "US",
+        "cik": "0000879101",
+        "issuerId": null,
+        "identityStatus": "CANONICAL_IDENTITY_READY",
+        "discoveryScore": 70,
+        "scoreType": "DISCOVERY_PRIORITY",
+        "status": "DISCOVERED_RESEARCH_REQUIRED",
+        "suggestedAction": "WATCH",
+        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
+        "isExistingFocusCompany": false,
+        "reasons": [
+          "Νέα επίσημη κατάθεση 10-Q στη SEC",
+          "Το γεγονός είναι πολύ πρόσφατο",
+          "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
+        ],
+        "latestEventAt": "2026-08-04T14:21:55.000Z",
+        "events": [
+          {
+            "form": "10-Q",
+            "title": "10-Q - KIMCO REALTY CORP (0000879101) (Filer)",
+            "publishedAt": "2026-08-04T14:21:55.000Z",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/879101/000119312526331817/0001193125-26-331817-index.htm",
+            "sourceName": "SEC EDGAR Current Filings",
+            "eventScore": 70
+          }
+        ]
+      },
+      "status": "DRAFT_RESEARCH",
+      "category": "INSUFFICIENT_EVIDENCE",
+      "action": "WATCH",
+      "finalAction": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-07-30.1",
+        "generatedAt": "2026-08-04T14:28:02.539Z",
+        "validUntil": "2026-08-05T14:28:02.539Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 80,
+        "dataQualityScore": 50,
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 0.00014972222222222223,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 24.967371944444444
+        },
+        "risk": {
+          "riskScore": 20,
+          "fundamentalFlags": [],
+          "marketFlags": []
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "thesis": "Η KIMCO REALTY έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: ετήσια μεταβολή εσόδων 5.06%, ετήσιο καθαρό περιθώριο 27.32%, μεταβολή απομειωμένου αριθμού μετοχών 0.47%, απόδοση 60 συνεδριάσεων 7.93%, σχετική ισχύς 60 συνεδριάσεων 4.42%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
+      "blockers": [
+        "INDEPENDENT_CROSS_CHECK_REQUIRED",
+        "CLAIM_CORROBORATION_REQUIRED"
+      ],
+      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
+      "reviewDate": "2026-10-03"
+    },
+    {
+      "companyId": "company:sec:0001303523",
+      "companyName": "British American Tobacco p.l.c.",
+      "symbol": "BTI",
+      "origin": "AUTONOMOUS_DISCOVERY",
+      "discovery": {
+        "discoveryId": "discovery:company:sec:0001303523:2026-08-04",
+        "companyId": "company:sec:0001303523",
+        "companyName": "British American Tobacco p.l.c.",
+        "symbol": "BTI",
+        "exchange": "NYSE",
+        "mic": "XNYS",
+        "market": "US",
+        "cik": "0001303523",
+        "issuerId": null,
+        "identityStatus": "CANONICAL_IDENTITY_READY",
+        "discoveryScore": 62,
+        "scoreType": "DISCOVERY_PRIORITY",
+        "status": "DISCOVERED_RESEARCH_REQUIRED",
+        "suggestedAction": "WATCH",
+        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
+        "isExistingFocusCompany": false,
+        "reasons": [
+          "Νέα επίσημη κατάθεση 6-K στη SEC",
+          "Το γεγονός είναι πολύ πρόσφατο",
+          "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
+        ],
+        "latestEventAt": "2026-08-04T14:12:40.000Z",
+        "events": [
+          {
+            "form": "6-K",
+            "title": "6-K - British American Tobacco p.l.c. (0001303523) (Filer)",
+            "publishedAt": "2026-08-04T14:12:40.000Z",
+            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1303523/000095015726000833/0000950157-26-000833-index.htm",
+            "sourceName": "SEC EDGAR Current Filings",
+            "eventScore": 62
+          }
+        ]
+      },
+      "status": "DRAFT_RESEARCH",
+      "category": "INSUFFICIENT_EVIDENCE",
+      "action": "WATCH",
+      "finalAction": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-07-30.1",
+        "generatedAt": "2026-08-04T14:28:02.539Z",
+        "validUntil": "2026-08-05T14:28:02.539Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 70,
+        "dataQualityScore": 35,
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 0,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 24.967371944444444
+        },
+        "risk": {
+          "riskScore": 20,
+          "fundamentalFlags": [],
+          "marketFlags": [
             "BELOW_50_DAY_AVERAGE"
           ]
         },
@@ -2456,14 +1608,14 @@
           "requiresUserExecution": true
         }
       },
-      "thesis": "Το επιβεβαιωμένο πρόγραμμα επαναγοράς ιδίων μετοχών της Allwyn μπορεί να βελτιώσει την αξία ανά μετοχή μόνο εφόσον οι αγορές είναι ουσιαστικές, γίνονται σε ελκυστική αποτίμηση και χρηματοδοτούνται χωρίς αποδυνάμωση της ρευστότητας. Αποτελεί μετρήσιμο καταλύτη κατανομής κεφαλαίου, όχι αυτοτελή λόγο αγοράς. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων -1.36%, σχετική ισχύς 60 συνεδριάσεων -11.05%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
+      "thesis": "Η British American Tobacco p.l.c. έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων 1.39%, σχετική ισχύς 60 συνεδριάσεων -2.12%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
       "blockers": [
         "FUNDAMENTALS_REQUIRED",
         "INDEPENDENT_CROSS_CHECK_REQUIRED",
         "CLAIM_CORROBORATION_REQUIRED"
       ],
       "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
-      "reviewDate": "2026-11-02"
+      "reviewDate": "2026-10-03"
     },
     {
       "companyId": "company:virgin-galactic-holdings",
@@ -2478,8 +1630,8 @@
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-04T11:34:06.670Z",
-        "validUntil": "2026-08-05T11:34:06.670Z",
+        "generatedAt": "2026-08-04T14:28:02.539Z",
+        "validUntil": "2026-08-05T14:28:02.539Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -2497,13 +1649,12 @@
         "blockers": [
           "DOSSIER_NOT_PUBLISHABLE",
           "DOSSIER_NOT_READY",
-          "CROSS_CHECK_NOT_READY",
-          "REFERENCE_PRICE_STALE"
+          "CROSS_CHECK_NOT_READY"
         ],
         "freshness": {
-          "referencePriceAgeHours": 15.568519444444444,
+          "referencePriceAgeHours": 0.007094166666666667,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 94.06851944444445
+          "latestMarketAgeHours": 24.967371944444444
         },
         "risk": {
           "riskScore": 100,
@@ -2525,7 +1676,7 @@
           "requiresUserExecution": true
         }
       },
-      "thesis": "Η Virgin Galactic έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: ετήσια μεταβολή εσόδων -78.06%, ετήσιο καθαρό περιθώριο -18063.92%, μεταβολή απομειωμένου αριθμού μετοχών 105.34%, απόδοση 60 συνεδριάσεων 4.08%, σχετική ισχύς 60 συνεδριάσεων 0.6%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
+      "thesis": "Η Virgin Galactic έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: ετήσια μεταβολή εσόδων -78.06%, ετήσιο καθαρό περιθώριο -18063.92%, μεταβολή απομειωμένου αριθμού μετοχών 105.34%, απόδοση 60 συνεδριάσεων 6.02%, σχετική ισχύς 60 συνεδριάσεων 2.5%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
       "blockers": [
         "INDEPENDENT_CROSS_CHECK_REQUIRED",
         "CLAIM_CORROBORATION_REQUIRED"
@@ -2546,8 +1697,8 @@
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-04T11:34:06.670Z",
-        "validUntil": "2026-08-05T11:34:06.670Z",
+        "generatedAt": "2026-08-04T14:28:02.539Z",
+        "validUntil": "2026-08-05T14:28:02.539Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -2567,12 +1718,12 @@
           "DOSSIER_NOT_READY",
           "CROSS_CHECK_NOT_READY",
           "FUNDAMENTALS_NOT_READY",
-          "MARKET_HISTORY_STALE"
+          "REFERENCE_PRICE_STALE"
         ],
         "freshness": {
-          "referencePriceAgeHours": 0,
+          "referencePriceAgeHours": 6.967371944444444,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 124.06851944444445
+          "latestMarketAgeHours": 6.967371944444444
         },
         "risk": {
           "riskScore": null,
@@ -2588,7 +1739,7 @@
           "requiresUserExecution": true
         }
       },
-      "thesis": "Η CrediaBank έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων -27.8%, σχετική ισχύς 60 συνεδριάσεων -34.68%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
+      "thesis": "Η CrediaBank έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων -23.85%, σχετική ισχύς 60 συνεδριάσεων -40.65%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
       "blockers": [
         "FUNDAMENTALS_REQUIRED",
         "INDEPENDENT_CROSS_CHECK_REQUIRED",
