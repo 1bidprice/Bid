@@ -63,6 +63,7 @@ jobs:
           node scripts/apply-v100-production-health.js
           node scripts/apply-v101-integrity-recovery.js
           node scripts/apply-v110-unified-intelligence.js
+          node scripts/apply-v111-alert-integrity.js
 
       - name: Verify purchase-lot calculations
         working-directory: mobile
@@ -81,6 +82,8 @@ jobs:
           grep -q "Βαθμός προτεραιότητας διερεύνησης" src/OpportunitiesView.js
           grep -q "marketDataStatus" src/OpportunitiesView.js
           grep -q "quoteContract.publicMessage" PortfolioApp.js
+          grep -q "Παύση δεδομένων" PortfolioApp.js
+          grep -q "quote.dayChangeVerified === true" src/alert-engine.js
           if grep -q 'Euronext error:.*officialError.message' src/market-data.js; then
             echo 'Raw provider error leak remains' >&2
             exit 1
@@ -92,16 +95,18 @@ jobs:
           const portfolio = fs.readFileSync('./PortfolioApp.js', 'utf8');
           const market = fs.readFileSync('./src/market-data.js', 'utf8');
           const store = fs.readFileSync('./src/intelligence-feed-store.js', 'utf8');
+          const alerts = fs.readFileSync('./src/alert-engine.js', 'utf8');
           if (app.expo.version !== '1.1.0') throw new Error('wrong Expo version');
           if (app.expo.android.package !== 'gr.investorcontrol.app') throw new Error('wrong package');
           if (app.expo.android.versionCode !== 22) throw new Error('wrong versionCode');
           if (pkg.version !== '1.1.0') throw new Error('wrong package version');
-          if (!pkg.scripts.postinstall.includes('apply-v110-unified-intelligence.js')) throw new Error('v1.1 patch missing from postinstall');
+          if (!pkg.scripts.postinstall.includes('apply-v111-alert-integrity.js')) throw new Error('alert integrity patch missing from postinstall');
           if (!portfolio.includes("quotePrice(item.average, item.currency, 4)")) throw new Error('four-decimal average all-in missing');
           if (!market.includes("'CREDIA.GR'")) throw new Error('CrediaBank official quote routing missing');
           if (!market.includes('safeProviderDiagnostic')) throw new Error('safe diagnostics missing');
           if (!store.includes('quoteRegistry')) throw new Error('canonical quote registry missing');
-          console.log('PASS v1.1 canonical quotes, source governance bridge, honest health and local-ledger invariants');
+          if (!alerts.includes('quoteContract.valuationEligible')) throw new Error('canonical alert valuation gate missing');
+          console.log('PASS v1.1 canonical quotes, source governance, alert gates, honest health and local-ledger invariants');
           NODE
 
       - name: Verify Android JavaScript bundle
