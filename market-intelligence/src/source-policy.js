@@ -29,5 +29,10 @@ export function sourcePolicySummary() {
 }
 
 export function independentPublisherPolicies() {
-  return governedIndependentPublishers();
+  return Object.fromEntries(
+    Object.entries(governedIndependentPublishers()).map(([key, publisher]) => [key, {
+      ...publisher,
+      reliabilityTier: Number(publisher.reliabilityTier || publisher.tier || 3),
+    }]),
+  );
 }
