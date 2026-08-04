@@ -37,7 +37,7 @@ function patchPortfolio() {
   if (!source.includes('function LegalNoticeModal(')) {
     source = replaceRequired(
       source,
-      'function MainApp() {',
+      'function MainApp({ onOpenDecisionGate }) {',
       `function LegalNoticeModal({ visible, onAccept }) {
   return (
     <Modal visible={visible} animationType="fade" transparent={false} onRequestClose={() => {}}>
@@ -59,7 +59,7 @@ function patchPortfolio() {
   );
 }
 
-function MainApp() {`,
+function MainApp({ onOpenDecisionGate }) {`,
       'legal notice component',
     );
   }
@@ -181,7 +181,7 @@ const app = JSON.parse(read('app.json'));
 const pkg = JSON.parse(read('package.json'));
 if (!portfolio.includes('Σημαντική ενημέρωση πριν τη χρήση')) throw new Error('legal notice missing');
 if (!portfolio.includes('Δεν απαιτείται προσωπικό API token')) throw new Error('managed source disclosure missing');
-if (!portfolio.includes(PRIVACY_POLICY_URL_PLACEHOLDER = 'https://1bidprice.github.io/Bid/privacy-policy.html')) throw new Error('privacy policy URL missing');
+if (!portfolio.includes('https://1bidprice.github.io/Bid/privacy-policy.html')) throw new Error('privacy policy URL missing');
 if (app.expo.version !== '1.2.0' || app.expo.android.versionCode !== 23) throw new Error('release version mismatch');
 if (!app.expo.android.blockedPermissions.includes('android.permission.CAMERA')) throw new Error('sensitive permission block missing');
 if (pkg.version !== '1.2.0' || pkg.dependencies['expo-build-properties'] !== '~55.0.16') throw new Error('package release config mismatch');
