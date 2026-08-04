@@ -123,23 +123,24 @@ function patchAppConfig() {
   app.expo.description = 'Προσωπικό χαρτοφυλάκιο και ελεγχόμενη αυτοματοποιημένη επενδυτική έρευνα, χωρίς εκτέλεση χρηματιστηριακών εντολών.';
   app.expo.primaryColor = '#0B66FF';
   app.expo.plugins = Array.isArray(app.expo.plugins) ? app.expo.plugins : [];
-  if (!app.expo.plugins.some((plugin) => Array.isArray(plugin) && plugin[0] === 'expo-build-properties')) {
-    app.expo.plugins.push([
-      'expo-build-properties',
-      {
-        android: {
-          compileSdkVersion: 36,
-          targetSdkVersion: 36,
-          buildToolsVersion: '36.0.0',
-        },
-      },
-    ]);
+  const existingPlugin = app.expo.plugins.find((plugin) => Array.isArray(plugin) && plugin[0] === 'expo-build-properties');
+  const androidBuildProperties = {
+    ...(existingPlugin?.[1]?.android || {}),
+    compileSdkVersion: 36,
+    targetSdkVersion: 36,
+    buildToolsVersion: '36.0.0',
+    usesCleartextTraffic: false,
+  };
+  if (existingPlugin) {
+    existingPlugin[1] = { ...(existingPlugin[1] || {}), android: androidBuildProperties };
+  } else {
+    app.expo.plugins.push(['expo-build-properties', { android: androidBuildProperties }]);
   }
   app.expo.android = app.expo.android || {};
   app.expo.android.package = 'gr.investorcontrol.app';
   app.expo.android.versionCode = 23;
   app.expo.android.allowBackup = false;
-  app.expo.android.usesCleartextTraffic = false;
+  delete app.expo.android.usesCleartextTraffic;
   app.expo.android.blockedPermissions = [
     'android.permission.ACCESS_COARSE_LOCATION',
     'android.permission.ACCESS_FINE_LOCATION',
@@ -179,10 +180,13 @@ patchPackage();
 const portfolio = read('PortfolioApp.js');
 const app = JSON.parse(read('app.json'));
 const pkg = JSON.parse(read('package.json'));
+const buildPlugin = app.expo.plugins.find((plugin) => Array.isArray(plugin) && plugin[0] === 'expo-build-properties');
 if (!portfolio.includes('Σημαντική ενημέρωση πριν τη χρήση')) throw new Error('legal notice missing');
 if (!portfolio.includes('Δεν απαιτείται προσωπικό API token')) throw new Error('managed source disclosure missing');
 if (!portfolio.includes('https://1bidprice.github.io/Bid/privacy-policy.html')) throw new Error('privacy policy URL missing');
 if (app.expo.version !== '1.2.0' || app.expo.android.versionCode !== 23) throw new Error('release version mismatch');
+if (app.expo.android.usesCleartextTraffic !== undefined) throw new Error('invalid top-level cleartext config remains');
+if (buildPlugin?.[1]?.android?.usesCleartextTraffic !== false) throw new Error('cleartext build property missing');
 if (!app.expo.android.blockedPermissions.includes('android.permission.CAMERA')) throw new Error('sensitive permission block missing');
 if (pkg.version !== '1.2.0' || pkg.dependencies['expo-build-properties'] !== '~55.0.16') throw new Error('package release config mismatch');
 console.log('Investor Control v1.2.0 Play Store release hardening applied.');
