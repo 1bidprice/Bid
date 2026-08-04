@@ -66,13 +66,29 @@ function patchPortfolio() {
   write('PortfolioApp.js', source);
 }
 
+function preservePatchChain() {
+  const packagePath = path.join(root, 'package.json');
+  const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+  pkg.version = '1.1.0';
+  pkg.scripts = pkg.scripts || {};
+  const command = 'node scripts/apply-v111-alert-integrity.js';
+  const current = String(pkg.scripts.postinstall || '').trim();
+  if (!current.includes('apply-v111-alert-integrity.js')) {
+    pkg.scripts.postinstall = current ? `${current} && ${command}` : command;
+  }
+  fs.writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`);
+}
+
 patchAlertEngine();
 patchPortfolio();
+preservePatchChain();
 
 const alertEngine = read('src/alert-engine.js');
 const portfolio = read('PortfolioApp.js');
+const pkg = JSON.parse(read('package.json'));
 if (!alertEngine.includes('quoteContract.valuationEligible')) throw new Error('alert verification failed: valuation gate');
 if (!alertEngine.includes('quote.dayChangeVerified === true')) throw new Error('alert verification failed: daily-change gate');
 if (!portfolio.includes('Παύση δεδομένων')) throw new Error('alert verification failed: paused UI state');
 if (!portfolio.includes("buildMobileQuoteContract('SPCE.US'")) throw new Error('alert verification failed: WebSocket quote contract');
+if (!String(pkg.scripts?.postinstall || '').includes('apply-v111-alert-integrity.js')) throw new Error('alert verification failed: postinstall chain');
 console.log('Investor Control v1.1.0 canonical alert integrity patch applied.');
