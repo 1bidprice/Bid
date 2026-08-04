@@ -66,22 +66,32 @@ jobs:
           npm run run:autonomous
           npm run build:autonomous-mobile
 
-      - name: Verify production contracts and execution boundary
+      - name: Verify v1.1 production contracts and execution boundary
         working-directory: source/market-intelligence
         run: |
           node - <<'NODE'
           const report = require('./out/autonomous-intelligence.json');
           const feed = require('./out/mobile-intelligence-feed.json');
           const allowed = new Set(['BUY_NOW', 'SELL_NOW', 'HOLD', 'DO_NOT_BUY', 'AVOID', 'WATCH']);
-          if (report.format !== 'investor-control-daily-intelligence' || report.version !== 7) throw new Error('wrong autonomous report contract');
+          if (report.format !== 'investor-control-daily-intelligence' || report.version !== 8) throw new Error('wrong autonomous report contract');
           if (!report.policyVersion || !report.finalActionCounts || !report.discovery || !report.operationalHealth) throw new Error('production metadata missing');
+          if (report.discovery.sourcePolicy?.selector !== 'DETERMINISTIC_SOURCE_GOVERNOR') throw new Error('deterministic source governor missing');
           if (report.discovery.sourcePolicy?.runtimeAiSourceSelection !== false) throw new Error('runtime AI source selection boundary broken');
+          if (report.discovery.sourcePolicy?.rules?.runtimeAiMayApproveSources !== false) throw new Error('AI source approval boundary broken');
+          if (!Array.isArray(report.discovery.marketsScanned) || !report.discovery.marketsScanned.includes('US') || !report.discovery.marketsScanned.includes('GR')) throw new Error('US/GR discovery coverage missing');
           if (feed.format !== 'investor-control-mobile-intelligence-feed' || feed.version !== 2) throw new Error('wrong mobile feed contract');
           if (!Array.isArray(feed.decisions) || !Array.isArray(feed.discoveryRadar)) throw new Error('decision or discovery list missing');
+          if (!feed.quoteRegistry || typeof feed.quoteRegistry !== 'object' || Array.isArray(feed.quoteRegistry)) throw new Error('canonical quote registry missing');
+          if (!feed.operationalHealth?.infrastructureStatus || !feed.operationalHealth?.marketDataStatus || !feed.operationalHealth?.fundamentalsStatus || !feed.operationalHealth?.decisionEngineStatus) throw new Error('split operational health missing');
           const generatedAt = new Date(report.generatedAt).getTime();
           if (!Number.isFinite(generatedAt) || Math.abs(Date.now() - generatedAt) > 60 * 60 * 1000) throw new Error('production output is not fresh');
           for (const candidate of feed.discoveryRadar) {
             if (candidate.suggestedAction !== 'WATCH') throw new Error('discovery candidate leaked a directional action');
+            if (candidate.scoreType !== 'DISCOVERY_PRIORITY' || candidate.investmentScore !== null) throw new Error('discovery priority is presented as an investment score');
+          }
+          for (const [symbol, quote] of Object.entries(feed.quoteRegistry)) {
+            if (!quote?.quoteContract || quote.appSymbol !== symbol) throw new Error(`invalid canonical quote registry entry ${symbol}`);
+            if (quote.quoteContract.sourceRole === 'FALLBACK_UNVERIFIED' && (quote.quoteContract.valuationEligible || quote.quoteContract.decisionEligible)) throw new Error(`fallback quote became decision eligible ${symbol}`);
           }
           for (const dossier of report.researchDossiers) {
             const finalAction = dossier.finalAction;
@@ -91,7 +101,7 @@ jobs:
             if (dossier.publicationMode === 'AUTOMATED_POLICY' && (dossier.status !== 'PUBLISHED' || finalAction.status !== 'FINAL' || finalAction.marketAction === 'WATCH')) throw new Error('invalid automated publication');
           }
           for (const item of feed.research) if (item.action !== 'WATCH') throw new Error('draft research leaked directional action');
-          console.log(`PASS health=${feed.operationalHealth?.status}, market=${report.marketSnapshotCount}, history=${report.historicalMarketMetricsCount}, readyHistory=${feed.sourceHealth?.readyHistoricalMarketMetricsCount}, final=${feed.summary.finalActionCount}, blocked=${feed.summary.blockedDecisionCount}`);
+          console.log(`PASS health=${feed.operationalHealth?.status}, marketHealth=${feed.operationalHealth?.marketDataStatus}, fundamentalHealth=${feed.operationalHealth?.fundamentalsStatus}, market=${report.marketSnapshotCount}, history=${report.historicalMarketMetricsCount}, final=${feed.summary.finalActionCount}, blocked=${feed.summary.blockedDecisionCount}, quotes=${Object.keys(feed.quoteRegistry).length}`);
           NODE
 
       - name: Publish verified live channel and audit history
@@ -112,20 +122,22 @@ jobs:
           const now = new Date().toISOString();
           const sourceCommit = execFileSync('git', ['-C', 'source', 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
           const readyHistory = (report.historicalMarketMetrics || []).filter((item) => item?.readiness?.marketMetricsReady === true).length;
-          const operationalStatus = readyHistory > 0 && Number(report.marketSnapshotCount || 0) > 0 ? 'OPERATIONAL' : 'DEGRADED';
+          const quoteEntries = Object.values(feed.quoteRegistry || {});
+          const valuationEligibleQuoteCount = quoteEntries.filter((item) => item?.quoteContract?.valuationEligible === true).length;
+          const decisionEligibleQuoteCount = quoteEntries.filter((item) => item?.quoteContract?.decisionEligible === true).length;
           const status = {
             format: 'investor-control-live-feed-status',
-            version: 5,
+            version: 6,
             generatedAt: feed.generatedAt,
             publishedAt: now,
             policyVersion: feed.policyVersion,
             sourcePolicyVersion: feed.sourceSelection?.version || null,
+            quoteContractVersion: quoteEntries.find((item) => item?.quoteContract?.version)?.quoteContract?.version || null,
             sourceWorkflowRunId: process.env.GITHUB_RUN_ID,
             sourceCommit,
             feedSha256,
             operationalHealth: {
               ...(report.operationalHealth || {}),
-              status: operationalStatus,
               readyHistoricalMarketMetricsCount: readyHistory,
               lastSuccessfulPublicationAt: now,
               staleOutput: false,
@@ -139,9 +151,18 @@ jobs:
               marketSnapshotCount: report.marketSnapshotCount,
               historicalMarketMetricsCount: report.historicalMarketMetricsCount,
               readyHistoricalMarketMetricsCount: readyHistory,
+              canonicalQuoteCount: quoteEntries.length,
+              valuationEligibleQuoteCount,
+              decisionEligibleQuoteCount,
+              marketsScanned: report.discovery?.marketsScanned || [],
               registryCompanyCount: report.discovery?.registryCompanyCount || 0,
+              secRegistryCompanyCount: report.discovery?.secRegistryCompanyCount || 0,
+              athensActiveIssuerCount: report.discovery?.athensActiveIssuerCount || 0,
               filingEventCount: report.discovery?.filingEventCount || 0,
+              secFilingEventCount: report.discovery?.secFilingEventCount || 0,
+              athensAnnouncementEventCount: report.discovery?.athensAnnouncementEventCount || 0,
               discoveryCandidateCount: report.discovery?.candidateCount || 0,
+              unresolvedDiscoveryIdentityCount: report.discovery?.unresolvedIdentityCount || 0,
               discoveryDeepAnalysisCount: report.discovery?.deepAnalysisCompanyCount || 0,
               diagnosticCount: (report.diagnostics?.length || 0) + (report.discovery?.diagnostics?.length || 0),
             },
@@ -169,13 +190,14 @@ jobs:
             confidenceScore: item.finalAction?.confidenceScore,
             dataQualityScore: item.finalAction?.dataQualityScore,
             referencePrice: item.referencePrice,
+            marketQuote: item.marketQuote || null,
             validUntil: item.finalAction?.validUntil,
           }));
           const identity = (item) => `${item.dossierId}|${item.marketAction}|${item.referencePrice?.timestamp || ''}`;
           const seen = new Set(current.map(identity));
           const merged = [...current, ...history.filter((item) => !seen.has(identity(item)))].slice(0, 500);
-          fs.writeFileSync('./live-feed/decision-history.json', `${JSON.stringify({ format: 'investor-control-decision-history', version: 1, updatedAt: now, items: merged }, null, 2)}\n`);
-          fs.writeFileSync('./live-feed/discovery-radar.json', `${JSON.stringify({ format: 'investor-control-discovery-radar', version: 1, updatedAt: now, sourcePolicy: feed.sourceSelection, items: feed.discoveryRadar }, null, 2)}\n`);
+          fs.writeFileSync('./live-feed/decision-history.json', `${JSON.stringify({ format: 'investor-control-decision-history', version: 2, updatedAt: now, items: merged }, null, 2)}\n`);
+          fs.writeFileSync('./live-feed/discovery-radar.json', `${JSON.stringify({ format: 'investor-control-discovery-radar', version: 2, updatedAt: now, sourcePolicy: feed.sourceSelection, marketsScanned: report.discovery?.marketsScanned || [], items: feed.discoveryRadar }, null, 2)}\n`);
           NODE
           cd live-feed
           git config user.name 'Investor Control Intelligence'
@@ -197,7 +219,7 @@ jobs:
           test -d live-feed/.git || exit 0
           node - <<'NODE'
           const fs = require('fs');
-          let status = { format: 'investor-control-live-feed-status', version: 5 };
+          let status = { format: 'investor-control-live-feed-status', version: 6 };
           try { status = JSON.parse(fs.readFileSync('./live-feed/status.json', 'utf8')); } catch {}
           const now = new Date().toISOString();
           status.publishedAt = now;
@@ -206,6 +228,7 @@ jobs:
           status.operationalHealth = {
             ...(status.operationalHealth || {}),
             status: 'FAILED',
+            infrastructureStatus: 'FAILED',
             staleOutput: true,
             lastFailureAt: now,
           };
