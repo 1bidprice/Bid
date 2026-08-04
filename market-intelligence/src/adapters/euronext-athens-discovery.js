@@ -1,7 +1,7 @@
 import { contentHash } from '../content-hash.js';
 
-export const ATHENS_DISCOVERY_VERSION = '2026-08-04.1';
-export const ATHENS_ISSUERS_URL = 'https://athens.euronext.com/en/market-data/issuers';
+export const ATHENS_DISCOVERY_VERSION = '2026-08-04.2';
+export const ATHENS_ISSUERS_URL = 'https://athens.euronext.com/en/market-data/issuers?letter=X';
 export const ATHENS_ANNOUNCEMENTS_URL = 'https://athens.euronext.com/en/market-data/announcements';
 
 function decodeHtml(value) {
@@ -17,7 +17,10 @@ function decodeHtml(value) {
 }
 
 function plainText(value) {
-  return decodeHtml(String(value || '').replace(/<script\b[\s\S]*?<\/script>/gi, ' ').replace(/<style\b[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' '))
+  return decodeHtml(String(value || '')
+    .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' '))
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -48,31 +51,14 @@ function parseAthensDate(value, fallback) {
   return Number.isNaN(date.getTime()) ? new Date(fallback).toISOString() : date.toISOString();
 }
 
-function issuerAnchors(html) {
-  const anchors = [];
-  const pattern = /<a\b[^>]*href=["']([^"']*\/market-data\/issuers\/(\d+)(?:[/?#][^"']*)?)["'][^>]*>([\s\S]*?)<\/a>/gi;
-  let match;
-  while ((match = pattern.exec(String(html || '')))) {
-    const name = plainText(match[3]);
-    if (!name || /financial data|announcements|corporate actions|related instruments/i.test(name)) continue;
-    anchors.push({ issuerId: match[2], name, sourceUrl: absoluteUrl(match[1]) });
-  }
-  return anchors;
-}
-
-export function extractAthensIssuerUniverse(html, options = {}) {
-  const generatedAt = new Date(options.generatedAt || Date.now()).toISOString();
-  const byId = new Map();
-  for (const item of issuerAnchors(html)) {
-    if (!byId.has(item.issuerId)) byId.set(item.issuerId, item);
-  }
-  const companies = [...byId.values()].map((item) => ({
-    companyId: `company:xath:${item.issuerId}`,
-    legalName: item.name,
-    displayName: item.name,
-    aliases: [item.name],
+function companyFromIssuer({ issuerId, name, sourceUrl }, generatedAt) {
+  return {
+    companyId: `company:xath:${issuerId}`,
+    legalName: name,
+    displayName: name,
+    aliases: [name],
     country: 'GR',
-    issuerId: item.issuerId,
+    issuerId,
     cik: null,
     lei: null,
     primaryListing: {
@@ -82,10 +68,41 @@ export function extractAthensIssuerUniverse(html, options = {}) {
       currency: 'EUR',
     },
     regulator: 'Euronext Athens / Hellenic Capital Market framework',
-    investorRelationsUrl: item.sourceUrl,
+    investorRelationsUrl: sourceUrl || `https://athens.euronext.com/en/market-data/issuers/${issuerId}`,
     active: true,
     discoveredAt: generatedAt,
-  }));
+  };
+}
+
+function issuerAnchors(html) {
+  const source = String(html || '');
+  const anchors = [];
+  const seen = new Set();
+  const add = (issuerId, name, href) => {
+    const cleanId = String(issuerId || '').trim();
+    const cleanName = plainText(name);
+    if (!cleanId || !cleanName || seen.has(cleanId)) return;
+    if (/financial data|announcements|corporate actions|related instruments|issuer profile|learn more/i.test(cleanName)) return;
+    seen.add(cleanId);
+    anchors.push({ issuerId: cleanId, name: cleanName, sourceUrl: absoluteUrl(href) });
+  };
+
+  const anchorPattern = /<a\b[^>]*href=["']([^"']*\/market-data\/issuers\/(\d+)(?:[/?#][^"']*)?)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let match;
+  while ((match = anchorPattern.exec(source))) add(match[2], match[3], match[1]);
+
+  const optionPattern = /<option\b[^>]*(?:value|data-url)=["']([^"']*\/market-data\/issuers\/(\d+)(?:[/?#][^"']*)?)["'][^>]*>([\s\S]*?)<\/option>/gi;
+  while ((match = optionPattern.exec(source))) add(match[2], match[3], match[1]);
+
+  const dataPattern = /<(?:div|li|article)\b[^>]*(?:data-href|data-url)=["']([^"']*\/market-data\/issuers\/(\d+)(?:[/?#][^"']*)?)["'][^>]*>([\s\S]*?)<\/(?:div|li|article)>/gi;
+  while ((match = dataPattern.exec(source))) add(match[2], match[3], match[1]);
+
+  return anchors;
+}
+
+export function extractAthensIssuerUniverse(html, options = {}) {
+  const generatedAt = new Date(options.generatedAt || Date.now()).toISOString();
+  const companies = issuerAnchors(html).map((item) => companyFromIssuer(item, generatedAt));
   return {
     companies,
     diagnostics: companies.length ? [] : [{ code: 'ATHENS_ISSUER_UNIVERSE_EMPTY' }],
@@ -100,15 +117,44 @@ function cells(row) {
   return (String(row || '').match(/<t[dh]\b[\s\S]*?<\/t[dh]>/gi) || []).map((cell) => plainText(cell));
 }
 
+function rowIssuerIdentity(row, fallbackName) {
+  const match = String(row || '').match(/<a\b[^>]*href=["']([^"']*\/market-data\/issuers\/(\d+)(?:[/?#][^"']*)?)["'][^>]*>([\s\S]*?)<\/a>/i);
+  if (!match) return null;
+  return {
+    issuerId: match[2],
+    name: plainText(match[3]) || plainText(fallbackName),
+    sourceUrl: absoluteUrl(match[1]),
+  };
+}
+
 function announcementLink(row) {
   const matches = [...String(row || '').matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)];
-  const preferred = matches.find((match) => /\/node\/\d+|announc/i.test(match[1])) || matches.at(-1);
+  const preferred = matches.find((match) => /\/node\/\d+|announc/i.test(match[1]))
+    || matches.find((match) => !/\/market-data\/issuers\/\d+/i.test(match[1]))
+    || matches.at(-1);
   return preferred ? { sourceUrl: absoluteUrl(preferred[1]), anchorText: plainText(preferred[2]) } : null;
+}
+
+function bestCompanyMatch(issuerName, issuerUniverse, byName, rowIdentity, generatedAt) {
+  const key = normalizedName(issuerName);
+  const exact = byName.get(key);
+  if (exact) return exact;
+  const fuzzy = issuerUniverse.find((company) => {
+    const a = normalizedName(company.displayName || company.legalName);
+    return a && key && (a.includes(key) || key.includes(a));
+  });
+  if (fuzzy) return fuzzy;
+  if (rowIdentity?.issuerId) return companyFromIssuer({
+    ...rowIdentity,
+    name: rowIdentity.name || issuerName,
+  }, generatedAt);
+  return null;
 }
 
 export function extractAthensAnnouncements(html, issuerUniverse = [], options = {}) {
   const retrievedAt = new Date(options.retrievedAt || Date.now()).toISOString();
   const byName = new Map();
+  const discoveredById = new Map(issuerUniverse.map((company) => [company.companyId, company]));
   for (const company of issuerUniverse) {
     const key = normalizedName(company.displayName || company.legalName);
     if (key) byName.set(key, company);
@@ -123,17 +169,18 @@ export function extractAthensAnnouncements(html, issuerUniverse = [], options = 
     const title = values[1];
     const dateText = values[2];
     if (!issuerName || !title || !/\d{1,2}[-/.]\d{1,2}[-/.]\d{4}/.test(dateText)) continue;
-    const link = announcementLink(row);
-    const exact = byName.get(normalizedName(issuerName));
-    const fuzzy = exact || issuerUniverse.find((company) => {
-      const a = normalizedName(company.displayName || company.legalName);
-      const b = normalizedName(issuerName);
-      return a && b && (a.includes(b) || b.includes(a));
-    });
-    if (!fuzzy) {
+    const rowIdentity = rowIssuerIdentity(row, issuerName);
+    const company = bestCompanyMatch(issuerName, [...discoveredById.values()], byName, rowIdentity, retrievedAt);
+    if (!company) {
       diagnostics.push({ code: 'ATHENS_ISSUER_IDENTITY_UNRESOLVED', issuerName, title });
       continue;
     }
+    if (!discoveredById.has(company.companyId)) {
+      discoveredById.set(company.companyId, company);
+      const key = normalizedName(company.displayName || company.legalName);
+      if (key) byName.set(key, company);
+    }
+    const link = announcementLink(row);
     const publishedAt = parseAthensDate(dateText, retrievedAt);
     const hash = contentHash({ issuerName, title, publishedAt, sourceUrl: link?.sourceUrl });
     records.push({
@@ -149,9 +196,9 @@ export function extractAthensAnnouncements(html, issuerUniverse = [], options = 
       rawText: null,
       contentHash: hash,
       language: 'en',
-      companyIds: [fuzzy.companyId],
-      companyId: fuzzy.companyId,
-      issuerId: fuzzy.issuerId,
+      companyIds: [company.companyId],
+      companyId: company.companyId,
+      issuerId: company.issuerId,
       claimType: 'FACT',
       reliabilityTier: 1,
       isPrimarySource: true,
@@ -165,14 +212,17 @@ export function extractAthensAnnouncements(html, issuerUniverse = [], options = 
     });
   }
 
-  return { records, diagnostics };
+  return { records, companies: [...discoveredById.values()], diagnostics };
 }
 
 export function extractAthensRelatedInstrument(html, company) {
-  const text = plainText(html);
-  const hrefSymbol = String(html || '').match(/\/market-data\/instruments\/stocks\/([A-Z0-9._-]+)/i)?.[1] || null;
+  const source = String(html || '');
+  const text = plainText(source);
+  const hrefSymbol = source.match(/\/market-data\/instruments\/stocks\/([A-Z0-9._-]+)/i)?.[1] || null;
+  const productRow = source.match(/<tr\b[\s\S]*?<a\b[^>]*href=["'][^"']*\/market-data\/instruments\/stocks\/([A-Z0-9._-]+)[^"']*["'][^>]*>[\s\S]*?<\/tr>/i)?.[1] || null;
   const tableSymbol = text.match(/\bSymbol\s+([A-Z0-9._-]{1,16})\s+(?:Product\s+)?Stock\b/i)?.[1] || null;
-  const symbol = String(hrefSymbol || tableSymbol || '').trim().toUpperCase() || null;
+  const distributionSymbol = text.match(/\bSymbol\s+(?:Amount[^A-Z0-9]+)?([A-Z][A-Z0-9._-]{0,15})\s+(?:\d|Amount|Type|Dividend|Cash)/i)?.[1] || null;
+  const symbol = String(hrefSymbol || productRow || tableSymbol || distributionSymbol || '').trim().toUpperCase() || null;
   return symbol ? {
     ...company,
     primaryListing: { ...company.primaryListing, symbol },
@@ -184,12 +234,36 @@ async function fetchText(fetchImpl, url, options = {}) {
   const response = await fetchImpl(url, {
     headers: {
       Accept: 'text/html,application/xhtml+xml',
-      'User-Agent': options.userAgent || 'Investor-Control-Market-Intelligence/1.1',
+      'User-Agent': options.userAgent || 'Investor-Control-Market-Intelligence/1.2',
     },
     signal: options.signal,
   });
   if (!response?.ok) throw new Error(`HTTP ${response?.status || 'unknown'}`);
   return response.text();
+}
+
+async function resolveCompanySymbol(fetchImpl, company, options, diagnostics) {
+  const candidates = [
+    `https://athens.euronext.com/en/market-data/issuers/${company.issuerId}/related-instruments`,
+    `https://athens.euronext.com/en/market-data/issuers/${company.issuerId}/cash-distribution`,
+    `https://athens.euronext.com/en/market-data/issuers/${company.issuerId}`,
+  ];
+  for (const url of candidates) {
+    try {
+      const html = await fetchText(fetchImpl, url, options);
+      const identified = extractAthensRelatedInstrument(html, company);
+      if (identified) return identified;
+    } catch (error) {
+      diagnostics.push({
+        code: 'ATHENS_RELATED_INSTRUMENT_FETCH_FAILED',
+        companyId: company.companyId,
+        endpoint: new URL(url).pathname,
+        errorClass: String(error?.message || error).startsWith('HTTP') ? String(error.message) : 'NETWORK_OR_PARSE_ERROR',
+      });
+    }
+  }
+  diagnostics.push({ code: 'ATHENS_SYMBOL_NOT_RESOLVED', companyId: company.companyId });
+  return company;
 }
 
 export async function fetchAthensDiscovery(options = {}) {
@@ -203,34 +277,27 @@ export async function fetchAthensDiscovery(options = {}) {
       fetchText(fetchImpl, options.issuersUrl || ATHENS_ISSUERS_URL, options),
       fetchText(fetchImpl, options.announcementsUrl || ATHENS_ANNOUNCEMENTS_URL, options),
     ]);
-    const universe = extractAthensIssuerUniverse(issuerHtml, { generatedAt });
+    const universe = extractAthensIssuerUniverse(`${issuerHtml}\n${announcementHtml}`, { generatedAt });
     const announcements = extractAthensAnnouncements(announcementHtml, universe.companies, { retrievedAt: generatedAt });
+    const companyPool = announcements.companies || universe.companies;
     const activeCompanyIds = [...new Set(announcements.records.map((record) => record.companyId))]
-      .slice(0, Math.max(1, Number(options.identityResolutionLimit ?? 12)));
-    const resolved = [];
-    const diagnostics = [...universe.diagnostics, ...announcements.diagnostics];
+      .slice(0, Math.max(1, Number(options.identityResolutionLimit ?? 20)));
+    const diagnostics = [...universe.diagnostics, ...announcements.diagnostics]
+      .filter((item) => !(item.code === 'ATHENS_ISSUER_UNIVERSE_EMPTY' && companyPool.length));
+    const companies = [];
 
     for (const companyId of activeCompanyIds) {
-      const company = universe.companies.find((item) => item.companyId === companyId);
-      if (!company?.issuerId) continue;
-      try {
-        const html = await fetchText(fetchImpl, `https://athens.euronext.com/en/market-data/issuers/${company.issuerId}/related-instruments`, options);
-        const identified = extractAthensRelatedInstrument(html, company);
-        if (identified) resolved.push(identified);
-        else diagnostics.push({ code: 'ATHENS_SYMBOL_NOT_RESOLVED', companyId });
-      } catch (error) {
-        diagnostics.push({ code: 'ATHENS_RELATED_INSTRUMENT_FETCH_FAILED', companyId, errorClass: String(error?.message || error).startsWith('HTTP') ? String(error.message) : 'NETWORK_OR_PARSE_ERROR' });
+      const company = companyPool.find((item) => item.companyId === companyId);
+      if (!company?.issuerId) {
+        diagnostics.push({ code: 'ATHENS_ISSUER_ID_MISSING', companyId });
+        continue;
       }
+      companies.push(await resolveCompanySymbol(fetchImpl, company, options, diagnostics));
     }
-
-    const resolvedById = new Map(resolved.map((company) => [company.companyId, company]));
-    const companies = universe.companies
-      .filter((company) => activeCompanyIds.includes(company.companyId))
-      .map((company) => resolvedById.get(company.companyId) || company);
 
     return {
       format: 'investor-control-athens-discovery',
-      version: 1,
+      version: 2,
       policyVersion: ATHENS_DISCOVERY_VERSION,
       generatedAt,
       companies,
@@ -240,7 +307,7 @@ export async function fetchAthensDiscovery(options = {}) {
   } catch (error) {
     return {
       format: 'investor-control-athens-discovery',
-      version: 1,
+      version: 2,
       policyVersion: ATHENS_DISCOVERY_VERSION,
       generatedAt,
       companies: [],
