@@ -1,0 +1,47 @@
+name: Validate Investor Control Mobile
+
+on:
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/mobile-app-v2-check.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Check Expo package compatibility
+        run: npx expo install --check 2>&1 | tee package-check.log
+
+      - name: Expo Doctor
+        continue-on-error: true
+        run: npx expo-doctor 2>&1 | tee doctor.log
+
+      - name: Export Android bundle
+        run: npx expo export --platform android --output-dir dist 2>&1 | tee export.log
+
+      - name: Upload validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-validation-logs
+          path: |
+            mobile/package-check.log
+            mobile/doctor.log
+            mobile/export.log
+          if-no-files-found: ignore
