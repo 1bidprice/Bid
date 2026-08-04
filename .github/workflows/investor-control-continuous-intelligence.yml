@@ -52,8 +52,7 @@ jobs:
           fi
           pdftotext -v
 
-      - name: Run deterministic tests on explicit deployment
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+      - name: Apply v1.1 contracts and run deterministic tests
         working-directory: source/market-intelligence
         run: npm test
 
@@ -63,8 +62,8 @@ jobs:
           SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
           FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
         run: |
-          npm run run:autonomous
-          npm run build:autonomous-mobile
+          node src/run-autonomous-intelligence.js out/autonomous-intelligence.json
+          node src/build-mobile-feed.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json
 
       - name: Verify v1.1 production contracts and execution boundary
         working-directory: source/market-intelligence
