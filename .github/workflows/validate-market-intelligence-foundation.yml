@@ -1,9 +1,10 @@
-name: Validate Market Intelligence Foundation
+name: Validate Market Intelligence v1.1
 
 on:
   push:
     branches:
       - investor-control-v1-market-intelligence-foundation
+      - investor-control-v1.1-unified-intelligence
     paths:
       - market-intelligence/**
       - .github/workflows/validate-market-intelligence-foundation.yml
@@ -16,7 +17,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -28,6 +29,19 @@ jobs:
         run: |
           set -o pipefail
           npm test 2>&1 | tee test-output.log
+      - name: Verify v1.1 source and quote contracts
+        working-directory: market-intelligence
+        run: |
+          node - <<'NODE'
+          import fs from 'node:fs';
+          const governor = fs.readFileSync('src/source-governor.js', 'utf8');
+          const quote = fs.readFileSync('src/canonical-market-quote.js', 'utf8');
+          const feed = fs.readFileSync('src/mobile-intelligence-feed.js', 'utf8');
+          if (!governor.includes('DETERMINISTIC_SOURCE_GOVERNOR')) throw new Error('source governor missing');
+          if (!quote.includes('valuationEligible')) throw new Error('canonical quote contract missing');
+          if (!feed.includes('quoteRegistry')) throw new Error('canonical quote registry missing from mobile feed');
+          console.log('PASS v1.1 source governor, canonical quote contract and feed registry');
+          NODE
       - name: Upload deterministic test output
         if: always()
         uses: actions/upload-artifact@v4
