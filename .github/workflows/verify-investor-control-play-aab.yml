@@ -1,0 +1,109 @@
+name: Investor Control Play AAB Verification
+
+on:
+  pull_request:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - mobile/**
+      - play-store/**
+      - .github/workflows/verify-investor-control-play-aab.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-play-aab-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-play-aab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install and apply production chain
+        working-directory: mobile
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+      - name: Validate release source
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          npm run test:lots
+          npx expo install --check
+          npx expo-doctor@latest
+          npx expo export --platform android --output-dir dist-play-aab
+          node - <<'NODE'
+          const app = require('./app.json');
+          const pkg = require('./package.json');
+          if (app.expo.version !== '1.2.0' || app.expo.android.versionCode !== 23) throw new Error('release version mismatch');
+          if (app.expo.android.package !== 'gr.investorcontrol.app') throw new Error('package mismatch');
+          const plugin = app.expo.plugins.find((item) => Array.isArray(item) && item[0] === 'expo-build-properties');
+          if (plugin?.[1]?.android?.targetSdkVersion !== 36) throw new Error('target API 36 missing');
+          if (pkg.version !== '1.2.0') throw new Error('package version mismatch');
+          NODE
+      - name: Prebuild Android
+        working-directory: mobile
+        run: npx expo prebuild --platform android --no-install --clean
+      - name: Build APK and AAB
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace
+      - name: Verify API, permissions, APK continuity and bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK='mobile/android/app/build/outputs/apk/release/app-release.apk'
+          AAB_SOURCE='mobile/android/app/build/outputs/bundle/release/app-release.aab'
+          AAB='mobile/Investor-Control-v1.2.0-play-unsigned.aab'
+          UPDATE='mobile/Investor-Control-v1.2.0-update.apk'
+          ALIGNED='mobile/Investor-Control-v1.2.0-aligned.apk'
+          KEYSTORE='mobile/android/app/debug.keystore'
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          test -s "$APK" && test -s "$AAB_SOURCE" && test -s "$KEYSTORE"
+          "$BUILD_TOOLS/zipalign" -p -f 4 "$APK" "$ALIGNED"
+          "$BUILD_TOOLS/apksigner" sign --ks "$KEYSTORE" --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --out "$UPDATE" "$ALIGNED"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$UPDATE" | tee mobile/Investor-Control-v1.2.0-update-signature.txt
+          grep -qi 'fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c' mobile/Investor-Control-v1.2.0-update-signature.txt
+          "$BUILD_TOOLS/aapt2" dump badging "$UPDATE" | tee mobile/Investor-Control-v1.2.0-badging.txt
+          grep -q "package: name='gr.investorcontrol.app' versionCode='23' versionName='1.2.0'" mobile/Investor-Control-v1.2.0-badging.txt
+          grep -q "targetSdkVersion:'36'" mobile/Investor-Control-v1.2.0-badging.txt
+          "$BUILD_TOOLS/aapt2" dump permissions "$UPDATE" | tee mobile/Investor-Control-v1.2.0-permissions.txt
+          for forbidden in ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION CAMERA RECORD_AUDIO READ_CONTACTS WRITE_CONTACTS READ_PHONE_STATE CALL_PHONE READ_SMS SEND_SMS; do
+            ! grep -q "android.permission.${forbidden}" mobile/Investor-Control-v1.2.0-permissions.txt || { echo "forbidden permission ${forbidden}" >&2; exit 1; }
+          done
+          cp "$AAB_SOURCE" "$AAB"
+          zip -d "$AAB" 'META-INF/*.RSA' 'META-INF/*.DSA' 'META-INF/*.EC' 'META-INF/*.SF' 'META-INF/MANIFEST.MF' >/dev/null 2>&1 || true
+          curl --fail --location --silent --show-error 'https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar' --output /tmp/bundletool.jar
+          java -jar /tmp/bundletool.jar validate --bundle="$AAB"
+          sha256sum "$UPDATE" | tee mobile/Investor-Control-v1.2.0-update.sha256
+          sha256sum "$AAB" | tee mobile/Investor-Control-v1.2.0-play-unsigned.sha256
+      - name: Upload verified release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1.2.0-verified-play-candidate
+          path: |
+            mobile/Investor-Control-v1.2.0-update.apk
+            mobile/Investor-Control-v1.2.0-update.sha256
+            mobile/Investor-Control-v1.2.0-update-signature.txt
+            mobile/Investor-Control-v1.2.0-badging.txt
+            mobile/Investor-Control-v1.2.0-permissions.txt
+            mobile/Investor-Control-v1.2.0-play-unsigned.aab
+            mobile/Investor-Control-v1.2.0-play-unsigned.sha256
+            play-store/**
+          if-no-files-found: error
+          retention-days: 90
