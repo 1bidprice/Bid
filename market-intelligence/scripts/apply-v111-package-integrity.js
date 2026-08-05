@@ -6,10 +6,10 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const packagePath = path.join(root, 'package.json');
 const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
 
-const chain = 'node scripts/apply-v100-production.js && node scripts/apply-v100-provider-refinements.js && node scripts/apply-v100-event-integrity.js && node scripts/apply-v100-feed-health.js && node scripts/apply-v110-unified-intelligence.js && node scripts/apply-v111-package-integrity.js && node scripts/apply-v122-athens-trading-directory.js';
-const buildChain = 'node scripts/apply-v100-provider-refinements.js && node scripts/apply-v100-event-integrity.js && node scripts/apply-v100-feed-health.js && node scripts/apply-v110-unified-intelligence.js && node scripts/apply-v111-package-integrity.js && node scripts/apply-v122-athens-trading-directory.js';
+const chain = 'node scripts/apply-v100-production.js && node scripts/apply-v100-provider-refinements.js && node scripts/apply-v100-event-integrity.js && node scripts/apply-v100-feed-health.js && node scripts/apply-v110-unified-intelligence.js && node scripts/apply-v111-package-integrity.js && node scripts/apply-v122-athens-trading-directory.js && node scripts/apply-v123-athens-directory-pagination.js';
+const buildChain = 'node scripts/apply-v100-provider-refinements.js && node scripts/apply-v100-event-integrity.js && node scripts/apply-v100-feed-health.js && node scripts/apply-v110-unified-intelligence.js && node scripts/apply-v111-package-integrity.js && node scripts/apply-v122-athens-trading-directory.js && node scripts/apply-v123-athens-directory-pagination.js';
 
-pkg.version = '1.2.2';
+pkg.version = '1.2.3';
 pkg.private = true;
 pkg.type = 'module';
 pkg.scripts = {
@@ -26,8 +26,13 @@ fs.writeFileSync(packagePath, `${JSON.stringify(pkg, null, 2)}\n`);
 const verified = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
 for (const scriptName of ['test', 'run:autonomous', 'build:autonomous-mobile']) {
   const command = String(verified.scripts?.[scriptName] || '');
-  if (!command.includes('apply-v111-package-integrity.js')) throw new Error(`package integrity failed: ${scriptName} v1.1`);
-  if (!command.includes('apply-v122-athens-trading-directory.js')) throw new Error(`package integrity failed: ${scriptName} Athens directory`);
+  for (const patch of [
+    'apply-v111-package-integrity.js',
+    'apply-v122-athens-trading-directory.js',
+    'apply-v123-athens-directory-pagination.js',
+  ]) {
+    if (!command.includes(patch)) throw new Error(`package integrity failed: ${scriptName} ${patch}`);
+  }
 }
-if (verified.version !== '1.2.2') throw new Error('package integrity failed: version');
-console.log('Investor Control market intelligence v1.2.2 package integrity restored.');
+if (verified.version !== '1.2.3') throw new Error('package integrity failed: version');
+console.log('Investor Control market intelligence v1.2.3 package integrity restored.');
