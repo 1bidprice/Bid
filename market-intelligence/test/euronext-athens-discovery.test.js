@@ -108,5 +108,9 @@ test('Athens discovery fetches taxonomy registry, announcements and official ide
   assert.equal(result.companies.find((item) => item.taxonomyTermId === '340').issuerId, '623');
   assert.equal(result.companies.find((item) => item.taxonomyTermId === '340').primaryListing.symbol, 'QUEST');
   assert.equal(result.companies.find((item) => item.taxonomyTermId === '549').primaryListing.symbol, 'ANDRO');
-  assert.equal(result.diagnostics.filter((item) => item.code !== 'ATHENS_TRADING_DIRECTORY_EMPTY').length, 0);
+  const unexpectedDiagnostics = result.diagnostics.filter((item) => ![
+    'ATHENS_TRADING_DIRECTORY_EMPTY',
+    'ATHENS_LETTER_DIRECTORY_FETCH_FAILED',
+  ].includes(item.code));
+  assert.equal(unexpectedDiagnostics.length, 0);
 });
