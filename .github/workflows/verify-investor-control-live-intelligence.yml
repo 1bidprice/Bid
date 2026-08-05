@@ -1,6 +1,12 @@
 name: Investor Control Live Intelligence Verification
 
 on:
+  push:
+    branches:
+      - investor-control-play-store-release
+    paths:
+      - market-intelligence/**
+      - .github/workflows/verify-investor-control-live-intelligence.yml
   pull_request:
     branches:
       - investor-control-v1-market-intelligence-foundation
@@ -19,34 +25,39 @@ concurrency:
 jobs:
   verify-live-intelligence:
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+
       - name: Install PDF extraction runtime
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y poppler-utils
+
       - name: Capture official Athens source HTML
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p market-intelligence/out/athens-source
-          curl --fail --location --silent --show-error \
-            -H 'Accept: text/html,application/xhtml+xml' \
-            -H 'User-Agent: Investor-Control-Market-Intelligence/1.2' \
-            'https://athens.euronext.com/en/market-data/issuers?letter=X' \
-            -o market-intelligence/out/athens-source/issuers.html
-          curl --fail --location --silent --show-error \
-            -H 'Accept: text/html,application/xhtml+xml' \
-            -H 'User-Agent: Investor-Control-Market-Intelligence/1.2' \
-            'https://athens.euronext.com/en/market-data/announcements' \
-            -o market-intelligence/out/athens-source/announcements.html
+          for spec in \
+            'issuers|https://athens.euronext.com/en/market-data/issuers?letter=X' \
+            'announcements|https://athens.euronext.com/en/market-data/announcements' \
+            'trading-issuers|https://athens.euronext.com/en/trade/trading-products/trading-issuers'; do
+            name="${spec%%|*}"
+            url="${spec#*|}"
+            curl --fail --location --silent --show-error \
+              -H 'Accept: text/html,application/xhtml+xml' \
+              -H 'User-Agent: Investor-Control-Market-Intelligence/1.2' \
+              "$url" -o "market-intelligence/out/athens-source/${name}.html"
+          done
           wc -c market-intelligence/out/athens-source/*.html
+
       - name: Apply contracts, test and run live autonomous intelligence
         working-directory: market-intelligence
         env:
@@ -58,20 +69,29 @@ jobs:
           mkdir -p out
           node src/run-autonomous-intelligence.js out/autonomous-intelligence.json
           node src/build-mobile-feed.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json
+
       - name: Verify live Athens and source contracts
         working-directory: market-intelligence
         run: |
           node - <<'NODE'
+          const fs = require('fs');
           const report = require('./out/autonomous-intelligence.json');
           const feed = require('./out/mobile-intelligence-feed.json');
           const discovery = report.discovery || {};
           const sourceHealth = feed.sourceHealth || {};
+          const tradingHtml = fs.readFileSync('./out/athens-source/trading-issuers.html', 'utf8');
           if (report.version !== 8) throw new Error(`unexpected report version ${report.version}`);
           if (discovery.sourcePolicy?.selector !== 'DETERMINISTIC_SOURCE_GOVERNOR') throw new Error('source governor missing');
           if (!Array.isArray(discovery.marketsScanned) || !discovery.marketsScanned.includes('US') || !discovery.marketsScanned.includes('GR')) throw new Error('US/GR scanning not active');
           if (Number(discovery.secRegistryCompanyCount || 0) < 1000) throw new Error('SEC universe incomplete');
           if (Number(discovery.athensActiveIssuerCount || 0) < 1) throw new Error(`Athens issuer discovery empty: ${discovery.athensActiveIssuerCount}`);
           if (Number(discovery.athensAnnouncementEventCount || 0) < 1) throw new Error(`Athens announcement discovery empty: ${discovery.athensAnnouncementEventCount}`);
+          if (!/OASIS|ISIN Code|Trading Issuers|Issuer/i.test(tradingHtml)) throw new Error('official Athens trading directory is not readable');
+          const greekCandidates = (discovery.shortlist || []).filter((item) => item.market === 'GR');
+          const identifiedGreek = greekCandidates.filter((item) => item.symbol && item.identityStatus !== 'SYMBOL_RESOLUTION_REQUIRED');
+          if (greekCandidates.length && identifiedGreek.length < Math.ceil(greekCandidates.length * 0.8)) {
+            throw new Error(`Athens identity coverage below 80%: ${identifiedGreek.length}/${greekCandidates.length}`);
+          }
           for (const item of feed.discoveryRadar || []) {
             if (item.suggestedAction !== 'WATCH') throw new Error('discovery leaked directional action');
           }
@@ -83,17 +103,21 @@ jobs:
             secCompanies: discovery.secRegistryCompanyCount,
             athensIssuers: discovery.athensActiveIssuerCount,
             athensAnnouncements: discovery.athensAnnouncementEventCount,
+            greekCandidates: greekCandidates.length,
+            identifiedGreek: identifiedGreek.length,
+            unresolvedGreek: greekCandidates.length - identifiedGreek.length,
             marketSnapshots: sourceHealth.marketSnapshotCount,
             fundamentals: sourceHealth.fundamentalSnapshotCount,
             finalActions: feed.summary?.finalActionCount,
             blocked: feed.summary?.blockedDecisionCount,
           }, null, 2));
           NODE
+
       - name: Upload live verification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: investor-control-v1.2.0-live-intelligence-evidence
+          name: investor-control-v1.2.2-live-intelligence-evidence
           path: |
             market-intelligence/out/autonomous-intelligence.json
             market-intelligence/out/mobile-intelligence-feed.json
