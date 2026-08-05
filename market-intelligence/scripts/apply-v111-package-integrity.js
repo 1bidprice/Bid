@@ -6,10 +6,10 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const packagePath = path.join(root, 'package.json');
 const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
 
-const chain = 'node scripts/apply-v100-production.js && node scripts/apply-v100-provider-refinements.js && node scripts/apply-v100-event-integrity.js && node scripts/apply-v100-feed-health.js && node scripts/apply-v110-unified-intelligence.js && node scripts/apply-v111-package-integrity.js && node scripts/apply-v122-athens-trading-directory.js && node scripts/apply-v123-athens-directory-pagination.js';
-const buildChain = 'node scripts/apply-v100-provider-refinements.js && node scripts/apply-v100-event-integrity.js && node scripts/apply-v100-feed-health.js && node scripts/apply-v110-unified-intelligence.js && node scripts/apply-v111-package-integrity.js && node scripts/apply-v122-athens-trading-directory.js && node scripts/apply-v123-athens-directory-pagination.js';
+const chain = 'node scripts/apply-v100-production.js && node scripts/apply-v100-provider-refinements.js && node scripts/apply-v100-event-integrity.js && node scripts/apply-v100-feed-health.js && node scripts/apply-v110-unified-intelligence.js && node scripts/apply-v111-package-integrity.js && node scripts/apply-v122-athens-trading-directory.js && node scripts/apply-v123-athens-directory-pagination.js && node scripts/apply-v124-athens-directory-all-filter.js';
+const buildChain = 'node scripts/apply-v100-provider-refinements.js && node scripts/apply-v100-event-integrity.js && node scripts/apply-v100-feed-health.js && node scripts/apply-v110-unified-intelligence.js && node scripts/apply-v111-package-integrity.js && node scripts/apply-v122-athens-trading-directory.js && node scripts/apply-v123-athens-directory-pagination.js && node scripts/apply-v124-athens-directory-all-filter.js';
 
-pkg.version = '1.2.3';
+pkg.version = '1.2.4';
 pkg.private = true;
 pkg.type = 'module';
 pkg.scripts = {
@@ -30,9 +30,10 @@ for (const scriptName of ['test', 'run:autonomous', 'build:autonomous-mobile']) 
     'apply-v111-package-integrity.js',
     'apply-v122-athens-trading-directory.js',
     'apply-v123-athens-directory-pagination.js',
+    'apply-v124-athens-directory-all-filter.js',
   ]) {
     if (!command.includes(patch)) throw new Error(`package integrity failed: ${scriptName} ${patch}`);
   }
 }
-if (verified.version !== '1.2.3') throw new Error('package integrity failed: version');
-console.log('Investor Control market intelligence v1.2.3 package integrity restored.');
+if (verified.version !== '1.2.4') throw new Error('package integrity failed: version');
+console.log('Investor Control market intelligence v1.2.4 package integrity restored.');
