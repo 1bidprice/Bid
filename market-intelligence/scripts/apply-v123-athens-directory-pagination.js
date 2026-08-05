@@ -27,8 +27,12 @@ const paginationHelpers = `function tradingDirectoryLastPage(html) {
 }
 
 async function fetchCompleteAthensTradingDirectory(fetchImpl, firstPageHtml, options = {}) {
-  const maxPublishedPage = tradingDirectoryLastPage(firstPageHtml);
-  const maxPage = Math.min(maxPublishedPage, Math.max(0, Number(options.tradingDirectoryMaxPage ?? 50)));
+  const publishedLastPage = tradingDirectoryLastPage(firstPageHtml);
+  const fallbackLastPage = Math.max(0, Number(options.tradingDirectoryFallbackLastPage ?? 20));
+  const configuredMaximum = Math.max(0, Number(options.tradingDirectoryMaxPage ?? 50));
+  const selectedLastPage = publishedLastPage > 0 ? publishedLastPage : fallbackLastPage;
+  const maxPage = Math.min(selectedLastPage, configuredMaximum);
+  const fallbackPaginationUsed = publishedLastPage === 0 && maxPage > 0;
   const pages = [String(firstPageHtml || '')];
   const diagnostics = [];
   const batchSize = Math.max(1, Math.min(6, Number(options.tradingDirectoryConcurrency ?? 4)));
@@ -64,6 +68,9 @@ async function fetchCompleteAthensTradingDirectory(fetchImpl, firstPageHtml, opt
   return {
     html: pages.join('\\n'),
     diagnostics,
+    publishedLastPage,
+    selectedLastPage: maxPage,
+    fallbackPaginationUsed,
     requestedPageCount: maxPage + 1,
     loadedPageCount: pages.length,
     complete: diagnostics.length === 0 && pages.length === maxPage + 1,
@@ -92,7 +99,7 @@ replaceRequired(
 
 replaceRequired(
   '      companies,\n      records: announcements.records,\n      diagnostics,',
-  "      companies,\n      records: announcements.records,\n      tradingDirectoryHealth: {\n        requestedPageCount: tradingDirectoryFetch.requestedPageCount,\n        loadedPageCount: tradingDirectoryFetch.loadedPageCount,\n        complete: tradingDirectoryFetch.complete,\n        instrumentCount: tradingDirectory.records.length,\n      },\n      diagnostics,",
+  "      companies,\n      records: announcements.records,\n      tradingDirectoryHealth: {\n        publishedLastPage: tradingDirectoryFetch.publishedLastPage,\n        selectedLastPage: tradingDirectoryFetch.selectedLastPage,\n        fallbackPaginationUsed: tradingDirectoryFetch.fallbackPaginationUsed,\n        requestedPageCount: tradingDirectoryFetch.requestedPageCount,\n        loadedPageCount: tradingDirectoryFetch.loadedPageCount,\n        complete: tradingDirectoryFetch.complete,\n        instrumentCount: tradingDirectory.records.length,\n      },\n      diagnostics,",
   'directory completeness contract',
 );
 
@@ -103,6 +110,8 @@ const verified = fs.readFileSync(adapterPath, 'utf8');
 for (const invariant of [
   'fetchCompleteAthensTradingDirectory',
   "decodeHtml(String(html || ''))",
+  'tradingDirectoryFallbackLastPage',
+  'fallbackPaginationUsed',
   'ATHENS_TRADING_DIRECTORY_PAGE_FAILED',
   'tradingDirectoryHealth',
   'version: 5,',
