@@ -25,7 +25,7 @@ test('complete Athens directory pagination resolves an issuer absent from page z
   };
 
   const result = await fetchAthensDiscovery({ fetchImpl, generatedAt: NOW });
-  assert.equal(result.version, 5);
+  assert.equal(result.version, 6);
   assert.equal(result.companies.length, 1);
   assert.equal(result.companies[0].primaryListing.symbol, 'FLEXO');
   assert.equal(result.companies[0].identitySource, 'EURONEXT_ATHENS_TRADING_ISSUERS');
