@@ -19,7 +19,8 @@ replaceRequired(
 );
 
 const paginationHelpers = `function tradingDirectoryLastPage(html) {
-  const pages = [...String(html || '').matchAll(/[?&]page=(\\d+)/gi)]
+  const decoded = decodeHtml(String(html || ''));
+  const pages = [...decoded.matchAll(/[?&]page=(\\d+)/gi)]
     .map((match) => Number(match[1]))
     .filter(Number.isFinite);
   return pages.length ? Math.max(...pages) : 0;
@@ -101,6 +102,7 @@ fs.writeFileSync(adapterPath, source);
 const verified = fs.readFileSync(adapterPath, 'utf8');
 for (const invariant of [
   'fetchCompleteAthensTradingDirectory',
+  "decodeHtml(String(html || ''))",
   'ATHENS_TRADING_DIRECTORY_PAGE_FAILED',
   'tradingDirectoryHealth',
   'version: 5,',
