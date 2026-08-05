@@ -37,8 +37,8 @@ async function fetchCompleteAthensTradingDirectory(fetchImpl, firstPageHtml, opt
     const results = await Promise.all(pageNumbers.map(async (page) => {
       try {
         const separator = ATHENS_TRADING_ISSUERS_URL.includes('?') ? '&' : '?';
-        const html = await fetchText(fetchImpl, \
-          `${ATHENS_TRADING_ISSUERS_URL}${separator}page=${page}`, options);
+        const pageUrl = ATHENS_TRADING_ISSUERS_URL + separator + 'page=' + page;
+        const html = await fetchText(fetchImpl, pageUrl, options);
         return { page, html };
       } catch (error) {
         return {
