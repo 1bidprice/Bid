@@ -102,7 +102,7 @@ test('Athens discovery fetches taxonomy registry, announcements and official ide
   };
 
   const result = await fetchAthensDiscovery({ fetchImpl, generatedAt: NOW });
-  assert.equal(result.version, 4);
+  assert.equal(result.version, 5);
   assert.equal(result.records.length, 2);
   assert.equal(result.companies.length, 2);
   assert.equal(result.companies.find((item) => item.taxonomyTermId === '340').issuerId, '623');
