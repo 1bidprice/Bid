@@ -95,17 +95,26 @@ test('Athens discovery fetches taxonomy registry, announcements and official ide
     const value = decodeURIComponent(String(url));
     if (value.includes('/market-data/issuers?letter=')) return { ok: true, text: async () => '<html>No server-rendered issuer rows</html>' };
     if (value.endsWith('/market-data/announcements')) return { ok: true, text: async () => announcementHtml };
+    if (value.includes('/trading-products/trading-issuers')) throw new Error('directory unavailable in unit fixture');
     if (value.includes('QUEST HOLDINGS')) return { ok: true, text: async () => searchQuest };
     if (value.includes('ALPHA TRUST ANDROMEDA')) return { ok: true, text: async () => searchAndro };
     throw new Error(`unexpected url ${value}`);
   };
 
-  const result = await fetchAthensDiscovery({ fetchImpl, generatedAt: NOW });
-  assert.equal(result.version, 3);
+  const result = await fetchAthensDiscovery({
+    fetchImpl,
+    generatedAt: NOW,
+    tradingDirectoryFallbackLastPage: 0,
+  });
+  assert.equal(result.version, 6);
   assert.equal(result.records.length, 2);
   assert.equal(result.companies.length, 2);
   assert.equal(result.companies.find((item) => item.taxonomyTermId === '340').issuerId, '623');
   assert.equal(result.companies.find((item) => item.taxonomyTermId === '340').primaryListing.symbol, 'QUEST');
   assert.equal(result.companies.find((item) => item.taxonomyTermId === '549').primaryListing.symbol, 'ANDRO');
-  assert.equal(result.diagnostics.length, 0);
+  const unexpectedDiagnostics = result.diagnostics.filter((item) => ![
+    'ATHENS_TRADING_DIRECTORY_EMPTY',
+    'ATHENS_LETTER_DIRECTORY_FETCH_FAILED',
+  ].includes(item.code));
+  assert.equal(unexpectedDiagnostics.length, 0);
 });
