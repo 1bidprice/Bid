@@ -65,8 +65,8 @@ replaceRequired(
 );
 
 replaceRequired(
-  '    const companies = [];\n    for (const companyId of activeCompanyIds) {',
-  '    const companies = [];\n    const letterDirectoryCache = new Map();\n    for (const companyId of activeCompanyIds) {',
+  '    const companies = [];\n\n    for (const companyId of activeCompanyIds) {',
+  '    const companies = [];\n    const letterDirectoryCache = new Map();\n\n    for (const companyId of activeCompanyIds) {',
   'shared letter-directory cache',
 );
 
