@@ -9,7 +9,7 @@ const announcements = `
 const firstDirectoryPage = `
 <table><tr><th>Issuer</th><th>ISIN Code</th><th>OASIS Code</th><th>Market</th><th>MIFID</th><th>Market Segment</th><th>Product</th><th>Product Name</th></tr>
 <tr><td>AEGEAN AIRLINES S.A.</td><td>GRS495003006</td><td>AEGN</td><td>SECURITIES MARKET</td><td>Regulated market</td><td>MAIN MARKET</td><td>Stock</td><td>AEGEAN AIRLINES</td></tr></table>
-<a href="?letter=All&page=1">Last page</a>`;
+<a href="?letter=All&amp;page=1">Last page</a>`;
 const secondDirectoryPage = `
 <table><tr><th>Issuer</th><th>ISIN Code</th><th>OASIS Code</th><th>Market</th><th>MIFID</th><th>Market Segment</th><th>Product</th><th>Product Name</th></tr>
 <tr><td>FLEXOPACK S.A.</td><td>GRS550003009</td><td>FLEXO</td><td>SECURITIES MARKET</td><td>Regulated market</td><td>MAIN MARKET</td><td>Stock</td><td>FLEXOPACK</td></tr></table>`;
