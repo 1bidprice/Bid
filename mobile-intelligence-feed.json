@@ -1,7 +1,7 @@
 {
   "format": "investor-control-mobile-intelligence-feed",
   "version": 2,
-  "generatedAt": "2026-08-05T22:21:26.454Z",
+  "generatedAt": "2026-08-06T03:34:01.604Z",
   "policyVersion": "2026-07-30.1",
   "sourceSelection": {
     "version": "2026-08-04.1",
@@ -30,8 +30,8 @@
       "price": 13.445,
       "previousClose": 13.49,
       "currency": "EUR",
-      "quoteAt": "2026-08-05T22:21:26.454Z",
-      "checkedAt": "2026-08-05T22:21:26.454Z",
+      "quoteAt": "2026-08-06T03:34:01.604Z",
+      "checkedAt": "2026-08-06T03:34:01.604Z",
       "source": "Euronext Athens delayed market data",
       "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/ALWN/related",
       "sourceQuality": "OFFICIAL_DELAYED",
@@ -59,7 +59,7 @@
       "previousClose": 2.95,
       "currency": "USD",
       "quoteAt": "2026-08-05T20:00:00.000Z",
-      "checkedAt": "2026-08-05T22:21:26.454Z",
+      "checkedAt": "2026-08-06T03:34:01.604Z",
       "source": "Finnhub Quote API",
       "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
       "sourceQuality": null,
@@ -69,12 +69,14 @@
         "sourceTier": 1,
         "sourceApproved": true,
         "timestampVerified": true,
-        "valuationEligible": true,
-        "decisionEligible": true,
-        "dayChangeEligible": true,
-        "publicStatus": "VERIFIED",
-        "publicMessage": "Επαληθευμένη χρηματιστηριακή τιμή από εγκεκριμένη πηγή.",
-        "diagnosticCodes": []
+        "valuationEligible": false,
+        "decisionEligible": false,
+        "dayChangeEligible": false,
+        "publicStatus": "STALE",
+        "publicMessage": "Η τελευταία τιμή είναι παρωχημένη και δεν χρησιμοποιείται σε αποτίμηση ή απόφαση.",
+        "diagnosticCodes": [
+          "QUOTE_STALE"
+        ]
       }
     },
     "CREDIA.GR": {
@@ -84,8 +86,8 @@
       "price": 0.98,
       "previousClose": 0.99,
       "currency": "EUR",
-      "quoteAt": "2026-08-05T22:21:26.454Z",
-      "checkedAt": "2026-08-05T22:21:26.454Z",
+      "quoteAt": "2026-08-06T03:34:01.604Z",
+      "checkedAt": "2026-08-06T03:34:01.604Z",
       "source": "Euronext Athens delayed market data",
       "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/CREDIA/related",
       "sourceQuality": "OFFICIAL_DELAYED",
@@ -105,31 +107,34 @@
         ]
       }
     },
-    "DRDB.US": {
-      "appSymbol": "DRDB.US",
-      "companyId": "company:sec:0002032528",
-      "companyName": "Roman DBDR Acquisition Corp. II",
-      "price": 10.59,
-      "previousClose": 10.635,
-      "currency": "USD",
-      "quoteAt": "2026-08-04T20:00:00.000Z",
-      "checkedAt": "2026-08-05T22:21:26.454Z",
-      "source": "Finnhub Quote API",
-      "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=DRDB",
-      "sourceQuality": null,
+    "AKTR.GR": {
+      "appSymbol": "AKTR.GR",
+      "companyId": "company:xath:term-424",
+      "companyName": "AKTOR S.A. HOLD. CO. TECHNICAL AND ENERGY PROJECTS",
+      "price": 0,
+      "previousClose": 0,
+      "currency": "EUR",
+      "quoteAt": "2026-08-06T03:34:01.604Z",
+      "checkedAt": "2026-08-06T03:34:01.604Z",
+      "source": "Euronext Athens delayed market data",
+      "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/AKTR",
+      "sourceQuality": "OFFICIAL_DELAYED",
       "quoteContract": {
         "version": "2026-08-04.1",
-        "sourceRole": "LICENSED_MARKET_DATA",
+        "sourceRole": "PRIMARY_EXCHANGE",
         "sourceTier": 1,
         "sourceApproved": true,
-        "timestampVerified": true,
+        "timestampVerified": false,
         "valuationEligible": false,
         "decisionEligible": false,
         "dayChangeEligible": false,
-        "publicStatus": "STALE",
-        "publicMessage": "Η τελευταία τιμή είναι παρωχημένη και δεν χρησιμοποιείται σε αποτίμηση ή απόφαση.",
+        "publicStatus": "UNAVAILABLE",
+        "publicMessage": "Δεν υπάρχει διαθέσιμη και επαληθεύσιμη τιμή.",
         "diagnosticCodes": [
-          "QUOTE_STALE"
+          "QUOTE_PRICE_MISSING",
+          "QUOTE_STALE",
+          "QUOTE_TIMESTAMP_NOT_VERIFIED",
+          "PREVIOUS_CLOSE_NOT_VERIFIED"
         ]
       }
     },
@@ -140,8 +145,8 @@
       "price": 0,
       "previousClose": 0,
       "currency": "EUR",
-      "quoteAt": "2026-08-05T22:21:26.454Z",
-      "checkedAt": "2026-08-05T22:21:26.454Z",
+      "quoteAt": "2026-08-06T03:34:01.604Z",
+      "checkedAt": "2026-08-06T03:34:01.604Z",
       "source": "Euronext Athens delayed market data",
       "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/PPC",
       "sourceQuality": "OFFICIAL_DELAYED",
@@ -171,8 +176,8 @@
       "price": 0,
       "previousClose": 0,
       "currency": "EUR",
-      "quoteAt": "2026-08-05T22:21:26.454Z",
-      "checkedAt": "2026-08-05T22:21:26.454Z",
+      "quoteAt": "2026-08-06T03:34:01.604Z",
+      "checkedAt": "2026-08-06T03:34:01.604Z",
       "source": "Euronext Athens delayed market data",
       "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/VIO",
       "sourceQuality": "OFFICIAL_DELAYED",
@@ -202,8 +207,8 @@
       "price": 0,
       "previousClose": 0,
       "currency": "EUR",
-      "quoteAt": "2026-08-05T22:21:26.454Z",
-      "checkedAt": "2026-08-05T22:21:26.454Z",
+      "quoteAt": "2026-08-06T03:34:01.604Z",
+      "checkedAt": "2026-08-06T03:34:01.604Z",
       "source": "Euronext Athens delayed market data",
       "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/ELPE",
       "sourceQuality": "OFFICIAL_DELAYED",
@@ -233,8 +238,8 @@
       "price": 0,
       "previousClose": 0,
       "currency": "EUR",
-      "quoteAt": "2026-08-05T22:21:26.454Z",
-      "checkedAt": "2026-08-05T22:21:26.454Z",
+      "quoteAt": "2026-08-06T03:34:01.604Z",
+      "checkedAt": "2026-08-06T03:34:01.604Z",
       "source": "Euronext Athens delayed market data",
       "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/FLEXO",
       "sourceQuality": "OFFICIAL_DELAYED",
@@ -265,38 +270,38 @@
     "fundamentalsStatus": "DEGRADED",
     "researchStatus": "ACTIVE",
     "decisionEngineStatus": "BLOCKED_BY_EVIDENCE",
-    "generatedAt": "2026-08-05T22:21:26.454Z",
+    "generatedAt": "2026-08-06T03:34:01.604Z",
     "analysedCompanyCount": 8,
     "marketSnapshotCount": 8,
     "marketCoverageRatio": 1,
     "historicalMarketMetricsCount": 8,
-    "readyHistoricalMarketMetricsCount": 3,
-    "historyCoverageRatio": 0.375,
-    "fundamentalSnapshotCount": 2,
-    "fundamentalCoverageRatio": 0.25,
-    "unresolvedDiagnosticCount": 317,
+    "readyHistoricalMarketMetricsCount": 2,
+    "historyCoverageRatio": 0.25,
+    "fundamentalSnapshotCount": 1,
+    "fundamentalCoverageRatio": 0.125,
+    "unresolvedDiagnosticCount": 291,
     "finalActionCount": 0,
     "blockedDecisionCount": 8,
     "staleOutput": false
   },
   "sourceHealth": {
-    "evidenceCount": 74,
-    "documentReviewedCount": 20,
+    "evidenceCount": 54,
+    "documentReviewedCount": 15,
     "independentDiscoveryCount": 2,
-    "fundamentalSnapshotCount": 2,
+    "fundamentalSnapshotCount": 1,
     "marketSnapshotCount": 8,
     "historicalMarketMetricsCount": 8,
-    "readyHistoricalMarketMetricsCount": 3,
-    "diagnosticCount": 317
+    "readyHistoricalMarketMetricsCount": 2,
+    "diagnosticCount": 291
   },
   "summary": {
     "publishedCount": 0,
     "reviewReadyCount": 0,
     "researchCount": 8,
     "urgentCount": 0,
-    "discoveryCandidateCount": 8,
+    "discoveryCandidateCount": 7,
     "discoveryDeepAnalysisCount": 5,
-    "unresolvedDiagnosticCount": 217,
+    "unresolvedDiagnosticCount": 191,
     "finalActionCount": 0,
     "buyNowCount": 0,
     "sellNowCount": 0,
@@ -306,9 +311,9 @@
     "blockedDecisionCount": 8
   },
   "today": {
-    "headline": "8 νέες μετοχές εντοπίστηκαν αυτόματα για έλεγχο",
+    "headline": "7 νέες μετοχές εντοπίστηκαν αυτόματα για έλεγχο",
     "primaryItem": {
-      "id": "dossier:company:allwyn-ag:c44c39f27b9850c46e19",
+      "id": "dossier:company:allwyn-ag:19484be8acc5a0c44e04",
       "companyId": "company:allwyn-ag",
       "companyName": "Allwyn",
       "symbol": "ALWN",
@@ -328,7 +333,7 @@
         "timestamp": "2026-08-04T07:30:00.000Z",
         "source": "Historical market series"
       },
-      "referencePriceAgeHours": 38.857348333333334,
+      "referencePriceAgeHours": 44.06711222222222,
       "marketQuote": {
         "appSymbol": "ALWN.GR",
         "companyId": "company:allwyn-ag",
@@ -336,8 +341,8 @@
         "price": 13.445,
         "previousClose": 13.49,
         "currency": "EUR",
-        "quoteAt": "2026-08-05T22:21:26.454Z",
-        "checkedAt": "2026-08-05T22:21:26.454Z",
+        "quoteAt": "2026-08-06T03:34:01.604Z",
+        "checkedAt": "2026-08-06T03:34:01.604Z",
         "source": "Euronext Athens delayed market data",
         "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/ALWN/related",
         "sourceQuality": "OFFICIAL_DELAYED",
@@ -357,7 +362,7 @@
           ]
         }
       },
-      "thesis": "Το επιβεβαιωμένο πρόγραμμα επαναγοράς ιδίων μετοχών της Allwyn μπορεί να βελτιώσει την αξία ανά μετοχή μόνο εφόσον οι αγορές είναι ουσιαστικές, γίνονται σε ελκυστική αποτίμηση και χρηματοδοτούνται χωρίς αποδυνάμωση της ρευστότητας. Αποτελεί μετρήσιμο καταλύτη κατανομής κεφαλαίου, όχι αυτοτελή λόγο αγοράς. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων 9.54%, σχετική ισχύς 60 συνεδριάσεων -11.05%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
+      "thesis": "Το επιβεβαιωμένο πρόγραμμα επαναγοράς ιδίων μετοχών της Allwyn μπορεί να βελτιώσει την αξία ανά μετοχή μόνο εφόσον οι αγορές είναι ουσιαστικές, γίνονται σε ελκυστική αποτίμηση και χρηματοδοτούνται χωρίς αποδυνάμωση της ρευστότητας. Αποτελεί μετρήσιμο καταλύτη κατανομής κεφαλαίου, όχι αυτοτελή λόγο αγοράς. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων 9.23%, σχετική ισχύς 60 συνεδριάσεων -11.05%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
       "causalMechanism": "Οι επαναγορές μειώνουν τον πραγματικό αριθμό μετοχών και μπορούν να αυξήσουν την οικονομική συμμετοχή κάθε εναπομείνασας μετοχής, μόνο όμως όταν η τιμή αγοράς και η πηγή χρηματοδότησης δημιουργούν καθαρή αξία.",
       "bullCase": "Η εταιρεία πραγματοποιεί ουσιαστικές επαναγορές κάτω από υποστηρίξιμη αποτίμηση, διατηρώντας λειτουργικές ταμειακές ροές και ευελιξία ισολογισμού.",
       "bearCase": "Οι επαναγορές είναι ασήμαντες, γίνονται σε υπερβολική αποτίμηση ή καταναλώνουν ρευστότητα που αργότερα χρειάζεται για λειτουργία, χρέος ή επενδύσεις.",
@@ -390,7 +395,7 @@
         }
       ],
       "invalidationCondition": "Η θετική ερμηνεία ακυρώνεται εάν οι επαναγορές σταματήσουν χωρίς ουσιαστική ολοκλήρωση, η ρευστότητα επιδεινωθεί σημαντικά ή ο πραγματικός αριθμός μετοχών δεν μειωθεί.",
-      "reviewDate": "2026-11-03",
+      "reviewDate": "2026-11-04",
       "blockers": [
         "FUNDAMENTALS_REQUIRED",
         "INDEPENDENT_CROSS_CHECK_REQUIRED",
@@ -414,14 +419,14 @@
         }
       ],
       "metricNotes": [],
-      "generatedAt": "2026-08-05T22:21:26.454Z",
+      "generatedAt": "2026-08-06T03:34:01.604Z",
       "publicationMode": null,
       "finalAction": {
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-05T22:21:26.454Z",
-        "validUntil": "2026-08-06T22:21:26.454Z",
+        "generatedAt": "2026-08-06T03:34:01.604Z",
+        "validUntil": "2026-08-07T03:34:01.604Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -444,16 +449,14 @@
           "REFERENCE_PRICE_STALE"
         ],
         "freshness": {
-          "referencePriceAgeHours": 38.857348333333334,
+          "referencePriceAgeHours": 44.06711222222222,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 38.857348333333334
+          "latestMarketAgeHours": 44.06711222222222
         },
         "risk": {
           "riskScore": null,
           "fundamentalFlags": [],
-          "marketFlags": [
-            "MATERIAL_DRAWDOWN"
-          ]
+          "marketFlags": []
         },
         "execution": {
           "automaticBrokerOrder": false,
@@ -469,7 +472,7 @@
       "companyName": "FLEXOPACK S.A.",
       "symbol": "FLEXO",
       "exchange": "Euronext Athens",
-      "discoveryScore": 82,
+      "discoveryScore": 78,
       "scoreType": "DISCOVERY_PRIORITY",
       "scoreLabel": "Προτεραιότητα διερεύνησης",
       "investmentScore": null,
@@ -478,8 +481,7 @@
       "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
       "reasons": [
         "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
-        "Πιθανή χρηματοδότηση ή αραίωση μετοχών",
-        "Το γεγονός είναι πολύ πρόσφατο"
+        "Πιθανή χρηματοδότηση ή αραίωση μετοχών"
       ],
       "latestEventAt": "2026-08-05T14:30:00.000Z",
       "events": [
@@ -489,7 +491,7 @@
           "publishedAt": "2026-08-05T14:30:00.000Z",
           "sourceUrl": "https://athens.euronext.com/en/node/968623",
           "sourceName": "Euronext Athens",
-          "eventScore": 82
+          "eventScore": 78
         }
       ],
       "isExistingFocusCompany": false
@@ -500,7 +502,7 @@
       "companyName": "PUBLIC POWER CORPORATION SA",
       "symbol": "PPC",
       "exchange": "Euronext Athens",
-      "discoveryScore": 79,
+      "discoveryScore": 75,
       "scoreType": "DISCOVERY_PRIORITY",
       "scoreLabel": "Προτεραιότητα διερεύνησης",
       "investmentScore": null,
@@ -509,8 +511,7 @@
       "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
       "reasons": [
         "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
-        "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-        "Το γεγονός είναι πολύ πρόσφατο"
+        "Νέα αποτελέσματα ή καθοδήγηση διοίκησης"
       ],
       "latestEventAt": "2026-08-05T16:14:00.000Z",
       "events": [
@@ -520,7 +521,7 @@
           "publishedAt": "2026-08-05T16:14:00.000Z",
           "sourceUrl": "https://athens.euronext.com/en/node/968632",
           "sourceName": "Euronext Athens",
-          "eventScore": 79
+          "eventScore": 75
         },
         {
           "form": "ATHEX_ANNOUNCEMENT",
@@ -528,7 +529,7 @@
           "publishedAt": "2026-08-05T14:28:00.000Z",
           "sourceUrl": "https://athens.euronext.com/en/node/968622",
           "sourceName": "Euronext Athens",
-          "eventScore": 79
+          "eventScore": 75
         }
       ],
       "isExistingFocusCompany": false
@@ -539,7 +540,7 @@
       "companyName": "VIOHALCO SA/NV",
       "symbol": "VIO",
       "exchange": "Euronext Athens",
-      "discoveryScore": 79,
+      "discoveryScore": 75,
       "scoreType": "DISCOVERY_PRIORITY",
       "scoreLabel": "Προτεραιότητα διερεύνησης",
       "investmentScore": null,
@@ -548,8 +549,7 @@
       "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
       "reasons": [
         "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
-        "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-        "Το γεγονός είναι πολύ πρόσφατο"
+        "Νέα αποτελέσματα ή καθοδήγηση διοίκησης"
       ],
       "latestEventAt": "2026-08-05T16:07:00.000Z",
       "events": [
@@ -559,7 +559,7 @@
           "publishedAt": "2026-08-05T16:07:00.000Z",
           "sourceUrl": "https://athens.euronext.com/en/node/968631",
           "sourceName": "Euronext Athens",
-          "eventScore": 79
+          "eventScore": 75
         },
         {
           "form": "ATHEX_ANNOUNCEMENT",
@@ -567,7 +567,7 @@
           "publishedAt": "2026-08-05T16:00:00.000Z",
           "sourceUrl": "https://athens.euronext.com/en/node/968630",
           "sourceName": "Euronext Athens",
-          "eventScore": 79
+          "eventScore": 75
         }
       ],
       "isExistingFocusCompany": false
@@ -578,7 +578,7 @@
       "companyName": "HELLENiQ ENERGY Holdings Societe Anonyme",
       "symbol": "ELPE",
       "exchange": "Euronext Athens",
-      "discoveryScore": 79,
+      "discoveryScore": 75,
       "scoreType": "DISCOVERY_PRIORITY",
       "scoreLabel": "Προτεραιότητα διερεύνησης",
       "investmentScore": null,
@@ -588,7 +588,6 @@
       "reasons": [
         "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
         "Αλλαγή στην κατανομή κεφαλαίου",
-        "Το γεγονός είναι πολύ πρόσφατο",
         "Νέα αποτελέσματα ή καθοδήγηση διοίκησης"
       ],
       "latestEventAt": "2026-08-05T15:25:00.000Z",
@@ -599,7 +598,7 @@
           "publishedAt": "2026-08-05T15:12:00.000Z",
           "sourceUrl": "https://athens.euronext.com/en/node/968627",
           "sourceName": "Euronext Athens",
-          "eventScore": 79
+          "eventScore": 75
         },
         {
           "form": "ATHEX_ANNOUNCEMENT",
@@ -607,38 +606,7 @@
           "publishedAt": "2026-08-05T15:25:00.000Z",
           "sourceUrl": "https://athens.euronext.com/en/node/968628",
           "sourceName": "Euronext Athens",
-          "eventScore": 77
-        }
-      ],
-      "isExistingFocusCompany": false
-    },
-    {
-      "discoveryId": "discovery:company:sec:0002032528:2026-08-05",
-      "companyId": "company:sec:0002032528",
-      "companyName": "Roman DBDR Acquisition Corp. II",
-      "symbol": "DRDB",
-      "exchange": "Nasdaq",
-      "discoveryScore": 66,
-      "scoreType": "DISCOVERY_PRIORITY",
-      "scoreLabel": "Προτεραιότητα διερεύνησης",
-      "investmentScore": null,
-      "status": "DISCOVERED_RESEARCH_REQUIRED",
-      "suggestedAction": "WATCH",
-      "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-      "reasons": [
-        "Νέα επίσημη κατάθεση SCHEDULE 13G/A στη SEC",
-        "Συγχώνευση, εξαγορά ή στρατηγική συναλλαγή",
-        "Το γεγονός είναι πολύ πρόσφατο"
-      ],
-      "latestEventAt": "2026-08-05T22:04:01.000Z",
-      "events": [
-        {
-          "form": "SCHEDULE 13G/A",
-          "title": "SCHEDULE 13G/A - Roman DBDR Acquisition Corp. II (0002032528) (Subject)",
-          "publishedAt": "2026-08-05T22:04:01.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2032528/000162828026053615/0001628280-26-053615-index.htm",
-          "sourceName": "SEC EDGAR Current Filings",
-          "eventScore": 66
+          "eventScore": 73
         }
       ],
       "isExistingFocusCompany": false
@@ -649,7 +617,7 @@
       "companyName": "AKTOR S.A. HOLD. CO. TECHNICAL AND ENERGY PROJECTS",
       "symbol": "AKTR",
       "exchange": "Euronext Athens",
-      "discoveryScore": 62,
+      "discoveryScore": 58,
       "scoreType": "DISCOVERY_PRIORITY",
       "scoreLabel": "Προτεραιότητα διερεύνησης",
       "investmentScore": null,
@@ -658,7 +626,6 @@
       "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
       "reasons": [
         "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
-        "Το γεγονός είναι πολύ πρόσφατο",
         "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
       ],
       "latestEventAt": "2026-08-05T16:30:00.000Z",
@@ -669,7 +636,7 @@
           "publishedAt": "2026-08-05T16:30:00.000Z",
           "sourceUrl": "https://athens.euronext.com/en/more-options/announcements/announcement-58692026-no-english-translation-available-correct",
           "sourceName": "Euronext Athens",
-          "eventScore": 62
+          "eventScore": 58
         },
         {
           "form": "ATHEX_ANNOUNCEMENT",
@@ -677,7 +644,7 @@
           "publishedAt": "2026-08-05T16:30:00.000Z",
           "sourceUrl": "https://athens.euronext.com/en/more-options/announcements/announcement-58682026-no-english-translation-available-correct",
           "sourceName": "Euronext Athens",
-          "eventScore": 62
+          "eventScore": 58
         },
         {
           "form": "ATHEX_ANNOUNCEMENT",
@@ -696,7 +663,7 @@
       "companyName": "PRODEA R.E.I.C. S.A.",
       "symbol": "PRODEA",
       "exchange": "Euronext Athens",
-      "discoveryScore": 62,
+      "discoveryScore": 58,
       "scoreType": "DISCOVERY_PRIORITY",
       "scoreLabel": "Προτεραιότητα διερεύνησης",
       "investmentScore": null,
@@ -705,7 +672,6 @@
       "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
       "reasons": [
         "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
-        "Το γεγονός είναι πολύ πρόσφατο",
         "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
       ],
       "latestEventAt": "2026-08-05T15:54:00.000Z",
@@ -716,7 +682,7 @@
           "publishedAt": "2026-08-05T15:54:00.000Z",
           "sourceUrl": "https://athens.euronext.com/en/node/968629",
           "sourceName": "Euronext Athens",
-          "eventScore": 62
+          "eventScore": 58
         }
       ],
       "isExistingFocusCompany": false
@@ -757,7 +723,7 @@
   "reviewReady": [],
   "research": [
     {
-      "id": "dossier:company:allwyn-ag:c44c39f27b9850c46e19",
+      "id": "dossier:company:allwyn-ag:19484be8acc5a0c44e04",
       "companyId": "company:allwyn-ag",
       "companyName": "Allwyn",
       "symbol": "ALWN",
@@ -777,7 +743,7 @@
         "timestamp": "2026-08-04T07:30:00.000Z",
         "source": "Historical market series"
       },
-      "referencePriceAgeHours": 38.857348333333334,
+      "referencePriceAgeHours": 44.06711222222222,
       "marketQuote": {
         "appSymbol": "ALWN.GR",
         "companyId": "company:allwyn-ag",
@@ -785,8 +751,8 @@
         "price": 13.445,
         "previousClose": 13.49,
         "currency": "EUR",
-        "quoteAt": "2026-08-05T22:21:26.454Z",
-        "checkedAt": "2026-08-05T22:21:26.454Z",
+        "quoteAt": "2026-08-06T03:34:01.604Z",
+        "checkedAt": "2026-08-06T03:34:01.604Z",
         "source": "Euronext Athens delayed market data",
         "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/ALWN/related",
         "sourceQuality": "OFFICIAL_DELAYED",
@@ -806,7 +772,7 @@
           ]
         }
       },
-      "thesis": "Το επιβεβαιωμένο πρόγραμμα επαναγοράς ιδίων μετοχών της Allwyn μπορεί να βελτιώσει την αξία ανά μετοχή μόνο εφόσον οι αγορές είναι ουσιαστικές, γίνονται σε ελκυστική αποτίμηση και χρηματοδοτούνται χωρίς αποδυνάμωση της ρευστότητας. Αποτελεί μετρήσιμο καταλύτη κατανομής κεφαλαίου, όχι αυτοτελή λόγο αγοράς. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων 9.54%, σχετική ισχύς 60 συνεδριάσεων -11.05%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
+      "thesis": "Το επιβεβαιωμένο πρόγραμμα επαναγοράς ιδίων μετοχών της Allwyn μπορεί να βελτιώσει την αξία ανά μετοχή μόνο εφόσον οι αγορές είναι ουσιαστικές, γίνονται σε ελκυστική αποτίμηση και χρηματοδοτούνται χωρίς αποδυνάμωση της ρευστότητας. Αποτελεί μετρήσιμο καταλύτη κατανομής κεφαλαίου, όχι αυτοτελή λόγο αγοράς. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων 9.23%, σχετική ισχύς 60 συνεδριάσεων -11.05%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
       "causalMechanism": "Οι επαναγορές μειώνουν τον πραγματικό αριθμό μετοχών και μπορούν να αυξήσουν την οικονομική συμμετοχή κάθε εναπομείνασας μετοχής, μόνο όμως όταν η τιμή αγοράς και η πηγή χρηματοδότησης δημιουργούν καθαρή αξία.",
       "bullCase": "Η εταιρεία πραγματοποιεί ουσιαστικές επαναγορές κάτω από υποστηρίξιμη αποτίμηση, διατηρώντας λειτουργικές ταμειακές ροές και ευελιξία ισολογισμού.",
       "bearCase": "Οι επαναγορές είναι ασήμαντες, γίνονται σε υπερβολική αποτίμηση ή καταναλώνουν ρευστότητα που αργότερα χρειάζεται για λειτουργία, χρέος ή επενδύσεις.",
@@ -839,7 +805,7 @@
         }
       ],
       "invalidationCondition": "Η θετική ερμηνεία ακυρώνεται εάν οι επαναγορές σταματήσουν χωρίς ουσιαστική ολοκλήρωση, η ρευστότητα επιδεινωθεί σημαντικά ή ο πραγματικός αριθμός μετοχών δεν μειωθεί.",
-      "reviewDate": "2026-11-03",
+      "reviewDate": "2026-11-04",
       "blockers": [
         "FUNDAMENTALS_REQUIRED",
         "INDEPENDENT_CROSS_CHECK_REQUIRED",
@@ -863,14 +829,14 @@
         }
       ],
       "metricNotes": [],
-      "generatedAt": "2026-08-05T22:21:26.454Z",
+      "generatedAt": "2026-08-06T03:34:01.604Z",
       "publicationMode": null,
       "finalAction": {
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-05T22:21:26.454Z",
-        "validUntil": "2026-08-06T22:21:26.454Z",
+        "generatedAt": "2026-08-06T03:34:01.604Z",
+        "validUntil": "2026-08-07T03:34:01.604Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -893,16 +859,14 @@
           "REFERENCE_PRICE_STALE"
         ],
         "freshness": {
-          "referencePriceAgeHours": 38.857348333333334,
+          "referencePriceAgeHours": 44.06711222222222,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 38.857348333333334
+          "latestMarketAgeHours": 44.06711222222222
         },
         "risk": {
           "riskScore": null,
           "fundamentalFlags": [],
-          "marketFlags": [
-            "MATERIAL_DRAWDOWN"
-          ]
+          "marketFlags": []
         },
         "execution": {
           "automaticBrokerOrder": false,
@@ -911,206 +875,7 @@
       }
     },
     {
-      "id": "dossier:company:sec:0002032528:c544650692e5562cb7a0",
-      "companyId": "company:sec:0002032528",
-      "companyName": "Roman DBDR Acquisition Corp. II",
-      "symbol": "DRDB",
-      "exchange": "Nasdaq",
-      "origin": "AUTONOMOUS_DISCOVERY",
-      "discovery": {
-        "discoveryId": "discovery:company:sec:0002032528:2026-08-05",
-        "companyId": "company:sec:0002032528",
-        "companyName": "Roman DBDR Acquisition Corp. II",
-        "symbol": "DRDB",
-        "exchange": "Nasdaq",
-        "mic": "XNAS",
-        "market": "US",
-        "cik": "0002032528",
-        "issuerId": null,
-        "identityStatus": "CANONICAL_IDENTITY_READY",
-        "discoveryScore": 66,
-        "scoreType": "DISCOVERY_PRIORITY",
-        "status": "DISCOVERED_RESEARCH_REQUIRED",
-        "suggestedAction": "WATCH",
-        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-        "isExistingFocusCompany": false,
-        "reasons": [
-          "Νέα επίσημη κατάθεση SCHEDULE 13G/A στη SEC",
-          "Συγχώνευση, εξαγορά ή στρατηγική συναλλαγή",
-          "Το γεγονός είναι πολύ πρόσφατο"
-        ],
-        "latestEventAt": "2026-08-05T22:04:01.000Z",
-        "events": [
-          {
-            "form": "SCHEDULE 13G/A",
-            "title": "SCHEDULE 13G/A - Roman DBDR Acquisition Corp. II (0002032528) (Subject)",
-            "publishedAt": "2026-08-05T22:04:01.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2032528/000162828026053615/0001628280-26-053615-index.htm",
-            "sourceName": "SEC EDGAR Current Filings",
-            "eventScore": 66
-          }
-        ]
-      },
-      "status": "DRAFT_RESEARCH",
-      "statusLabel": "Αυτόματη ανακάλυψη · έρευνα σε εξέλιξη",
-      "category": "INSUFFICIENT_EVIDENCE",
-      "categoryLabel": "Ανεπαρκή στοιχεία",
-      "action": "WATCH",
-      "actionLabel": "Παρακολούθηση",
-      "timeHorizon": "UNDETERMINED",
-      "referencePrice": {
-        "value": 10.59000015258789,
-        "currency": "USD",
-        "timestamp": "2026-08-04T13:30:00.000Z",
-        "source": "Historical market series"
-      },
-      "referencePriceAgeHours": 32.857348333333334,
-      "marketQuote": {
-        "appSymbol": "DRDB.US",
-        "companyId": "company:sec:0002032528",
-        "companyName": "Roman DBDR Acquisition Corp. II",
-        "price": 10.59,
-        "previousClose": 10.635,
-        "currency": "USD",
-        "quoteAt": "2026-08-04T20:00:00.000Z",
-        "checkedAt": "2026-08-05T22:21:26.454Z",
-        "source": "Finnhub Quote API",
-        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=DRDB",
-        "sourceQuality": null,
-        "quoteContract": {
-          "version": "2026-08-04.1",
-          "sourceRole": "LICENSED_MARKET_DATA",
-          "sourceTier": 1,
-          "sourceApproved": true,
-          "timestampVerified": true,
-          "valuationEligible": false,
-          "decisionEligible": false,
-          "dayChangeEligible": false,
-          "publicStatus": "STALE",
-          "publicMessage": "Η τελευταία τιμή είναι παρωχημένη και δεν χρησιμοποιείται σε αποτίμηση ή απόφαση.",
-          "diagnosticCodes": [
-            "QUOTE_STALE"
-          ]
-        }
-      },
-      "thesis": "Η Roman DBDR Acquisition Corp. II έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων 0.76%, σχετική ισχύς 60 συνεδριάσεων -4.94%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
-      "causalMechanism": "Το γεγονός μπορεί να επηρεάσει την αξία μόνο μέσω μετρήσιμης αλλαγής στις ταμειακές ροές, στον κίνδυνο ισολογισμού, στον αριθμό μετοχών, στην πιθανότητα λειτουργικής επιτυχίας ή στις προσδοκίες αποτίμησης.",
-      "bullCase": "Μεταγενέστερα επαληθευμένα στοιχεία αποδεικνύουν ευνοϊκή και διατηρήσιμη οικονομική επίδραση που δεν έχει ήδη ενσωματωθεί στην αποτίμηση.",
-      "bearCase": "Το γεγονός αποδεικνύεται ασήμαντο, αναιρείται από νεότερα στοιχεία ή παράγει ασθενέστερα οικονομικά αποτελέσματα από όσα αναμένει η αγορά.",
-      "catalysts": [
-        {
-          "text": "Η επίσημη πηγή επιβεβαιώνει: SCHEDULE 13G/A filing — Roman DBDR Acquisition Corp. II.",
-          "evidenceIds": [
-            "evidence:sec:0001628280-26-053615"
-          ],
-          "confidence": 0.94,
-          "inference": false
-        }
-      ],
-      "risks": [
-        {
-          "text": "Τα διαθέσιμα στοιχεία μπορεί να είναι πραγματικά αλλά όχι οικονομικά ουσιαστικά για τους μετόχους.",
-          "evidenceIds": [
-            "evidence:sec:0001628280-26-053615"
-          ],
-          "confidence": 0.82,
-          "inference": true
-        },
-        {
-          "text": "Τα καταγεγραμμένα ίδια κεφάλαια είναι μη θετικά, μειώνοντας την ανθεκτικότητα του ισολογισμού.",
-          "evidenceIds": [
-            "evidence:sec:0001628280-26-053615"
-          ],
-          "confidence": 0.88,
-          "inference": true
-        },
-        {
-          "text": "Η τιμή και η ρευστότητα της μετοχής μπορεί να αντιδράσουν διαφορετικά από την υποκείμενη εταιρική εξέλιξη, ιδιαίτερα όταν οι προσδοκίες είχαν ήδη ενσωματωθεί πριν από τη δημοσίευση.",
-          "evidenceIds": [
-            "evidence:sec:0001628280-26-053615"
-          ],
-          "confidence": 0.72,
-          "inference": true
-        }
-      ],
-      "invalidationCondition": "Η υπόθεση παραμένει μη ταξινομημένη μέχρι να υποστηρίζονται από επαληθευμένα στοιχεία ένας μετρήσιμος αιτιώδης σύνδεσμος και σαφής συνθήκη ακύρωσης.",
-      "reviewDate": "2026-10-04",
-      "blockers": [
-        "HISTORICAL_MARKET_METRICS_REQUIRED",
-        "INDEPENDENT_CROSS_CHECK_REQUIRED",
-        "CLAIM_CORROBORATION_REQUIRED"
-      ],
-      "blockerLabels": [
-        "Λείπει επαρκές ιστορικό τιμής και όγκου",
-        "Λείπει ανεξάρτητη διασταύρωση",
-        "Ο συγκεκριμένος ισχυρισμός δεν έχει επιβεβαιωθεί επαρκώς"
-      ],
-      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
-      "sources": [
-        {
-          "sourceName": "SEC EDGAR",
-          "sourceType": "REGULATORY_FILING",
-          "title": "SCHEDULE 13G/A filing — Roman DBDR Acquisition Corp. II",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2032528/000162828026053615/xslSCHEDULE_13G_X01/primary_doc.xml",
-          "publishedAt": "2026-08-05T12:00:00.000Z",
-          "reviewed": true,
-          "primary": true
-        }
-      ],
-      "metricNotes": [],
-      "generatedAt": "2026-08-05T22:21:26.454Z",
-      "publicationMode": null,
-      "finalAction": {
-        "format": "investor-control-final-action",
-        "version": 2,
-        "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-05T22:21:26.454Z",
-        "validUntil": "2026-08-06T22:21:26.454Z",
-        "status": "BLOCKED",
-        "marketAction": "WATCH",
-        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "holderAction": "WATCH",
-        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "nonHolderAction": "WATCH",
-        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "urgency": "NONE",
-        "urgencyLabel": "Χωρίς τελική ενέργεια",
-        "confidenceScore": 34,
-        "dataQualityScore": 30,
-        "reasons": [
-          "FINAL_ACTION_BLOCKED"
-        ],
-        "blockers": [
-          "DOSSIER_NOT_PUBLISHABLE",
-          "DOSSIER_NOT_READY",
-          "CROSS_CHECK_NOT_READY",
-          "MARKET_METRICS_NOT_READY",
-          "MARKET_HISTORY_SOURCE_NOT_READY",
-          "MARKET_HISTORY_NOT_CROSSCHECKED",
-          "REFERENCE_PRICE_STALE"
-        ],
-        "freshness": {
-          "referencePriceAgeHours": 32.857348333333334,
-          "dossierAgeHours": 0,
-          "latestMarketAgeHours": 32.857348333333334
-        },
-        "risk": {
-          "riskScore": 42,
-          "fundamentalFlags": [
-            "NON_POSITIVE_EQUITY"
-          ],
-          "marketFlags": [
-            "LOW_LIQUIDITY"
-          ]
-        },
-        "execution": {
-          "automaticBrokerOrder": false,
-          "requiresUserExecution": true
-        }
-      }
-    },
-    {
-      "id": "dossier:company:xath:term-463:b7c36d4315153d91cafc",
+      "id": "dossier:company:xath:term-463:7708358c2f143fa40224",
       "companyId": "company:xath:term-463",
       "companyName": "FLEXOPACK S.A.",
       "symbol": "FLEXO",
@@ -1127,7 +892,7 @@
         "cik": null,
         "issuerId": "277",
         "identityStatus": "CANONICAL_IDENTITY_READY",
-        "discoveryScore": 82,
+        "discoveryScore": 78,
         "scoreType": "DISCOVERY_PRIORITY",
         "status": "DISCOVERED_RESEARCH_REQUIRED",
         "suggestedAction": "WATCH",
@@ -1135,8 +900,7 @@
         "isExistingFocusCompany": false,
         "reasons": [
           "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
-          "Πιθανή χρηματοδότηση ή αραίωση μετοχών",
-          "Το γεγονός είναι πολύ πρόσφατο"
+          "Πιθανή χρηματοδότηση ή αραίωση μετοχών"
         ],
         "latestEventAt": "2026-08-05T14:30:00.000Z",
         "events": [
@@ -1146,7 +910,7 @@
             "publishedAt": "2026-08-05T14:30:00.000Z",
             "sourceUrl": "https://athens.euronext.com/en/node/968623",
             "sourceName": "Euronext Athens",
-            "eventScore": 82
+            "eventScore": 78
           }
         ]
       },
@@ -1163,7 +927,7 @@
         "timestamp": "2026-08-04T07:30:00.000Z",
         "source": "Historical market series"
       },
-      "referencePriceAgeHours": 38.857348333333334,
+      "referencePriceAgeHours": 44.06711222222222,
       "marketQuote": {
         "appSymbol": "FLEXO.GR",
         "companyId": "company:xath:term-463",
@@ -1171,8 +935,8 @@
         "price": 0,
         "previousClose": 0,
         "currency": "EUR",
-        "quoteAt": "2026-08-05T22:21:26.454Z",
-        "checkedAt": "2026-08-05T22:21:26.454Z",
+        "quoteAt": "2026-08-06T03:34:01.604Z",
+        "checkedAt": "2026-08-06T03:34:01.604Z",
         "source": "Euronext Athens delayed market data",
         "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/FLEXO",
         "sourceQuality": "OFFICIAL_DELAYED",
@@ -1236,14 +1000,14 @@
       "nextStep": "Άνοιγμα και ανάλυση του επίσημου εγγράφου",
       "sources": [],
       "metricNotes": [],
-      "generatedAt": "2026-08-05T22:21:26.454Z",
+      "generatedAt": "2026-08-06T03:34:01.604Z",
       "publicationMode": null,
       "finalAction": {
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-05T22:21:26.454Z",
-        "validUntil": "2026-08-06T22:21:26.454Z",
+        "generatedAt": "2026-08-06T03:34:01.604Z",
+        "validUntil": "2026-08-07T03:34:01.604Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -1270,9 +1034,9 @@
           "REVIEW_DATE_EXPIRED"
         ],
         "freshness": {
-          "referencePriceAgeHours": 38.857348333333334,
+          "referencePriceAgeHours": 44.06711222222222,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 38.857348333333334
+          "latestMarketAgeHours": 44.06711222222222
         },
         "risk": {
           "riskScore": null,
@@ -1288,7 +1052,7 @@
       }
     },
     {
-      "id": "dossier:company:xath:term-342:487707d246bf52ae0f5f",
+      "id": "dossier:company:xath:term-342:237a23a86e6a7494ef89",
       "companyId": "company:xath:term-342",
       "companyName": "PUBLIC POWER CORPORATION SA",
       "symbol": "PPC",
@@ -1305,7 +1069,7 @@
         "cik": null,
         "issuerId": "881",
         "identityStatus": "CANONICAL_IDENTITY_READY",
-        "discoveryScore": 79,
+        "discoveryScore": 75,
         "scoreType": "DISCOVERY_PRIORITY",
         "status": "DISCOVERED_RESEARCH_REQUIRED",
         "suggestedAction": "WATCH",
@@ -1313,8 +1077,7 @@
         "isExistingFocusCompany": false,
         "reasons": [
           "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
-          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-          "Το γεγονός είναι πολύ πρόσφατο"
+          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης"
         ],
         "latestEventAt": "2026-08-05T16:14:00.000Z",
         "events": [
@@ -1324,7 +1087,7 @@
             "publishedAt": "2026-08-05T16:14:00.000Z",
             "sourceUrl": "https://athens.euronext.com/en/node/968632",
             "sourceName": "Euronext Athens",
-            "eventScore": 79
+            "eventScore": 75
           },
           {
             "form": "ATHEX_ANNOUNCEMENT",
@@ -1332,7 +1095,7 @@
             "publishedAt": "2026-08-05T14:28:00.000Z",
             "sourceUrl": "https://athens.euronext.com/en/node/968622",
             "sourceName": "Euronext Athens",
-            "eventScore": 79
+            "eventScore": 75
           }
         ]
       },
@@ -1349,7 +1112,7 @@
         "timestamp": "2026-08-04T07:30:00.000Z",
         "source": "Historical market series"
       },
-      "referencePriceAgeHours": 38.857348333333334,
+      "referencePriceAgeHours": 44.06711222222222,
       "marketQuote": {
         "appSymbol": "PPC.GR",
         "companyId": "company:xath:term-342",
@@ -1357,8 +1120,8 @@
         "price": 0,
         "previousClose": 0,
         "currency": "EUR",
-        "quoteAt": "2026-08-05T22:21:26.454Z",
-        "checkedAt": "2026-08-05T22:21:26.454Z",
+        "quoteAt": "2026-08-06T03:34:01.604Z",
+        "checkedAt": "2026-08-06T03:34:01.604Z",
         "source": "Euronext Athens delayed market data",
         "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/PPC",
         "sourceQuality": "OFFICIAL_DELAYED",
@@ -1422,14 +1185,14 @@
       "nextStep": "Άνοιγμα και ανάλυση του επίσημου εγγράφου",
       "sources": [],
       "metricNotes": [],
-      "generatedAt": "2026-08-05T22:21:26.454Z",
+      "generatedAt": "2026-08-06T03:34:01.604Z",
       "publicationMode": null,
       "finalAction": {
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-05T22:21:26.454Z",
-        "validUntil": "2026-08-06T22:21:26.454Z",
+        "generatedAt": "2026-08-06T03:34:01.604Z",
+        "validUntil": "2026-08-07T03:34:01.604Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -1456,9 +1219,9 @@
           "REVIEW_DATE_EXPIRED"
         ],
         "freshness": {
-          "referencePriceAgeHours": 38.857348333333334,
+          "referencePriceAgeHours": 44.06711222222222,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 38.857348333333334
+          "latestMarketAgeHours": 44.06711222222222
         },
         "risk": {
           "riskScore": null,
@@ -1472,7 +1235,7 @@
       }
     },
     {
-      "id": "dossier:company:xath:term-227:7da669d4c1add6be8512",
+      "id": "dossier:company:xath:term-227:1a1f57ba097661b3682b",
       "companyId": "company:xath:term-227",
       "companyName": "VIOHALCO SA/NV",
       "symbol": "VIO",
@@ -1489,7 +1252,7 @@
         "cik": null,
         "issuerId": "1259",
         "identityStatus": "CANONICAL_IDENTITY_READY",
-        "discoveryScore": 79,
+        "discoveryScore": 75,
         "scoreType": "DISCOVERY_PRIORITY",
         "status": "DISCOVERED_RESEARCH_REQUIRED",
         "suggestedAction": "WATCH",
@@ -1497,8 +1260,7 @@
         "isExistingFocusCompany": false,
         "reasons": [
           "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
-          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-          "Το γεγονός είναι πολύ πρόσφατο"
+          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης"
         ],
         "latestEventAt": "2026-08-05T16:07:00.000Z",
         "events": [
@@ -1508,7 +1270,7 @@
             "publishedAt": "2026-08-05T16:07:00.000Z",
             "sourceUrl": "https://athens.euronext.com/en/node/968631",
             "sourceName": "Euronext Athens",
-            "eventScore": 79
+            "eventScore": 75
           },
           {
             "form": "ATHEX_ANNOUNCEMENT",
@@ -1516,7 +1278,7 @@
             "publishedAt": "2026-08-05T16:00:00.000Z",
             "sourceUrl": "https://athens.euronext.com/en/node/968630",
             "sourceName": "Euronext Athens",
-            "eventScore": 79
+            "eventScore": 75
           }
         ]
       },
@@ -1533,7 +1295,7 @@
         "timestamp": "2026-08-04T07:30:00.000Z",
         "source": "Historical market series"
       },
-      "referencePriceAgeHours": 38.857348333333334,
+      "referencePriceAgeHours": 44.06711222222222,
       "marketQuote": {
         "appSymbol": "VIO.GR",
         "companyId": "company:xath:term-227",
@@ -1541,8 +1303,8 @@
         "price": 0,
         "previousClose": 0,
         "currency": "EUR",
-        "quoteAt": "2026-08-05T22:21:26.454Z",
-        "checkedAt": "2026-08-05T22:21:26.454Z",
+        "quoteAt": "2026-08-06T03:34:01.604Z",
+        "checkedAt": "2026-08-06T03:34:01.604Z",
         "source": "Euronext Athens delayed market data",
         "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/VIO",
         "sourceQuality": "OFFICIAL_DELAYED",
@@ -1606,14 +1368,14 @@
       "nextStep": "Άνοιγμα και ανάλυση του επίσημου εγγράφου",
       "sources": [],
       "metricNotes": [],
-      "generatedAt": "2026-08-05T22:21:26.454Z",
+      "generatedAt": "2026-08-06T03:34:01.604Z",
       "publicationMode": null,
       "finalAction": {
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-05T22:21:26.454Z",
-        "validUntil": "2026-08-06T22:21:26.454Z",
+        "generatedAt": "2026-08-06T03:34:01.604Z",
+        "validUntil": "2026-08-07T03:34:01.604Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -1640,9 +1402,9 @@
           "REVIEW_DATE_EXPIRED"
         ],
         "freshness": {
-          "referencePriceAgeHours": 38.857348333333334,
+          "referencePriceAgeHours": 44.06711222222222,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 38.857348333333334
+          "latestMarketAgeHours": 44.06711222222222
         },
         "risk": {
           "riskScore": null,
@@ -1658,7 +1420,7 @@
       }
     },
     {
-      "id": "dossier:company:xath:term-440:ae29cf17e74d9b0cd22e",
+      "id": "dossier:company:xath:term-440:3aef8f0a687f7242f6df",
       "companyId": "company:xath:term-440",
       "companyName": "HELLENiQ ENERGY Holdings Societe Anonyme",
       "symbol": "ELPE",
@@ -1675,7 +1437,7 @@
         "cik": null,
         "issuerId": "579",
         "identityStatus": "CANONICAL_IDENTITY_READY",
-        "discoveryScore": 79,
+        "discoveryScore": 75,
         "scoreType": "DISCOVERY_PRIORITY",
         "status": "DISCOVERED_RESEARCH_REQUIRED",
         "suggestedAction": "WATCH",
@@ -1684,7 +1446,6 @@
         "reasons": [
           "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
           "Αλλαγή στην κατανομή κεφαλαίου",
-          "Το γεγονός είναι πολύ πρόσφατο",
           "Νέα αποτελέσματα ή καθοδήγηση διοίκησης"
         ],
         "latestEventAt": "2026-08-05T15:25:00.000Z",
@@ -1695,7 +1456,7 @@
             "publishedAt": "2026-08-05T15:12:00.000Z",
             "sourceUrl": "https://athens.euronext.com/en/node/968627",
             "sourceName": "Euronext Athens",
-            "eventScore": 79
+            "eventScore": 75
           },
           {
             "form": "ATHEX_ANNOUNCEMENT",
@@ -1703,7 +1464,7 @@
             "publishedAt": "2026-08-05T15:25:00.000Z",
             "sourceUrl": "https://athens.euronext.com/en/node/968628",
             "sourceName": "Euronext Athens",
-            "eventScore": 77
+            "eventScore": 73
           }
         ]
       },
@@ -1720,7 +1481,7 @@
         "timestamp": "2026-08-04T07:30:00.000Z",
         "source": "Historical market series"
       },
-      "referencePriceAgeHours": 38.857348333333334,
+      "referencePriceAgeHours": 44.06711222222222,
       "marketQuote": {
         "appSymbol": "ELPE.GR",
         "companyId": "company:xath:term-440",
@@ -1728,8 +1489,8 @@
         "price": 0,
         "previousClose": 0,
         "currency": "EUR",
-        "quoteAt": "2026-08-05T22:21:26.454Z",
-        "checkedAt": "2026-08-05T22:21:26.454Z",
+        "quoteAt": "2026-08-06T03:34:01.604Z",
+        "checkedAt": "2026-08-06T03:34:01.604Z",
         "source": "Euronext Athens delayed market data",
         "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/ELPE",
         "sourceQuality": "OFFICIAL_DELAYED",
@@ -1793,14 +1554,14 @@
       "nextStep": "Άνοιγμα και ανάλυση του επίσημου εγγράφου",
       "sources": [],
       "metricNotes": [],
-      "generatedAt": "2026-08-05T22:21:26.454Z",
+      "generatedAt": "2026-08-06T03:34:01.604Z",
       "publicationMode": null,
       "finalAction": {
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-05T22:21:26.454Z",
-        "validUntil": "2026-08-06T22:21:26.454Z",
+        "generatedAt": "2026-08-06T03:34:01.604Z",
+        "validUntil": "2026-08-07T03:34:01.604Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -1827,9 +1588,9 @@
           "REVIEW_DATE_EXPIRED"
         ],
         "freshness": {
-          "referencePriceAgeHours": 38.857348333333334,
+          "referencePriceAgeHours": 44.06711222222222,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 38.857348333333334
+          "latestMarketAgeHours": 44.06711222222222
         },
         "risk": {
           "riskScore": null,
@@ -1843,7 +1604,202 @@
       }
     },
     {
-      "id": "dossier:company:virgin-galactic-holdings:5f63a84e862824213498",
+      "id": "dossier:company:xath:term-424:0fea0258ace8a8ee99a1",
+      "companyId": "company:xath:term-424",
+      "companyName": "AKTOR S.A. HOLD. CO. TECHNICAL AND ENERGY PROJECTS",
+      "symbol": "AKTR",
+      "exchange": "Euronext Athens",
+      "origin": "AUTONOMOUS_DISCOVERY",
+      "discovery": {
+        "discoveryId": "discovery:company:xath:term-424:2026-08-05",
+        "companyId": "company:xath:term-424",
+        "companyName": "AKTOR S.A. HOLD. CO. TECHNICAL AND ENERGY PROJECTS",
+        "symbol": "AKTR",
+        "exchange": "Euronext Athens",
+        "mic": "XATH",
+        "market": "GR",
+        "cik": null,
+        "issuerId": "879",
+        "identityStatus": "CANONICAL_IDENTITY_READY",
+        "discoveryScore": 58,
+        "scoreType": "DISCOVERY_PRIORITY",
+        "status": "DISCOVERED_RESEARCH_REQUIRED",
+        "suggestedAction": "WATCH",
+        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
+        "isExistingFocusCompany": false,
+        "reasons": [
+          "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
+          "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
+        ],
+        "latestEventAt": "2026-08-05T16:30:00.000Z",
+        "events": [
+          {
+            "form": "ATHEX_ANNOUNCEMENT",
+            "title": "Announcement 5869/2026 (no English translation available) (Correct Repetition)",
+            "publishedAt": "2026-08-05T16:30:00.000Z",
+            "sourceUrl": "https://athens.euronext.com/en/more-options/announcements/announcement-58692026-no-english-translation-available-correct",
+            "sourceName": "Euronext Athens",
+            "eventScore": 58
+          },
+          {
+            "form": "ATHEX_ANNOUNCEMENT",
+            "title": "Announcement 5868/2026 (no English translation available) (Correct Repetition)",
+            "publishedAt": "2026-08-05T16:30:00.000Z",
+            "sourceUrl": "https://athens.euronext.com/en/more-options/announcements/announcement-58682026-no-english-translation-available-correct",
+            "sourceName": "Euronext Athens",
+            "eventScore": 58
+          },
+          {
+            "form": "ATHEX_ANNOUNCEMENT",
+            "title": "Announcement regarding significant business developments",
+            "publishedAt": "2026-08-05T14:20:00.000Z",
+            "sourceUrl": "https://athens.euronext.com/en/node/968620",
+            "sourceName": "Euronext Athens",
+            "eventScore": 58
+          }
+        ]
+      },
+      "status": "DRAFT_RESEARCH",
+      "statusLabel": "Αυτόματη ανακάλυψη · έρευνα σε εξέλιξη",
+      "category": "INSUFFICIENT_EVIDENCE",
+      "categoryLabel": "Ανεπαρκή στοιχεία",
+      "action": "WATCH",
+      "actionLabel": "Παρακολούθηση",
+      "timeHorizon": "UNDETERMINED",
+      "referencePrice": {
+        "value": 11,
+        "currency": "EUR",
+        "timestamp": "2026-08-04T07:30:00.000Z",
+        "source": "Historical market series"
+      },
+      "referencePriceAgeHours": 44.06711222222222,
+      "marketQuote": {
+        "appSymbol": "AKTR.GR",
+        "companyId": "company:xath:term-424",
+        "companyName": "AKTOR S.A. HOLD. CO. TECHNICAL AND ENERGY PROJECTS",
+        "price": 0,
+        "previousClose": 0,
+        "currency": "EUR",
+        "quoteAt": "2026-08-06T03:34:01.604Z",
+        "checkedAt": "2026-08-06T03:34:01.604Z",
+        "source": "Euronext Athens delayed market data",
+        "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/AKTR",
+        "sourceQuality": "OFFICIAL_DELAYED",
+        "quoteContract": {
+          "version": "2026-08-04.1",
+          "sourceRole": "PRIMARY_EXCHANGE",
+          "sourceTier": 1,
+          "sourceApproved": true,
+          "timestampVerified": false,
+          "valuationEligible": false,
+          "decisionEligible": false,
+          "dayChangeEligible": false,
+          "publicStatus": "UNAVAILABLE",
+          "publicMessage": "Δεν υπάρχει διαθέσιμη και επαληθεύσιμη τιμή.",
+          "diagnosticCodes": [
+            "QUOTE_PRICE_MISSING",
+            "QUOTE_STALE",
+            "QUOTE_TIMESTAMP_NOT_VERIFIED",
+            "PREVIOUS_CLOSE_NOT_VERIFIED"
+          ]
+        }
+      },
+      "thesis": null,
+      "causalMechanism": null,
+      "bullCase": null,
+      "bearCase": null,
+      "catalysts": [],
+      "risks": [],
+      "invalidationCondition": null,
+      "reviewDate": null,
+      "blockers": [
+        "DOCUMENT_REVIEW_REQUIRED",
+        "FUNDAMENTALS_REQUIRED",
+        "HISTORICAL_MARKET_METRICS_REQUIRED",
+        "INDEPENDENT_CROSS_CHECK_REQUIRED",
+        "THESIS_REQUIRED",
+        "INVALIDATION_CONDITION_REQUIRED",
+        "MATERIAL_RISKS_REQUIRED",
+        "CAUSAL_MECHANISM_REQUIRED",
+        "BULL_CASE_REQUIRED",
+        "BEAR_CASE_REQUIRED",
+        "VERIFIED_CATALYST_REQUIRED",
+        "REVIEW_DATE_REQUIRED",
+        "CANONICAL_CLAIM_REQUIRED"
+      ],
+      "blockerLabels": [
+        "Απαιτείται ανάγνωση του επίσημου εγγράφου",
+        "Λείπουν επαρκή θεμελιώδη στοιχεία",
+        "Λείπει επαρκές ιστορικό τιμής και όγκου",
+        "Λείπει ανεξάρτητη διασταύρωση",
+        "Λείπει ολοκληρωμένη επενδυτική θέση",
+        "Λείπει σαφής συνθήκη ακύρωσης",
+        "Λείπουν ουσιαστικοί κίνδυνοι",
+        "Λείπει ο μηχανισμός που συνδέει το γεγονός με την αξία",
+        "Λείπει θετικό σενάριο",
+        "Λείπει αρνητικό σενάριο",
+        "Λείπει επαληθευμένος καταλύτης",
+        "Λείπει ημερομηνία επανεξέτασης",
+        "Δεν έχει συνδεθεί σαφής εταιρικός ισχυρισμός"
+      ],
+      "nextStep": "Άνοιγμα και ανάλυση του επίσημου εγγράφου",
+      "sources": [],
+      "metricNotes": [],
+      "generatedAt": "2026-08-06T03:34:01.604Z",
+      "publicationMode": null,
+      "finalAction": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-07-30.1",
+        "generatedAt": "2026-08-06T03:34:01.604Z",
+        "validUntil": "2026-08-07T03:34:01.604Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 55,
+        "dataQualityScore": 10,
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY",
+          "MARKET_METRICS_NOT_READY",
+          "MARKET_HISTORY_SOURCE_NOT_READY",
+          "MARKET_HISTORY_NOT_CROSSCHECKED",
+          "REFERENCE_PRICE_STALE",
+          "REVIEW_DATE_EXPIRED"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 44.06711222222222,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 44.06711222222222
+        },
+        "risk": {
+          "riskScore": null,
+          "fundamentalFlags": [],
+          "marketFlags": [
+            "HIGH_VOLATILITY",
+            "MATERIAL_DRAWDOWN",
+            "BELOW_50_DAY_AVERAGE"
+          ]
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      }
+    },
+    {
+      "id": "dossier:company:virgin-galactic-holdings:8d84d08e6f36651c552e",
       "companyId": "company:virgin-galactic-holdings",
       "companyName": "Virgin Galactic",
       "symbol": "SPCE",
@@ -1858,12 +1814,12 @@
       "actionLabel": "Παρακολούθηση",
       "timeHorizon": "UNDETERMINED",
       "referencePrice": {
-        "value": 2.89,
+        "value": 2.890000104904175,
         "currency": "USD",
-        "timestamp": "2026-08-05T20:00:00.000Z",
-        "source": "Finnhub Quote API"
+        "timestamp": "2026-08-05T13:30:00.000Z",
+        "source": "Historical market series"
       },
-      "referencePriceAgeHours": 2.3573483333333334,
+      "referencePriceAgeHours": 14.067112222222223,
       "marketQuote": {
         "appSymbol": "SPCE.US",
         "companyId": "company:virgin-galactic-holdings",
@@ -1872,7 +1828,7 @@
         "previousClose": 2.95,
         "currency": "USD",
         "quoteAt": "2026-08-05T20:00:00.000Z",
-        "checkedAt": "2026-08-05T22:21:26.454Z",
+        "checkedAt": "2026-08-06T03:34:01.604Z",
         "source": "Finnhub Quote API",
         "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
         "sourceQuality": null,
@@ -1882,12 +1838,14 @@
           "sourceTier": 1,
           "sourceApproved": true,
           "timestampVerified": true,
-          "valuationEligible": true,
-          "decisionEligible": true,
-          "dayChangeEligible": true,
-          "publicStatus": "VERIFIED",
-          "publicMessage": "Επαληθευμένη χρηματιστηριακή τιμή από εγκεκριμένη πηγή.",
-          "diagnosticCodes": []
+          "valuationEligible": false,
+          "decisionEligible": false,
+          "dayChangeEligible": false,
+          "publicStatus": "STALE",
+          "publicMessage": "Η τελευταία τιμή είναι παρωχημένη και δεν χρησιμοποιείται σε αποτίμηση ή απόφαση.",
+          "diagnosticCodes": [
+            "QUOTE_STALE"
+          ]
         }
       },
       "thesis": "Η Virgin Galactic έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: ετήσια μεταβολή εσόδων -78.06%, ετήσιο καθαρό περιθώριο -18063.92%, μεταβολή απομειωμένου αριθμού μετοχών 105.34%, απόδοση 60 συνεδριάσεων -1.7%, σχετική ισχύς 60 συνεδριάσεων -6.33%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
@@ -1969,12 +1927,14 @@
         }
       ],
       "invalidationCondition": "Η υπόθεση παραμένει μη ταξινομημένη μέχρι να υποστηρίζονται από επαληθευμένα στοιχεία ένας μετρήσιμος αιτιώδης σύνδεσμος και σαφής συνθήκη ακύρωσης.",
-      "reviewDate": "2026-10-04",
+      "reviewDate": "2026-10-05",
       "blockers": [
+        "HISTORICAL_MARKET_METRICS_REQUIRED",
         "INDEPENDENT_CROSS_CHECK_REQUIRED",
         "CLAIM_CORROBORATION_REQUIRED"
       ],
       "blockerLabels": [
+        "Λείπει επαρκές ιστορικό τιμής και όγκου",
         "Λείπει ανεξάρτητη διασταύρωση",
         "Ο συγκεκριμένος ισχυρισμός δεν έχει επιβεβαιωθεί επαρκώς"
       ],
@@ -2002,14 +1962,14 @@
       "metricNotes": [
         "Το ακραίο καθαρό περιθώριο επηρεάζεται από πολύ χαμηλή βάση εσόδων σε σχέση με τις ζημίες και χρειάζεται ανάγνωση μαζί με τα απόλυτα ποσά."
       ],
-      "generatedAt": "2026-08-05T22:21:26.454Z",
+      "generatedAt": "2026-08-06T03:34:01.604Z",
       "publicationMode": null,
       "finalAction": {
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-05T22:21:26.454Z",
-        "validUntil": "2026-08-06T22:21:26.454Z",
+        "generatedAt": "2026-08-06T03:34:01.604Z",
+        "validUntil": "2026-08-07T03:34:01.604Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -2019,20 +1979,24 @@
         "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
         "urgency": "NONE",
         "urgencyLabel": "Χωρίς τελική ενέργεια",
-        "confidenceScore": 40,
-        "dataQualityScore": 55,
+        "confidenceScore": 25,
+        "dataQualityScore": 35,
         "reasons": [
           "FINAL_ACTION_BLOCKED"
         ],
         "blockers": [
           "DOSSIER_NOT_PUBLISHABLE",
           "DOSSIER_NOT_READY",
-          "CROSS_CHECK_NOT_READY"
+          "CROSS_CHECK_NOT_READY",
+          "MARKET_METRICS_NOT_READY",
+          "MARKET_HISTORY_SOURCE_NOT_READY",
+          "MARKET_HISTORY_NOT_CROSSCHECKED",
+          "REFERENCE_PRICE_STALE"
         ],
         "freshness": {
-          "referencePriceAgeHours": 2.3573483333333334,
+          "referencePriceAgeHours": 14.067112222222223,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 8.857348333333332
+          "latestMarketAgeHours": 14.067112222222223
         },
         "risk": {
           "riskScore": 100,
@@ -2056,7 +2020,7 @@
       }
     },
     {
-      "id": "dossier:company:crediabank:97ecdc1e9290ddaf66f7",
+      "id": "dossier:company:crediabank:157b236c72bd6ca8081f",
       "companyId": "company:crediabank",
       "companyName": "CrediaBank",
       "symbol": "CREDIA",
@@ -2076,7 +2040,7 @@
         "timestamp": "2026-08-04T07:30:00.000Z",
         "source": "Historical market series"
       },
-      "referencePriceAgeHours": 38.857348333333334,
+      "referencePriceAgeHours": 44.06711222222222,
       "marketQuote": {
         "appSymbol": "CREDIA.GR",
         "companyId": "company:crediabank",
@@ -2084,8 +2048,8 @@
         "price": 0.98,
         "previousClose": 0.99,
         "currency": "EUR",
-        "quoteAt": "2026-08-05T22:21:26.454Z",
-        "checkedAt": "2026-08-05T22:21:26.454Z",
+        "quoteAt": "2026-08-06T03:34:01.604Z",
+        "checkedAt": "2026-08-06T03:34:01.604Z",
         "source": "Euronext Athens delayed market data",
         "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/CREDIA/related",
         "sourceQuality": "OFFICIAL_DELAYED",
@@ -2105,7 +2069,7 @@
           ]
         }
       },
-      "thesis": "Η CrediaBank έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων -22.17%, σχετική ισχύς 60 συνεδριάσεων -34.68%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
+      "thesis": "Η CrediaBank έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων -23.61%, σχετική ισχύς 60 συνεδριάσεων -34.68%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
       "causalMechanism": "Το γεγονός μπορεί να επηρεάσει την αξία μόνο μέσω μετρήσιμης αλλαγής στις ταμειακές ροές, στον κίνδυνο ισολογισμού, στον αριθμό μετοχών, στην πιθανότητα λειτουργικής επιτυχίας ή στις προσδοκίες αποτίμησης.",
       "bullCase": "Μεταγενέστερα επαληθευμένα στοιχεία αποδεικνύουν ευνοϊκή και διατηρήσιμη οικονομική επίδραση που δεν έχει ήδη ενσωματωθεί στην αποτίμηση.",
       "bearCase": "Το γεγονός αποδεικνύεται ασήμαντο, αναιρείται από νεότερα στοιχεία ή παράγει ασθενέστερα οικονομικά αποτελέσματα από όσα αναμένει η αγορά.",
@@ -2138,7 +2102,7 @@
         }
       ],
       "invalidationCondition": "Η υπόθεση παραμένει μη ταξινομημένη μέχρι να υποστηρίζονται από επαληθευμένα στοιχεία ένας μετρήσιμος αιτιώδης σύνδεσμος και σαφής συνθήκη ακύρωσης.",
-      "reviewDate": "2026-10-04",
+      "reviewDate": "2026-10-05",
       "blockers": [
         "FUNDAMENTALS_REQUIRED",
         "INDEPENDENT_CROSS_CHECK_REQUIRED",
@@ -2162,14 +2126,14 @@
         }
       ],
       "metricNotes": [],
-      "generatedAt": "2026-08-05T22:21:26.454Z",
+      "generatedAt": "2026-08-06T03:34:01.604Z",
       "publicationMode": null,
       "finalAction": {
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-05T22:21:26.454Z",
-        "validUntil": "2026-08-06T22:21:26.454Z",
+        "generatedAt": "2026-08-06T03:34:01.604Z",
+        "validUntil": "2026-08-07T03:34:01.604Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -2192,9 +2156,9 @@
           "REFERENCE_PRICE_STALE"
         ],
         "freshness": {
-          "referencePriceAgeHours": 38.857348333333334,
+          "referencePriceAgeHours": 44.06711222222222,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 38.857348333333334
+          "latestMarketAgeHours": 44.06711222222222
         },
         "risk": {
           "riskScore": null,
@@ -2227,8 +2191,8 @@
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-05T22:21:26.454Z",
-        "validUntil": "2026-08-06T22:21:26.454Z",
+        "generatedAt": "2026-08-06T03:34:01.604Z",
+        "validUntil": "2026-08-07T03:34:01.604Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -2251,129 +2215,28 @@
           "REFERENCE_PRICE_STALE"
         ],
         "freshness": {
-          "referencePriceAgeHours": 38.857348333333334,
+          "referencePriceAgeHours": 44.06711222222222,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 38.857348333333334
+          "latestMarketAgeHours": 44.06711222222222
         },
         "risk": {
           "riskScore": null,
           "fundamentalFlags": [],
-          "marketFlags": [
-            "MATERIAL_DRAWDOWN"
-          ]
+          "marketFlags": []
         },
         "execution": {
           "automaticBrokerOrder": false,
           "requiresUserExecution": true
         }
       },
-      "thesis": "Το επιβεβαιωμένο πρόγραμμα επαναγοράς ιδίων μετοχών της Allwyn μπορεί να βελτιώσει την αξία ανά μετοχή μόνο εφόσον οι αγορές είναι ουσιαστικές, γίνονται σε ελκυστική αποτίμηση και χρηματοδοτούνται χωρίς αποδυνάμωση της ρευστότητας. Αποτελεί μετρήσιμο καταλύτη κατανομής κεφαλαίου, όχι αυτοτελή λόγο αγοράς. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων 9.54%, σχετική ισχύς 60 συνεδριάσεων -11.05%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
+      "thesis": "Το επιβεβαιωμένο πρόγραμμα επαναγοράς ιδίων μετοχών της Allwyn μπορεί να βελτιώσει την αξία ανά μετοχή μόνο εφόσον οι αγορές είναι ουσιαστικές, γίνονται σε ελκυστική αποτίμηση και χρηματοδοτούνται χωρίς αποδυνάμωση της ρευστότητας. Αποτελεί μετρήσιμο καταλύτη κατανομής κεφαλαίου, όχι αυτοτελή λόγο αγοράς. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων 9.23%, σχετική ισχύς 60 συνεδριάσεων -11.05%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
       "blockers": [
         "FUNDAMENTALS_REQUIRED",
         "INDEPENDENT_CROSS_CHECK_REQUIRED",
         "CLAIM_CORROBORATION_REQUIRED"
       ],
       "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
-      "reviewDate": "2026-11-03"
-    },
-    {
-      "companyId": "company:sec:0002032528",
-      "companyName": "Roman DBDR Acquisition Corp. II",
-      "symbol": "DRDB",
-      "origin": "AUTONOMOUS_DISCOVERY",
-      "discovery": {
-        "discoveryId": "discovery:company:sec:0002032528:2026-08-05",
-        "companyId": "company:sec:0002032528",
-        "companyName": "Roman DBDR Acquisition Corp. II",
-        "symbol": "DRDB",
-        "exchange": "Nasdaq",
-        "mic": "XNAS",
-        "market": "US",
-        "cik": "0002032528",
-        "issuerId": null,
-        "identityStatus": "CANONICAL_IDENTITY_READY",
-        "discoveryScore": 66,
-        "scoreType": "DISCOVERY_PRIORITY",
-        "status": "DISCOVERED_RESEARCH_REQUIRED",
-        "suggestedAction": "WATCH",
-        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-        "isExistingFocusCompany": false,
-        "reasons": [
-          "Νέα επίσημη κατάθεση SCHEDULE 13G/A στη SEC",
-          "Συγχώνευση, εξαγορά ή στρατηγική συναλλαγή",
-          "Το γεγονός είναι πολύ πρόσφατο"
-        ],
-        "latestEventAt": "2026-08-05T22:04:01.000Z",
-        "events": [
-          {
-            "form": "SCHEDULE 13G/A",
-            "title": "SCHEDULE 13G/A - Roman DBDR Acquisition Corp. II (0002032528) (Subject)",
-            "publishedAt": "2026-08-05T22:04:01.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2032528/000162828026053615/0001628280-26-053615-index.htm",
-            "sourceName": "SEC EDGAR Current Filings",
-            "eventScore": 66
-          }
-        ]
-      },
-      "status": "DRAFT_RESEARCH",
-      "category": "INSUFFICIENT_EVIDENCE",
-      "action": "WATCH",
-      "finalAction": {
-        "format": "investor-control-final-action",
-        "version": 2,
-        "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-05T22:21:26.454Z",
-        "validUntil": "2026-08-06T22:21:26.454Z",
-        "status": "BLOCKED",
-        "marketAction": "WATCH",
-        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "holderAction": "WATCH",
-        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "nonHolderAction": "WATCH",
-        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "urgency": "NONE",
-        "urgencyLabel": "Χωρίς τελική ενέργεια",
-        "confidenceScore": 34,
-        "dataQualityScore": 30,
-        "reasons": [
-          "FINAL_ACTION_BLOCKED"
-        ],
-        "blockers": [
-          "DOSSIER_NOT_PUBLISHABLE",
-          "DOSSIER_NOT_READY",
-          "CROSS_CHECK_NOT_READY",
-          "MARKET_METRICS_NOT_READY",
-          "MARKET_HISTORY_SOURCE_NOT_READY",
-          "MARKET_HISTORY_NOT_CROSSCHECKED",
-          "REFERENCE_PRICE_STALE"
-        ],
-        "freshness": {
-          "referencePriceAgeHours": 32.857348333333334,
-          "dossierAgeHours": 0,
-          "latestMarketAgeHours": 32.857348333333334
-        },
-        "risk": {
-          "riskScore": 42,
-          "fundamentalFlags": [
-            "NON_POSITIVE_EQUITY"
-          ],
-          "marketFlags": [
-            "LOW_LIQUIDITY"
-          ]
-        },
-        "execution": {
-          "automaticBrokerOrder": false,
-          "requiresUserExecution": true
-        }
-      },
-      "thesis": "Η Roman DBDR Acquisition Corp. II έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων 0.76%, σχετική ισχύς 60 συνεδριάσεων -4.94%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
-      "blockers": [
-        "HISTORICAL_MARKET_METRICS_REQUIRED",
-        "INDEPENDENT_CROSS_CHECK_REQUIRED",
-        "CLAIM_CORROBORATION_REQUIRED"
-      ],
-      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
-      "reviewDate": "2026-10-04"
+      "reviewDate": "2026-11-04"
     },
     {
       "companyId": "company:xath:term-463",
@@ -2391,7 +2254,7 @@
         "cik": null,
         "issuerId": "277",
         "identityStatus": "CANONICAL_IDENTITY_READY",
-        "discoveryScore": 82,
+        "discoveryScore": 78,
         "scoreType": "DISCOVERY_PRIORITY",
         "status": "DISCOVERED_RESEARCH_REQUIRED",
         "suggestedAction": "WATCH",
@@ -2399,8 +2262,7 @@
         "isExistingFocusCompany": false,
         "reasons": [
           "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
-          "Πιθανή χρηματοδότηση ή αραίωση μετοχών",
-          "Το γεγονός είναι πολύ πρόσφατο"
+          "Πιθανή χρηματοδότηση ή αραίωση μετοχών"
         ],
         "latestEventAt": "2026-08-05T14:30:00.000Z",
         "events": [
@@ -2410,7 +2272,7 @@
             "publishedAt": "2026-08-05T14:30:00.000Z",
             "sourceUrl": "https://athens.euronext.com/en/node/968623",
             "sourceName": "Euronext Athens",
-            "eventScore": 82
+            "eventScore": 78
           }
         ]
       },
@@ -2421,8 +2283,8 @@
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-05T22:21:26.454Z",
-        "validUntil": "2026-08-06T22:21:26.454Z",
+        "generatedAt": "2026-08-06T03:34:01.604Z",
+        "validUntil": "2026-08-07T03:34:01.604Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -2449,9 +2311,9 @@
           "REVIEW_DATE_EXPIRED"
         ],
         "freshness": {
-          "referencePriceAgeHours": 38.857348333333334,
+          "referencePriceAgeHours": 44.06711222222222,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 38.857348333333334
+          "latestMarketAgeHours": 44.06711222222222
         },
         "risk": {
           "riskScore": null,
@@ -2500,7 +2362,7 @@
         "cik": null,
         "issuerId": "881",
         "identityStatus": "CANONICAL_IDENTITY_READY",
-        "discoveryScore": 79,
+        "discoveryScore": 75,
         "scoreType": "DISCOVERY_PRIORITY",
         "status": "DISCOVERED_RESEARCH_REQUIRED",
         "suggestedAction": "WATCH",
@@ -2508,8 +2370,7 @@
         "isExistingFocusCompany": false,
         "reasons": [
           "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
-          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-          "Το γεγονός είναι πολύ πρόσφατο"
+          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης"
         ],
         "latestEventAt": "2026-08-05T16:14:00.000Z",
         "events": [
@@ -2519,7 +2380,7 @@
             "publishedAt": "2026-08-05T16:14:00.000Z",
             "sourceUrl": "https://athens.euronext.com/en/node/968632",
             "sourceName": "Euronext Athens",
-            "eventScore": 79
+            "eventScore": 75
           },
           {
             "form": "ATHEX_ANNOUNCEMENT",
@@ -2527,7 +2388,7 @@
             "publishedAt": "2026-08-05T14:28:00.000Z",
             "sourceUrl": "https://athens.euronext.com/en/node/968622",
             "sourceName": "Euronext Athens",
-            "eventScore": 79
+            "eventScore": 75
           }
         ]
       },
@@ -2538,8 +2399,8 @@
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-05T22:21:26.454Z",
-        "validUntil": "2026-08-06T22:21:26.454Z",
+        "generatedAt": "2026-08-06T03:34:01.604Z",
+        "validUntil": "2026-08-07T03:34:01.604Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -2566,9 +2427,9 @@
           "REVIEW_DATE_EXPIRED"
         ],
         "freshness": {
-          "referencePriceAgeHours": 38.857348333333334,
+          "referencePriceAgeHours": 44.06711222222222,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 38.857348333333334
+          "latestMarketAgeHours": 44.06711222222222
         },
         "risk": {
           "riskScore": null,
@@ -2615,7 +2476,7 @@
         "cik": null,
         "issuerId": "1259",
         "identityStatus": "CANONICAL_IDENTITY_READY",
-        "discoveryScore": 79,
+        "discoveryScore": 75,
         "scoreType": "DISCOVERY_PRIORITY",
         "status": "DISCOVERED_RESEARCH_REQUIRED",
         "suggestedAction": "WATCH",
@@ -2623,8 +2484,7 @@
         "isExistingFocusCompany": false,
         "reasons": [
           "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
-          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης",
-          "Το γεγονός είναι πολύ πρόσφατο"
+          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης"
         ],
         "latestEventAt": "2026-08-05T16:07:00.000Z",
         "events": [
@@ -2634,7 +2494,7 @@
             "publishedAt": "2026-08-05T16:07:00.000Z",
             "sourceUrl": "https://athens.euronext.com/en/node/968631",
             "sourceName": "Euronext Athens",
-            "eventScore": 79
+            "eventScore": 75
           },
           {
             "form": "ATHEX_ANNOUNCEMENT",
@@ -2642,7 +2502,7 @@
             "publishedAt": "2026-08-05T16:00:00.000Z",
             "sourceUrl": "https://athens.euronext.com/en/node/968630",
             "sourceName": "Euronext Athens",
-            "eventScore": 79
+            "eventScore": 75
           }
         ]
       },
@@ -2653,8 +2513,8 @@
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-05T22:21:26.454Z",
-        "validUntil": "2026-08-06T22:21:26.454Z",
+        "generatedAt": "2026-08-06T03:34:01.604Z",
+        "validUntil": "2026-08-07T03:34:01.604Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -2681,9 +2541,9 @@
           "REVIEW_DATE_EXPIRED"
         ],
         "freshness": {
-          "referencePriceAgeHours": 38.857348333333334,
+          "referencePriceAgeHours": 44.06711222222222,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 38.857348333333334
+          "latestMarketAgeHours": 44.06711222222222
         },
         "risk": {
           "riskScore": null,
@@ -2732,7 +2592,7 @@
         "cik": null,
         "issuerId": "579",
         "identityStatus": "CANONICAL_IDENTITY_READY",
-        "discoveryScore": 79,
+        "discoveryScore": 75,
         "scoreType": "DISCOVERY_PRIORITY",
         "status": "DISCOVERED_RESEARCH_REQUIRED",
         "suggestedAction": "WATCH",
@@ -2741,7 +2601,6 @@
         "reasons": [
           "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
           "Αλλαγή στην κατανομή κεφαλαίου",
-          "Το γεγονός είναι πολύ πρόσφατο",
           "Νέα αποτελέσματα ή καθοδήγηση διοίκησης"
         ],
         "latestEventAt": "2026-08-05T15:25:00.000Z",
@@ -2752,7 +2611,7 @@
             "publishedAt": "2026-08-05T15:12:00.000Z",
             "sourceUrl": "https://athens.euronext.com/en/node/968627",
             "sourceName": "Euronext Athens",
-            "eventScore": 79
+            "eventScore": 75
           },
           {
             "form": "ATHEX_ANNOUNCEMENT",
@@ -2760,7 +2619,7 @@
             "publishedAt": "2026-08-05T15:25:00.000Z",
             "sourceUrl": "https://athens.euronext.com/en/node/968628",
             "sourceName": "Euronext Athens",
-            "eventScore": 77
+            "eventScore": 73
           }
         ]
       },
@@ -2771,8 +2630,8 @@
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-05T22:21:26.454Z",
-        "validUntil": "2026-08-06T22:21:26.454Z",
+        "generatedAt": "2026-08-06T03:34:01.604Z",
+        "validUntil": "2026-08-07T03:34:01.604Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -2799,14 +2658,140 @@
           "REVIEW_DATE_EXPIRED"
         ],
         "freshness": {
-          "referencePriceAgeHours": 38.857348333333334,
+          "referencePriceAgeHours": 44.06711222222222,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 38.857348333333334
+          "latestMarketAgeHours": 44.06711222222222
         },
         "risk": {
           "riskScore": null,
           "fundamentalFlags": [],
           "marketFlags": []
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "thesis": null,
+      "blockers": [
+        "DOCUMENT_REVIEW_REQUIRED",
+        "FUNDAMENTALS_REQUIRED",
+        "HISTORICAL_MARKET_METRICS_REQUIRED",
+        "INDEPENDENT_CROSS_CHECK_REQUIRED",
+        "THESIS_REQUIRED",
+        "INVALIDATION_CONDITION_REQUIRED",
+        "MATERIAL_RISKS_REQUIRED",
+        "CAUSAL_MECHANISM_REQUIRED",
+        "BULL_CASE_REQUIRED",
+        "BEAR_CASE_REQUIRED",
+        "VERIFIED_CATALYST_REQUIRED",
+        "REVIEW_DATE_REQUIRED",
+        "CANONICAL_CLAIM_REQUIRED"
+      ],
+      "nextStep": "Άνοιγμα και ανάλυση του επίσημου εγγράφου",
+      "reviewDate": null
+    },
+    {
+      "companyId": "company:xath:term-424",
+      "companyName": "AKTOR S.A. HOLD. CO. TECHNICAL AND ENERGY PROJECTS",
+      "symbol": "AKTR",
+      "origin": "AUTONOMOUS_DISCOVERY",
+      "discovery": {
+        "discoveryId": "discovery:company:xath:term-424:2026-08-05",
+        "companyId": "company:xath:term-424",
+        "companyName": "AKTOR S.A. HOLD. CO. TECHNICAL AND ENERGY PROJECTS",
+        "symbol": "AKTR",
+        "exchange": "Euronext Athens",
+        "mic": "XATH",
+        "market": "GR",
+        "cik": null,
+        "issuerId": "879",
+        "identityStatus": "CANONICAL_IDENTITY_READY",
+        "discoveryScore": 58,
+        "scoreType": "DISCOVERY_PRIORITY",
+        "status": "DISCOVERED_RESEARCH_REQUIRED",
+        "suggestedAction": "WATCH",
+        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
+        "isExistingFocusCompany": false,
+        "reasons": [
+          "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
+          "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
+        ],
+        "latestEventAt": "2026-08-05T16:30:00.000Z",
+        "events": [
+          {
+            "form": "ATHEX_ANNOUNCEMENT",
+            "title": "Announcement 5869/2026 (no English translation available) (Correct Repetition)",
+            "publishedAt": "2026-08-05T16:30:00.000Z",
+            "sourceUrl": "https://athens.euronext.com/en/more-options/announcements/announcement-58692026-no-english-translation-available-correct",
+            "sourceName": "Euronext Athens",
+            "eventScore": 58
+          },
+          {
+            "form": "ATHEX_ANNOUNCEMENT",
+            "title": "Announcement 5868/2026 (no English translation available) (Correct Repetition)",
+            "publishedAt": "2026-08-05T16:30:00.000Z",
+            "sourceUrl": "https://athens.euronext.com/en/more-options/announcements/announcement-58682026-no-english-translation-available-correct",
+            "sourceName": "Euronext Athens",
+            "eventScore": 58
+          },
+          {
+            "form": "ATHEX_ANNOUNCEMENT",
+            "title": "Announcement regarding significant business developments",
+            "publishedAt": "2026-08-05T14:20:00.000Z",
+            "sourceUrl": "https://athens.euronext.com/en/node/968620",
+            "sourceName": "Euronext Athens",
+            "eventScore": 58
+          }
+        ]
+      },
+      "status": "DRAFT_RESEARCH",
+      "category": "INSUFFICIENT_EVIDENCE",
+      "action": "WATCH",
+      "finalAction": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-07-30.1",
+        "generatedAt": "2026-08-06T03:34:01.604Z",
+        "validUntil": "2026-08-07T03:34:01.604Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 55,
+        "dataQualityScore": 10,
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY",
+          "MARKET_METRICS_NOT_READY",
+          "MARKET_HISTORY_SOURCE_NOT_READY",
+          "MARKET_HISTORY_NOT_CROSSCHECKED",
+          "REFERENCE_PRICE_STALE",
+          "REVIEW_DATE_EXPIRED"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 44.06711222222222,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 44.06711222222222
+        },
+        "risk": {
+          "riskScore": null,
+          "fundamentalFlags": [],
+          "marketFlags": [
+            "HIGH_VOLATILITY",
+            "MATERIAL_DRAWDOWN",
+            "BELOW_50_DAY_AVERAGE"
+          ]
         },
         "execution": {
           "automaticBrokerOrder": false,
@@ -2845,8 +2830,8 @@
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-05T22:21:26.454Z",
-        "validUntil": "2026-08-06T22:21:26.454Z",
+        "generatedAt": "2026-08-06T03:34:01.604Z",
+        "validUntil": "2026-08-07T03:34:01.604Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -2856,20 +2841,24 @@
         "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
         "urgency": "NONE",
         "urgencyLabel": "Χωρίς τελική ενέργεια",
-        "confidenceScore": 40,
-        "dataQualityScore": 55,
+        "confidenceScore": 25,
+        "dataQualityScore": 35,
         "reasons": [
           "FINAL_ACTION_BLOCKED"
         ],
         "blockers": [
           "DOSSIER_NOT_PUBLISHABLE",
           "DOSSIER_NOT_READY",
-          "CROSS_CHECK_NOT_READY"
+          "CROSS_CHECK_NOT_READY",
+          "MARKET_METRICS_NOT_READY",
+          "MARKET_HISTORY_SOURCE_NOT_READY",
+          "MARKET_HISTORY_NOT_CROSSCHECKED",
+          "REFERENCE_PRICE_STALE"
         ],
         "freshness": {
-          "referencePriceAgeHours": 2.3573483333333334,
+          "referencePriceAgeHours": 14.067112222222223,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 8.857348333333332
+          "latestMarketAgeHours": 14.067112222222223
         },
         "risk": {
           "riskScore": 100,
@@ -2893,11 +2882,12 @@
       },
       "thesis": "Η Virgin Galactic έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: ετήσια μεταβολή εσόδων -78.06%, ετήσιο καθαρό περιθώριο -18063.92%, μεταβολή απομειωμένου αριθμού μετοχών 105.34%, απόδοση 60 συνεδριάσεων -1.7%, σχετική ισχύς 60 συνεδριάσεων -6.33%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
       "blockers": [
+        "HISTORICAL_MARKET_METRICS_REQUIRED",
         "INDEPENDENT_CROSS_CHECK_REQUIRED",
         "CLAIM_CORROBORATION_REQUIRED"
       ],
       "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
-      "reviewDate": "2026-10-04"
+      "reviewDate": "2026-10-05"
     },
     {
       "companyId": "company:crediabank",
@@ -2912,8 +2902,8 @@
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-07-30.1",
-        "generatedAt": "2026-08-05T22:21:26.454Z",
-        "validUntil": "2026-08-06T22:21:26.454Z",
+        "generatedAt": "2026-08-06T03:34:01.604Z",
+        "validUntil": "2026-08-07T03:34:01.604Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -2936,9 +2926,9 @@
           "REFERENCE_PRICE_STALE"
         ],
         "freshness": {
-          "referencePriceAgeHours": 38.857348333333334,
+          "referencePriceAgeHours": 44.06711222222222,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 38.857348333333334
+          "latestMarketAgeHours": 44.06711222222222
         },
         "risk": {
           "riskScore": null,
@@ -2954,14 +2944,14 @@
           "requiresUserExecution": true
         }
       },
-      "thesis": "Η CrediaBank έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων -22.17%, σχετική ισχύς 60 συνεδριάσεων -34.68%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
+      "thesis": "Η CrediaBank έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων -23.61%, σχετική ισχύς 60 συνεδριάσεων -34.68%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
       "blockers": [
         "FUNDAMENTALS_REQUIRED",
         "INDEPENDENT_CROSS_CHECK_REQUIRED",
         "CLAIM_CORROBORATION_REQUIRED"
       ],
       "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
-      "reviewDate": "2026-10-04"
+      "reviewDate": "2026-10-05"
     }
   ],
   "disclosure": "Οι νέες μετοχές εντοπίζονται αυτόματα από επίσημα γεγονότα και περνούν σε βαθιά ανάλυση. Καμία ανακάλυψη δεν γίνεται πρόταση αγοράς πριν περάσουν όλοι οι έλεγχοι πηγών, θεμελιωδών, αγοράς, ρευστότητας, φρεσκότητας και αντιφάσεων. Δεν εκτελούνται συναλλαγές."
