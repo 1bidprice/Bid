@@ -1,4 +1,4 @@
-name: Investor Control Play Store Release Candidate
+name: Investor Control Play Store Release
 
 on:
   push:
@@ -9,12 +9,18 @@ on:
       - play-store/**
       - .github/workflows/build-investor-control-play-store-release.yml
   workflow_dispatch:
+    inputs:
+      sign_for_play:
+        description: 'Create a Play-uploadable AAB using the protected upload-key secrets'
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
 concurrency:
-  group: investor-control-play-store-${{ github.ref }}
+  group: investor-control-play-store-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -61,6 +67,7 @@ jobs:
           node scripts/apply-v110-unified-intelligence.js
           node scripts/apply-v111-alert-integrity.js
           node scripts/apply-v120-play-store-release.js
+          node scripts/apply-v121-play-permission-minimization.js
 
       - name: Verify accounting, privacy and Play release invariants
         working-directory: mobile
@@ -75,22 +82,43 @@ jobs:
           const portfolio = fs.readFileSync('./PortfolioApp.js', 'utf8');
           const decision = fs.readFileSync('./DecisionOverlay.js', 'utf8');
           const alerts = fs.readFileSync('./src/alert-engine.js', 'utf8');
-          if (app.expo.version !== '1.2.0') throw new Error('wrong app version');
-          if (app.expo.android.versionCode !== 23) throw new Error('wrong versionCode');
+
+          if (app.expo.version !== '1.2.1') throw new Error('wrong app version');
+          if (app.expo.android.versionCode !== 24) throw new Error('wrong versionCode');
           if (app.expo.android.package !== 'gr.investorcontrol.app') throw new Error('wrong package');
+
           const buildPlugin = app.expo.plugins.find((item) => Array.isArray(item) && item[0] === 'expo-build-properties');
-          if (!buildPlugin || buildPlugin[1]?.android?.targetSdkVersion !== 36 || buildPlugin[1]?.android?.compileSdkVersion !== 36) throw new Error('API 36 build properties missing');
-          for (const permission of ['android.permission.CAMERA','android.permission.RECORD_AUDIO','android.permission.ACCESS_FINE_LOCATION','android.permission.READ_CONTACTS','android.permission.READ_SMS']) {
-            if (!app.expo.android.blockedPermissions.includes(permission)) throw new Error(`sensitive permission not blocked: ${permission}`);
+          if (!buildPlugin || buildPlugin[1]?.android?.targetSdkVersion !== 36 || buildPlugin[1]?.android?.compileSdkVersion !== 36) {
+            throw new Error('API 36 build properties missing');
           }
-          if (pkg.version !== '1.2.0') throw new Error('wrong package version');
+          if (buildPlugin[1]?.android?.usesCleartextTraffic !== false) throw new Error('cleartext traffic must be disabled');
+
+          const blocked = new Set(app.expo.android.blockedPermissions || []);
+          for (const permission of [
+            'android.permission.CAMERA',
+            'android.permission.RECORD_AUDIO',
+            'android.permission.ACCESS_FINE_LOCATION',
+            'android.permission.READ_CONTACTS',
+            'android.permission.READ_SMS',
+            'android.permission.SYSTEM_ALERT_WINDOW',
+            'com.google.android.c2dm.permission.RECEIVE',
+          ]) {
+            if (!blocked.has(permission)) throw new Error(`sensitive or unused permission not blocked: ${permission}`);
+          }
+
+          if (pkg.version !== '1.2.1') throw new Error('wrong package version');
           if (pkg.dependencies['expo-build-properties'] !== '~55.0.16') throw new Error('wrong build-properties version');
           if (!portfolio.includes('Σημαντική ενημέρωση πριν τη χρήση')) throw new Error('mandatory risk disclosure missing');
           if (!portfolio.includes('https://1bidprice.github.io/Bid/privacy-policy.html')) throw new Error('privacy URL missing');
           if (!portfolio.includes('Δεν απαιτείται προσωπικό API token')) throw new Error('managed source UX missing');
-          if (!portfolio.includes("const VERSION = '1.2.0';") || !decision.includes("const VERSION = '1.2.0';")) throw new Error('runtime version mismatch');
+          if (!portfolio.includes("const VERSION = '1.2.1';") || !decision.includes("const VERSION = '1.2.1';")) {
+            throw new Error('runtime version mismatch');
+          }
           if (!alerts.includes('quoteContract.valuationEligible')) throw new Error('verified quote alert gate missing');
-          console.log('PASS Play release version, API 36, disclosures, permissions, accounting and decision gates');
+          if (!alerts.includes('scheduleNotificationAsync')) throw new Error('local notification delivery missing');
+          if (alerts.includes('getExpoPushTokenAsync')) throw new Error('unexpected remote push-token dependency');
+
+          console.log('PASS v1.2.1 identity, API 36, local notifications, permissions, disclosures, accounting and decision gates');
           NODE
 
       - name: Expo compatibility and JavaScript bundle
@@ -113,16 +141,16 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace 2>&1 | tee ../gradle-play-release.log
 
-      - name: Prepare and verify release artifacts
+      - name: Prepare and verify preflight artifacts
         shell: bash
         run: |
           set -euo pipefail
           UNSIGNED_APK='mobile/android/app/build/outputs/apk/release/app-release.apk'
           GRADLE_AAB='mobile/android/app/build/outputs/bundle/release/app-release.aab'
-          UPDATE_APK='mobile/Investor-Control-v1.2.0-update.apk'
-          ALIGNED_APK='mobile/Investor-Control-v1.2.0-aligned.apk'
-          PLAY_AAB='mobile/Investor-Control-v1.2.0-play-unsigned.aab'
-          KEYSTORE='mobile/android/app/debug.keystore'
+          DEVICE_APK='mobile/Investor-Control-v1.2.1-device-test.apk'
+          ALIGNED_APK='mobile/Investor-Control-v1.2.1-aligned.apk'
+          PREFLIGHT_AAB='mobile/Investor-Control-v1.2.1-preflight-unsigned.aab'
+          DEBUG_KEYSTORE='mobile/android/app/debug.keystore'
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           ZIPALIGN="$BUILD_TOOLS/zipalign"
           APKSIGNER="$BUILD_TOOLS/apksigner"
@@ -130,62 +158,146 @@ jobs:
 
           test -s "$UNSIGNED_APK"
           test -s "$GRADLE_AAB"
-          test -s "$KEYSTORE"
+          test -s "$DEBUG_KEYSTORE"
           unzip -l "$UNSIGNED_APK" | grep -q 'assets/index.android.bundle'
 
           "$ZIPALIGN" -p -f 4 "$UNSIGNED_APK" "$ALIGNED_APK"
           "$APKSIGNER" sign \
-            --ks "$KEYSTORE" \
+            --ks "$DEBUG_KEYSTORE" \
             --ks-key-alias androiddebugkey \
             --ks-pass pass:android \
             --key-pass pass:android \
-            --out "$UPDATE_APK" \
+            --out "$DEVICE_APK" \
             "$ALIGNED_APK"
-          "$APKSIGNER" verify --verbose --print-certs "$UPDATE_APK" | tee mobile/Investor-Control-v1.2.0-update-signature.txt
-          grep -qi 'fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c' mobile/Investor-Control-v1.2.0-update-signature.txt
+          "$APKSIGNER" verify --verbose --print-certs "$DEVICE_APK" | tee mobile/Investor-Control-v1.2.1-device-signature.txt
+          grep -qi 'fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c' mobile/Investor-Control-v1.2.1-device-signature.txt
 
-          "$AAPT2" dump badging "$UPDATE_APK" | tee mobile/Investor-Control-v1.2.0-badging.txt
-          grep -q "package: name='gr.investorcontrol.app' versionCode='23' versionName='1.2.0'" mobile/Investor-Control-v1.2.0-badging.txt
-          grep -q "targetSdkVersion:'36'" mobile/Investor-Control-v1.2.0-badging.txt
-          "$AAPT2" dump permissions "$UPDATE_APK" | tee mobile/Investor-Control-v1.2.0-permissions.txt
-          for forbidden in ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION CAMERA RECORD_AUDIO READ_CONTACTS WRITE_CONTACTS READ_PHONE_STATE CALL_PHONE READ_SMS SEND_SMS; do
-            if grep -q "android.permission.${forbidden}" mobile/Investor-Control-v1.2.0-permissions.txt; then
-              echo "Forbidden permission present: ${forbidden}" >&2
+          "$AAPT2" dump badging "$DEVICE_APK" | tee mobile/Investor-Control-v1.2.1-badging.txt
+          grep -q "package: name='gr.investorcontrol.app' versionCode='24' versionName='1.2.1'" mobile/Investor-Control-v1.2.1-badging.txt
+          grep -q "targetSdkVersion:'36'" mobile/Investor-Control-v1.2.1-badging.txt
+          "$AAPT2" dump permissions "$DEVICE_APK" | tee mobile/Investor-Control-v1.2.1-permissions.txt
+
+          for forbidden in \
+            android.permission.ACCESS_FINE_LOCATION \
+            android.permission.ACCESS_COARSE_LOCATION \
+            android.permission.CAMERA \
+            android.permission.RECORD_AUDIO \
+            android.permission.READ_CONTACTS \
+            android.permission.WRITE_CONTACTS \
+            android.permission.READ_PHONE_STATE \
+            android.permission.CALL_PHONE \
+            android.permission.READ_SMS \
+            android.permission.SEND_SMS \
+            android.permission.SYSTEM_ALERT_WINDOW \
+            com.google.android.c2dm.permission.RECEIVE; do
+            if grep -q "$forbidden" mobile/Investor-Control-v1.2.1-permissions.txt; then
+              echo "Forbidden permission present: $forbidden" >&2
               exit 1
             fi
           done
 
-          cp "$GRADLE_AAB" "$PLAY_AAB"
-          zip -d "$PLAY_AAB" 'META-INF/*.RSA' 'META-INF/*.DSA' 'META-INF/*.EC' 'META-INF/*.SF' 'META-INF/MANIFEST.MF' >/dev/null 2>&1 || true
+          cp "$GRADLE_AAB" "$PREFLIGHT_AAB"
           curl --fail --location --silent --show-error \
             'https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar' \
             --output /tmp/bundletool.jar
-          java -jar /tmp/bundletool.jar validate --bundle="$PLAY_AAB"
+          java -jar /tmp/bundletool.jar validate --bundle="$PREFLIGHT_AAB"
 
-          sha256sum "$UPDATE_APK" | tee mobile/Investor-Control-v1.2.0-update.sha256
-          sha256sum "$PLAY_AAB" | tee mobile/Investor-Control-v1.2.0-play-unsigned.sha256
+          sha256sum "$DEVICE_APK" | tee mobile/Investor-Control-v1.2.1-device-test.sha256
+          sha256sum "$PREFLIGHT_AAB" | tee mobile/Investor-Control-v1.2.1-preflight-unsigned.sha256
+
+      - name: Require protected upload-key secrets for Play signing
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_for_play }}
+        shell: bash
+        env:
+          UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "${UPLOAD_KEYSTORE_BASE64:-}" || { echo 'Missing ANDROID_UPLOAD_KEYSTORE_BASE64' >&2; exit 1; }
+          test -n "${UPLOAD_KEY_ALIAS:-}" || { echo 'Missing ANDROID_UPLOAD_KEY_ALIAS' >&2; exit 1; }
+          test -n "${UPLOAD_KEYSTORE_PASSWORD:-}" || { echo 'Missing ANDROID_UPLOAD_KEYSTORE_PASSWORD' >&2; exit 1; }
+          test -n "${UPLOAD_KEY_PASSWORD:-}" || { echo 'Missing ANDROID_UPLOAD_KEY_PASSWORD' >&2; exit 1; }
+
+      - name: Sign and verify Play-uploadable Android App Bundle
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_for_play }}
+        shell: bash
+        env:
+          UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYSTORE="$RUNNER_TEMP/investor-control-upload.jks"
+          SOURCE_AAB='mobile/Investor-Control-v1.2.1-preflight-unsigned.aab'
+          SIGNED_AAB='mobile/Investor-Control-v1.2.1-play-signed.aab'
+
+          printf '%s' "$UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          chmod 600 "$KEYSTORE"
+          keytool -list -keystore "$KEYSTORE" -storepass "$UPLOAD_KEYSTORE_PASSWORD" -alias "$UPLOAD_KEY_ALIAS" >/dev/null
+
+          cp "$SOURCE_AAB" "$SIGNED_AAB"
+          jarsigner \
+            -keystore "$KEYSTORE" \
+            -storepass "$UPLOAD_KEYSTORE_PASSWORD" \
+            -keypass "$UPLOAD_KEY_PASSWORD" \
+            -sigalg SHA256withRSA \
+            -digestalg SHA-256 \
+            "$SIGNED_AAB" \
+            "$UPLOAD_KEY_ALIAS"
+
+          jarsigner -verify -verbose -certs "$SIGNED_AAB" | tee mobile/Investor-Control-v1.2.1-play-signature.txt
+          java -jar /tmp/bundletool.jar validate --bundle="$SIGNED_AAB"
+          keytool -list -v \
+            -keystore "$KEYSTORE" \
+            -storepass "$UPLOAD_KEYSTORE_PASSWORD" \
+            -alias "$UPLOAD_KEY_ALIAS" \
+            | grep -E 'Alias name:|SHA1:|SHA256:|Valid from:' \
+            | tee mobile/Investor-Control-v1.2.1-upload-certificate.txt
+          sha256sum "$SIGNED_AAB" | tee mobile/Investor-Control-v1.2.1-play-signed.sha256
+
+      - name: Remove temporary upload keystore
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/investor-control-upload.jks"
 
       - name: Upload Gradle diagnostic
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: investor-control-v1.2.0-build-diagnostic
+          name: investor-control-v1.2.1-build-diagnostic
           path: mobile/gradle-play-release.log
           if-no-files-found: warn
           retention-days: 30
 
-      - name: Upload validated Play release candidate
+      - name: Upload validated preflight package
         uses: actions/upload-artifact@v4
         with:
-          name: investor-control-v1.2.0-play-release-candidate
+          name: investor-control-v1.2.1-validated-preflight
           path: |
-            mobile/Investor-Control-v1.2.0-update.apk
-            mobile/Investor-Control-v1.2.0-update.sha256
-            mobile/Investor-Control-v1.2.0-update-signature.txt
-            mobile/Investor-Control-v1.2.0-badging.txt
-            mobile/Investor-Control-v1.2.0-permissions.txt
-            mobile/Investor-Control-v1.2.0-play-unsigned.aab
-            mobile/Investor-Control-v1.2.0-play-unsigned.sha256
+            mobile/Investor-Control-v1.2.1-device-test.apk
+            mobile/Investor-Control-v1.2.1-device-test.sha256
+            mobile/Investor-Control-v1.2.1-device-signature.txt
+            mobile/Investor-Control-v1.2.1-badging.txt
+            mobile/Investor-Control-v1.2.1-permissions.txt
+            mobile/Investor-Control-v1.2.1-preflight-unsigned.aab
+            mobile/Investor-Control-v1.2.1-preflight-unsigned.sha256
+            play-store/**
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload signed Play bundle
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_for_play }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1.2.1-play-signed
+          path: |
+            mobile/Investor-Control-v1.2.1-play-signed.aab
+            mobile/Investor-Control-v1.2.1-play-signed.sha256
+            mobile/Investor-Control-v1.2.1-play-signature.txt
+            mobile/Investor-Control-v1.2.1-upload-certificate.txt
             play-store/**
           if-no-files-found: error
           retention-days: 90
