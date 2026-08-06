@@ -197,6 +197,17 @@ jobs:
           done
 
           cp "$GRADLE_AAB" "$PREFLIGHT_AAB"
+          zip -d "$PREFLIGHT_AAB" \
+            'META-INF/*.RSA' \
+            'META-INF/*.DSA' \
+            'META-INF/*.EC' \
+            'META-INF/*.SF' \
+            'META-INF/MANIFEST.MF' >/dev/null 2>&1 || true
+          if unzip -l "$PREFLIGHT_AAB" | grep -Eq 'META-INF/.*\.(RSA|DSA|EC|SF)$'; then
+            echo 'Inherited AAB signature remains after sanitization' >&2
+            exit 1
+          fi
+
           curl --fail --location --silent --show-error \
             'https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar' \
             --output /tmp/bundletool.jar
@@ -249,6 +260,7 @@ jobs:
             "$UPLOAD_KEY_ALIAS"
 
           jarsigner -verify -verbose -certs "$SIGNED_AAB" | tee mobile/Investor-Control-v1.2.1-play-signature.txt
+          grep -qi 'jar verified' mobile/Investor-Control-v1.2.1-play-signature.txt
           java -jar /tmp/bundletool.jar validate --bundle="$SIGNED_AAB"
           keytool -list -v \
             -keystore "$KEYSTORE" \
