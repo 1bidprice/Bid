@@ -12,7 +12,7 @@ const kri = {
   legalName: 'KRI-KRI S.A.',
   sector: 'Consumer Staples',
   issuerId: '965',
-  primaryListing: { symbol: 'KRI', mic: 'XATH', exchange: 'Euronext Athens' },
+  primaryListing: { symbol: 'KRI', mic: 'XATH', exchange: 'Euronext Athens', currency: 'EUR' },
 };
 
 const kriHtml = `
@@ -106,4 +106,56 @@ test('issuer transition mismatch is fail-closed: OPAP historical documents are n
   const documents = extractAthensFinancialDocuments(html, allwyn);
   assert.equal(documents.length, 1);
   assert.equal(documents[0].identityVerified, false);
+});
+
+test('Athens parser rejects table-of-contents numbers and preserves the first real financial columns', () => {
+  const premia = {
+    companyId: 'company:xath:term-357',
+    displayName: 'PREMIA REAL ESTATE INVESTMENT COMPANY SOCIETE ANOMYME',
+    legalName: 'PREMIA R.E.I.C.',
+    sector: 'Real Estate',
+    primaryListing: { symbol: 'PREMIA', mic: 'XATH', exchange: 'Euronext Athens', currency: 'EUR' },
+  };
+  const document = {
+    title: 'Financial report PREMIA R.E.I.C. (2025,Six-Month Statement,Consolidated)',
+    identityVerified: true,
+    period: { year: 2025, months: 6, type: 'INTERIM_6M', periodEnd: '2025-06-30' },
+    pdfUrl: 'https://athens.euronext.com/premia-h1-2025.pdf',
+  };
+  const pages = [
+    `PREMIA R.E.I.C.\nINTERIM FINANCIAL REPORT\n(Amounts in €)`,
+    `TABLE OF CONTENTS\n6.25 Revenue from sale of inventories ........................................................................ 57\n6.11 Cash and cash equivalents ................................................................................... 49`,
+    `Profit after tax was formed at € 9.25 million against profit € 18.06 million in the corresponding half of 2024, presenting a decrease.`,
+    `Statement of comprehensive income\nRevenue from sale of inventories    12.500.000    10.000.000\nStatement of financial position\nCash and cash equivalents    6.110.000    5.500.000\nTotal assets    500.000.000    470.000.000    450.000.000\nTotal liabilities    250.000.000    240.000.000\nTotal equity    250.000.000    230.000.000`,
+  ];
+
+  const snapshot = buildAthensFundamentalSnapshotFromText(pages.join('\f'), document, premia, { pages, extractionStatus: 'REVIEWED_PDF' });
+
+  assert.equal(snapshot.annual.revenue[0].value, 12_500_000);
+  assert.equal(snapshot.annual.revenue[1].value, 10_000_000);
+  assert.equal(snapshot.annual.netIncome[0].value, 9_250_000);
+  assert.equal(snapshot.annual.netIncome[1].value, 18_060_000);
+  assert.equal(snapshot.instant.cash.value, 6_110_000);
+  assert.equal(snapshot.instant.assets.value, 500_000_000);
+  assert.equal(snapshot.instant.assets.provenance.extractedLine.includes('500.000.000'), true);
+  assert.notEqual(snapshot.annual.revenue[0].value, 6.25);
+  assert.notEqual(snapshot.annual.netIncome[1].value, 2024);
+});
+
+test('fundamental risk infers EUR from the audited Athens snapshot and fails closed on a currency mismatch', () => {
+  const document = extractAthensFinancialDocuments(kriHtml, kri)[0];
+  const snapshot = buildAthensFundamentalSnapshotFromText(kriPages.join('\f'), document, kri, { pages: kriPages });
+
+  const inferred = assessFundamentalRisk(snapshot, 29.15, { companyId: kri.companyId });
+  assert.equal(inferred.currency, 'EUR');
+  assert.equal(inferred.reportedCurrency, 'EUR');
+  assert.equal(inferred.currencyConsistent, true);
+  assert.equal(inferred.metricsReady, true);
+
+  const mismatch = assessFundamentalRisk(snapshot, 29.15, { companyId: kri.companyId, currency: 'USD' });
+  assert.equal(mismatch.currency, 'USD');
+  assert.equal(mismatch.reportedCurrency, 'EUR');
+  assert.equal(mismatch.currencyConsistent, false);
+  assert.equal(mismatch.metricsReady, false);
+  assert.equal(mismatch.riskDataStatus, 'INSUFFICIENT_DATA');
 });
