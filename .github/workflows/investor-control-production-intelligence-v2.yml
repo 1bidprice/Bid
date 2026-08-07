@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths: [.github/workflows/investor-control-production-intelligence-v2.yml]
   workflow_dispatch:
+  schedule:
+    - cron: '17 */3 * * 1-5'
+    - cron: '37 */6 * * 0,6'
 
 permissions:
   contents: write
