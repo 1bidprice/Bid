@@ -1,0 +1,89 @@
+name: Investor Control Trusted News Diagnostics
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/investor-control-trusted-news-diagnostics.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout intelligence source
+        uses: actions/checkout@v4
+        with:
+          ref: investor-control-v1-market-intelligence-foundation
+          path: source
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Diagnose SPCE trusted-news discovery and review
+        working-directory: source/market-intelligence
+        run: |
+          node --input-type=module - <<'NODE'
+          import { fetchTrustedNewsEvidence } from './src/adapters/trusted-news-rss.js';
+          import { reviewTrustedNewsRecord } from './src/trusted-news-review.js';
+
+          const company = {
+            companyId: 'company:virgin-galactic-holdings',
+            legalName: 'Virgin Galactic Holdings, Inc.',
+            displayName: 'Virgin Galactic',
+            aliases: ['Virgin Galactic Holdings', 'Virgin Galactic'],
+            primaryListing: { symbol: 'SPCE', mic: 'XNYS', exchange: 'New York Stock Exchange' },
+          };
+
+          const discovery = await fetchTrustedNewsEvidence(company, {
+            review: false,
+            limit: 30,
+            retrievedAt: new Date().toISOString(),
+          });
+
+          console.log('ACCEPTED_RECORDS');
+          for (const record of discovery.records || []) {
+            console.log(JSON.stringify({
+              id: record.id,
+              sourceName: record.sourceName,
+              sourceUrl: record.sourceUrl,
+              title: record.title,
+              publishedAt: record.publishedAt,
+              claimType: record.claimType,
+            }));
+          }
+          console.log('DISCOVERY_DIAGNOSTICS');
+          console.log(JSON.stringify(discovery.diagnostics || [], null, 2));
+
+          const browserUa = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
+          for (const record of (discovery.records || []).slice(0, 5)) {
+            console.log(`\nPROBE ${record.id} ${record.sourceName}`);
+            try {
+              const manual = await fetch(record.sourceUrl, { redirect: 'manual', headers: { 'User-Agent': browserUa, Accept: 'text/html,*/*' } });
+              console.log(JSON.stringify({ phase: 'manual', status: manual.status, location: manual.headers.get('location'), contentType: manual.headers.get('content-type'), url: manual.url }));
+            } catch (error) {
+              console.log(JSON.stringify({ phase: 'manual-error', message: String(error) }));
+            }
+            try {
+              const followed = await fetch(record.sourceUrl, { redirect: 'follow', headers: { 'User-Agent': browserUa, Accept: 'text/html,*/*', 'Accept-Language': 'en-US,en;q=0.9' } });
+              const body = await followed.text();
+              console.log(JSON.stringify({ phase: 'follow', status: followed.status, url: followed.url, contentType: followed.headers.get('content-type'), bodyLength: body.length, bodyPrefix: body.slice(0, 300).replace(/\s+/g, ' ') }));
+            } catch (error) {
+              console.log(JSON.stringify({ phase: 'follow-error', message: String(error) }));
+            }
+            const reviewed = await reviewTrustedNewsRecord(record, company, { userAgent: browserUa, reviewedAt: new Date().toISOString(), minText: 400 });
+            console.log('REVIEW_RESULT');
+            console.log(JSON.stringify({
+              document: reviewed.record?.document || null,
+              sourceUrl: reviewed.record?.sourceUrl,
+              claimType: reviewed.record?.claimType,
+              diagnostics: reviewed.diagnostics || [],
+            }, null, 2));
+          }
+          NODE
