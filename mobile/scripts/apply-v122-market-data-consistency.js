@@ -152,8 +152,8 @@ function patchOpportunities() {
   if (!source.includes('discoveryPriorityBadge:')) {
     source = replaceRequired(
       source,
-      "discoveryScore: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#0B66FF', alignItems: 'center', justifyContent: 'center' },",
-      "discoveryScore: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#0B66FF', alignItems: 'center', justifyContent: 'center' }, discoveryPriorityBadge: { minWidth: 128, maxWidth: 150, borderRadius: 16, backgroundColor: '#edf4ff', paddingHorizontal: 10, paddingVertical: 8, alignItems: 'flex-end' }, discoveryPriorityLabel: { color: '#6f7e92', fontSize: 8, lineHeight: 11, fontWeight: '800', textAlign: 'right' }, discoveryPriorityValue: { color: '#0B66FF', fontSize: 13, lineHeight: 17, fontWeight: '900', marginTop: 2, textAlign: 'right' },",
+      "discoveryScore: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#0B66FF', alignItems: 'center', justifyContent: 'center' },",
+      "discoveryScore: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#0B66FF', alignItems: 'center', justifyContent: 'center' }, discoveryPriorityBadge: { minWidth: 128, maxWidth: 150, borderRadius: 16, backgroundColor: '#edf4ff', paddingHorizontal: 10, paddingVertical: 8, alignItems: 'flex-end' }, discoveryPriorityLabel: { color: '#6f7e92', fontSize: 8, lineHeight: 11, fontWeight: '800', textAlign: 'right' }, discoveryPriorityValue: { color: '#0B66FF', fontSize: 13, lineHeight: 17, fontWeight: '900', marginTop: 2, textAlign: 'right' }, discoveryDisclaimer: { color: '#718096', fontSize: 10, lineHeight: 15, fontWeight: '700', marginTop: 5 },",
       'discovery priority styles',
     );
   }
