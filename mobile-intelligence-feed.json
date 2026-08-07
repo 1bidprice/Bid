@@ -1,7 +1,7 @@
 {
   "format": "investor-control-mobile-intelligence-feed",
   "version": 2,
-  "generatedAt": "2026-08-07T21:22:54.875Z",
+  "generatedAt": "2026-08-07T21:54:15.548Z",
   "policyVersion": "2026-08-07.1",
   "sourceSelection": {
     "version": "2026-08-04.1",
@@ -30,8 +30,8 @@
       "price": 13.49,
       "previousClose": 13.29,
       "currency": "EUR",
-      "quoteAt": "2026-08-07T21:22:54.875Z",
-      "checkedAt": "2026-08-07T21:22:54.875Z",
+      "quoteAt": "2026-08-07T21:54:15.548Z",
+      "checkedAt": "2026-08-07T21:54:15.548Z",
       "source": "Euronext Athens delayed market data",
       "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/ALWN/related",
       "sourceQuality": "OFFICIAL_DELAYED",
@@ -64,7 +64,7 @@
       "previousClose": 2.93,
       "currency": "USD",
       "quoteAt": "2026-08-07T20:00:00.000Z",
-      "checkedAt": "2026-08-07T21:22:54.875Z",
+      "checkedAt": "2026-08-07T21:54:15.548Z",
       "source": "Finnhub Quote API",
       "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
       "sourceQuality": null,
@@ -93,8 +93,8 @@
       "price": 0.949,
       "previousClose": 0.975,
       "currency": "EUR",
-      "quoteAt": "2026-08-07T21:22:54.875Z",
-      "checkedAt": "2026-08-07T21:22:54.875Z",
+      "quoteAt": "2026-08-07T21:54:15.548Z",
+      "checkedAt": "2026-08-07T21:54:15.548Z",
       "source": "Euronext Athens delayed market data",
       "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/CREDIA/related",
       "sourceQuality": "OFFICIAL_DELAYED",
@@ -119,65 +119,69 @@
         ]
       }
     },
-    "AIXC.US": {
-      "appSymbol": "AIXC.US",
-      "companyId": "company:sec:0001460702",
-      "companyName": "AIxCrypto Holdings,",
-      "price": 0.822,
-      "previousClose": 0.8257,
-      "currency": "USD",
-      "quoteAt": "2026-08-07T20:00:00.000Z",
-      "checkedAt": "2026-08-07T21:22:54.875Z",
-      "source": "Finnhub Quote API",
-      "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=AIXC",
-      "sourceQuality": null,
+    "PPC.GR": {
+      "appSymbol": "PPC.GR",
+      "companyId": "company:xath:term-342",
+      "companyName": "PUBLIC POWER CORPORATION SA",
+      "price": 21.94,
+      "previousClose": 21.66,
+      "currency": "EUR",
+      "quoteAt": "2026-08-07T21:54:15.548Z",
+      "checkedAt": "2026-08-07T21:54:15.548Z",
+      "source": "Euronext Athens delayed market data",
+      "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/PPC/related",
+      "sourceQuality": "OFFICIAL_DELAYED",
       "quoteContract": {
         "version": "2026-08-04.1",
-        "sourceRole": "LICENSED_MARKET_DATA",
+        "sourceRole": "PRIMARY_EXCHANGE",
         "sourceTier": 1,
         "sourceApproved": true,
-        "timestampVerified": true,
+        "timestampVerified": false,
         "valuationEligible": true,
         "analysisReferenceEligible": true,
-        "executionFreshnessEligible": true,
-        "decisionEligible": true,
-        "dayChangeEligible": true,
-        "advertisedDelayMinutes": null,
-        "freshnessModel": "VERIFIED_TIMESTAMP",
-        "publicStatus": "VERIFIED",
-        "publicMessage": "Επαληθευμένη χρηματιστηριακή τιμή από εγκεκριμένη πηγή.",
-        "diagnosticCodes": []
-      }
-    },
-    "SQFT.US": {
-      "appSymbol": "SQFT.US",
-      "companyId": "company:sec:0001080657",
-      "companyName": "Presidio Property Trust,",
-      "price": 2.29,
-      "previousClose": 2.3,
-      "currency": "USD",
-      "quoteAt": "2026-08-06T15:25:20.000Z",
-      "checkedAt": "2026-08-07T21:22:54.875Z",
-      "source": "Finnhub Quote API",
-      "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SQFT",
-      "sourceQuality": null,
-      "quoteContract": {
-        "version": "2026-08-04.1",
-        "sourceRole": "LICENSED_MARKET_DATA",
-        "sourceTier": 1,
-        "sourceApproved": true,
-        "timestampVerified": true,
-        "valuationEligible": false,
-        "analysisReferenceEligible": false,
         "executionFreshnessEligible": false,
         "decisionEligible": false,
         "dayChangeEligible": false,
-        "advertisedDelayMinutes": null,
-        "freshnessModel": "UNVERIFIED",
-        "publicStatus": "STALE",
-        "publicMessage": "Η τελευταία τιμή είναι παρωχημένη και δεν χρησιμοποιείται σε αποτίμηση ή απόφαση.",
+        "advertisedDelayMinutes": 15,
+        "freshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
+        "publicStatus": "TIMESTAMP_NOT_VERIFIED",
+        "publicMessage": "Η τιμή προέρχεται από επιτρεπόμενη πηγή, αλλά ο χρόνος της δεν έχει επιβεβαιωθεί επαρκώς.",
         "diagnosticCodes": [
-          "QUOTE_STALE"
+          "QUOTE_TIMESTAMP_NOT_VERIFIED",
+          "QUOTE_ANALYSIS_REFERENCE_ONLY"
+        ]
+      }
+    },
+    "QUAL.GR": {
+      "appSymbol": "QUAL.GR",
+      "companyId": "company:xath:term-341",
+      "companyName": "QUALITY AND RELIABILITY S.A.",
+      "price": 1.31,
+      "previousClose": 1.304,
+      "currency": "EUR",
+      "quoteAt": "2026-08-07T21:54:15.548Z",
+      "checkedAt": "2026-08-07T21:54:15.548Z",
+      "source": "Euronext Athens delayed market data",
+      "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/QUAL/related",
+      "sourceQuality": "OFFICIAL_DELAYED",
+      "quoteContract": {
+        "version": "2026-08-04.1",
+        "sourceRole": "PRIMARY_EXCHANGE",
+        "sourceTier": 1,
+        "sourceApproved": true,
+        "timestampVerified": false,
+        "valuationEligible": true,
+        "analysisReferenceEligible": true,
+        "executionFreshnessEligible": false,
+        "decisionEligible": false,
+        "dayChangeEligible": false,
+        "advertisedDelayMinutes": 15,
+        "freshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
+        "publicStatus": "TIMESTAMP_NOT_VERIFIED",
+        "publicMessage": "Η τιμή προέρχεται από επιτρεπόμενη πηγή, αλλά ο χρόνος της δεν έχει επιβεβαιωθεί επαρκώς.",
+        "diagnosticCodes": [
+          "QUOTE_TIMESTAMP_NOT_VERIFIED",
+          "QUOTE_ANALYSIS_REFERENCE_ONLY"
         ]
       }
     },
@@ -188,8 +192,8 @@
       "price": 2.37,
       "previousClose": 2.4,
       "currency": "EUR",
-      "quoteAt": "2026-08-07T21:22:54.875Z",
-      "checkedAt": "2026-08-07T21:22:54.875Z",
+      "quoteAt": "2026-08-07T21:54:15.548Z",
+      "checkedAt": "2026-08-07T21:54:15.548Z",
       "source": "Euronext Athens delayed market data",
       "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/OLYMP/related",
       "sourceQuality": "OFFICIAL_DELAYED",
@@ -221,8 +225,8 @@
       "price": 1.334,
       "previousClose": 1.312,
       "currency": "EUR",
-      "quoteAt": "2026-08-07T21:22:54.875Z",
-      "checkedAt": "2026-08-07T21:22:54.875Z",
+      "quoteAt": "2026-08-07T21:54:15.548Z",
+      "checkedAt": "2026-08-07T21:54:15.548Z",
       "source": "Euronext Athens delayed market data",
       "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/ELLAKTOR/related",
       "sourceQuality": "OFFICIAL_DELAYED",
@@ -254,8 +258,8 @@
       "price": 8.2,
       "previousClose": 8.05,
       "currency": "EUR",
-      "quoteAt": "2026-08-07T21:22:54.875Z",
-      "checkedAt": "2026-08-07T21:22:54.875Z",
+      "quoteAt": "2026-08-07T21:54:15.548Z",
+      "checkedAt": "2026-08-07T21:54:15.548Z",
       "source": "Euronext Athens delayed market data",
       "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/FLEXO/related",
       "sourceQuality": "OFFICIAL_DELAYED",
@@ -284,42 +288,42 @@
   "operationalHealth": {
     "status": "DEGRADED",
     "infrastructureStatus": "OPERATIONAL",
-    "marketDataStatus": "DEGRADED",
-    "fundamentalsStatus": "OPERATIONAL",
+    "marketDataStatus": "OPERATIONAL",
+    "fundamentalsStatus": "DEGRADED",
     "researchStatus": "ACTIVE",
     "decisionEngineStatus": "BLOCKED_BY_EVIDENCE",
-    "generatedAt": "2026-08-07T21:22:54.875Z",
+    "generatedAt": "2026-08-07T21:54:15.548Z",
     "analysedCompanyCount": 8,
     "marketSnapshotCount": 8,
     "marketCoverageRatio": 1,
     "historicalMarketMetricsCount": 8,
-    "readyHistoricalMarketMetricsCount": 7,
-    "historyCoverageRatio": 0.875,
-    "fundamentalSnapshotCount": 7,
-    "fundamentalCoverageRatio": 0.875,
-    "unresolvedDiagnosticCount": 337,
+    "readyHistoricalMarketMetricsCount": 8,
+    "historyCoverageRatio": 1,
+    "fundamentalSnapshotCount": 6,
+    "fundamentalCoverageRatio": 0.75,
+    "unresolvedDiagnosticCount": 290,
     "finalActionCount": 0,
     "blockedDecisionCount": 8,
     "staleOutput": false
   },
   "sourceHealth": {
-    "evidenceCount": 95,
-    "documentReviewedCount": 24,
-    "independentDiscoveryCount": 3,
-    "fundamentalSnapshotCount": 7,
+    "evidenceCount": 54,
+    "documentReviewedCount": 15,
+    "independentDiscoveryCount": 2,
+    "fundamentalSnapshotCount": 6,
     "marketSnapshotCount": 8,
     "historicalMarketMetricsCount": 8,
-    "readyHistoricalMarketMetricsCount": 7,
-    "diagnosticCount": 337
+    "readyHistoricalMarketMetricsCount": 8,
+    "diagnosticCount": 290
   },
   "summary": {
     "publishedCount": 0,
     "reviewReadyCount": 0,
     "researchCount": 8,
     "urgentCount": 0,
-    "discoveryCandidateCount": 12,
+    "discoveryCandidateCount": 11,
     "discoveryDeepAnalysisCount": 5,
-    "unresolvedDiagnosticCount": 237,
+    "unresolvedDiagnosticCount": 190,
     "finalActionCount": 0,
     "buyNowCount": 0,
     "sellNowCount": 0,
@@ -329,116 +333,76 @@
     "blockedDecisionCount": 8
   },
   "today": {
-    "headline": "12 νέες μετοχές εντοπίστηκαν αυτόματα για έλεγχο",
+    "headline": "11 νέες μετοχές εντοπίστηκαν αυτόματα για έλεγχο",
     "primaryItem": {
-      "id": "dossier:company:sec:0001460702:f1040048c9f5f34f2a48",
-      "companyId": "company:sec:0001460702",
-      "companyName": "AIxCrypto Holdings,",
-      "symbol": "AIXC",
-      "exchange": "Nasdaq",
-      "origin": "AUTONOMOUS_DISCOVERY",
-      "discovery": {
-        "discoveryId": "discovery:company:sec:0001460702:2026-08-07",
-        "companyId": "company:sec:0001460702",
-        "companyName": "AIxCrypto Holdings,",
-        "symbol": "AIXC",
-        "exchange": "Nasdaq",
-        "mic": "XNAS",
-        "market": "US",
-        "cik": "0001460702",
-        "issuerId": null,
-        "identityStatus": "CANONICAL_IDENTITY_READY",
-        "discoveryScore": 82,
-        "scoreType": "DISCOVERY_PRIORITY",
-        "status": "DISCOVERED_RESEARCH_REQUIRED",
-        "suggestedAction": "WATCH",
-        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-        "isExistingFocusCompany": false,
-        "reasons": [
-          "Νέα επίσημη κατάθεση 10-Q στη SEC",
-          "Το γεγονός είναι πολύ πρόσφατο",
-          "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος",
-          "Νέα επίσημη κατάθεση 8-K στη SEC",
-          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης"
-        ],
-        "latestEventAt": "2026-08-07T21:21:08.000Z",
-        "events": [
-          {
-            "form": "8-K",
-            "title": "8-K - AIxCrypto Holdings, Inc. (0001460702) (Filer)",
-            "publishedAt": "2026-08-07T21:20:44.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1460702/000149315226036659/0001493152-26-036659-index.htm",
-            "sourceName": "SEC EDGAR Current Filings",
-            "eventScore": 82
-          },
-          {
-            "form": "10-Q",
-            "title": "10-Q - AIxCrypto Holdings, Inc. (0001460702) (Filer)",
-            "publishedAt": "2026-08-07T21:21:08.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1460702/000149315226036658/0001493152-26-036658-index.htm",
-            "sourceName": "SEC EDGAR Current Filings",
-            "eventScore": 70
-          }
-        ]
-      },
+      "id": "dossier:company:allwyn-ag:ee4a6e85880d71bad234",
+      "companyId": "company:allwyn-ag",
+      "companyName": "Allwyn",
+      "symbol": "ALWN",
+      "exchange": "Euronext Athens",
+      "origin": "FOCUS_UNIVERSE",
+      "discovery": null,
       "status": "DRAFT_RESEARCH",
-      "statusLabel": "Αυτόματη ανακάλυψη · έρευνα σε εξέλιξη",
-      "category": "INSUFFICIENT_EVIDENCE",
-      "categoryLabel": "Ανεπαρκή στοιχεία",
+      "statusLabel": "Έρευνα σε εξέλιξη",
+      "category": "EVENT_DRIVEN",
+      "categoryLabel": "Υπόθεση καταλύτη υπό έλεγχο",
       "action": "WATCH",
       "actionLabel": "Παρακολούθηση",
-      "timeHorizon": "UNDETERMINED",
+      "timeHorizon": "MONTHS",
       "referencePrice": {
-        "value": 0.822,
-        "currency": "USD",
-        "timestamp": "2026-08-07T20:00:00.000Z",
-        "source": "Finnhub Quote API",
+        "value": 13.49,
+        "currency": "EUR",
+        "timestamp": "2026-08-07T21:54:15.548Z",
+        "source": "Euronext Athens delayed market data",
         "purpose": "ANALYSIS_REFERENCE",
         "analysisReferenceEligible": true,
-        "executionFreshnessEligible": true,
-        "decisionEligible": true,
-        "freshnessModel": "VERIFIED_TIMESTAMP"
+        "executionFreshnessEligible": false,
+        "decisionEligible": false,
+        "freshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY"
       },
-      "referencePriceAgeHours": 1.3819097222222223,
+      "referencePriceAgeHours": 0,
       "marketQuote": {
-        "appSymbol": "AIXC.US",
-        "companyId": "company:sec:0001460702",
-        "companyName": "AIxCrypto Holdings,",
-        "price": 0.822,
-        "previousClose": 0.8257,
-        "currency": "USD",
-        "quoteAt": "2026-08-07T20:00:00.000Z",
-        "checkedAt": "2026-08-07T21:22:54.875Z",
-        "source": "Finnhub Quote API",
-        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=AIXC",
-        "sourceQuality": null,
+        "appSymbol": "ALWN.GR",
+        "companyId": "company:allwyn-ag",
+        "companyName": "Allwyn",
+        "price": 13.49,
+        "previousClose": 13.29,
+        "currency": "EUR",
+        "quoteAt": "2026-08-07T21:54:15.548Z",
+        "checkedAt": "2026-08-07T21:54:15.548Z",
+        "source": "Euronext Athens delayed market data",
+        "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/ALWN/related",
+        "sourceQuality": "OFFICIAL_DELAYED",
         "quoteContract": {
           "version": "2026-08-04.1",
-          "sourceRole": "LICENSED_MARKET_DATA",
+          "sourceRole": "PRIMARY_EXCHANGE",
           "sourceTier": 1,
           "sourceApproved": true,
-          "timestampVerified": true,
+          "timestampVerified": false,
           "valuationEligible": true,
           "analysisReferenceEligible": true,
-          "executionFreshnessEligible": true,
-          "decisionEligible": true,
-          "dayChangeEligible": true,
-          "advertisedDelayMinutes": null,
-          "freshnessModel": "VERIFIED_TIMESTAMP",
-          "publicStatus": "VERIFIED",
-          "publicMessage": "Επαληθευμένη χρηματιστηριακή τιμή από εγκεκριμένη πηγή.",
-          "diagnosticCodes": []
+          "executionFreshnessEligible": false,
+          "decisionEligible": false,
+          "dayChangeEligible": false,
+          "advertisedDelayMinutes": 15,
+          "freshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
+          "publicStatus": "TIMESTAMP_NOT_VERIFIED",
+          "publicMessage": "Η τιμή προέρχεται από επιτρεπόμενη πηγή, αλλά ο χρόνος της δεν έχει επιβεβαιωθεί επαρκώς.",
+          "diagnosticCodes": [
+            "QUOTE_TIMESTAMP_NOT_VERIFIED",
+            "QUOTE_ANALYSIS_REFERENCE_ONLY"
+          ]
         }
       },
-      "thesis": "Η AIxCrypto Holdings, έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: μεταβολή απομειωμένου αριθμού μετοχών 565.9%, απόδοση 60 συνεδριάσεων -37.01%, σχετική ισχύς 60 συνεδριάσεων -42.03%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
-      "causalMechanism": "Το γεγονός μπορεί να επηρεάσει την αξία μόνο μέσω μετρήσιμης αλλαγής στις ταμειακές ροές, στον κίνδυνο ισολογισμού, στον αριθμό μετοχών, στην πιθανότητα λειτουργικής επιτυχίας ή στις προσδοκίες αποτίμησης.",
-      "bullCase": "Μεταγενέστερα επαληθευμένα στοιχεία αποδεικνύουν ευνοϊκή και διατηρήσιμη οικονομική επίδραση που δεν έχει ήδη ενσωματωθεί στην αποτίμηση.",
-      "bearCase": "Το γεγονός αποδεικνύεται ασήμαντο, αναιρείται από νεότερα στοιχεία ή παράγει ασθενέστερα οικονομικά αποτελέσματα από όσα αναμένει η αγορά.",
+      "thesis": "Το επιβεβαιωμένο πρόγραμμα επαναγοράς ιδίων μετοχών της Allwyn μπορεί να βελτιώσει την αξία ανά μετοχή μόνο εφόσον οι αγορές είναι ουσιαστικές, γίνονται σε ελκυστική αποτίμηση και χρηματοδοτούνται χωρίς αποδυνάμωση της ρευστότητας. Αποτελεί μετρήσιμο καταλύτη κατανομής κεφαλαίου, όχι αυτοτελή λόγο αγοράς. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων 10.29%, σχετική ισχύς 60 συνεδριάσεων -11.05%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
+      "causalMechanism": "Οι επαναγορές μειώνουν τον πραγματικό αριθμό μετοχών και μπορούν να αυξήσουν την οικονομική συμμετοχή κάθε εναπομείνασας μετοχής, μόνο όμως όταν η τιμή αγοράς και η πηγή χρηματοδότησης δημιουργούν καθαρή αξία.",
+      "bullCase": "Η εταιρεία πραγματοποιεί ουσιαστικές επαναγορές κάτω από υποστηρίξιμη αποτίμηση, διατηρώντας λειτουργικές ταμειακές ροές και ευελιξία ισολογισμού.",
+      "bearCase": "Οι επαναγορές είναι ασήμαντες, γίνονται σε υπερβολική αποτίμηση ή καταναλώνουν ρευστότητα που αργότερα χρειάζεται για λειτουργία, χρέος ή επενδύσεις.",
       "catalysts": [
         {
-          "text": "Η επίσημη πηγή επιβεβαιώνει: 8-K filing — AIxCrypto Holdings,.",
+          "text": "Η επίσημη πηγή επιβεβαιώνει: Company purchased a total of 463,200 of its own shares on Euronext Athens.",
           "evidenceIds": [
-            "evidence:sec:0001493152-26-036659"
+            "evidence:allwyn:59ae0d0f1cc7710a4941d11b"
           ],
           "confidence": 0.94,
           "inference": false
@@ -446,32 +410,24 @@
       ],
       "risks": [
         {
-          "text": "Τα διαθέσιμα στοιχεία μπορεί να είναι πραγματικά αλλά όχι οικονομικά ουσιαστικά για τους μετόχους.",
+          "text": "Μια επαναγορά μπορεί να φαίνεται θετική αλλά να καταστρέφει αξία όταν είναι πολύ μικρή, χρηματοδοτείται με χρέος ή εκτελείται πάνω από υποστηρίξιμη αποτίμηση.",
           "evidenceIds": [
-            "evidence:sec:0001493152-26-036659"
+            "evidence:allwyn:59ae0d0f1cc7710a4941d11b"
           ],
           "confidence": 0.82,
           "inference": true
         },
         {
-          "text": "Ο καταγεγραμμένος απομειωμένος αριθμός μετοχών αυξήθηκε αρκετά ώστε να δημιουργεί σοβαρό κίνδυνο αραίωσης ανά μετοχή.",
-          "evidenceIds": [
-            "evidence:sec:0001493152-26-036659"
-          ],
-          "confidence": 0.88,
-          "inference": true
-        },
-        {
           "text": "Η τιμή και η ρευστότητα της μετοχής μπορεί να αντιδράσουν διαφορετικά από την υποκείμενη εταιρική εξέλιξη, ιδιαίτερα όταν οι προσδοκίες είχαν ήδη ενσωματωθεί πριν από τη δημοσίευση.",
           "evidenceIds": [
-            "evidence:sec:0001493152-26-036659"
+            "evidence:allwyn:59ae0d0f1cc7710a4941d11b"
           ],
           "confidence": 0.72,
           "inference": true
         }
       ],
-      "invalidationCondition": "Η υπόθεση παραμένει μη ταξινομημένη μέχρι να υποστηρίζονται από επαληθευμένα στοιχεία ένας μετρήσιμος αιτιώδης σύνδεσμος και σαφής συνθήκη ακύρωσης.",
-      "reviewDate": "2026-10-06",
+      "invalidationCondition": "Η θετική ερμηνεία ακυρώνεται εάν οι επαναγορές σταματήσουν χωρίς ουσιαστική ολοκλήρωση, η ρευστότητα επιδεινωθεί σημαντικά ή ο πραγματικός αριθμός μετοχών δεν μειωθεί.",
+      "reviewDate": "2026-11-05",
       "blockers": [
         "FUNDAMENTALS_REQUIRED",
         "INDEPENDENT_CROSS_CHECK_REQUIRED",
@@ -485,24 +441,24 @@
       "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
       "sources": [
         {
-          "sourceName": "SEC EDGAR",
-          "sourceType": "REGULATORY_FILING",
-          "title": "8-K filing — AIxCrypto Holdings,",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1460702/000149315226036659/form8-k.htm",
-          "publishedAt": "2026-08-07T12:00:00.000Z",
+          "sourceName": "Allwyn Regulatory Announcements",
+          "sourceType": "ISSUER_IR",
+          "title": "Company purchased a total of 463,200 of its own shares on Euronext Athens",
+          "sourceUrl": "https://www.allwyn.com/regulatory-announcements/company-purchased-a-total-of-463-200-of-its-own-shares-on-euronext-athens",
+          "publishedAt": "2026-08-03T12:00:00.000Z",
           "reviewed": true,
           "primary": true
         }
       ],
       "metricNotes": [],
-      "generatedAt": "2026-08-07T21:22:54.875Z",
+      "generatedAt": "2026-08-07T21:54:15.548Z",
       "publicationMode": null,
       "finalAction": {
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-08-07.1",
-        "generatedAt": "2026-08-07T21:22:54.875Z",
-        "validUntil": "2026-08-08T21:22:54.875Z",
+        "generatedAt": "2026-08-07T21:54:15.548Z",
+        "validUntil": "2026-08-08T21:54:15.548Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -512,7 +468,7 @@
         "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
         "urgency": "NONE",
         "urgencyLabel": "Χωρίς τελική ενέργεια",
-        "confidenceScore": 33,
+        "confidenceScore": 70,
         "dataQualityScore": 30,
         "reasons": [
           "FINAL_ACTION_BLOCKED"
@@ -524,24 +480,18 @@
           "FUNDAMENTALS_NOT_READY"
         ],
         "freshness": {
-          "referencePriceAgeHours": 1.3819097222222223,
+          "referencePriceAgeHours": 0,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 7.881909722222222,
+          "latestMarketAgeHours": 38.40431888888889,
           "referencePricePurpose": "ANALYSIS_REFERENCE",
-          "referencePriceFreshnessModel": "VERIFIED_TIMESTAMP",
-          "executionFreshnessEligible": true
+          "referencePriceFreshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
+          "executionFreshnessEligible": false
         },
         "risk": {
-          "riskScore": 0,
-          "fundamentalFlags": [
-            "SEVERE_DILUTION"
-          ],
+          "riskScore": null,
+          "fundamentalFlags": [],
           "marketFlags": [
-            "EXTREME_VOLATILITY",
-            "SEVERE_DRAWDOWN",
-            "LOW_LIQUIDITY",
-            "BELOW_50_DAY_AVERAGE",
-            "WEAK_RELATIVE_STRENGTH"
+            "BELOW_50_DAY_AVERAGE"
           ]
         },
         "controlledPlan": {
@@ -549,23 +499,23 @@
           "level": "INTERIM_RISK_CONTROL",
           "title": "Πλάνο τώρα",
           "holderAction": "HOLD",
-          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ — ΕΠΑΝΕΞΕΤΑΣΗ ΚΙΝΔΥΝΟΥ",
+          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ",
           "nonHolderAction": "DO_NOT_BUY",
           "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
           "marketAction": "WATCH",
           "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
           "newBuyAllowed": false,
           "sellSignalApproved": false,
-          "confidenceScore": 33,
+          "confidenceScore": 70,
           "dataQualityScore": 30,
-          "rationale": "Υπάρχουν επαληθευμένες ενδείξεις αυξημένου κινδύνου, αλλά δεν έχουν περάσει ακόμη όλοι οι έλεγχοι που απαιτούνται για τελικό σήμα πώλησης ή μείωσης.",
+          "rationale": "Δεν έχουν ολοκληρωθεί όλοι οι υποχρεωτικοί έλεγχοι για τελική αγορά ή πώληση. Μέχρι τότε η πειθαρχημένη στάση είναι διατήρηση υπάρχουσας θέσης χωρίς νέα ενίσχυση και αποφυγή νέας εισόδου.",
           "blockers": [
             "DOSSIER_NOT_PUBLISHABLE",
             "DOSSIER_NOT_READY",
             "CROSS_CHECK_NOT_READY",
             "FUNDAMENTALS_NOT_READY"
           ],
-          "validUntil": "2026-08-08T21:22:54.875Z"
+          "validUntil": "2026-08-08T21:54:15.548Z"
         },
         "execution": {
           "automaticBrokerOrder": false,
@@ -603,78 +553,6 @@
           "sourceUrl": "https://athens.euronext.com/en/node/968697",
           "sourceName": "Euronext Athens",
           "eventScore": 100
-        }
-      ],
-      "isExistingFocusCompany": false
-    },
-    {
-      "discoveryId": "discovery:company:sec:0001080657:2026-08-07",
-      "companyId": "company:sec:0001080657",
-      "companyName": "Presidio Property Trust,",
-      "symbol": "SQFT",
-      "exchange": "Nasdaq",
-      "discoveryScore": 86,
-      "scoreType": "DISCOVERY_PRIORITY",
-      "scoreLabel": "Προτεραιότητα διερεύνησης",
-      "investmentScore": null,
-      "status": "DISCOVERED_RESEARCH_REQUIRED",
-      "suggestedAction": "WATCH",
-      "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-      "reasons": [
-        "Νέα επίσημη κατάθεση SC TO-I στη SEC",
-        "Το γεγονός είναι πολύ πρόσφατο",
-        "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
-      ],
-      "latestEventAt": "2026-08-07T21:17:51.000Z",
-      "events": [
-        {
-          "form": "SC TO-I",
-          "title": "SC TO-I - Presidio Property Trust, Inc. (0001080657) (Subject)",
-          "publishedAt": "2026-08-07T21:17:51.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1080657/000149315226036654/0001493152-26-036654-index.htm",
-          "sourceName": "SEC EDGAR Current Filings",
-          "eventScore": 86
-        }
-      ],
-      "isExistingFocusCompany": false
-    },
-    {
-      "discoveryId": "discovery:company:sec:0001460702:2026-08-07",
-      "companyId": "company:sec:0001460702",
-      "companyName": "AIxCrypto Holdings,",
-      "symbol": "AIXC",
-      "exchange": "Nasdaq",
-      "discoveryScore": 82,
-      "scoreType": "DISCOVERY_PRIORITY",
-      "scoreLabel": "Προτεραιότητα διερεύνησης",
-      "investmentScore": null,
-      "status": "DISCOVERED_RESEARCH_REQUIRED",
-      "suggestedAction": "WATCH",
-      "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-      "reasons": [
-        "Νέα επίσημη κατάθεση 10-Q στη SEC",
-        "Το γεγονός είναι πολύ πρόσφατο",
-        "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος",
-        "Νέα επίσημη κατάθεση 8-K στη SEC",
-        "Νέα αποτελέσματα ή καθοδήγηση διοίκησης"
-      ],
-      "latestEventAt": "2026-08-07T21:21:08.000Z",
-      "events": [
-        {
-          "form": "8-K",
-          "title": "8-K - AIxCrypto Holdings, Inc. (0001460702) (Filer)",
-          "publishedAt": "2026-08-07T21:20:44.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1460702/000149315226036659/0001493152-26-036659-index.htm",
-          "sourceName": "SEC EDGAR Current Filings",
-          "eventScore": 82
-        },
-        {
-          "form": "10-Q",
-          "title": "10-Q - AIxCrypto Holdings, Inc. (0001460702) (Filer)",
-          "publishedAt": "2026-08-07T21:21:08.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1460702/000149315226036658/0001493152-26-036658-index.htm",
-          "sourceName": "SEC EDGAR Current Filings",
-          "eventScore": 70
         }
       ],
       "isExistingFocusCompany": false
@@ -751,12 +629,12 @@
       "isExistingFocusCompany": false
     },
     {
-      "discoveryId": "discovery:company:sec:0002060703:2026-08-07",
-      "companyId": "company:sec:0002060703",
-      "companyName": "Canary Staked SUI ETF",
-      "symbol": "SUIS",
-      "exchange": "Nasdaq",
-      "discoveryScore": 70,
+      "discoveryId": "discovery:company:xath:term-342:2026-08-07",
+      "companyId": "company:xath:term-342",
+      "companyName": "PUBLIC POWER CORPORATION SA",
+      "symbol": "PPC",
+      "exchange": "Euronext Athens",
+      "discoveryScore": 62,
       "scoreType": "DISCOVERY_PRIORITY",
       "scoreLabel": "Προτεραιότητα διερεύνησης",
       "investmentScore": null,
@@ -764,30 +642,30 @@
       "suggestedAction": "WATCH",
       "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
       "reasons": [
-        "Νέα επίσημη κατάθεση 10-Q στη SEC",
+        "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
         "Το γεγονός είναι πολύ πρόσφατο",
         "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
       ],
-      "latestEventAt": "2026-08-07T21:21:53.000Z",
+      "latestEventAt": "2026-08-07T17:15:00.000Z",
       "events": [
         {
-          "form": "10-Q",
-          "title": "10-Q - Canary Staked SUI ETF (0002060703) (Filer)",
-          "publishedAt": "2026-08-07T21:21:53.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2060703/000199937126017439/0001999371-26-017439-index.htm",
-          "sourceName": "SEC EDGAR Current Filings",
-          "eventScore": 70
+          "form": "ATHEX_ANNOUNCEMENT",
+          "title": "PPC Group: New agreement for a RES project portfolio of over 2 GW in Poland and Hungary",
+          "publishedAt": "2026-08-07T17:15:00.000Z",
+          "sourceUrl": "https://athens.euronext.com/en/node/968699",
+          "sourceName": "Euronext Athens",
+          "eventScore": 62
         }
       ],
       "isExistingFocusCompany": false
     },
     {
-      "discoveryId": "discovery:company:sec:0002041869:2026-08-07",
-      "companyId": "company:sec:0002041869",
-      "companyName": "Canary Marinade Solana ETF",
-      "symbol": "SOLC",
-      "exchange": "Nasdaq",
-      "discoveryScore": 70,
+      "discoveryId": "discovery:company:xath:term-341:2026-08-07",
+      "companyId": "company:xath:term-341",
+      "companyName": "QUALITY AND RELIABILITY S.A.",
+      "symbol": "QUAL",
+      "exchange": "Euronext Athens",
+      "discoveryScore": 62,
       "scoreType": "DISCOVERY_PRIORITY",
       "scoreLabel": "Προτεραιότητα διερεύνησης",
       "investmentScore": null,
@@ -795,30 +673,30 @@
       "suggestedAction": "WATCH",
       "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
       "reasons": [
-        "Νέα επίσημη κατάθεση 10-Q στη SEC",
+        "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
         "Το γεγονός είναι πολύ πρόσφατο",
         "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
       ],
-      "latestEventAt": "2026-08-07T21:20:20.000Z",
+      "latestEventAt": "2026-08-07T15:44:00.000Z",
       "events": [
         {
-          "form": "10-Q",
-          "title": "10-Q - Canary Marinade Solana ETF (0002041869) (Filer)",
-          "publishedAt": "2026-08-07T21:20:20.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/2041869/000199937126017436/0001999371-26-017436-index.htm",
-          "sourceName": "SEC EDGAR Current Filings",
-          "eventScore": 70
+          "form": "ATHEX_ANNOUNCEMENT",
+          "title": "Announcement of Own Share Purchases",
+          "publishedAt": "2026-08-07T15:44:00.000Z",
+          "sourceUrl": "https://athens.euronext.com/en/node/968698",
+          "sourceName": "Euronext Athens",
+          "eventScore": 62
         }
       ],
       "isExistingFocusCompany": false
     },
     {
-      "discoveryId": "discovery:company:sec:0001606366:2026-08-07",
-      "companyId": "company:sec:0001606366",
-      "companyName": "El Pollo Loco Holdings,",
-      "symbol": "LOCO",
-      "exchange": "Nasdaq",
-      "discoveryScore": 70,
+      "discoveryId": "discovery:company:xath:term-469:2026-08-07",
+      "companyId": "company:xath:term-469",
+      "companyName": "EVROFARMA S.A.",
+      "symbol": "EVROF",
+      "exchange": "Euronext Athens",
+      "discoveryScore": 62,
       "scoreType": "DISCOVERY_PRIORITY",
       "scoreLabel": "Προτεραιότητα διερεύνησης",
       "investmentScore": null,
@@ -826,30 +704,30 @@
       "suggestedAction": "WATCH",
       "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
       "reasons": [
-        "Νέα επίσημη κατάθεση 10-Q στη SEC",
+        "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
         "Το γεγονός είναι πολύ πρόσφατο",
         "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
       ],
-      "latestEventAt": "2026-08-07T21:17:12.000Z",
+      "latestEventAt": "2026-08-07T14:25:00.000Z",
       "events": [
         {
-          "form": "10-Q",
-          "title": "10-Q - El Pollo Loco Holdings, Inc. (0001606366) (Filer)",
-          "publishedAt": "2026-08-07T21:17:12.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1606366/000160636626000047/0001606366-26-000047-index.htm",
-          "sourceName": "SEC EDGAR Current Filings",
-          "eventScore": 70
+          "form": "ATHEX_ANNOUNCEMENT",
+          "title": "Announcement 5956/2026 (no English translation available)",
+          "publishedAt": "2026-08-07T14:25:00.000Z",
+          "sourceUrl": "https://athens.euronext.com/en/more-options/announcements/announcement-59562026-no-english-translation-available",
+          "sourceName": "Euronext Athens",
+          "eventScore": 62
         }
       ],
       "isExistingFocusCompany": false
     },
     {
-      "discoveryId": "discovery:company:sec:0000052827:2026-08-07",
-      "companyId": "company:sec:0000052827",
-      "companyName": "RAYONIER",
-      "symbol": "RYN",
-      "exchange": "NYSE",
-      "discoveryScore": 70,
+      "discoveryId": "discovery:company:xath:term-526:2026-08-07",
+      "companyId": "company:xath:term-526",
+      "companyName": "BIOTER S.A.",
+      "symbol": "BIOT",
+      "exchange": "Euronext Athens",
+      "discoveryScore": 62,
       "scoreType": "DISCOVERY_PRIORITY",
       "scoreLabel": "Προτεραιότητα διερεύνησης",
       "investmentScore": null,
@@ -857,30 +735,30 @@
       "suggestedAction": "WATCH",
       "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
       "reasons": [
-        "Νέα επίσημη κατάθεση 10-Q στη SEC",
+        "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
         "Το γεγονός είναι πολύ πρόσφατο",
         "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
       ],
-      "latestEventAt": "2026-08-07T21:13:25.000Z",
+      "latestEventAt": "2026-08-07T14:22:00.000Z",
       "events": [
         {
-          "form": "10-Q",
-          "title": "10-Q - RAYONIER INC (0000052827) (Filer)",
-          "publishedAt": "2026-08-07T21:13:25.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/52827/000005282726000099/0000052827-26-000099-index.htm",
-          "sourceName": "SEC EDGAR Current Filings",
-          "eventScore": 70
+          "form": "ATHEX_ANNOUNCEMENT",
+          "title": "INVITATION TO GENERAL MEETING (Correct Repetition)",
+          "publishedAt": "2026-08-07T14:22:00.000Z",
+          "sourceUrl": "https://athens.euronext.com/en/node/968690",
+          "sourceName": "Euronext Athens",
+          "eventScore": 62
         }
       ],
       "isExistingFocusCompany": false
     },
     {
-      "discoveryId": "discovery:company:sec:0001760689:2026-08-07",
-      "companyId": "company:sec:0001760689",
-      "companyName": "Microvast Holdings,",
-      "symbol": "MVST",
-      "exchange": "Nasdaq",
-      "discoveryScore": 65,
+      "discoveryId": "discovery:company:xath:term-525:2026-08-07",
+      "companyId": "company:xath:term-525",
+      "companyName": "BITROS HOLDING S.A.",
+      "symbol": "MPITR",
+      "exchange": "Euronext Athens",
+      "discoveryScore": 62,
       "scoreType": "DISCOVERY_PRIORITY",
       "scoreLabel": "Προτεραιότητα διερεύνησης",
       "investmentScore": null,
@@ -888,30 +766,30 @@
       "suggestedAction": "WATCH",
       "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
       "reasons": [
-        "Νέα επίσημη κατάθεση 8-K στη SEC",
+        "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
         "Το γεγονός είναι πολύ πρόσφατο",
         "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
       ],
-      "latestEventAt": "2026-08-07T21:18:47.000Z",
+      "latestEventAt": "2026-08-07T14:20:00.000Z",
       "events": [
         {
-          "form": "8-K",
-          "title": "8-K - Microvast Holdings, Inc. (0001760689) (Filer)",
-          "publishedAt": "2026-08-07T21:18:47.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1760689/000094787126000756/0000947871-26-000756-index.htm",
-          "sourceName": "SEC EDGAR Current Filings",
-          "eventScore": 65
+          "form": "ATHEX_ANNOUNCEMENT",
+          "title": "Announcement 5960/2026 (no English translation available)",
+          "publishedAt": "2026-08-07T14:20:00.000Z",
+          "sourceUrl": "https://athens.euronext.com/en/more-options/announcements/announcement-59602026-no-english-translation-available",
+          "sourceName": "Euronext Athens",
+          "eventScore": 62
         }
       ],
       "isExistingFocusCompany": false
     },
     {
-      "discoveryId": "discovery:company:sec:0000835011:2026-08-07",
-      "companyId": "company:sec:0000835011",
-      "companyName": "MGP INGREDIENTS",
-      "symbol": "MGPI",
-      "exchange": "Nasdaq",
-      "discoveryScore": 65,
+      "discoveryId": "discovery:company:xath:term-519:2026-08-07",
+      "companyId": "company:xath:term-519",
+      "companyName": "COCA-COLA HBC AG",
+      "symbol": "EEE",
+      "exchange": "Euronext Athens",
+      "discoveryScore": 58,
       "scoreType": "DISCOVERY_PRIORITY",
       "scoreLabel": "Προτεραιότητα διερεύνησης",
       "investmentScore": null,
@@ -919,30 +797,29 @@
       "suggestedAction": "WATCH",
       "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
       "reasons": [
-        "Νέα επίσημη κατάθεση 8-K στη SEC",
-        "Το γεγονός είναι πολύ πρόσφατο",
+        "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
         "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
       ],
-      "latestEventAt": "2026-08-07T21:18:41.000Z",
+      "latestEventAt": "2026-08-07T12:15:00.000Z",
       "events": [
         {
-          "form": "8-K",
-          "title": "8-K - MGP INGREDIENTS INC (0000835011) (Filer)",
-          "publishedAt": "2026-08-07T21:18:41.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/835011/000083501126000108/0000835011-26-000108-index.htm",
-          "sourceName": "SEC EDGAR Current Filings",
-          "eventScore": 65
+          "form": "ATHEX_ANNOUNCEMENT",
+          "title": "Notification of transactions by Persons Discharging Managerial Responsibilities (“PDMRs')",
+          "publishedAt": "2026-08-07T12:15:00.000Z",
+          "sourceUrl": "https://athens.euronext.com/en/node/968688",
+          "sourceName": "Euronext Athens",
+          "eventScore": 58
         }
       ],
       "isExistingFocusCompany": false
     },
     {
-      "discoveryId": "discovery:company:sec:0001282648:2026-08-07",
-      "companyId": "company:sec:0001282648",
-      "companyName": "BATTALION OIL",
-      "symbol": "BATL",
-      "exchange": "NYSE",
-      "discoveryScore": 65,
+      "discoveryId": "discovery:company:xath:term-459:2026-08-07",
+      "companyId": "company:xath:term-459",
+      "companyName": "FOODLINK S.A.",
+      "symbol": "FOODL",
+      "exchange": "Euronext Athens",
+      "discoveryScore": 58,
       "scoreType": "DISCOVERY_PRIORITY",
       "scoreLabel": "Προτεραιότητα διερεύνησης",
       "investmentScore": null,
@@ -950,19 +827,48 @@
       "suggestedAction": "WATCH",
       "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
       "reasons": [
-        "Νέα επίσημη κατάθεση 8-K στη SEC",
-        "Το γεγονός είναι πολύ πρόσφατο",
+        "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
         "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
       ],
-      "latestEventAt": "2026-08-07T21:17:30.000Z",
+      "latestEventAt": "2026-08-07T12:10:00.000Z",
       "events": [
         {
-          "form": "8-K",
-          "title": "8-K - BATTALION OIL CORP (0001282648) (Filer)",
-          "publishedAt": "2026-08-07T21:17:30.000Z",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1282648/000110465926092788/0001104659-26-092788-index.htm",
-          "sourceName": "SEC EDGAR Current Filings",
-          "eventScore": 65
+          "form": "ATHEX_ANNOUNCEMENT",
+          "title": "Announcement 5954/2026 (no English translation available)",
+          "publishedAt": "2026-08-07T12:10:00.000Z",
+          "sourceUrl": "https://athens.euronext.com/en/more-options/announcements/announcement-59542026-no-english-translation-available",
+          "sourceName": "Euronext Athens",
+          "eventScore": 58
+        }
+      ],
+      "isExistingFocusCompany": false
+    },
+    {
+      "discoveryId": "discovery:company:xath:term-548:2026-08-07",
+      "companyId": "company:xath:term-548",
+      "companyName": "ALPHA BANK S.A.",
+      "symbol": "ALPHA",
+      "exchange": "Euronext Athens",
+      "discoveryScore": 58,
+      "scoreType": "DISCOVERY_PRIORITY",
+      "scoreLabel": "Προτεραιότητα διερεύνησης",
+      "investmentScore": null,
+      "status": "DISCOVERED_RESEARCH_REQUIRED",
+      "suggestedAction": "WATCH",
+      "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
+      "reasons": [
+        "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
+        "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
+      ],
+      "latestEventAt": "2026-08-07T12:00:00.000Z",
+      "events": [
+        {
+          "form": "ATHEX_ANNOUNCEMENT",
+          "title": "OTHER ANNOUNCEMENTS",
+          "publishedAt": "2026-08-07T12:00:00.000Z",
+          "sourceUrl": "https://athens.euronext.com/en/node/968686",
+          "sourceName": "Euronext Athens",
+          "eventScore": 58
         }
       ],
       "isExistingFocusCompany": false
@@ -973,494 +879,7 @@
   "reviewReady": [],
   "research": [
     {
-      "id": "dossier:company:sec:0001460702:f1040048c9f5f34f2a48",
-      "companyId": "company:sec:0001460702",
-      "companyName": "AIxCrypto Holdings,",
-      "symbol": "AIXC",
-      "exchange": "Nasdaq",
-      "origin": "AUTONOMOUS_DISCOVERY",
-      "discovery": {
-        "discoveryId": "discovery:company:sec:0001460702:2026-08-07",
-        "companyId": "company:sec:0001460702",
-        "companyName": "AIxCrypto Holdings,",
-        "symbol": "AIXC",
-        "exchange": "Nasdaq",
-        "mic": "XNAS",
-        "market": "US",
-        "cik": "0001460702",
-        "issuerId": null,
-        "identityStatus": "CANONICAL_IDENTITY_READY",
-        "discoveryScore": 82,
-        "scoreType": "DISCOVERY_PRIORITY",
-        "status": "DISCOVERED_RESEARCH_REQUIRED",
-        "suggestedAction": "WATCH",
-        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-        "isExistingFocusCompany": false,
-        "reasons": [
-          "Νέα επίσημη κατάθεση 10-Q στη SEC",
-          "Το γεγονός είναι πολύ πρόσφατο",
-          "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος",
-          "Νέα επίσημη κατάθεση 8-K στη SEC",
-          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης"
-        ],
-        "latestEventAt": "2026-08-07T21:21:08.000Z",
-        "events": [
-          {
-            "form": "8-K",
-            "title": "8-K - AIxCrypto Holdings, Inc. (0001460702) (Filer)",
-            "publishedAt": "2026-08-07T21:20:44.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1460702/000149315226036659/0001493152-26-036659-index.htm",
-            "sourceName": "SEC EDGAR Current Filings",
-            "eventScore": 82
-          },
-          {
-            "form": "10-Q",
-            "title": "10-Q - AIxCrypto Holdings, Inc. (0001460702) (Filer)",
-            "publishedAt": "2026-08-07T21:21:08.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1460702/000149315226036658/0001493152-26-036658-index.htm",
-            "sourceName": "SEC EDGAR Current Filings",
-            "eventScore": 70
-          }
-        ]
-      },
-      "status": "DRAFT_RESEARCH",
-      "statusLabel": "Αυτόματη ανακάλυψη · έρευνα σε εξέλιξη",
-      "category": "INSUFFICIENT_EVIDENCE",
-      "categoryLabel": "Ανεπαρκή στοιχεία",
-      "action": "WATCH",
-      "actionLabel": "Παρακολούθηση",
-      "timeHorizon": "UNDETERMINED",
-      "referencePrice": {
-        "value": 0.822,
-        "currency": "USD",
-        "timestamp": "2026-08-07T20:00:00.000Z",
-        "source": "Finnhub Quote API",
-        "purpose": "ANALYSIS_REFERENCE",
-        "analysisReferenceEligible": true,
-        "executionFreshnessEligible": true,
-        "decisionEligible": true,
-        "freshnessModel": "VERIFIED_TIMESTAMP"
-      },
-      "referencePriceAgeHours": 1.3819097222222223,
-      "marketQuote": {
-        "appSymbol": "AIXC.US",
-        "companyId": "company:sec:0001460702",
-        "companyName": "AIxCrypto Holdings,",
-        "price": 0.822,
-        "previousClose": 0.8257,
-        "currency": "USD",
-        "quoteAt": "2026-08-07T20:00:00.000Z",
-        "checkedAt": "2026-08-07T21:22:54.875Z",
-        "source": "Finnhub Quote API",
-        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=AIXC",
-        "sourceQuality": null,
-        "quoteContract": {
-          "version": "2026-08-04.1",
-          "sourceRole": "LICENSED_MARKET_DATA",
-          "sourceTier": 1,
-          "sourceApproved": true,
-          "timestampVerified": true,
-          "valuationEligible": true,
-          "analysisReferenceEligible": true,
-          "executionFreshnessEligible": true,
-          "decisionEligible": true,
-          "dayChangeEligible": true,
-          "advertisedDelayMinutes": null,
-          "freshnessModel": "VERIFIED_TIMESTAMP",
-          "publicStatus": "VERIFIED",
-          "publicMessage": "Επαληθευμένη χρηματιστηριακή τιμή από εγκεκριμένη πηγή.",
-          "diagnosticCodes": []
-        }
-      },
-      "thesis": "Η AIxCrypto Holdings, έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: μεταβολή απομειωμένου αριθμού μετοχών 565.9%, απόδοση 60 συνεδριάσεων -37.01%, σχετική ισχύς 60 συνεδριάσεων -42.03%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
-      "causalMechanism": "Το γεγονός μπορεί να επηρεάσει την αξία μόνο μέσω μετρήσιμης αλλαγής στις ταμειακές ροές, στον κίνδυνο ισολογισμού, στον αριθμό μετοχών, στην πιθανότητα λειτουργικής επιτυχίας ή στις προσδοκίες αποτίμησης.",
-      "bullCase": "Μεταγενέστερα επαληθευμένα στοιχεία αποδεικνύουν ευνοϊκή και διατηρήσιμη οικονομική επίδραση που δεν έχει ήδη ενσωματωθεί στην αποτίμηση.",
-      "bearCase": "Το γεγονός αποδεικνύεται ασήμαντο, αναιρείται από νεότερα στοιχεία ή παράγει ασθενέστερα οικονομικά αποτελέσματα από όσα αναμένει η αγορά.",
-      "catalysts": [
-        {
-          "text": "Η επίσημη πηγή επιβεβαιώνει: 8-K filing — AIxCrypto Holdings,.",
-          "evidenceIds": [
-            "evidence:sec:0001493152-26-036659"
-          ],
-          "confidence": 0.94,
-          "inference": false
-        }
-      ],
-      "risks": [
-        {
-          "text": "Τα διαθέσιμα στοιχεία μπορεί να είναι πραγματικά αλλά όχι οικονομικά ουσιαστικά για τους μετόχους.",
-          "evidenceIds": [
-            "evidence:sec:0001493152-26-036659"
-          ],
-          "confidence": 0.82,
-          "inference": true
-        },
-        {
-          "text": "Ο καταγεγραμμένος απομειωμένος αριθμός μετοχών αυξήθηκε αρκετά ώστε να δημιουργεί σοβαρό κίνδυνο αραίωσης ανά μετοχή.",
-          "evidenceIds": [
-            "evidence:sec:0001493152-26-036659"
-          ],
-          "confidence": 0.88,
-          "inference": true
-        },
-        {
-          "text": "Η τιμή και η ρευστότητα της μετοχής μπορεί να αντιδράσουν διαφορετικά από την υποκείμενη εταιρική εξέλιξη, ιδιαίτερα όταν οι προσδοκίες είχαν ήδη ενσωματωθεί πριν από τη δημοσίευση.",
-          "evidenceIds": [
-            "evidence:sec:0001493152-26-036659"
-          ],
-          "confidence": 0.72,
-          "inference": true
-        }
-      ],
-      "invalidationCondition": "Η υπόθεση παραμένει μη ταξινομημένη μέχρι να υποστηρίζονται από επαληθευμένα στοιχεία ένας μετρήσιμος αιτιώδης σύνδεσμος και σαφής συνθήκη ακύρωσης.",
-      "reviewDate": "2026-10-06",
-      "blockers": [
-        "FUNDAMENTALS_REQUIRED",
-        "INDEPENDENT_CROSS_CHECK_REQUIRED",
-        "CLAIM_CORROBORATION_REQUIRED"
-      ],
-      "blockerLabels": [
-        "Λείπουν επαρκή θεμελιώδη στοιχεία",
-        "Λείπει ανεξάρτητη διασταύρωση",
-        "Ο συγκεκριμένος ισχυρισμός δεν έχει επιβεβαιωθεί επαρκώς"
-      ],
-      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
-      "sources": [
-        {
-          "sourceName": "SEC EDGAR",
-          "sourceType": "REGULATORY_FILING",
-          "title": "8-K filing — AIxCrypto Holdings,",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1460702/000149315226036659/form8-k.htm",
-          "publishedAt": "2026-08-07T12:00:00.000Z",
-          "reviewed": true,
-          "primary": true
-        }
-      ],
-      "metricNotes": [],
-      "generatedAt": "2026-08-07T21:22:54.875Z",
-      "publicationMode": null,
-      "finalAction": {
-        "format": "investor-control-final-action",
-        "version": 2,
-        "policyVersion": "2026-08-07.1",
-        "generatedAt": "2026-08-07T21:22:54.875Z",
-        "validUntil": "2026-08-08T21:22:54.875Z",
-        "status": "BLOCKED",
-        "marketAction": "WATCH",
-        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "holderAction": "WATCH",
-        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "nonHolderAction": "WATCH",
-        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "urgency": "NONE",
-        "urgencyLabel": "Χωρίς τελική ενέργεια",
-        "confidenceScore": 33,
-        "dataQualityScore": 30,
-        "reasons": [
-          "FINAL_ACTION_BLOCKED"
-        ],
-        "blockers": [
-          "DOSSIER_NOT_PUBLISHABLE",
-          "DOSSIER_NOT_READY",
-          "CROSS_CHECK_NOT_READY",
-          "FUNDAMENTALS_NOT_READY"
-        ],
-        "freshness": {
-          "referencePriceAgeHours": 1.3819097222222223,
-          "dossierAgeHours": 0,
-          "latestMarketAgeHours": 7.881909722222222,
-          "referencePricePurpose": "ANALYSIS_REFERENCE",
-          "referencePriceFreshnessModel": "VERIFIED_TIMESTAMP",
-          "executionFreshnessEligible": true
-        },
-        "risk": {
-          "riskScore": 0,
-          "fundamentalFlags": [
-            "SEVERE_DILUTION"
-          ],
-          "marketFlags": [
-            "EXTREME_VOLATILITY",
-            "SEVERE_DRAWDOWN",
-            "LOW_LIQUIDITY",
-            "BELOW_50_DAY_AVERAGE",
-            "WEAK_RELATIVE_STRENGTH"
-          ]
-        },
-        "controlledPlan": {
-          "status": "AVAILABLE",
-          "level": "INTERIM_RISK_CONTROL",
-          "title": "Πλάνο τώρα",
-          "holderAction": "HOLD",
-          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ — ΕΠΑΝΕΞΕΤΑΣΗ ΚΙΝΔΥΝΟΥ",
-          "nonHolderAction": "DO_NOT_BUY",
-          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
-          "marketAction": "WATCH",
-          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-          "newBuyAllowed": false,
-          "sellSignalApproved": false,
-          "confidenceScore": 33,
-          "dataQualityScore": 30,
-          "rationale": "Υπάρχουν επαληθευμένες ενδείξεις αυξημένου κινδύνου, αλλά δεν έχουν περάσει ακόμη όλοι οι έλεγχοι που απαιτούνται για τελικό σήμα πώλησης ή μείωσης.",
-          "blockers": [
-            "DOSSIER_NOT_PUBLISHABLE",
-            "DOSSIER_NOT_READY",
-            "CROSS_CHECK_NOT_READY",
-            "FUNDAMENTALS_NOT_READY"
-          ],
-          "validUntil": "2026-08-08T21:22:54.875Z"
-        },
-        "execution": {
-          "automaticBrokerOrder": false,
-          "requiresUserExecution": true
-        }
-      }
-    },
-    {
-      "id": "dossier:company:sec:0001080657:a0ad24f10b9ca1e9ec3a",
-      "companyId": "company:sec:0001080657",
-      "companyName": "Presidio Property Trust,",
-      "symbol": "SQFT",
-      "exchange": "Nasdaq",
-      "origin": "AUTONOMOUS_DISCOVERY",
-      "discovery": {
-        "discoveryId": "discovery:company:sec:0001080657:2026-08-07",
-        "companyId": "company:sec:0001080657",
-        "companyName": "Presidio Property Trust,",
-        "symbol": "SQFT",
-        "exchange": "Nasdaq",
-        "mic": "XNAS",
-        "market": "US",
-        "cik": "0001080657",
-        "issuerId": null,
-        "identityStatus": "CANONICAL_IDENTITY_READY",
-        "discoveryScore": 86,
-        "scoreType": "DISCOVERY_PRIORITY",
-        "status": "DISCOVERED_RESEARCH_REQUIRED",
-        "suggestedAction": "WATCH",
-        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-        "isExistingFocusCompany": false,
-        "reasons": [
-          "Νέα επίσημη κατάθεση SC TO-I στη SEC",
-          "Το γεγονός είναι πολύ πρόσφατο",
-          "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
-        ],
-        "latestEventAt": "2026-08-07T21:17:51.000Z",
-        "events": [
-          {
-            "form": "SC TO-I",
-            "title": "SC TO-I - Presidio Property Trust, Inc. (0001080657) (Subject)",
-            "publishedAt": "2026-08-07T21:17:51.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1080657/000149315226036654/0001493152-26-036654-index.htm",
-            "sourceName": "SEC EDGAR Current Filings",
-            "eventScore": 86
-          }
-        ]
-      },
-      "status": "DRAFT_RESEARCH",
-      "statusLabel": "Αυτόματη ανακάλυψη · έρευνα σε εξέλιξη",
-      "category": "INSUFFICIENT_EVIDENCE",
-      "categoryLabel": "Ανεπαρκή στοιχεία",
-      "action": "WATCH",
-      "actionLabel": "Παρακολούθηση",
-      "timeHorizon": "UNDETERMINED",
-      "referencePrice": {
-        "value": 2.2899999618530273,
-        "currency": "USD",
-        "timestamp": "2026-08-06T13:30:00.000Z",
-        "source": "Historical market series",
-        "purpose": "HISTORICAL_REFERENCE",
-        "analysisReferenceEligible": true,
-        "executionFreshnessEligible": false,
-        "decisionEligible": false,
-        "freshnessModel": "HISTORICAL_CLOSE"
-      },
-      "referencePriceAgeHours": 31.881909722222222,
-      "marketQuote": {
-        "appSymbol": "SQFT.US",
-        "companyId": "company:sec:0001080657",
-        "companyName": "Presidio Property Trust,",
-        "price": 2.29,
-        "previousClose": 2.3,
-        "currency": "USD",
-        "quoteAt": "2026-08-06T15:25:20.000Z",
-        "checkedAt": "2026-08-07T21:22:54.875Z",
-        "source": "Finnhub Quote API",
-        "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SQFT",
-        "sourceQuality": null,
-        "quoteContract": {
-          "version": "2026-08-04.1",
-          "sourceRole": "LICENSED_MARKET_DATA",
-          "sourceTier": 1,
-          "sourceApproved": true,
-          "timestampVerified": true,
-          "valuationEligible": false,
-          "analysisReferenceEligible": false,
-          "executionFreshnessEligible": false,
-          "decisionEligible": false,
-          "dayChangeEligible": false,
-          "advertisedDelayMinutes": null,
-          "freshnessModel": "UNVERIFIED",
-          "publicStatus": "STALE",
-          "publicMessage": "Η τελευταία τιμή είναι παρωχημένη και δεν χρησιμοποιείται σε αποτίμηση ή απόφαση.",
-          "diagnosticCodes": [
-            "QUOTE_STALE"
-          ]
-        }
-      },
-      "thesis": "Η Presidio Property Trust, έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: μεταβολή απομειωμένου αριθμού μετοχών 0.27%, απόδοση 60 συνεδριάσεων -26.37%, σχετική ισχύς 60 συνεδριάσεων -30.59%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
-      "causalMechanism": "Το γεγονός μπορεί να επηρεάσει την αξία μόνο μέσω μετρήσιμης αλλαγής στις ταμειακές ροές, στον κίνδυνο ισολογισμού, στον αριθμό μετοχών, στην πιθανότητα λειτουργικής επιτυχίας ή στις προσδοκίες αποτίμησης.",
-      "bullCase": "Μεταγενέστερα επαληθευμένα στοιχεία αποδεικνύουν ευνοϊκή και διατηρήσιμη οικονομική επίδραση που δεν έχει ήδη ενσωματωθεί στην αποτίμηση.",
-      "bearCase": "Το γεγονός αποδεικνύεται ασήμαντο, αναιρείται από νεότερα στοιχεία ή παράγει ασθενέστερα οικονομικά αποτελέσματα από όσα αναμένει η αγορά.",
-      "catalysts": [
-        {
-          "text": "Η επίσημη πηγή επιβεβαιώνει: SC TO-I filing — Presidio Property Trust,.",
-          "evidenceIds": [
-            "evidence:sec:0001493152-26-036654"
-          ],
-          "confidence": 0.94,
-          "inference": false
-        }
-      ],
-      "risks": [
-        {
-          "text": "Τα διαθέσιμα στοιχεία μπορεί να είναι πραγματικά αλλά όχι οικονομικά ουσιαστικά για τους μετόχους.",
-          "evidenceIds": [
-            "evidence:sec:0001493152-26-036654"
-          ],
-          "confidence": 0.82,
-          "inference": true
-        },
-        {
-          "text": "Η τιμή και η ρευστότητα της μετοχής μπορεί να αντιδράσουν διαφορετικά από την υποκείμενη εταιρική εξέλιξη, ιδιαίτερα όταν οι προσδοκίες είχαν ήδη ενσωματωθεί πριν από τη δημοσίευση.",
-          "evidenceIds": [
-            "evidence:sec:0001493152-26-036654"
-          ],
-          "confidence": 0.72,
-          "inference": true
-        }
-      ],
-      "invalidationCondition": "Η υπόθεση παραμένει μη ταξινομημένη μέχρι να υποστηρίζονται από επαληθευμένα στοιχεία ένας μετρήσιμος αιτιώδης σύνδεσμος και σαφής συνθήκη ακύρωσης.",
-      "reviewDate": "2026-10-06",
-      "blockers": [
-        "FUNDAMENTALS_REQUIRED",
-        "HISTORICAL_MARKET_METRICS_REQUIRED",
-        "INDEPENDENT_CROSS_CHECK_REQUIRED",
-        "CLAIM_CORROBORATION_REQUIRED"
-      ],
-      "blockerLabels": [
-        "Λείπουν επαρκή θεμελιώδη στοιχεία",
-        "Λείπει επαρκές ιστορικό τιμής και όγκου",
-        "Λείπει ανεξάρτητη διασταύρωση",
-        "Ο συγκεκριμένος ισχυρισμός δεν έχει επιβεβαιωθεί επαρκώς"
-      ],
-      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
-      "sources": [
-        {
-          "sourceName": "SEC EDGAR",
-          "sourceType": "REGULATORY_FILING",
-          "title": "SC TO-I filing — Presidio Property Trust,",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1080657/000149315226036654/formsctoi.htm",
-          "publishedAt": "2026-08-07T12:00:00.000Z",
-          "reviewed": true,
-          "primary": true
-        },
-        {
-          "sourceName": "SEC EDGAR",
-          "sourceType": "REGULATORY_FILING",
-          "title": "S-4 filing — Presidio Property Trust,",
-          "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1080657/000149315226036562/forms-4.htm",
-          "publishedAt": "2026-08-07T12:00:00.000Z",
-          "reviewed": false,
-          "primary": true
-        }
-      ],
-      "metricNotes": [],
-      "generatedAt": "2026-08-07T21:22:54.875Z",
-      "publicationMode": null,
-      "finalAction": {
-        "format": "investor-control-final-action",
-        "version": 2,
-        "policyVersion": "2026-08-07.1",
-        "generatedAt": "2026-08-07T21:22:54.875Z",
-        "validUntil": "2026-08-08T21:22:54.875Z",
-        "status": "BLOCKED",
-        "marketAction": "WATCH",
-        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "holderAction": "WATCH",
-        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "nonHolderAction": "WATCH",
-        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "urgency": "NONE",
-        "urgencyLabel": "Χωρίς τελική ενέργεια",
-        "confidenceScore": 42,
-        "dataQualityScore": 15,
-        "reasons": [
-          "FINAL_ACTION_BLOCKED"
-        ],
-        "blockers": [
-          "DOSSIER_NOT_PUBLISHABLE",
-          "DOSSIER_NOT_READY",
-          "CROSS_CHECK_NOT_READY",
-          "FUNDAMENTALS_NOT_READY",
-          "MARKET_METRICS_NOT_READY",
-          "MARKET_HISTORY_SOURCE_NOT_READY",
-          "MARKET_HISTORY_NOT_CROSSCHECKED",
-          "REFERENCE_PRICE_STALE"
-        ],
-        "freshness": {
-          "referencePriceAgeHours": 31.881909722222222,
-          "dossierAgeHours": 0,
-          "latestMarketAgeHours": 31.881909722222222,
-          "referencePricePurpose": "HISTORICAL_REFERENCE",
-          "referencePriceFreshnessModel": "HISTORICAL_CLOSE",
-          "executionFreshnessEligible": false
-        },
-        "risk": {
-          "riskScore": 0,
-          "fundamentalFlags": [],
-          "marketFlags": [
-            "HIGH_VOLATILITY",
-            "MATERIAL_DRAWDOWN",
-            "LOW_LIQUIDITY",
-            "BELOW_50_DAY_AVERAGE",
-            "WEAK_RELATIVE_STRENGTH"
-          ]
-        },
-        "controlledPlan": {
-          "status": "AVAILABLE",
-          "level": "INTERIM_RISK_CONTROL",
-          "title": "Πλάνο τώρα",
-          "holderAction": "HOLD",
-          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ",
-          "nonHolderAction": "DO_NOT_BUY",
-          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
-          "marketAction": "WATCH",
-          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-          "newBuyAllowed": false,
-          "sellSignalApproved": false,
-          "confidenceScore": 42,
-          "dataQualityScore": 15,
-          "rationale": "Δεν έχουν ολοκληρωθεί όλοι οι υποχρεωτικοί έλεγχοι για τελική αγορά ή πώληση. Μέχρι τότε η πειθαρχημένη στάση είναι διατήρηση υπάρχουσας θέσης χωρίς νέα ενίσχυση και αποφυγή νέας εισόδου.",
-          "blockers": [
-            "DOSSIER_NOT_PUBLISHABLE",
-            "DOSSIER_NOT_READY",
-            "CROSS_CHECK_NOT_READY",
-            "FUNDAMENTALS_NOT_READY",
-            "MARKET_METRICS_NOT_READY",
-            "MARKET_HISTORY_SOURCE_NOT_READY",
-            "MARKET_HISTORY_NOT_CROSSCHECKED",
-            "REFERENCE_PRICE_STALE"
-          ],
-          "validUntil": "2026-08-08T21:22:54.875Z"
-        },
-        "execution": {
-          "automaticBrokerOrder": false,
-          "requiresUserExecution": true
-        }
-      }
-    },
-    {
-      "id": "dossier:company:allwyn-ag:852f41f6124e149c4a56",
+      "id": "dossier:company:allwyn-ag:ee4a6e85880d71bad234",
       "companyId": "company:allwyn-ag",
       "companyName": "Allwyn",
       "symbol": "ALWN",
@@ -1477,7 +896,7 @@
       "referencePrice": {
         "value": 13.49,
         "currency": "EUR",
-        "timestamp": "2026-08-07T21:22:54.875Z",
+        "timestamp": "2026-08-07T21:54:15.548Z",
         "source": "Euronext Athens delayed market data",
         "purpose": "ANALYSIS_REFERENCE",
         "analysisReferenceEligible": true,
@@ -1493,8 +912,8 @@
         "price": 13.49,
         "previousClose": 13.29,
         "currency": "EUR",
-        "quoteAt": "2026-08-07T21:22:54.875Z",
-        "checkedAt": "2026-08-07T21:22:54.875Z",
+        "quoteAt": "2026-08-07T21:54:15.548Z",
+        "checkedAt": "2026-08-07T21:54:15.548Z",
         "source": "Euronext Athens delayed market data",
         "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/ALWN/related",
         "sourceQuality": "OFFICIAL_DELAYED",
@@ -1519,7 +938,7 @@
           ]
         }
       },
-      "thesis": "Το επιβεβαιωμένο πρόγραμμα επαναγοράς ιδίων μετοχών της Allwyn μπορεί να βελτιώσει την αξία ανά μετοχή μόνο εφόσον οι αγορές είναι ουσιαστικές, γίνονται σε ελκυστική αποτίμηση και χρηματοδοτούνται χωρίς αποδυνάμωση της ρευστότητας. Αποτελεί μετρήσιμο καταλύτη κατανομής κεφαλαίου, όχι αυτοτελή λόγο αγοράς. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων 8.45%, σχετική ισχύς 60 συνεδριάσεων -11.05%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
+      "thesis": "Το επιβεβαιωμένο πρόγραμμα επαναγοράς ιδίων μετοχών της Allwyn μπορεί να βελτιώσει την αξία ανά μετοχή μόνο εφόσον οι αγορές είναι ουσιαστικές, γίνονται σε ελκυστική αποτίμηση και χρηματοδοτούνται χωρίς αποδυνάμωση της ρευστότητας. Αποτελεί μετρήσιμο καταλύτη κατανομής κεφαλαίου, όχι αυτοτελή λόγο αγοράς. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων 10.29%, σχετική ισχύς 60 συνεδριάσεων -11.05%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
       "causalMechanism": "Οι επαναγορές μειώνουν τον πραγματικό αριθμό μετοχών και μπορούν να αυξήσουν την οικονομική συμμετοχή κάθε εναπομείνασας μετοχής, μόνο όμως όταν η τιμή αγοράς και η πηγή χρηματοδότησης δημιουργούν καθαρή αξία.",
       "bullCase": "Η εταιρεία πραγματοποιεί ουσιαστικές επαναγορές κάτω από υποστηρίξιμη αποτίμηση, διατηρώντας λειτουργικές ταμειακές ροές και ευελιξία ισολογισμού.",
       "bearCase": "Οι επαναγορές είναι ασήμαντες, γίνονται σε υπερβολική αποτίμηση ή καταναλώνουν ρευστότητα που αργότερα χρειάζεται για λειτουργία, χρέος ή επενδύσεις.",
@@ -1576,14 +995,14 @@
         }
       ],
       "metricNotes": [],
-      "generatedAt": "2026-08-07T21:22:54.875Z",
+      "generatedAt": "2026-08-07T21:54:15.548Z",
       "publicationMode": null,
       "finalAction": {
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-08-07.1",
-        "generatedAt": "2026-08-07T21:22:54.875Z",
-        "validUntil": "2026-08-08T21:22:54.875Z",
+        "generatedAt": "2026-08-07T21:54:15.548Z",
+        "validUntil": "2026-08-08T21:54:15.548Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -1607,7 +1026,7 @@
         "freshness": {
           "referencePriceAgeHours": 0,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 37.881909722222225,
+          "latestMarketAgeHours": 38.40431888888889,
           "referencePricePurpose": "ANALYSIS_REFERENCE",
           "referencePriceFreshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
           "executionFreshnessEligible": false
@@ -1640,7 +1059,7 @@
             "CROSS_CHECK_NOT_READY",
             "FUNDAMENTALS_NOT_READY"
           ],
-          "validUntil": "2026-08-08T21:22:54.875Z"
+          "validUntil": "2026-08-08T21:54:15.548Z"
         },
         "execution": {
           "automaticBrokerOrder": false,
@@ -1649,7 +1068,7 @@
       }
     },
     {
-      "id": "dossier:company:xath:term-320:c5c0aadbe32f37dac49e",
+      "id": "dossier:company:xath:term-320:259b8aa4d52f8f55afb8",
       "companyId": "company:xath:term-320",
       "companyName": "TECHNICAL OLYMPIC S.A.",
       "symbol": "OLYMP",
@@ -1700,7 +1119,7 @@
       "referencePrice": {
         "value": 2.37,
         "currency": "EUR",
-        "timestamp": "2026-08-07T21:22:54.875Z",
+        "timestamp": "2026-08-07T21:54:15.548Z",
         "source": "Euronext Athens delayed market data",
         "purpose": "ANALYSIS_REFERENCE",
         "analysisReferenceEligible": true,
@@ -1716,8 +1135,8 @@
         "price": 2.37,
         "previousClose": 2.4,
         "currency": "EUR",
-        "quoteAt": "2026-08-07T21:22:54.875Z",
-        "checkedAt": "2026-08-07T21:22:54.875Z",
+        "quoteAt": "2026-08-07T21:54:15.548Z",
+        "checkedAt": "2026-08-07T21:54:15.548Z",
         "source": "Euronext Athens delayed market data",
         "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/OLYMP/related",
         "sourceQuality": "OFFICIAL_DELAYED",
@@ -1781,14 +1200,14 @@
       "nextStep": "Άνοιγμα και ανάλυση του επίσημου εγγράφου",
       "sources": [],
       "metricNotes": [],
-      "generatedAt": "2026-08-07T21:22:54.875Z",
+      "generatedAt": "2026-08-07T21:54:15.548Z",
       "publicationMode": null,
       "finalAction": {
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-08-07.1",
-        "generatedAt": "2026-08-07T21:22:54.875Z",
-        "validUntil": "2026-08-08T21:22:54.875Z",
+        "generatedAt": "2026-08-07T21:54:15.548Z",
+        "validUntil": "2026-08-08T21:54:15.548Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -1813,7 +1232,7 @@
         "freshness": {
           "referencePriceAgeHours": 0,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 37.881909722222225,
+          "latestMarketAgeHours": 38.40431888888889,
           "referencePricePurpose": "ANALYSIS_REFERENCE",
           "referencePriceFreshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
           "executionFreshnessEligible": false
@@ -1848,7 +1267,7 @@
             "FUNDAMENTALS_NOT_READY",
             "REVIEW_DATE_EXPIRED"
           ],
-          "validUntil": "2026-08-08T21:22:54.875Z"
+          "validUntil": "2026-08-08T21:54:15.548Z"
         },
         "execution": {
           "automaticBrokerOrder": false,
@@ -1857,7 +1276,7 @@
       }
     },
     {
-      "id": "dossier:company:xath:term-463:c67f8c0683f5bf6199c2",
+      "id": "dossier:company:xath:term-463:ea7c15c78129ee63f258",
       "companyId": "company:xath:term-463",
       "companyName": "FLEXOPACK S.A.",
       "symbol": "FLEXO",
@@ -1916,7 +1335,7 @@
       "referencePrice": {
         "value": 8.2,
         "currency": "EUR",
-        "timestamp": "2026-08-07T21:22:54.875Z",
+        "timestamp": "2026-08-07T21:54:15.548Z",
         "source": "Euronext Athens delayed market data",
         "purpose": "ANALYSIS_REFERENCE",
         "analysisReferenceEligible": true,
@@ -1932,8 +1351,8 @@
         "price": 8.2,
         "previousClose": 8.05,
         "currency": "EUR",
-        "quoteAt": "2026-08-07T21:22:54.875Z",
-        "checkedAt": "2026-08-07T21:22:54.875Z",
+        "quoteAt": "2026-08-07T21:54:15.548Z",
+        "checkedAt": "2026-08-07T21:54:15.548Z",
         "source": "Euronext Athens delayed market data",
         "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/FLEXO/related",
         "sourceQuality": "OFFICIAL_DELAYED",
@@ -1997,14 +1416,14 @@
       "nextStep": "Άνοιγμα και ανάλυση του επίσημου εγγράφου",
       "sources": [],
       "metricNotes": [],
-      "generatedAt": "2026-08-07T21:22:54.875Z",
+      "generatedAt": "2026-08-07T21:54:15.548Z",
       "publicationMode": null,
       "finalAction": {
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-08-07.1",
-        "generatedAt": "2026-08-07T21:22:54.875Z",
-        "validUntil": "2026-08-08T21:22:54.875Z",
+        "generatedAt": "2026-08-07T21:54:15.548Z",
+        "validUntil": "2026-08-08T21:54:15.548Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -2029,7 +1448,7 @@
         "freshness": {
           "referencePriceAgeHours": 0,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 37.881909722222225,
+          "latestMarketAgeHours": 38.40431888888889,
           "referencePricePurpose": "ANALYSIS_REFERENCE",
           "referencePriceFreshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
           "executionFreshnessEligible": false
@@ -2063,7 +1482,7 @@
             "FUNDAMENTALS_NOT_READY",
             "REVIEW_DATE_EXPIRED"
           ],
-          "validUntil": "2026-08-08T21:22:54.875Z"
+          "validUntil": "2026-08-08T21:54:15.548Z"
         },
         "execution": {
           "automaticBrokerOrder": false,
@@ -2072,7 +1491,7 @@
       }
     },
     {
-      "id": "dossier:company:xath:term-490:50cdec1584cec2966da1",
+      "id": "dossier:company:xath:term-490:0ba7026b13a2f47fc09d",
       "companyId": "company:xath:term-490",
       "companyName": "ELLAKTOR S.A.",
       "symbol": "ELLAKTOR",
@@ -2122,7 +1541,7 @@
       "referencePrice": {
         "value": 1.334,
         "currency": "EUR",
-        "timestamp": "2026-08-07T21:22:54.875Z",
+        "timestamp": "2026-08-07T21:54:15.548Z",
         "source": "Euronext Athens delayed market data",
         "purpose": "ANALYSIS_REFERENCE",
         "analysisReferenceEligible": true,
@@ -2138,8 +1557,8 @@
         "price": 1.334,
         "previousClose": 1.312,
         "currency": "EUR",
-        "quoteAt": "2026-08-07T21:22:54.875Z",
-        "checkedAt": "2026-08-07T21:22:54.875Z",
+        "quoteAt": "2026-08-07T21:54:15.548Z",
+        "checkedAt": "2026-08-07T21:54:15.548Z",
         "source": "Euronext Athens delayed market data",
         "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/ELLAKTOR/related",
         "sourceQuality": "OFFICIAL_DELAYED",
@@ -2213,14 +1632,14 @@
         }
       ],
       "metricNotes": [],
-      "generatedAt": "2026-08-07T21:22:54.875Z",
+      "generatedAt": "2026-08-07T21:54:15.548Z",
       "publicationMode": null,
       "finalAction": {
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-08-07.1",
-        "generatedAt": "2026-08-07T21:22:54.875Z",
-        "validUntil": "2026-08-08T21:22:54.875Z",
+        "generatedAt": "2026-08-07T21:54:15.548Z",
+        "validUntil": "2026-08-08T21:54:15.548Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -2245,7 +1664,7 @@
         "freshness": {
           "referencePriceAgeHours": 0,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 37.881909722222225,
+          "latestMarketAgeHours": 38.40431888888889,
           "referencePricePurpose": "ANALYSIS_REFERENCE",
           "referencePriceFreshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
           "executionFreshnessEligible": false
@@ -2282,7 +1701,7 @@
             "FUNDAMENTALS_NOT_READY",
             "REVIEW_DATE_EXPIRED"
           ],
-          "validUntil": "2026-08-08T21:22:54.875Z"
+          "validUntil": "2026-08-08T21:54:15.548Z"
         },
         "execution": {
           "automaticBrokerOrder": false,
@@ -2291,7 +1710,419 @@
       }
     },
     {
-      "id": "dossier:company:virgin-galactic-holdings:8d5ee446a54768cf97fd",
+      "id": "dossier:company:xath:term-342:f925e8bf7129c7ac5fab",
+      "companyId": "company:xath:term-342",
+      "companyName": "PUBLIC POWER CORPORATION SA",
+      "symbol": "PPC",
+      "exchange": "Euronext Athens",
+      "origin": "AUTONOMOUS_DISCOVERY",
+      "discovery": {
+        "discoveryId": "discovery:company:xath:term-342:2026-08-07",
+        "companyId": "company:xath:term-342",
+        "companyName": "PUBLIC POWER CORPORATION SA",
+        "symbol": "PPC",
+        "exchange": "Euronext Athens",
+        "mic": "XATH",
+        "market": "GR",
+        "cik": null,
+        "issuerId": "881",
+        "identityStatus": "CANONICAL_IDENTITY_READY",
+        "discoveryScore": 62,
+        "scoreType": "DISCOVERY_PRIORITY",
+        "status": "DISCOVERED_RESEARCH_REQUIRED",
+        "suggestedAction": "WATCH",
+        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
+        "isExistingFocusCompany": false,
+        "reasons": [
+          "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
+          "Το γεγονός είναι πολύ πρόσφατο",
+          "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
+        ],
+        "latestEventAt": "2026-08-07T17:15:00.000Z",
+        "events": [
+          {
+            "form": "ATHEX_ANNOUNCEMENT",
+            "title": "PPC Group: New agreement for a RES project portfolio of over 2 GW in Poland and Hungary",
+            "publishedAt": "2026-08-07T17:15:00.000Z",
+            "sourceUrl": "https://athens.euronext.com/en/node/968699",
+            "sourceName": "Euronext Athens",
+            "eventScore": 62
+          }
+        ]
+      },
+      "status": "DRAFT_RESEARCH",
+      "statusLabel": "Αυτόματη ανακάλυψη · έρευνα σε εξέλιξη",
+      "category": "INSUFFICIENT_EVIDENCE",
+      "categoryLabel": "Ανεπαρκή στοιχεία",
+      "action": "WATCH",
+      "actionLabel": "Παρακολούθηση",
+      "timeHorizon": "UNDETERMINED",
+      "referencePrice": {
+        "value": 21.94,
+        "currency": "EUR",
+        "timestamp": "2026-08-07T21:54:15.548Z",
+        "source": "Euronext Athens delayed market data",
+        "purpose": "ANALYSIS_REFERENCE",
+        "analysisReferenceEligible": true,
+        "executionFreshnessEligible": false,
+        "decisionEligible": false,
+        "freshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY"
+      },
+      "referencePriceAgeHours": 0,
+      "marketQuote": {
+        "appSymbol": "PPC.GR",
+        "companyId": "company:xath:term-342",
+        "companyName": "PUBLIC POWER CORPORATION SA",
+        "price": 21.94,
+        "previousClose": 21.66,
+        "currency": "EUR",
+        "quoteAt": "2026-08-07T21:54:15.548Z",
+        "checkedAt": "2026-08-07T21:54:15.548Z",
+        "source": "Euronext Athens delayed market data",
+        "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/PPC/related",
+        "sourceQuality": "OFFICIAL_DELAYED",
+        "quoteContract": {
+          "version": "2026-08-04.1",
+          "sourceRole": "PRIMARY_EXCHANGE",
+          "sourceTier": 1,
+          "sourceApproved": true,
+          "timestampVerified": false,
+          "valuationEligible": true,
+          "analysisReferenceEligible": true,
+          "executionFreshnessEligible": false,
+          "decisionEligible": false,
+          "dayChangeEligible": false,
+          "advertisedDelayMinutes": 15,
+          "freshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
+          "publicStatus": "TIMESTAMP_NOT_VERIFIED",
+          "publicMessage": "Η τιμή προέρχεται από επιτρεπόμενη πηγή, αλλά ο χρόνος της δεν έχει επιβεβαιωθεί επαρκώς.",
+          "diagnosticCodes": [
+            "QUOTE_TIMESTAMP_NOT_VERIFIED",
+            "QUOTE_ANALYSIS_REFERENCE_ONLY"
+          ]
+        }
+      },
+      "thesis": null,
+      "causalMechanism": null,
+      "bullCase": null,
+      "bearCase": null,
+      "catalysts": [],
+      "risks": [],
+      "invalidationCondition": null,
+      "reviewDate": null,
+      "blockers": [
+        "DOCUMENT_REVIEW_REQUIRED",
+        "FUNDAMENTALS_REQUIRED",
+        "INDEPENDENT_CROSS_CHECK_REQUIRED",
+        "THESIS_REQUIRED",
+        "INVALIDATION_CONDITION_REQUIRED",
+        "MATERIAL_RISKS_REQUIRED",
+        "CAUSAL_MECHANISM_REQUIRED",
+        "BULL_CASE_REQUIRED",
+        "BEAR_CASE_REQUIRED",
+        "VERIFIED_CATALYST_REQUIRED",
+        "REVIEW_DATE_REQUIRED",
+        "CANONICAL_CLAIM_REQUIRED"
+      ],
+      "blockerLabels": [
+        "Απαιτείται ανάγνωση του επίσημου εγγράφου",
+        "Λείπουν επαρκή θεμελιώδη στοιχεία",
+        "Λείπει ανεξάρτητη διασταύρωση",
+        "Λείπει ολοκληρωμένη επενδυτική θέση",
+        "Λείπει σαφής συνθήκη ακύρωσης",
+        "Λείπουν ουσιαστικοί κίνδυνοι",
+        "Λείπει ο μηχανισμός που συνδέει το γεγονός με την αξία",
+        "Λείπει θετικό σενάριο",
+        "Λείπει αρνητικό σενάριο",
+        "Λείπει επαληθευμένος καταλύτης",
+        "Λείπει ημερομηνία επανεξέτασης",
+        "Δεν έχει συνδεθεί σαφής εταιρικός ισχυρισμός"
+      ],
+      "nextStep": "Άνοιγμα και ανάλυση του επίσημου εγγράφου",
+      "sources": [],
+      "metricNotes": [],
+      "generatedAt": "2026-08-07T21:54:15.548Z",
+      "publicationMode": null,
+      "finalAction": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-07.1",
+        "generatedAt": "2026-08-07T21:54:15.548Z",
+        "validUntil": "2026-08-08T21:54:15.548Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 70,
+        "dataQualityScore": 30,
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY",
+          "REVIEW_DATE_EXPIRED"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 0,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 38.40431888888889,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": null,
+          "fundamentalFlags": [],
+          "marketFlags": [
+            "BELOW_50_DAY_AVERAGE"
+          ]
+        },
+        "controlledPlan": {
+          "status": "AVAILABLE",
+          "level": "INTERIM_RISK_CONTROL",
+          "title": "Πλάνο τώρα",
+          "holderAction": "HOLD",
+          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ",
+          "nonHolderAction": "DO_NOT_BUY",
+          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
+          "marketAction": "WATCH",
+          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+          "newBuyAllowed": false,
+          "sellSignalApproved": false,
+          "confidenceScore": 70,
+          "dataQualityScore": 30,
+          "rationale": "Δεν έχουν ολοκληρωθεί όλοι οι υποχρεωτικοί έλεγχοι για τελική αγορά ή πώληση. Μέχρι τότε η πειθαρχημένη στάση είναι διατήρηση υπάρχουσας θέσης χωρίς νέα ενίσχυση και αποφυγή νέας εισόδου.",
+          "blockers": [
+            "DOSSIER_NOT_PUBLISHABLE",
+            "DOSSIER_NOT_READY",
+            "CROSS_CHECK_NOT_READY",
+            "FUNDAMENTALS_NOT_READY",
+            "REVIEW_DATE_EXPIRED"
+          ],
+          "validUntil": "2026-08-08T21:54:15.548Z"
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      }
+    },
+    {
+      "id": "dossier:company:xath:term-341:6c1f1ef44fb72527f792",
+      "companyId": "company:xath:term-341",
+      "companyName": "QUALITY AND RELIABILITY S.A.",
+      "symbol": "QUAL",
+      "exchange": "Euronext Athens",
+      "origin": "AUTONOMOUS_DISCOVERY",
+      "discovery": {
+        "discoveryId": "discovery:company:xath:term-341:2026-08-07",
+        "companyId": "company:xath:term-341",
+        "companyName": "QUALITY AND RELIABILITY S.A.",
+        "symbol": "QUAL",
+        "exchange": "Euronext Athens",
+        "mic": "XATH",
+        "market": "GR",
+        "cik": null,
+        "issuerId": "826",
+        "identityStatus": "CANONICAL_IDENTITY_READY",
+        "discoveryScore": 62,
+        "scoreType": "DISCOVERY_PRIORITY",
+        "status": "DISCOVERED_RESEARCH_REQUIRED",
+        "suggestedAction": "WATCH",
+        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
+        "isExistingFocusCompany": false,
+        "reasons": [
+          "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
+          "Το γεγονός είναι πολύ πρόσφατο",
+          "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
+        ],
+        "latestEventAt": "2026-08-07T15:44:00.000Z",
+        "events": [
+          {
+            "form": "ATHEX_ANNOUNCEMENT",
+            "title": "Announcement of Own Share Purchases",
+            "publishedAt": "2026-08-07T15:44:00.000Z",
+            "sourceUrl": "https://athens.euronext.com/en/node/968698",
+            "sourceName": "Euronext Athens",
+            "eventScore": 62
+          }
+        ]
+      },
+      "status": "DRAFT_RESEARCH",
+      "statusLabel": "Αυτόματη ανακάλυψη · έρευνα σε εξέλιξη",
+      "category": "INSUFFICIENT_EVIDENCE",
+      "categoryLabel": "Ανεπαρκή στοιχεία",
+      "action": "WATCH",
+      "actionLabel": "Παρακολούθηση",
+      "timeHorizon": "UNDETERMINED",
+      "referencePrice": {
+        "value": 1.31,
+        "currency": "EUR",
+        "timestamp": "2026-08-07T21:54:15.548Z",
+        "source": "Euronext Athens delayed market data",
+        "purpose": "ANALYSIS_REFERENCE",
+        "analysisReferenceEligible": true,
+        "executionFreshnessEligible": false,
+        "decisionEligible": false,
+        "freshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY"
+      },
+      "referencePriceAgeHours": 0,
+      "marketQuote": {
+        "appSymbol": "QUAL.GR",
+        "companyId": "company:xath:term-341",
+        "companyName": "QUALITY AND RELIABILITY S.A.",
+        "price": 1.31,
+        "previousClose": 1.304,
+        "currency": "EUR",
+        "quoteAt": "2026-08-07T21:54:15.548Z",
+        "checkedAt": "2026-08-07T21:54:15.548Z",
+        "source": "Euronext Athens delayed market data",
+        "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/QUAL/related",
+        "sourceQuality": "OFFICIAL_DELAYED",
+        "quoteContract": {
+          "version": "2026-08-04.1",
+          "sourceRole": "PRIMARY_EXCHANGE",
+          "sourceTier": 1,
+          "sourceApproved": true,
+          "timestampVerified": false,
+          "valuationEligible": true,
+          "analysisReferenceEligible": true,
+          "executionFreshnessEligible": false,
+          "decisionEligible": false,
+          "dayChangeEligible": false,
+          "advertisedDelayMinutes": 15,
+          "freshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
+          "publicStatus": "TIMESTAMP_NOT_VERIFIED",
+          "publicMessage": "Η τιμή προέρχεται από επιτρεπόμενη πηγή, αλλά ο χρόνος της δεν έχει επιβεβαιωθεί επαρκώς.",
+          "diagnosticCodes": [
+            "QUOTE_TIMESTAMP_NOT_VERIFIED",
+            "QUOTE_ANALYSIS_REFERENCE_ONLY"
+          ]
+        }
+      },
+      "thesis": null,
+      "causalMechanism": null,
+      "bullCase": null,
+      "bearCase": null,
+      "catalysts": [],
+      "risks": [],
+      "invalidationCondition": null,
+      "reviewDate": null,
+      "blockers": [
+        "DOCUMENT_REVIEW_REQUIRED",
+        "FUNDAMENTALS_REQUIRED",
+        "INDEPENDENT_CROSS_CHECK_REQUIRED",
+        "THESIS_REQUIRED",
+        "INVALIDATION_CONDITION_REQUIRED",
+        "MATERIAL_RISKS_REQUIRED",
+        "CAUSAL_MECHANISM_REQUIRED",
+        "BULL_CASE_REQUIRED",
+        "BEAR_CASE_REQUIRED",
+        "VERIFIED_CATALYST_REQUIRED",
+        "REVIEW_DATE_REQUIRED",
+        "CANONICAL_CLAIM_REQUIRED"
+      ],
+      "blockerLabels": [
+        "Απαιτείται ανάγνωση του επίσημου εγγράφου",
+        "Λείπουν επαρκή θεμελιώδη στοιχεία",
+        "Λείπει ανεξάρτητη διασταύρωση",
+        "Λείπει ολοκληρωμένη επενδυτική θέση",
+        "Λείπει σαφής συνθήκη ακύρωσης",
+        "Λείπουν ουσιαστικοί κίνδυνοι",
+        "Λείπει ο μηχανισμός που συνδέει το γεγονός με την αξία",
+        "Λείπει θετικό σενάριο",
+        "Λείπει αρνητικό σενάριο",
+        "Λείπει επαληθευμένος καταλύτης",
+        "Λείπει ημερομηνία επανεξέτασης",
+        "Δεν έχει συνδεθεί σαφής εταιρικός ισχυρισμός"
+      ],
+      "nextStep": "Άνοιγμα και ανάλυση του επίσημου εγγράφου",
+      "sources": [],
+      "metricNotes": [],
+      "generatedAt": "2026-08-07T21:54:15.548Z",
+      "publicationMode": null,
+      "finalAction": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-07.1",
+        "generatedAt": "2026-08-07T21:54:15.548Z",
+        "validUntil": "2026-08-08T21:54:15.548Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 57,
+        "dataQualityScore": 30,
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY",
+          "REVIEW_DATE_EXPIRED"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 0,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 38.40431888888889,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": 20,
+          "fundamentalFlags": [],
+          "marketFlags": [
+            "LOW_LIQUIDITY"
+          ]
+        },
+        "controlledPlan": {
+          "status": "AVAILABLE",
+          "level": "INTERIM_RISK_CONTROL",
+          "title": "Πλάνο τώρα",
+          "holderAction": "HOLD",
+          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ — ΕΠΑΝΕΞΕΤΑΣΗ ΚΙΝΔΥΝΟΥ",
+          "nonHolderAction": "DO_NOT_BUY",
+          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
+          "marketAction": "WATCH",
+          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+          "newBuyAllowed": false,
+          "sellSignalApproved": false,
+          "confidenceScore": 57,
+          "dataQualityScore": 30,
+          "rationale": "Υπάρχουν επαληθευμένες ενδείξεις αυξημένου κινδύνου, αλλά δεν έχουν περάσει ακόμη όλοι οι έλεγχοι που απαιτούνται για τελικό σήμα πώλησης ή μείωσης.",
+          "blockers": [
+            "DOSSIER_NOT_PUBLISHABLE",
+            "DOSSIER_NOT_READY",
+            "CROSS_CHECK_NOT_READY",
+            "FUNDAMENTALS_NOT_READY",
+            "REVIEW_DATE_EXPIRED"
+          ],
+          "validUntil": "2026-08-08T21:54:15.548Z"
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      }
+    },
+    {
+      "id": "dossier:company:virgin-galactic-holdings:1b1e9a6d9f90af7f4cf6",
       "companyId": "company:virgin-galactic-holdings",
       "companyName": "Virgin Galactic",
       "symbol": "SPCE",
@@ -2316,7 +2147,7 @@
         "decisionEligible": true,
         "freshnessModel": "VERIFIED_TIMESTAMP"
       },
-      "referencePriceAgeHours": 1.3819097222222223,
+      "referencePriceAgeHours": 1.904318888888889,
       "marketQuote": {
         "appSymbol": "SPCE.US",
         "companyId": "company:virgin-galactic-holdings",
@@ -2325,7 +2156,7 @@
         "previousClose": 2.93,
         "currency": "USD",
         "quoteAt": "2026-08-07T20:00:00.000Z",
-        "checkedAt": "2026-08-07T21:22:54.875Z",
+        "checkedAt": "2026-08-07T21:54:15.548Z",
         "source": "Finnhub Quote API",
         "sourceUrl": "https://finnhub.io/api/v1/quote?symbol=SPCE",
         "sourceQuality": null,
@@ -2464,14 +2295,14 @@
       "metricNotes": [
         "Το ακραίο καθαρό περιθώριο επηρεάζεται από πολύ χαμηλή βάση εσόδων σε σχέση με τις ζημίες και χρειάζεται ανάγνωση μαζί με τα απόλυτα ποσά."
       ],
-      "generatedAt": "2026-08-07T21:22:54.875Z",
+      "generatedAt": "2026-08-07T21:54:15.548Z",
       "publicationMode": null,
       "finalAction": {
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-08-07.1",
-        "generatedAt": "2026-08-07T21:22:54.875Z",
-        "validUntil": "2026-08-08T21:22:54.875Z",
+        "generatedAt": "2026-08-07T21:54:15.548Z",
+        "validUntil": "2026-08-08T21:54:15.548Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -2492,9 +2323,9 @@
           "CROSS_CHECK_NOT_READY"
         ],
         "freshness": {
-          "referencePriceAgeHours": 1.3819097222222223,
+          "referencePriceAgeHours": 1.904318888888889,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 7.881909722222222,
+          "latestMarketAgeHours": 8.40431888888889,
           "referencePricePurpose": "ANALYSIS_REFERENCE",
           "referencePriceFreshnessModel": "VERIFIED_TIMESTAMP",
           "executionFreshnessEligible": true
@@ -2533,7 +2364,7 @@
             "DOSSIER_NOT_READY",
             "CROSS_CHECK_NOT_READY"
           ],
-          "validUntil": "2026-08-08T21:22:54.875Z"
+          "validUntil": "2026-08-08T21:54:15.548Z"
         },
         "execution": {
           "automaticBrokerOrder": false,
@@ -2542,7 +2373,7 @@
       }
     },
     {
-      "id": "dossier:company:crediabank:0664ba32fc3e6dc0509e",
+      "id": "dossier:company:crediabank:e2c5e34a9907e8780bab",
       "companyId": "company:crediabank",
       "companyName": "CrediaBank",
       "symbol": "CREDIA",
@@ -2559,7 +2390,7 @@
       "referencePrice": {
         "value": 0.949,
         "currency": "EUR",
-        "timestamp": "2026-08-07T21:22:54.875Z",
+        "timestamp": "2026-08-07T21:54:15.548Z",
         "source": "Euronext Athens delayed market data",
         "purpose": "ANALYSIS_REFERENCE",
         "analysisReferenceEligible": true,
@@ -2575,8 +2406,8 @@
         "price": 0.949,
         "previousClose": 0.975,
         "currency": "EUR",
-        "quoteAt": "2026-08-07T21:22:54.875Z",
-        "checkedAt": "2026-08-07T21:22:54.875Z",
+        "quoteAt": "2026-08-07T21:54:15.548Z",
+        "checkedAt": "2026-08-07T21:54:15.548Z",
         "source": "Euronext Athens delayed market data",
         "sourceUrl": "https://athens.euronext.com/en/market-data/instruments/stocks/CREDIA/related",
         "sourceQuality": "OFFICIAL_DELAYED",
@@ -2601,7 +2432,7 @@
           ]
         }
       },
-      "thesis": "Η CrediaBank έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων -22.99%, σχετική ισχύς 60 συνεδριάσεων -34.68%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
+      "thesis": "Η CrediaBank έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων -20.73%, σχετική ισχύς 60 συνεδριάσεων -34.68%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
       "causalMechanism": "Το γεγονός μπορεί να επηρεάσει την αξία μόνο μέσω μετρήσιμης αλλαγής στις ταμειακές ροές, στον κίνδυνο ισολογισμού, στον αριθμό μετοχών, στην πιθανότητα λειτουργικής επιτυχίας ή στις προσδοκίες αποτίμησης.",
       "bullCase": "Μεταγενέστερα επαληθευμένα στοιχεία αποδεικνύουν ευνοϊκή και διατηρήσιμη οικονομική επίδραση που δεν έχει ήδη ενσωματωθεί στην αποτίμηση.",
       "bearCase": "Το γεγονός αποδεικνύεται ασήμαντο, αναιρείται από νεότερα στοιχεία ή παράγει ασθενέστερα οικονομικά αποτελέσματα από όσα αναμένει η αγορά.",
@@ -2668,14 +2499,14 @@
         }
       ],
       "metricNotes": [],
-      "generatedAt": "2026-08-07T21:22:54.875Z",
+      "generatedAt": "2026-08-07T21:54:15.548Z",
       "publicationMode": null,
       "finalAction": {
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-08-07.1",
-        "generatedAt": "2026-08-07T21:22:54.875Z",
-        "validUntil": "2026-08-08T21:22:54.875Z",
+        "generatedAt": "2026-08-07T21:54:15.548Z",
+        "validUntil": "2026-08-08T21:54:15.548Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -2699,7 +2530,7 @@
         "freshness": {
           "referencePriceAgeHours": 0,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 37.881909722222225,
+          "latestMarketAgeHours": 38.40431888888889,
           "referencePricePurpose": "ANALYSIS_REFERENCE",
           "referencePriceFreshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
           "executionFreshnessEligible": false
@@ -2734,7 +2565,7 @@
             "CROSS_CHECK_NOT_READY",
             "FUNDAMENTALS_NOT_READY"
           ],
-          "validUntil": "2026-08-08T21:22:54.875Z"
+          "validUntil": "2026-08-08T21:54:15.548Z"
         },
         "execution": {
           "automaticBrokerOrder": false,
@@ -2745,275 +2576,6 @@
   ],
   "urgent": [],
   "assistantContext": [
-    {
-      "companyId": "company:sec:0001460702",
-      "companyName": "AIxCrypto Holdings,",
-      "symbol": "AIXC",
-      "origin": "AUTONOMOUS_DISCOVERY",
-      "discovery": {
-        "discoveryId": "discovery:company:sec:0001460702:2026-08-07",
-        "companyId": "company:sec:0001460702",
-        "companyName": "AIxCrypto Holdings,",
-        "symbol": "AIXC",
-        "exchange": "Nasdaq",
-        "mic": "XNAS",
-        "market": "US",
-        "cik": "0001460702",
-        "issuerId": null,
-        "identityStatus": "CANONICAL_IDENTITY_READY",
-        "discoveryScore": 82,
-        "scoreType": "DISCOVERY_PRIORITY",
-        "status": "DISCOVERED_RESEARCH_REQUIRED",
-        "suggestedAction": "WATCH",
-        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-        "isExistingFocusCompany": false,
-        "reasons": [
-          "Νέα επίσημη κατάθεση 10-Q στη SEC",
-          "Το γεγονός είναι πολύ πρόσφατο",
-          "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος",
-          "Νέα επίσημη κατάθεση 8-K στη SEC",
-          "Νέα αποτελέσματα ή καθοδήγηση διοίκησης"
-        ],
-        "latestEventAt": "2026-08-07T21:21:08.000Z",
-        "events": [
-          {
-            "form": "8-K",
-            "title": "8-K - AIxCrypto Holdings, Inc. (0001460702) (Filer)",
-            "publishedAt": "2026-08-07T21:20:44.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1460702/000149315226036659/0001493152-26-036659-index.htm",
-            "sourceName": "SEC EDGAR Current Filings",
-            "eventScore": 82
-          },
-          {
-            "form": "10-Q",
-            "title": "10-Q - AIxCrypto Holdings, Inc. (0001460702) (Filer)",
-            "publishedAt": "2026-08-07T21:21:08.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1460702/000149315226036658/0001493152-26-036658-index.htm",
-            "sourceName": "SEC EDGAR Current Filings",
-            "eventScore": 70
-          }
-        ]
-      },
-      "status": "DRAFT_RESEARCH",
-      "category": "INSUFFICIENT_EVIDENCE",
-      "action": "WATCH",
-      "finalAction": {
-        "format": "investor-control-final-action",
-        "version": 2,
-        "policyVersion": "2026-08-07.1",
-        "generatedAt": "2026-08-07T21:22:54.875Z",
-        "validUntil": "2026-08-08T21:22:54.875Z",
-        "status": "BLOCKED",
-        "marketAction": "WATCH",
-        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "holderAction": "WATCH",
-        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "nonHolderAction": "WATCH",
-        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "urgency": "NONE",
-        "urgencyLabel": "Χωρίς τελική ενέργεια",
-        "confidenceScore": 33,
-        "dataQualityScore": 30,
-        "reasons": [
-          "FINAL_ACTION_BLOCKED"
-        ],
-        "blockers": [
-          "DOSSIER_NOT_PUBLISHABLE",
-          "DOSSIER_NOT_READY",
-          "CROSS_CHECK_NOT_READY",
-          "FUNDAMENTALS_NOT_READY"
-        ],
-        "freshness": {
-          "referencePriceAgeHours": 1.3819097222222223,
-          "dossierAgeHours": 0,
-          "latestMarketAgeHours": 7.881909722222222,
-          "referencePricePurpose": "ANALYSIS_REFERENCE",
-          "referencePriceFreshnessModel": "VERIFIED_TIMESTAMP",
-          "executionFreshnessEligible": true
-        },
-        "risk": {
-          "riskScore": 0,
-          "fundamentalFlags": [
-            "SEVERE_DILUTION"
-          ],
-          "marketFlags": [
-            "EXTREME_VOLATILITY",
-            "SEVERE_DRAWDOWN",
-            "LOW_LIQUIDITY",
-            "BELOW_50_DAY_AVERAGE",
-            "WEAK_RELATIVE_STRENGTH"
-          ]
-        },
-        "controlledPlan": {
-          "status": "AVAILABLE",
-          "level": "INTERIM_RISK_CONTROL",
-          "title": "Πλάνο τώρα",
-          "holderAction": "HOLD",
-          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ — ΕΠΑΝΕΞΕΤΑΣΗ ΚΙΝΔΥΝΟΥ",
-          "nonHolderAction": "DO_NOT_BUY",
-          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
-          "marketAction": "WATCH",
-          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-          "newBuyAllowed": false,
-          "sellSignalApproved": false,
-          "confidenceScore": 33,
-          "dataQualityScore": 30,
-          "rationale": "Υπάρχουν επαληθευμένες ενδείξεις αυξημένου κινδύνου, αλλά δεν έχουν περάσει ακόμη όλοι οι έλεγχοι που απαιτούνται για τελικό σήμα πώλησης ή μείωσης.",
-          "blockers": [
-            "DOSSIER_NOT_PUBLISHABLE",
-            "DOSSIER_NOT_READY",
-            "CROSS_CHECK_NOT_READY",
-            "FUNDAMENTALS_NOT_READY"
-          ],
-          "validUntil": "2026-08-08T21:22:54.875Z"
-        },
-        "execution": {
-          "automaticBrokerOrder": false,
-          "requiresUserExecution": true
-        }
-      },
-      "thesis": "Η AIxCrypto Holdings, έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: μεταβολή απομειωμένου αριθμού μετοχών 565.9%, απόδοση 60 συνεδριάσεων -37.01%, σχετική ισχύς 60 συνεδριάσεων -42.03%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
-      "blockers": [
-        "FUNDAMENTALS_REQUIRED",
-        "INDEPENDENT_CROSS_CHECK_REQUIRED",
-        "CLAIM_CORROBORATION_REQUIRED"
-      ],
-      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
-      "reviewDate": "2026-10-06"
-    },
-    {
-      "companyId": "company:sec:0001080657",
-      "companyName": "Presidio Property Trust,",
-      "symbol": "SQFT",
-      "origin": "AUTONOMOUS_DISCOVERY",
-      "discovery": {
-        "discoveryId": "discovery:company:sec:0001080657:2026-08-07",
-        "companyId": "company:sec:0001080657",
-        "companyName": "Presidio Property Trust,",
-        "symbol": "SQFT",
-        "exchange": "Nasdaq",
-        "mic": "XNAS",
-        "market": "US",
-        "cik": "0001080657",
-        "issuerId": null,
-        "identityStatus": "CANONICAL_IDENTITY_READY",
-        "discoveryScore": 86,
-        "scoreType": "DISCOVERY_PRIORITY",
-        "status": "DISCOVERED_RESEARCH_REQUIRED",
-        "suggestedAction": "WATCH",
-        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
-        "isExistingFocusCompany": false,
-        "reasons": [
-          "Νέα επίσημη κατάθεση SC TO-I στη SEC",
-          "Το γεγονός είναι πολύ πρόσφατο",
-          "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
-        ],
-        "latestEventAt": "2026-08-07T21:17:51.000Z",
-        "events": [
-          {
-            "form": "SC TO-I",
-            "title": "SC TO-I - Presidio Property Trust, Inc. (0001080657) (Subject)",
-            "publishedAt": "2026-08-07T21:17:51.000Z",
-            "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1080657/000149315226036654/0001493152-26-036654-index.htm",
-            "sourceName": "SEC EDGAR Current Filings",
-            "eventScore": 86
-          }
-        ]
-      },
-      "status": "DRAFT_RESEARCH",
-      "category": "INSUFFICIENT_EVIDENCE",
-      "action": "WATCH",
-      "finalAction": {
-        "format": "investor-control-final-action",
-        "version": 2,
-        "policyVersion": "2026-08-07.1",
-        "generatedAt": "2026-08-07T21:22:54.875Z",
-        "validUntil": "2026-08-08T21:22:54.875Z",
-        "status": "BLOCKED",
-        "marketAction": "WATCH",
-        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "holderAction": "WATCH",
-        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "nonHolderAction": "WATCH",
-        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-        "urgency": "NONE",
-        "urgencyLabel": "Χωρίς τελική ενέργεια",
-        "confidenceScore": 42,
-        "dataQualityScore": 15,
-        "reasons": [
-          "FINAL_ACTION_BLOCKED"
-        ],
-        "blockers": [
-          "DOSSIER_NOT_PUBLISHABLE",
-          "DOSSIER_NOT_READY",
-          "CROSS_CHECK_NOT_READY",
-          "FUNDAMENTALS_NOT_READY",
-          "MARKET_METRICS_NOT_READY",
-          "MARKET_HISTORY_SOURCE_NOT_READY",
-          "MARKET_HISTORY_NOT_CROSSCHECKED",
-          "REFERENCE_PRICE_STALE"
-        ],
-        "freshness": {
-          "referencePriceAgeHours": 31.881909722222222,
-          "dossierAgeHours": 0,
-          "latestMarketAgeHours": 31.881909722222222,
-          "referencePricePurpose": "HISTORICAL_REFERENCE",
-          "referencePriceFreshnessModel": "HISTORICAL_CLOSE",
-          "executionFreshnessEligible": false
-        },
-        "risk": {
-          "riskScore": 0,
-          "fundamentalFlags": [],
-          "marketFlags": [
-            "HIGH_VOLATILITY",
-            "MATERIAL_DRAWDOWN",
-            "LOW_LIQUIDITY",
-            "BELOW_50_DAY_AVERAGE",
-            "WEAK_RELATIVE_STRENGTH"
-          ]
-        },
-        "controlledPlan": {
-          "status": "AVAILABLE",
-          "level": "INTERIM_RISK_CONTROL",
-          "title": "Πλάνο τώρα",
-          "holderAction": "HOLD",
-          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ",
-          "nonHolderAction": "DO_NOT_BUY",
-          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
-          "marketAction": "WATCH",
-          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
-          "newBuyAllowed": false,
-          "sellSignalApproved": false,
-          "confidenceScore": 42,
-          "dataQualityScore": 15,
-          "rationale": "Δεν έχουν ολοκληρωθεί όλοι οι υποχρεωτικοί έλεγχοι για τελική αγορά ή πώληση. Μέχρι τότε η πειθαρχημένη στάση είναι διατήρηση υπάρχουσας θέσης χωρίς νέα ενίσχυση και αποφυγή νέας εισόδου.",
-          "blockers": [
-            "DOSSIER_NOT_PUBLISHABLE",
-            "DOSSIER_NOT_READY",
-            "CROSS_CHECK_NOT_READY",
-            "FUNDAMENTALS_NOT_READY",
-            "MARKET_METRICS_NOT_READY",
-            "MARKET_HISTORY_SOURCE_NOT_READY",
-            "MARKET_HISTORY_NOT_CROSSCHECKED",
-            "REFERENCE_PRICE_STALE"
-          ],
-          "validUntil": "2026-08-08T21:22:54.875Z"
-        },
-        "execution": {
-          "automaticBrokerOrder": false,
-          "requiresUserExecution": true
-        }
-      },
-      "thesis": "Η Presidio Property Trust, έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: μεταβολή απομειωμένου αριθμού μετοχών 0.27%, απόδοση 60 συνεδριάσεων -26.37%, σχετική ισχύς 60 συνεδριάσεων -30.59%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
-      "blockers": [
-        "FUNDAMENTALS_REQUIRED",
-        "HISTORICAL_MARKET_METRICS_REQUIRED",
-        "INDEPENDENT_CROSS_CHECK_REQUIRED",
-        "CLAIM_CORROBORATION_REQUIRED"
-      ],
-      "nextStep": "Διασταύρωση του ίδιου γεγονότος με ανεξάρτητη πηγή",
-      "reviewDate": "2026-10-06"
-    },
     {
       "companyId": "company:allwyn-ag",
       "companyName": "Allwyn",
@@ -3027,8 +2589,8 @@
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-08-07.1",
-        "generatedAt": "2026-08-07T21:22:54.875Z",
-        "validUntil": "2026-08-08T21:22:54.875Z",
+        "generatedAt": "2026-08-07T21:54:15.548Z",
+        "validUntil": "2026-08-08T21:54:15.548Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -3052,7 +2614,7 @@
         "freshness": {
           "referencePriceAgeHours": 0,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 37.881909722222225,
+          "latestMarketAgeHours": 38.40431888888889,
           "referencePricePurpose": "ANALYSIS_REFERENCE",
           "referencePriceFreshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
           "executionFreshnessEligible": false
@@ -3085,14 +2647,14 @@
             "CROSS_CHECK_NOT_READY",
             "FUNDAMENTALS_NOT_READY"
           ],
-          "validUntil": "2026-08-08T21:22:54.875Z"
+          "validUntil": "2026-08-08T21:54:15.548Z"
         },
         "execution": {
           "automaticBrokerOrder": false,
           "requiresUserExecution": true
         }
       },
-      "thesis": "Το επιβεβαιωμένο πρόγραμμα επαναγοράς ιδίων μετοχών της Allwyn μπορεί να βελτιώσει την αξία ανά μετοχή μόνο εφόσον οι αγορές είναι ουσιαστικές, γίνονται σε ελκυστική αποτίμηση και χρηματοδοτούνται χωρίς αποδυνάμωση της ρευστότητας. Αποτελεί μετρήσιμο καταλύτη κατανομής κεφαλαίου, όχι αυτοτελή λόγο αγοράς. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων 8.45%, σχετική ισχύς 60 συνεδριάσεων -11.05%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
+      "thesis": "Το επιβεβαιωμένο πρόγραμμα επαναγοράς ιδίων μετοχών της Allwyn μπορεί να βελτιώσει την αξία ανά μετοχή μόνο εφόσον οι αγορές είναι ουσιαστικές, γίνονται σε ελκυστική αποτίμηση και χρηματοδοτούνται χωρίς αποδυνάμωση της ρευστότητας. Αποτελεί μετρήσιμο καταλύτη κατανομής κεφαλαίου, όχι αυτοτελή λόγο αγοράς. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων 10.29%, σχετική ισχύς 60 συνεδριάσεων -11.05%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
       "blockers": [
         "FUNDAMENTALS_REQUIRED",
         "INDEPENDENT_CROSS_CHECK_REQUIRED",
@@ -3148,8 +2710,8 @@
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-08-07.1",
-        "generatedAt": "2026-08-07T21:22:54.875Z",
-        "validUntil": "2026-08-08T21:22:54.875Z",
+        "generatedAt": "2026-08-07T21:54:15.548Z",
+        "validUntil": "2026-08-08T21:54:15.548Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -3174,7 +2736,7 @@
         "freshness": {
           "referencePriceAgeHours": 0,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 37.881909722222225,
+          "latestMarketAgeHours": 38.40431888888889,
           "referencePricePurpose": "ANALYSIS_REFERENCE",
           "referencePriceFreshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
           "executionFreshnessEligible": false
@@ -3209,7 +2771,7 @@
             "FUNDAMENTALS_NOT_READY",
             "REVIEW_DATE_EXPIRED"
           ],
-          "validUntil": "2026-08-08T21:22:54.875Z"
+          "validUntil": "2026-08-08T21:54:15.548Z"
         },
         "execution": {
           "automaticBrokerOrder": false,
@@ -3289,8 +2851,8 @@
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-08-07.1",
-        "generatedAt": "2026-08-07T21:22:54.875Z",
-        "validUntil": "2026-08-08T21:22:54.875Z",
+        "generatedAt": "2026-08-07T21:54:15.548Z",
+        "validUntil": "2026-08-08T21:54:15.548Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -3315,7 +2877,7 @@
         "freshness": {
           "referencePriceAgeHours": 0,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 37.881909722222225,
+          "latestMarketAgeHours": 38.40431888888889,
           "referencePricePurpose": "ANALYSIS_REFERENCE",
           "referencePriceFreshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
           "executionFreshnessEligible": false
@@ -3349,7 +2911,7 @@
             "FUNDAMENTALS_NOT_READY",
             "REVIEW_DATE_EXPIRED"
           ],
-          "validUntil": "2026-08-08T21:22:54.875Z"
+          "validUntil": "2026-08-08T21:54:15.548Z"
         },
         "execution": {
           "automaticBrokerOrder": false,
@@ -3420,8 +2982,8 @@
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-08-07.1",
-        "generatedAt": "2026-08-07T21:22:54.875Z",
-        "validUntil": "2026-08-08T21:22:54.875Z",
+        "generatedAt": "2026-08-07T21:54:15.548Z",
+        "validUntil": "2026-08-08T21:54:15.548Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -3446,7 +3008,7 @@
         "freshness": {
           "referencePriceAgeHours": 0,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 37.881909722222225,
+          "latestMarketAgeHours": 38.40431888888889,
           "referencePricePurpose": "ANALYSIS_REFERENCE",
           "referencePriceFreshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
           "executionFreshnessEligible": false
@@ -3483,7 +3045,7 @@
             "FUNDAMENTALS_NOT_READY",
             "REVIEW_DATE_EXPIRED"
           ],
-          "validUntil": "2026-08-08T21:22:54.875Z"
+          "validUntil": "2026-08-08T21:54:15.548Z"
         },
         "execution": {
           "automaticBrokerOrder": false,
@@ -3509,6 +3071,268 @@
       "reviewDate": null
     },
     {
+      "companyId": "company:xath:term-342",
+      "companyName": "PUBLIC POWER CORPORATION SA",
+      "symbol": "PPC",
+      "origin": "AUTONOMOUS_DISCOVERY",
+      "discovery": {
+        "discoveryId": "discovery:company:xath:term-342:2026-08-07",
+        "companyId": "company:xath:term-342",
+        "companyName": "PUBLIC POWER CORPORATION SA",
+        "symbol": "PPC",
+        "exchange": "Euronext Athens",
+        "mic": "XATH",
+        "market": "GR",
+        "cik": null,
+        "issuerId": "881",
+        "identityStatus": "CANONICAL_IDENTITY_READY",
+        "discoveryScore": 62,
+        "scoreType": "DISCOVERY_PRIORITY",
+        "status": "DISCOVERED_RESEARCH_REQUIRED",
+        "suggestedAction": "WATCH",
+        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
+        "isExistingFocusCompany": false,
+        "reasons": [
+          "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
+          "Το γεγονός είναι πολύ πρόσφατο",
+          "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
+        ],
+        "latestEventAt": "2026-08-07T17:15:00.000Z",
+        "events": [
+          {
+            "form": "ATHEX_ANNOUNCEMENT",
+            "title": "PPC Group: New agreement for a RES project portfolio of over 2 GW in Poland and Hungary",
+            "publishedAt": "2026-08-07T17:15:00.000Z",
+            "sourceUrl": "https://athens.euronext.com/en/node/968699",
+            "sourceName": "Euronext Athens",
+            "eventScore": 62
+          }
+        ]
+      },
+      "status": "DRAFT_RESEARCH",
+      "category": "INSUFFICIENT_EVIDENCE",
+      "action": "WATCH",
+      "finalAction": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-07.1",
+        "generatedAt": "2026-08-07T21:54:15.548Z",
+        "validUntil": "2026-08-08T21:54:15.548Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 70,
+        "dataQualityScore": 30,
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY",
+          "REVIEW_DATE_EXPIRED"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 0,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 38.40431888888889,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": null,
+          "fundamentalFlags": [],
+          "marketFlags": [
+            "BELOW_50_DAY_AVERAGE"
+          ]
+        },
+        "controlledPlan": {
+          "status": "AVAILABLE",
+          "level": "INTERIM_RISK_CONTROL",
+          "title": "Πλάνο τώρα",
+          "holderAction": "HOLD",
+          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ",
+          "nonHolderAction": "DO_NOT_BUY",
+          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
+          "marketAction": "WATCH",
+          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+          "newBuyAllowed": false,
+          "sellSignalApproved": false,
+          "confidenceScore": 70,
+          "dataQualityScore": 30,
+          "rationale": "Δεν έχουν ολοκληρωθεί όλοι οι υποχρεωτικοί έλεγχοι για τελική αγορά ή πώληση. Μέχρι τότε η πειθαρχημένη στάση είναι διατήρηση υπάρχουσας θέσης χωρίς νέα ενίσχυση και αποφυγή νέας εισόδου.",
+          "blockers": [
+            "DOSSIER_NOT_PUBLISHABLE",
+            "DOSSIER_NOT_READY",
+            "CROSS_CHECK_NOT_READY",
+            "FUNDAMENTALS_NOT_READY",
+            "REVIEW_DATE_EXPIRED"
+          ],
+          "validUntil": "2026-08-08T21:54:15.548Z"
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "thesis": null,
+      "blockers": [
+        "DOCUMENT_REVIEW_REQUIRED",
+        "FUNDAMENTALS_REQUIRED",
+        "INDEPENDENT_CROSS_CHECK_REQUIRED",
+        "THESIS_REQUIRED",
+        "INVALIDATION_CONDITION_REQUIRED",
+        "MATERIAL_RISKS_REQUIRED",
+        "CAUSAL_MECHANISM_REQUIRED",
+        "BULL_CASE_REQUIRED",
+        "BEAR_CASE_REQUIRED",
+        "VERIFIED_CATALYST_REQUIRED",
+        "REVIEW_DATE_REQUIRED",
+        "CANONICAL_CLAIM_REQUIRED"
+      ],
+      "nextStep": "Άνοιγμα και ανάλυση του επίσημου εγγράφου",
+      "reviewDate": null
+    },
+    {
+      "companyId": "company:xath:term-341",
+      "companyName": "QUALITY AND RELIABILITY S.A.",
+      "symbol": "QUAL",
+      "origin": "AUTONOMOUS_DISCOVERY",
+      "discovery": {
+        "discoveryId": "discovery:company:xath:term-341:2026-08-07",
+        "companyId": "company:xath:term-341",
+        "companyName": "QUALITY AND RELIABILITY S.A.",
+        "symbol": "QUAL",
+        "exchange": "Euronext Athens",
+        "mic": "XATH",
+        "market": "GR",
+        "cik": null,
+        "issuerId": "826",
+        "identityStatus": "CANONICAL_IDENTITY_READY",
+        "discoveryScore": 62,
+        "scoreType": "DISCOVERY_PRIORITY",
+        "status": "DISCOVERED_RESEARCH_REQUIRED",
+        "suggestedAction": "WATCH",
+        "suggestedActionLabel": "Παρακολούθηση μέχρι πλήρη ανάλυση",
+        "isExistingFocusCompany": false,
+        "reasons": [
+          "Νέα επίσημη ανακοίνωση εκδότη στο Euronext Athens",
+          "Το γεγονός είναι πολύ πρόσφατο",
+          "Απαιτείται ανάγνωση της ανακοίνωσης για να προσδιοριστεί η οικονομική ουσία του γεγονότος"
+        ],
+        "latestEventAt": "2026-08-07T15:44:00.000Z",
+        "events": [
+          {
+            "form": "ATHEX_ANNOUNCEMENT",
+            "title": "Announcement of Own Share Purchases",
+            "publishedAt": "2026-08-07T15:44:00.000Z",
+            "sourceUrl": "https://athens.euronext.com/en/node/968698",
+            "sourceName": "Euronext Athens",
+            "eventScore": 62
+          }
+        ]
+      },
+      "status": "DRAFT_RESEARCH",
+      "category": "INSUFFICIENT_EVIDENCE",
+      "action": "WATCH",
+      "finalAction": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-07.1",
+        "generatedAt": "2026-08-07T21:54:15.548Z",
+        "validUntil": "2026-08-08T21:54:15.548Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 57,
+        "dataQualityScore": 30,
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY",
+          "REVIEW_DATE_EXPIRED"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 0,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 38.40431888888889,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": 20,
+          "fundamentalFlags": [],
+          "marketFlags": [
+            "LOW_LIQUIDITY"
+          ]
+        },
+        "controlledPlan": {
+          "status": "AVAILABLE",
+          "level": "INTERIM_RISK_CONTROL",
+          "title": "Πλάνο τώρα",
+          "holderAction": "HOLD",
+          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ — ΕΠΑΝΕΞΕΤΑΣΗ ΚΙΝΔΥΝΟΥ",
+          "nonHolderAction": "DO_NOT_BUY",
+          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
+          "marketAction": "WATCH",
+          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+          "newBuyAllowed": false,
+          "sellSignalApproved": false,
+          "confidenceScore": 57,
+          "dataQualityScore": 30,
+          "rationale": "Υπάρχουν επαληθευμένες ενδείξεις αυξημένου κινδύνου, αλλά δεν έχουν περάσει ακόμη όλοι οι έλεγχοι που απαιτούνται για τελικό σήμα πώλησης ή μείωσης.",
+          "blockers": [
+            "DOSSIER_NOT_PUBLISHABLE",
+            "DOSSIER_NOT_READY",
+            "CROSS_CHECK_NOT_READY",
+            "FUNDAMENTALS_NOT_READY",
+            "REVIEW_DATE_EXPIRED"
+          ],
+          "validUntil": "2026-08-08T21:54:15.548Z"
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "thesis": null,
+      "blockers": [
+        "DOCUMENT_REVIEW_REQUIRED",
+        "FUNDAMENTALS_REQUIRED",
+        "INDEPENDENT_CROSS_CHECK_REQUIRED",
+        "THESIS_REQUIRED",
+        "INVALIDATION_CONDITION_REQUIRED",
+        "MATERIAL_RISKS_REQUIRED",
+        "CAUSAL_MECHANISM_REQUIRED",
+        "BULL_CASE_REQUIRED",
+        "BEAR_CASE_REQUIRED",
+        "VERIFIED_CATALYST_REQUIRED",
+        "REVIEW_DATE_REQUIRED",
+        "CANONICAL_CLAIM_REQUIRED"
+      ],
+      "nextStep": "Άνοιγμα και ανάλυση του επίσημου εγγράφου",
+      "reviewDate": null
+    },
+    {
       "companyId": "company:virgin-galactic-holdings",
       "companyName": "Virgin Galactic",
       "symbol": "SPCE",
@@ -3521,8 +3345,8 @@
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-08-07.1",
-        "generatedAt": "2026-08-07T21:22:54.875Z",
-        "validUntil": "2026-08-08T21:22:54.875Z",
+        "generatedAt": "2026-08-07T21:54:15.548Z",
+        "validUntil": "2026-08-08T21:54:15.548Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -3543,9 +3367,9 @@
           "CROSS_CHECK_NOT_READY"
         ],
         "freshness": {
-          "referencePriceAgeHours": 1.3819097222222223,
+          "referencePriceAgeHours": 1.904318888888889,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 7.881909722222222,
+          "latestMarketAgeHours": 8.40431888888889,
           "referencePricePurpose": "ANALYSIS_REFERENCE",
           "referencePriceFreshnessModel": "VERIFIED_TIMESTAMP",
           "executionFreshnessEligible": true
@@ -3584,7 +3408,7 @@
             "DOSSIER_NOT_READY",
             "CROSS_CHECK_NOT_READY"
           ],
-          "validUntil": "2026-08-08T21:22:54.875Z"
+          "validUntil": "2026-08-08T21:54:15.548Z"
         },
         "execution": {
           "automaticBrokerOrder": false,
@@ -3612,8 +3436,8 @@
         "format": "investor-control-final-action",
         "version": 2,
         "policyVersion": "2026-08-07.1",
-        "generatedAt": "2026-08-07T21:22:54.875Z",
-        "validUntil": "2026-08-08T21:22:54.875Z",
+        "generatedAt": "2026-08-07T21:54:15.548Z",
+        "validUntil": "2026-08-08T21:54:15.548Z",
         "status": "BLOCKED",
         "marketAction": "WATCH",
         "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
@@ -3637,7 +3461,7 @@
         "freshness": {
           "referencePriceAgeHours": 0,
           "dossierAgeHours": 0,
-          "latestMarketAgeHours": 37.881909722222225,
+          "latestMarketAgeHours": 38.40431888888889,
           "referencePricePurpose": "ANALYSIS_REFERENCE",
           "referencePriceFreshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
           "executionFreshnessEligible": false
@@ -3672,14 +3496,14 @@
             "CROSS_CHECK_NOT_READY",
             "FUNDAMENTALS_NOT_READY"
           ],
-          "validUntil": "2026-08-08T21:22:54.875Z"
+          "validUntil": "2026-08-08T21:54:15.548Z"
         },
         "execution": {
           "automaticBrokerOrder": false,
           "requiresUserExecution": true
         }
       },
-      "thesis": "Η CrediaBank έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων -22.99%, σχετική ισχύς 60 συνεδριάσεων -34.68%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
+      "thesis": "Η CrediaBank έχει μια αναγνωσμένη επίσημη εξέλιξη, αλλά οι ντετερμινιστικοί κανόνες δεν μπορούν ακόμη να θεμελιώσουν αρκετά συγκεκριμένη αιτιώδη επενδυτική θέση. Το γεγονός πρέπει να παραμείνει υπό παρακολούθηση μέχρι οι οικονομικές και χρηματιστηριακές συνέπειές του να είναι μετρήσιμες. Οι ντετερμινιστικοί υπολογισμοί καταγράφουν σήμερα: απόδοση 60 συνεδριάσεων -20.73%, σχετική ισχύς 60 συνεδριάσεων -34.68%. Οι τιμές αυτές αποτελούν εισόδους υπολογισμού και δεν υποκαθιστούν τους ελέγχους τεκμηρίωσης.",
       "blockers": [
         "FUNDAMENTALS_REQUIRED",
         "INDEPENDENT_CROSS_CHECK_REQUIRED",
