@@ -116,7 +116,24 @@ jobs:
               }
             }
 
-            for (const { fact, expectedContext, metric } of athensFacts(snapshot)) {
+            const verifiedAthensFacts = athensFacts(snapshot);
+            if (verifiedAthensFacts.length) {
+              if (snapshot?.quality?.rowLabelPolicy !== 'ROW_LABEL_ANCHORED_V1') {
+                throw new Error(`Athens snapshot missing row-label policy: ${snapshot.companyId}`);
+              }
+              if (snapshot?.quality?.numericSemanticsPolicy !== 'FINANCIAL_TABLE_NUMBER_V1') {
+                throw new Error(`Athens snapshot missing numeric-semantics policy: ${snapshot.companyId}`);
+              }
+              const balanceStatus = snapshot?.quality?.balanceSheetIntegrity?.status || 'INSUFFICIENT_DATA';
+              if (balanceStatus === 'FAILED') {
+                throw new Error(`Athens balance-sheet integrity failed: ${snapshot.companyId}:${(snapshot.quality.balanceSheetIntegrity.issues || []).join(',')}`);
+              }
+              if (snapshot.metricsReady === true && balanceStatus !== 'PASSED') {
+                throw new Error(`Athens snapshot ready without passed balance sheet: ${snapshot.companyId}:${balanceStatus}`);
+              }
+            }
+
+            for (const { fact, expectedContext, metric } of verifiedAthensFacts) {
               const provenance = fact.provenance || {};
               const line = String(provenance.extractedLine || '');
               if (provenance.metricExtractionPolicy !== 'STATEMENT_ROW_ONLY_V2') {
@@ -172,6 +189,9 @@ jobs:
             blocked: feed.summary?.blockedDecisionCount,
             fundamentalIntegrity: 'VERIFIED',
             athensStatementProvenance: 'REQUIRED',
+            athensRowLabelPolicy: 'REQUIRED',
+            athensNumericSemantics: 'REQUIRED',
+            athensBalanceSheetIntegrity: 'REQUIRED_FOR_READY',
           }, null, 2));
           NODE
 
