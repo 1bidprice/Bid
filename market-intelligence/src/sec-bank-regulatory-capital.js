@@ -1,4 +1,4 @@
-export const SEC_BANK_REGULATORY_CAPITAL_VERSION = '2026-08-07.2';
+export const SEC_BANK_REGULATORY_CAPITAL_VERSION = '2026-08-07.3';
 
 const FORM_PATTERN = /\b(10-K\/A|10-Q\/A|10-K|10-Q)\b/i;
 const RATIO_PATTERNS = Object.freeze({
@@ -27,24 +27,28 @@ function lineCandidates(lines, pattern) {
   for (let index = 0; index < lines.length; index += 1) {
     const line = String(lines[index] || '').trim();
     if (!pattern.test(line)) continue;
+    const sameLineRatios = percentages(line);
     const next = String(lines[index + 1] || '').trim();
-    const window = [line, next].filter(Boolean).join(' ');
-    const ratios = percentages(window);
+    const ratioSource = sameLineRatios.length ? line : [line, next].filter(Boolean).join(' ');
+    const ratios = sameLineRatios.length ? sameLineRatios : percentages(ratioSource);
     if (!ratios.length) continue;
 
-    const lowered = window.toLowerCase();
-    const minimumPenalty = /minimum|required|well[- ]capitalized|adequately capitalized|regulatory minimum|buffer requirement/.test(lowered) ? 80 : 0;
-    const actualBonus = /actual|company|bank|capital ratio|capital ratios/.test(lowered) ? 20 : 0;
-    const sameLineBonus = percentages(line).length ? 30 : 0;
+    const loweredLine = line.toLowerCase();
+    const minimumRow = /minimum|required|well[- ]capitalized|adequately capitalized|regulatory minimum|buffer requirement/.test(loweredLine);
+    const actualBonus = /actual|company|bank|capital ratio|capital ratios/.test(loweredLine) ? 20 : 0;
+    const sameLineBonus = sameLineRatios.length ? 30 : 0;
     const ratio = ratios[0];
     candidates.push({
       value: round(ratio.value),
       lineNumber: index + 1,
-      excerpt: window.slice(0, 500),
-      score: 100 + actualBonus + sameLineBonus - minimumPenalty,
+      excerpt: ratioSource.slice(0, 500),
+      score: 100 + actualBonus + sameLineBonus - (minimumRow ? 120 : 0),
+      minimumRow,
     });
   }
-  return candidates.sort((a, b) => b.score - a.score || a.lineNumber - b.lineNumber);
+  return candidates
+    .filter((candidate) => candidate.minimumRow !== true)
+    .sort((a, b) => b.score - a.score || a.lineNumber - b.lineNumber);
 }
 
 function extractRatio(lines, pattern) {
