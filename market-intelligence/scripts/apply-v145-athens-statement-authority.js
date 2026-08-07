@@ -21,9 +21,11 @@ function insertBefore(marker, content, verificationMarker, label) {
 insertBefore(
   'function findMetricRow(pages, labels, options = {}) {',
   `function statementPageAuthorityScore(pages, pageIndex, contexts = []) {
-  const current = normalizeLine(String(pages[pageIndex] || ''));
+  const rawCurrent = String(pages[pageIndex] || '');
+  const current = normalizeLine(rawCurrent);
   const previous = pageIndex > 0 ? normalizeLine(String(pages[pageIndex - 1] || '')) : '';
   const vicinity = current + ' ' + previous;
+  const lines = rawCurrent.split(String.fromCharCode(10)).map((line) => line.trim()).filter(Boolean);
   let score = 0;
 
   // Audited/reviewed statement sections outrank Board Report, APM and ratio
@@ -33,9 +35,9 @@ insertBefore(
   if (/board of directors report|review of h1 .* results|remarks on key figures|alternative performance measures|profitability ratios|definitions of financial figures/.test(current)) score -= 180;
 
   // A page headed by the requested primary statement receives a bounded bonus.
-  if (contexts.includes('INCOME_STATEMENT') && /(?:^|\n)\s*(?:income statement|statement of comprehensive income)\b/i.test(String(pages[pageIndex] || ''))) score += 80;
-  if (contexts.includes('BALANCE_SHEET') && /(?:^|\n)\s*(?:statement of financial position|(?:condensed )?balance sheet)\b/i.test(String(pages[pageIndex] || ''))) score += 80;
-  if (contexts.includes('CASH_FLOW') && /(?:^|\n)\s*(?:statement of cash flows?|cash flow statement)\b/i.test(String(pages[pageIndex] || ''))) score += 80;
+  if (contexts.includes('INCOME_STATEMENT') && lines.some((line) => /^(?:income statement|statement of comprehensive income)(?: |$)/i.test(line))) score += 80;
+  if (contexts.includes('BALANCE_SHEET') && lines.some((line) => /^(?:statement of financial position|(?:condensed )?balance sheet)(?: |$)/i.test(line))) score += 80;
+  if (contexts.includes('CASH_FLOW') && lines.some((line) => /^(?:statement of cash flows?|cash flow statement)(?: |$)/i.test(line))) score += 80;
   return score;
 }`,
   'statementPageAuthorityScore',
