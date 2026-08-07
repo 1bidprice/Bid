@@ -78,6 +78,8 @@ function completeDossier(executionFreshnessEligible) {
       timestamp,
       source: 'Test market source',
       purpose: 'ANALYSIS_REFERENCE',
+      analysisReferenceEligible: true,
+      decisionEligible: executionFreshnessEligible,
       freshnessModel: executionFreshnessEligible ? 'VERIFIED_TIMESTAMP' : 'OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY',
       executionFreshnessEligible,
     },
@@ -89,6 +91,7 @@ function completeDossier(executionFreshnessEligible) {
       fundamentalRisk: { metricsReady: true, riskScore: 20, flags: [] },
       market: {
         readiness: { marketMetricsReady: true },
+        dataQuality: { sourceReady: true, crossCheckReady: true, benchmarkReady: true },
         latestTimestamp: Date.parse(timestamp) / 1000,
         liquidity: { score: 80 },
         relativeStrength: { excessReturnPct: 8 },
