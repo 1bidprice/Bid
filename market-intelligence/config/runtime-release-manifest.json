@@ -1,0 +1,44 @@
+{
+  "format": "investor-control-runtime-release-manifest",
+  "version": 1,
+  "releaseVersion": "1.2.9",
+  "testPatches": [
+    "apply-v100-production.js",
+    "apply-v100-provider-refinements.js",
+    "apply-v100-event-integrity.js",
+    "apply-v100-feed-health.js",
+    "apply-v110-unified-intelligence.js",
+    "apply-v111-package-integrity.js",
+    "apply-v122-athens-trading-directory.js",
+    "apply-v123-athens-directory-pagination.js",
+    "apply-v124-athens-directory-all-filter.js",
+    "apply-v125-athens-letter-resolution.js",
+    "apply-v126-controlled-plan.js",
+    "apply-v127-decision-grade-reference.js",
+    "apply-v128-athens-fundamental-passport.js",
+    "apply-v129-fundamental-integrity.js"
+  ],
+  "buildPatches": [
+    "apply-v100-provider-refinements.js",
+    "apply-v100-event-integrity.js",
+    "apply-v100-feed-health.js",
+    "apply-v110-unified-intelligence.js",
+    "apply-v111-package-integrity.js",
+    "apply-v122-athens-trading-directory.js",
+    "apply-v123-athens-directory-pagination.js",
+    "apply-v124-athens-directory-all-filter.js",
+    "apply-v125-athens-letter-resolution.js",
+    "apply-v126-controlled-plan.js",
+    "apply-v127-decision-grade-reference.js",
+    "apply-v128-athens-fundamental-passport.js",
+    "apply-v129-fundamental-integrity.js"
+  ],
+  "entrypoints": {
+    "test": "node --test",
+    "run:daily": "node src/run-daily-intelligence.js out/daily-intelligence.json",
+    "run:autonomous": "node src/run-autonomous-intelligence.js out/autonomous-intelligence.json",
+    "build:mobile": "node src/build-mobile-feed.js out/daily-intelligence.json out/mobile-intelligence-feed.json",
+    "build:autonomous-mobile": "node src/build-mobile-feed.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json",
+    "publish:reviewed": "node src/publish-reviewed-research.js out/daily-intelligence.json config/review-decisions.json out/reviewed-publication.json"
+  }
+}
