@@ -36,14 +36,14 @@ jobs:
           from datetime import datetime, timezone
 
           event_name = os.environ.get('EVENT_NAME', '')
-          force = event_name in {'push', 'workflow_dispatch'}
+          force = event_name == 'workflow_dispatch'
           url = 'https://raw.githubusercontent.com/1bidprice/Bid/investor-control-live-feed/status.json'
           reason = 'healthy'
           age_minutes = 10**9
           now = datetime.now(timezone.utc)
           threshold = 230 if now.weekday() < 5 else 430
           try:
-              request = urllib.request.Request(url, headers={'User-Agent': 'Investor-Control-Watchdog/1.0.1', 'Cache-Control': 'no-cache'})
+              request = urllib.request.Request(url, headers={'User-Agent': 'Investor-Control-Watchdog/2.0.0', 'Cache-Control': 'no-cache'})
               with urllib.request.urlopen(request, timeout=20) as response:
                   status = json.load(response)
               generated = datetime.fromisoformat(str(status.get('generatedAt', '')).replace('Z', '+00:00'))
@@ -56,6 +56,8 @@ jobs:
                   reason = 'backend_marked_output_stale'
               elif status.get('operationalHealth', {}).get('status') == 'FAILED':
                   reason = 'last_production_run_failed'
+              elif status.get('publisherContract') != 'TRANSACTIONAL_V2':
+                  reason = 'legacy_publisher_contract'
           except Exception as exc:
               reason = f'status_unavailable:{type(exc).__name__}'
 
@@ -73,8 +75,8 @@ jobs:
         run: |
           set -euo pipefail
           echo "Recovery reason: ${{ steps.health.outputs.reason }} · age ${{ steps.health.outputs.age_minutes }} / threshold ${{ steps.health.outputs.threshold_minutes }} minutes"
-          gh workflow run investor-control-continuous-intelligence.yml --repo 1bidprice/Bid --ref main
+          gh workflow run investor-control-production-intelligence-v2.yml --repo 1bidprice/Bid --ref main
 
       - name: Report healthy feed
         if: steps.health.outputs.recover != 'true'
-        run: echo "Feed healthy · age ${{ steps.health.outputs.age_minutes }} minutes"
+        run: echo "Feed healthy · transactional-v2 · age ${{ steps.health.outputs.age_minutes }} minutes"
