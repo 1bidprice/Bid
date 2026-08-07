@@ -35,6 +35,11 @@ insertBefore(
   const tail = (firstNumber >= 0 ? remainder.slice(0, firstNumber) : remainder).trim();
   if (!tail) return true;
   if (/^[\\s·•*\\-–—:()./]+$/u.test(tail)) return true;
+  // Explicit statement row/note codes are valid after a row label. This is
+  // intentionally bounded: prose such as "related to assets held for sale"
+  // or "at period start" remains rejected.
+  if (/^(?:note\\s*)?(?:[a-z]\\.)?\\d+(?:[.]\\d+)*$/iu.test(tail)) return true;
+  if (/^\\(?[a-z]\\)?$/iu.test(tail)) return true;
   if (options.allowUnitQualifier === true && /^\\(?\\s*in\\s+(?:eur|euro|euros|€)(?:\\s+thousands?)?\\s*\\)?$/iu.test(tail)) return true;
   return false;
 }
@@ -121,6 +126,18 @@ replaceRequired(
 );
 
 replaceRequired(
+  "  const revenueRow = findMetricRow(pages, ['sales', 'revenue', 'turnover'], { statementContexts: ['INCOME_STATEMENT'], exclude: ['cost of sales', 'revenue reserve', 'revenue recognition'] });",
+  "  const revenueRow = findMetricRow(pages, ['revenue from sale of inventories', 'revenue from contracts with customers', 'sales', 'revenue', 'turnover'], { statementContexts: ['INCOME_STATEMENT'], exclude: ['cost of sales', 'revenue reserve', 'revenue recognition'] });",
+  'canonical extended revenue labels',
+);
+
+replaceRequired(
+  "  const netIncomeRow = findMetricRow(pages, ['net profit for the period', 'profit for the period', 'profit after tax', 'profit after taxes', 'net income'], { statementContexts: ['INCOME_STATEMENT'], exclude: ['before tax', 'before taxes'] });",
+  "  const netIncomeRow = findMetricRow(pages, ['net profit/ (loss) for the period', 'net profit/(loss) for the period', 'net profit for the period', 'profit/(loss) for the period', 'profit for the period', 'profit after tax', 'profit after taxes', 'net income'], { statementContexts: ['INCOME_STATEMENT'], exclude: ['before tax', 'before taxes'] });",
+  'profit-loss row labels',
+);
+
+replaceRequired(
   "  const cashRow = findMetricRow(pages, ['cash and cash equivalents', 'cash & cash equivalents'], { statementContexts: ['BALANCE_SHEET'], exclude: ['beginning of period', 'end of period', 'change in'] });",
   "  const cashRow = findMetricRow(pages, ['cash and cash equivalents', 'cash & cash equivalents'], { statementContexts: ['BALANCE_SHEET'], exclude: ['beginning of period', 'end of period', 'change in', 'period start', 'at period start'] });",
   'cash period-start exclusion',
@@ -150,6 +167,8 @@ for (const invariant of [
   'GROUP_TOTAL_CONTINUING_DISCONTINUED_V1',
   'GROUP_CURRENT_COMPARATIVE_V1',
   'statementColumnPolicy',
+  'revenue from sale of inventories',
+  'net profit/ (loss) for the period',
   "exclude: ['beginning of period', 'end of period', 'change in', 'period start', 'at period start']",
   "if (epsRow?.statementColumnPolicy === 'GROUP_TOTAL_CONTINUING_DISCONTINUED_V1') return [];",
 ]) {
