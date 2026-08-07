@@ -163,7 +163,7 @@ patchFundamentalRiskPeriodSafety();
 patchKnownAthensIssuerIdentity();
 
 for (const [file, invariants] of Object.entries({
-  'src/run-daily-intelligence.js': ['fetchEuronextAthensFundamentals', 'athensListing', 'fundamental PDF extraction inputs'],
+  'src/run-daily-intelligence.js': ['fetchEuronextAthensFundamentals', 'athensListing', 'maxDocumentBytes: options.maxDocumentBytes'],
   'src/fundamental-risk.js': ['latestFreeCashFlow ??', 'flowPeriodMonths', 'annualComparable ? ratio(marketCap, revenue) : null'],
   'config/universe.seed.json': ['euronextFinancialDataUrl', 'issuers/863/financial-data', 'issuers/50/financial-data'],
 })) {
