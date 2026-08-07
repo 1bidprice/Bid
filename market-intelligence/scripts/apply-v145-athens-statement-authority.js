@@ -55,10 +55,16 @@ function hasAuthoritativeFinancialStatementSection(pages) {
 
 replaceRequired(
   `  const contexts = Array.isArray(options.statementContexts) ? options.statementContexts : [];
-  for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {`,
+  const maximumNumbers = Number(options.maximumNumbers || 4);
+  const candidates = [];
+
+  for (let pageIndex = 0; pageIndex < maxPages; pageIndex += 1) {`,
   `  const contexts = Array.isArray(options.statementContexts) ? options.statementContexts : [];
+  const maximumNumbers = Number(options.maximumNumbers || 4);
+  const candidates = [];
   const authoritativeSectionPresent = contexts.length > 0 && hasAuthoritativeFinancialStatementSection(pages);
-  for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {`,
+
+  for (let pageIndex = 0; pageIndex < maxPages; pageIndex += 1) {`,
   'document-level authoritative statement gate',
 );
 
