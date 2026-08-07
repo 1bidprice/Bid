@@ -1,4 +1,4 @@
-export const SEC_BANK_PASSPORT_VERSION = '2026-08-07.1';
+export const SEC_BANK_PASSPORT_VERSION = '2026-08-07.2';
 
 const CONCEPTS = Object.freeze({
   loans: [
@@ -72,8 +72,6 @@ function latestFromAliases(payload, aliases, units = ['USD']) {
   candidates.sort((a, b) => String(b.end).localeCompare(String(a.end)) || String(b.filed).localeCompare(String(a.filed)));
   const latestEnd = candidates[0]?.end || null;
   if (!latestEnd) return null;
-  // Prefer the latest-filed fact for the latest reporting date. This avoids
-  // silently mixing a stale concept alias with a newer quarter.
   return candidates
     .filter((entry) => entry.end === latestEnd)
     .sort((a, b) => String(b.filed).localeCompare(String(a.filed)))[0] || null;
@@ -95,6 +93,49 @@ function coverage(items) {
     score: round((available.length / Math.max(entries.length, 1)) * 100),
     available,
     missing,
+  };
+}
+
+function validCapitalRatio(value) {
+  const ratio = Number(value);
+  return Number.isFinite(ratio) && ratio >= 3 && ratio <= 50;
+}
+
+export function reviewedRegulatoryCapitalReady(regulatoryCapital) {
+  if (!regulatoryCapital || regulatoryCapital.sourceRole !== 'REVIEWED_SEC_FILING_TABLE') return false;
+  const cet1 = Number(regulatoryCapital.commonEquityTier1Pct);
+  const tier1 = Number(regulatoryCapital.tier1CapitalPct);
+  const total = Number(regulatoryCapital.totalCapitalPct);
+  if (![cet1, tier1, total].every(validCapitalRatio)) return false;
+  if (!(total >= tier1 && tier1 >= cet1)) return false;
+  if (!regulatoryCapital.evidenceId || !regulatoryCapital.sourceUrl || !regulatoryCapital.accession) return false;
+  return true;
+}
+
+export function applyReviewedRegulatoryCapitalToBankPassport(passport = {}, regulatoryCapital = null) {
+  const regulatoryCapitalReady = reviewedRegulatoryCapitalReady(regulatoryCapital);
+  const coreDataReady = passport?.coverage?.coreDataReady === true;
+  const assetQualityReady = passport?.coverage?.assetQualityReady === true;
+  const decisionReady = coreDataReady && assetQualityReady && regulatoryCapitalReady;
+
+  return {
+    ...passport,
+    policyVersion: SEC_BANK_PASSPORT_VERSION,
+    status: decisionReady ? 'DECISION_MODEL_READY' : coreDataReady ? 'BANK_MODEL_PARTIAL' : 'INSUFFICIENT_BANK_DATA',
+    coverage: {
+      ...(passport.coverage || {}),
+      coreDataReady,
+      assetQualityReady,
+      regulatoryCapitalReady,
+    },
+    regulatoryCapital: regulatoryCapitalReady ? regulatoryCapital : null,
+    modelReady: decisionReady,
+    decisionReady,
+    blockers: [
+      ...(!coreDataReady ? ['BANK_CORE_FACTS_REQUIRED'] : []),
+      ...(!assetQualityReady ? ['BANK_ASSET_QUALITY_REQUIRED'] : []),
+      ...(!regulatoryCapitalReady ? ['BANK_REGULATORY_CAPITAL_REQUIRED'] : []),
+    ],
   };
 }
 
@@ -120,20 +161,7 @@ export function buildSecBankPassport(payload, baseSnapshot = {}, company = {}, o
   const coreDataReady = coreCoverage.availableCount === coreCoverage.expectedCount && loanToDepositPct !== null && equityToAssetsPct !== null;
   const assetQualityReady = allowanceToLoansPct !== null && nonaccrualToLoansPct !== null;
 
-  // Regulatory CET1/Tier-1 ratios are intentionally not inferred from balance
-  // sheet proxies. They must arrive from a reviewed filing/table in a separate
-  // evidence stage before the bank model can unlock a final investment action.
-  const regulatoryCapital = options.regulatoryCapital || null;
-  const regulatoryCapitalReady = Boolean(
-    regulatoryCapital &&
-    Number.isFinite(Number(regulatoryCapital.commonEquityTier1Pct)) &&
-    Number.isFinite(Number(regulatoryCapital.tier1CapitalPct)) &&
-    Number.isFinite(Number(regulatoryCapital.totalCapitalPct)),
-  );
-
-  const decisionReady = coreDataReady && assetQualityReady && regulatoryCapitalReady;
-
-  return {
+  const basePassport = {
     format: 'investor-control-sec-bank-passport',
     version: 1,
     policyVersion: SEC_BANK_PASSPORT_VERSION,
@@ -141,7 +169,7 @@ export function buildSecBankPassport(payload, baseSnapshot = {}, company = {}, o
     companyName: company?.displayName || company?.legalName || baseSnapshot?.companyName || null,
     generatedAt: new Date(options.generatedAt || baseSnapshot?.generatedAt || Date.now()).toISOString(),
     sourceUrl: baseSnapshot?.sourceUrl || null,
-    status: decisionReady ? 'DECISION_MODEL_READY' : coreDataReady ? 'BANK_MODEL_PARTIAL' : 'INSUFFICIENT_BANK_DATA',
+    status: coreDataReady ? 'BANK_MODEL_PARTIAL' : 'INSUFFICIENT_BANK_DATA',
     facts: {
       loans,
       deposits,
@@ -165,15 +193,15 @@ export function buildSecBankPassport(payload, baseSnapshot = {}, company = {}, o
       assetQuality: creditCoverage,
       coreDataReady,
       assetQualityReady,
-      regulatoryCapitalReady,
+      regulatoryCapitalReady: false,
     },
-    regulatoryCapital,
-    modelReady: decisionReady,
-    decisionReady,
+    regulatoryCapital: null,
+    modelReady: false,
+    decisionReady: false,
     blockers: [
       ...(!coreDataReady ? ['BANK_CORE_FACTS_REQUIRED'] : []),
       ...(!assetQualityReady ? ['BANK_ASSET_QUALITY_REQUIRED'] : []),
-      ...(!regulatoryCapitalReady ? ['BANK_REGULATORY_CAPITAL_REQUIRED'] : []),
+      'BANK_REGULATORY_CAPITAL_REQUIRED',
     ],
     accountingPolicy: {
       genericPriceToSalesAllowed: false,
@@ -183,4 +211,6 @@ export function buildSecBankPassport(payload, baseSnapshot = {}, company = {}, o
       regulatoryCapitalMayBeInferredFromEquityRatio: false,
     },
   };
+
+  return applyReviewedRegulatoryCapitalToBankPassport(basePassport, options.regulatoryCapital || null);
 }
