@@ -120,6 +120,35 @@ function metricPair`);
 }
 
 replaceRequired(
+  `    provenance: { pageNumber: row.pageNumber, extractedLine: row.line, sourceRole: 'PRIMARY_EXCHANGE_FINANCIAL_DOCUMENT' },`,
+  `    provenance: {
+      pageNumber: row.pageNumber,
+      extractedLine: row.line,
+      sourceRole: 'PRIMARY_EXCHANGE_FINANCIAL_DOCUMENT',
+      metricExtractionPolicy: row.extractionPolicy || null,
+      selectionPolicy: row.selectionPolicy || null,
+      statementContexts: row.statementContexts || [],
+      contextScore: Number.isFinite(Number(row.contextScore)) ? Number(row.contextScore) : null,
+    },`,
+  'metric statement-selection provenance',
+);
+
+replaceRequired(
+  `    provenance: { pageNumber: epsRow.pageNumber, extractedLine: epsRow.line, derivation: 'netIncome / reported basic-and-diluted EPS' },`,
+  `    provenance: {
+      pageNumber: epsRow.pageNumber,
+      extractedLine: epsRow.line,
+      derivation: 'netIncome / reported basic-and-diluted EPS',
+      sourceRole: 'PRIMARY_EXCHANGE_FINANCIAL_DOCUMENT',
+      metricExtractionPolicy: epsRow.extractionPolicy || null,
+      selectionPolicy: epsRow.selectionPolicy || null,
+      statementContexts: epsRow.statementContexts || [],
+      contextScore: Number.isFinite(Number(epsRow.contextScore)) ? Number(epsRow.contextScore) : null,
+    },`,
+  'derived-share statement-selection provenance',
+);
+
+replaceRequired(
   `  const revenueRow = findMetricRow(pages, ['sales', 'revenue', 'turnover'], { exclude: ['cost of sales', 'revenue reserve', 'revenue recognition'] });
   const netIncomeRow = findMetricRow(pages, ['net profit for the period', 'profit for the period', 'profit after tax', 'profit after taxes', 'net income'], { exclude: ['before tax', 'before taxes'] });
   const operatingCashFlowRow = findMetricRow(pages, ['cash flow from operating activities', 'net cash from operating activities', 'net cash generated from operating activities']);
@@ -151,6 +180,8 @@ for (const invariant of [
   'ACCOUNTING_STATEMENT_CONTEXT_V1',
   'options.maxPages || pages.length',
   'numbers.length > maximumNumbers',
+  'metricExtractionPolicy: row.extractionPolicy || null',
+  'selectionPolicy: row.selectionPolicy || null',
   "statementContexts: ['INCOME_STATEMENT']",
   "statementContexts: ['BALANCE_SHEET']",
   "statementContexts: ['CASH_FLOW']",
