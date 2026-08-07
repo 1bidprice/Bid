@@ -104,13 +104,6 @@ function metricPair`;
     'current/comparative column order and row scale',
   );
 
-  source = replaceRequired(
-    source,
-    "      sourceRole: 'PRIMARY_EXCHANGE_FINANCIAL_DOCUMENT'\n    },",
-    "      sourceRole: 'PRIMARY_EXCHANGE_FINANCIAL_DOCUMENT',\n      metricExtractionPolicy: 'STATEMENT_ROW_ONLY_V2'\n    },",
-    'parser integrity audit marker',
-  );
-
   write('src/adapters/euronext-athens-fundamentals.js', source);
 }
 
