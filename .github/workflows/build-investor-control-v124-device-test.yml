@@ -1,0 +1,175 @@
+name: Investor Control v1.2.4 Device Test
+
+on:
+  push:
+    branches:
+      - investor-control-play-store-release
+    paths:
+      - mobile/**
+      - .github/workflows/build-investor-control-v124-device-test.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-v124-device-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies without lifecycle scripts
+        working-directory: mobile
+        run: npm install --legacy-peer-deps --no-audit --no-fund --ignore-scripts
+
+      - name: Apply complete production patch chain plus v1.2.4 corrections
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          node scripts/apply-v065-native-ui-fix.js
+          node scripts/apply-v070-opportunities.js
+          node scripts/apply-v071-live-sync.js
+          node scripts/apply-v080-autonomous-decisions.js
+          node scripts/apply-v081-position-performance.js
+          node scripts/apply-v081b-fix-source-newline.js
+          node scripts/apply-v090-discovery-clarity.js
+          node scripts/apply-v090b-background-intelligence.js
+          node scripts/apply-v091-reliability.js
+          node scripts/apply-v100-production-health.js
+          node scripts/apply-v101-integrity-recovery.js
+          node scripts/apply-v110-unified-intelligence.js
+          node scripts/apply-v111-alert-integrity.js
+          node scripts/apply-v120-play-store-release.js
+          node scripts/apply-v121-play-permission-minimization.js
+          node scripts/apply-v122-market-data-consistency.js
+          node scripts/apply-v123-actionable-plan.js
+          node scripts/apply-v124-user-test-corrections.js
+
+      - name: Verify v1.2.4 user-test invariants
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          npm run test:lots
+          node - <<'NODE'
+          const fs = require('fs');
+          const app = require('./app.json');
+          const pkg = require('./package.json');
+          const engine = fs.readFileSync('./src/decision-engine.js', 'utf8');
+          const finalDecision = fs.readFileSync('./src/FinalDecisionCard.js', 'utf8');
+          const portfolio = fs.readFileSync('./PortfolioApp.js', 'utf8');
+          const decision = fs.readFileSync('./DecisionOverlay.js', 'utf8');
+          const alerts = fs.readFileSync('./src/alert-engine.js', 'utf8');
+          const contract = fs.readFileSync('./src/quote-contract.js', 'utf8');
+
+          if (app.expo.version !== '1.2.4' || app.expo.android.versionCode !== 27 || app.expo.ios.buildNumber !== '27') throw new Error('v1.2.4 identity mismatch');
+          if (app.expo.android.package !== 'gr.investorcontrol.app') throw new Error('wrong package');
+          if (pkg.version !== '1.2.4') throw new Error('wrong package version');
+          if (!String(pkg.scripts?.postinstall || '').includes('apply-v124-user-test-corrections.js')) throw new Error('v1.2.4 correction patch not persisted');
+
+          const buildPlugin = app.expo.plugins.find((item) => Array.isArray(item) && item[0] === 'expo-build-properties');
+          if (!buildPlugin || buildPlugin[1]?.android?.targetSdkVersion !== 36 || buildPlugin[1]?.android?.compileSdkVersion !== 36) throw new Error('API 36 missing');
+          if (buildPlugin[1]?.android?.usesCleartextTraffic !== false) throw new Error('cleartext traffic enabled');
+
+          for (const text of ['canonicalPositionSymbol', 'samePositionSymbol']) if (!engine.includes(text)) throw new Error(`symbol helper missing: ${text}`);
+          for (const text of ['samePositionSymbol(position.symbol, item?.symbol)', 'clearInterval(interval)', 'Υπάρχει ήδη θέση στο χαρτοφυλάκιο']) if (!finalDecision.includes(text)) throw new Error(`research correction missing: ${text}`);
+          for (const text of ["const VERSION = '1.2.4';", 'Κόστος € · τρέχ. FX', 'Αποτέλεσμα · χωρίς FX', 'Σημείωση FX:']) if (!portfolio.includes(text)) throw new Error(`FX clarity missing: ${text}`);
+          for (const text of ["const VERSION = '1.2.4';", 'ΕΝΙΣΧΥΣΗ: ΟΧΙ', 'ΕΝΙΣΧΥΣΗ: ΕΝΤΟΣ ΟΡΙΩΝ']) if (!decision.includes(text)) throw new Error(`Decision Gate correction missing: ${text}`);
+          if (!alerts.includes('quoteContract.valuationEligible')) throw new Error('alert quote gate missing');
+          if (!contract.includes("'VERIFIED_CLOSE'")) throw new Error('verified close state missing');
+          if (!portfolio.includes('https://1bidprice.github.io/Bid/privacy-policy.html') || !portfolio.includes('https://1bidprice.github.io/Bid/terms.html')) throw new Error('legal links missing');
+          console.log('PASS v1.2.4 position identity, FX clarity, Decision Gate semantics, accounting and safety invariants');
+          NODE
+
+      - name: Expo compatibility and JavaScript bundle
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          npx expo install --check
+          npx expo-doctor@latest
+          npx expo export --platform android --output-dir dist-v124
+
+      - name: Generate Android project
+        working-directory: mobile
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Build release APK
+        working-directory: mobile/android
+        run: |
+          set -o pipefail
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee ../gradle-v124.log
+
+      - name: Sign and verify device-test APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          UNSIGNED_APK='mobile/android/app/build/outputs/apk/release/app-release.apk'
+          DEVICE_APK='mobile/Investor-Control-v1.2.4-device-test.apk'
+          ALIGNED_APK='mobile/Investor-Control-v1.2.4-aligned.apk'
+          DEBUG_KEYSTORE='mobile/android/app/debug.keystore'
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          ZIPALIGN="$BUILD_TOOLS/zipalign"
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+          AAPT2="$BUILD_TOOLS/aapt2"
+
+          test -s "$UNSIGNED_APK"
+          test -s "$DEBUG_KEYSTORE"
+          unzip -l "$UNSIGNED_APK" | grep -q 'assets/index.android.bundle'
+          "$ZIPALIGN" -p -f 4 "$UNSIGNED_APK" "$ALIGNED_APK"
+          "$APKSIGNER" sign --ks "$DEBUG_KEYSTORE" --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --out "$DEVICE_APK" "$ALIGNED_APK"
+          "$APKSIGNER" verify --verbose --print-certs "$DEVICE_APK" | tee mobile/Investor-Control-v1.2.4-device-signature.txt
+          grep -qi 'fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c' mobile/Investor-Control-v1.2.4-device-signature.txt
+
+          "$AAPT2" dump badging "$DEVICE_APK" | tee mobile/Investor-Control-v1.2.4-badging.txt
+          grep -q "package: name='gr.investorcontrol.app' versionCode='27' versionName='1.2.4'" mobile/Investor-Control-v1.2.4-badging.txt
+          grep -q "targetSdkVersion:'36'" mobile/Investor-Control-v1.2.4-badging.txt
+          "$AAPT2" dump permissions "$DEVICE_APK" | tee mobile/Investor-Control-v1.2.4-permissions.txt
+
+          for forbidden in android.permission.ACCESS_FINE_LOCATION android.permission.ACCESS_COARSE_LOCATION android.permission.CAMERA android.permission.RECORD_AUDIO android.permission.READ_CONTACTS android.permission.WRITE_CONTACTS android.permission.READ_PHONE_STATE android.permission.CALL_PHONE android.permission.READ_SMS android.permission.SEND_SMS android.permission.SYSTEM_ALERT_WINDOW com.google.android.c2dm.permission.RECEIVE; do
+            if grep -q "$forbidden" mobile/Investor-Control-v1.2.4-permissions.txt; then
+              echo "Forbidden permission present: $forbidden" >&2
+              exit 1
+            fi
+          done
+          sha256sum "$DEVICE_APK" | tee mobile/Investor-Control-v1.2.4-device-test.sha256
+
+      - name: Upload v1.2.4 device-test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1.2.4-device-test
+          path: |
+            mobile/Investor-Control-v1.2.4-device-test.apk
+            mobile/Investor-Control-v1.2.4-device-test.sha256
+            mobile/Investor-Control-v1.2.4-device-signature.txt
+            mobile/Investor-Control-v1.2.4-badging.txt
+            mobile/Investor-Control-v1.2.4-permissions.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Gradle diagnostic
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1.2.4-build-diagnostic
+          path: mobile/gradle-v124.log
+          if-no-files-found: warn
+          retention-days: 30
