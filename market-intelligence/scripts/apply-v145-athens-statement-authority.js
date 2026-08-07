@@ -79,6 +79,17 @@ replaceRequired(
 );
 
 replaceRequired(
+  `  const hasContinuing = /continuing operations/.test(text);
+  const hasDiscontinued = /discontinued operations/.test(text);`,
+  `  // pdftotext may emit multi-column headers as "Continuing Discontinued Total"
+  // on one line and the repeated word "operations" on another. Detect the
+  // column concepts as independent tokens instead of requiring adjacency.
+  const hasContinuing = /\\bcontinuing\\b/.test(text);
+  const hasDiscontinued = /\\bdiscontinued\\b/.test(text);`,
+  'split multi-column operation headers',
+);
+
+replaceRequired(
   `        statementColumnCount: columnSelection?.layout?.expectedColumns || 2,
         selectionScore: contextScore + (labelMatch?.score || 0) - notesPenalty - Math.max(0, numbers.length - needed) * 4,`,
   `        statementColumnCount: columnSelection?.layout?.expectedColumns || 2,
@@ -132,6 +143,8 @@ for (const invariant of [
   '(?:condensed )?statement of comprehensive income',
   '(?:condensed )?statement of financial position',
   '(?:condensed )?(?:statement of cash flows?',
+  'const hasContinuing = /\\bcontinuing\\b/.test(text);',
+  'const hasDiscontinued = /\\bdiscontinued\\b/.test(text);',
   'candidateAudit',
   'columnSelection ? 0 : Math.max(0, numbers.length - needed) * 4',
   'Number(epsRow?.statementColumnCount || 2) > 2',
