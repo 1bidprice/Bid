@@ -36,8 +36,14 @@ test('Athens extractor searches the full document and accepts metrics only from 
   assert.equal(snapshot.annual.revenue[1].value, 44_100_000);
   assert.equal(snapshot.annual.revenue[0].provenance.pageNumber, 12);
   assert.equal(snapshot.annual.revenue[0].provenance.extractedLine.startsWith('Revenue'), true);
+  assert.equal(snapshot.annual.revenue[0].provenance.metricExtractionPolicy, 'STATEMENT_ROW_ONLY_V2');
+  assert.equal(snapshot.annual.revenue[0].provenance.selectionPolicy, 'ACCOUNTING_STATEMENT_CONTEXT_V1');
+  assert.deepEqual(snapshot.annual.revenue[0].provenance.statementContexts, ['INCOME_STATEMENT']);
+  assert.ok(snapshot.annual.revenue[0].provenance.contextScore >= 60);
   assert.equal(snapshot.instant.cash.value, 262_100_000);
   assert.equal(snapshot.instant.cash.provenance.pageNumber, 13);
+  assert.equal(snapshot.instant.cash.provenance.selectionPolicy, 'ACCOUNTING_STATEMENT_CONTEXT_V1');
+  assert.deepEqual(snapshot.instant.cash.provenance.statementContexts, ['BALANCE_SHEET']);
   assert.notEqual(snapshot.annual.revenue[0].value, 8_900);
   assert.notEqual(snapshot.annual.revenue[0].value, 1_000_000);
   assert.notEqual(snapshot.instant.cash.value, 30_062_025_000);
