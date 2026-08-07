@@ -35,14 +35,13 @@ insertBefore(
   if (/board of directors report|review of h1 .* results|remarks on key figures|alternative performance measures|profitability ratios|definitions of financial figures/.test(current)) score -= 180;
 
   // The primary Income Statement outranks comprehensive-income recaps for
-  // revenue/profit extraction. Other primary statements receive the same
-  // explicit heading authority.
+  // revenue/profit extraction. Condensed variants are equally authoritative.
   if (contexts.includes('INCOME_STATEMENT')) {
-    if (lines.some((line) => /^income statement(?: |$)/i.test(line))) score += 140;
-    else if (lines.some((line) => /^statement of comprehensive income(?: |$)/i.test(line))) score += 40;
+    if (lines.some((line) => /^(?:condensed )?income statement(?: |$)/i.test(line))) score += 140;
+    else if (lines.some((line) => /^(?:condensed )?statement of comprehensive income(?: |$)/i.test(line))) score += 40;
   }
-  if (contexts.includes('BALANCE_SHEET') && lines.some((line) => /^(?:statement of financial position|(?:condensed )?balance sheet)(?: |$)/i.test(line))) score += 140;
-  if (contexts.includes('CASH_FLOW') && lines.some((line) => /^(?:statement of cash flows?|cash flow statement)(?: |$)/i.test(line))) score += 140;
+  if (contexts.includes('BALANCE_SHEET') && lines.some((line) => /^(?:(?:condensed )?statement of financial position|(?:condensed )?balance sheet)(?: |$)/i.test(line))) score += 140;
+  if (contexts.includes('CASH_FLOW') && lines.some((line) => /^(?:condensed )?(?:statement of cash flows?|cash flow statement)(?: |$)/i.test(line))) score += 140;
   return score;
 }
 
@@ -129,8 +128,10 @@ for (const invariant of [
   'statementPageAuthorityScore',
   'hasAuthoritativeFinancialStatementSection',
   'authoritativeSectionPresent && authorityScore <= 0',
-  '^income statement(?: |$)',
-  'statement of comprehensive income',
+  '(?:condensed )?income statement',
+  '(?:condensed )?statement of comprehensive income',
+  '(?:condensed )?statement of financial position',
+  '(?:condensed )?(?:statement of cash flows?',
   'candidateAudit',
   'columnSelection ? 0 : Math.max(0, numbers.length - needed) * 4',
   'Number(epsRow?.statementColumnCount || 2) > 2',
