@@ -65,7 +65,7 @@ function patchDecisionCard() {
         <View style={styles.metric}><Text style={styles.metricLabel}>Ποιότητα δεδομένων</Text><Text style={styles.metricValue}>{Math.round(Number(personalized.source?.dataQualityScore || 0))}/100</Text></View>
       </View>
       {personalized.interim ? <Text style={styles.planRationale}>{personalized.source?.rationale || 'Δεν έχουν ολοκληρωθεί όλοι οι έλεγχοι για τελική ενέργεια.'}</Text> : null}
-      <Text style={styles.validity}>Ισχύει μέχρι: {when(personalized.source?.validUntil)}{personalized.interim ? ' · Δεν αποτελεί τελικό BUY/SELL σήμα' : ` · Πολιτική ${finalAction.policyVersion}`}</Text>
+      <Text style={styles.validity}>Ισχύει μέχρι: {when(personalized.source?.validUntil)}{personalized.interim ? ' · Δεν αποτελεί τελικό BUY/SELL σήμα' : ' · Πολιτική ' + finalAction.policyVersion}</Text>
       <Text style={styles.execution}>{personalized.interim ? 'Το πλάνο είναι συντηρητικός έλεγχος κινδύνου μέχρι να ολοκληρωθεί η τεκμηρίωση. Δεν εκτελείται καμία εντολή.' : 'Δεν εκτελείται εντολή σε χρηματιστηριακή. Η τελική πράξη παραμένει αποκλειστικά δική σου.'}</Text>`,
     'controlled-plan metrics and disclaimer',
   );
