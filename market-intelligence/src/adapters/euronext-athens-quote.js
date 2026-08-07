@@ -108,32 +108,64 @@ export async function fetchEuronextAthensQuote(company, options = {}) {
   if (typeof fetchImpl !== 'function') throw new Error('Euronext Athens quote adapter requires fetch');
   const symbol = String(company.primaryListing?.symbol || '').trim();
   if (!symbol) return { snapshot: null, diagnostics: [{ code: 'MARKET_SYMBOL_MISSING', companyId: company.companyId }] };
-  const url = company.marketData?.euronextInstrumentUrl
-    || `https://athens.euronext.com/en/market-data/instruments/stocks/${encodeURIComponent(symbol)}`;
-  const response = await fetchImpl(url, {
-    headers: {
-      Accept: 'text/html,application/xhtml+xml',
-      'Cache-Control': 'no-cache',
-      'User-Agent': options.userAgent || 'Investor-Control-Market-Intelligence/1.0',
-    },
-  });
-  if (!response.ok) {
-    return {
-      snapshot: null,
-      diagnostics: [{ code: 'EURONEXT_ATHENS_QUOTE_HTTP_ERROR', companyId: company.companyId, status: response.status }],
-    };
+
+  const baseUrl = `https://athens.euronext.com/en/market-data/instruments/stocks/${encodeURIComponent(symbol)}`;
+  const configuredUrl = company.marketData?.euronextInstrumentUrl || baseUrl;
+  const urls = [...new Set([configuredUrl, `${baseUrl}/related`, baseUrl])];
+  const diagnostics = [];
+  let lastSnapshot = null;
+
+  for (const url of urls) {
+    let response;
+    try {
+      response = await fetchImpl(url, {
+        headers: {
+          Accept: 'text/html,application/xhtml+xml',
+          'Cache-Control': 'no-cache',
+          'User-Agent': options.userAgent || 'Investor-Control-Market-Intelligence/1.0',
+        },
+      });
+    } catch (error) {
+      diagnostics.push({
+        code: 'EURONEXT_ATHENS_QUOTE_FETCH_FAILED',
+        companyId: company.companyId,
+        endpoint: new URL(url).pathname,
+        errorClass: 'NETWORK_OR_FETCH_ERROR',
+      });
+      continue;
+    }
+
+    if (!response.ok) {
+      diagnostics.push({
+        code: 'EURONEXT_ATHENS_QUOTE_HTTP_ERROR',
+        companyId: company.companyId,
+        status: response.status,
+        endpoint: new URL(url).pathname,
+      });
+      continue;
+    }
+
+    const html = await response.text();
+    const snapshot = normalizeEuronextAthensQuote(html, company, {
+      generatedAt: options.generatedAt,
+      sourceUrl: url,
+    });
+    lastSnapshot = snapshot;
+    if (snapshot.usable) {
+      if (snapshot.previousClose === null) diagnostics.push({ code: 'EURONEXT_ATHENS_PREVIOUS_CLOSE_MISSING', companyId: company.companyId });
+      return { snapshot, diagnostics };
+    }
+    diagnostics.push({
+      code: 'EURONEXT_ATHENS_QUOTE_NOT_PARSED',
+      companyId: company.companyId,
+      endpoint: new URL(url).pathname,
+    });
   }
-  const html = await response.text();
-  const snapshot = normalizeEuronextAthensQuote(html, company, {
-    generatedAt: options.generatedAt,
-    sourceUrl: url,
-  });
+
   return {
-    snapshot,
-    diagnostics: snapshot.usable
-      ? snapshot.previousClose === null
-        ? [{ code: 'EURONEXT_ATHENS_PREVIOUS_CLOSE_MISSING', companyId: company.companyId }]
-        : []
+    snapshot: lastSnapshot,
+    diagnostics: diagnostics.length
+      ? diagnostics
       : [{ code: 'EURONEXT_ATHENS_QUOTE_NOT_PARSED', companyId: company.companyId }],
   };
 }
