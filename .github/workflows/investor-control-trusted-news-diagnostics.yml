@@ -26,45 +26,39 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Diagnose SPCE Google News publisher payload
+      - name: Diagnose Bing News RSS direct publisher links
         working-directory: source/market-intelligence
         run: |
           node --input-type=module - <<'NODE'
-          import { fetchTrustedNewsEvidence } from './src/adapters/trusted-news-rss.js';
-
-          const company = {
-            companyId: 'company:virgin-galactic-holdings',
-            legalName: 'Virgin Galactic Holdings, Inc.',
-            displayName: 'Virgin Galactic',
-            aliases: ['Virgin Galactic Holdings', 'Virgin Galactic'],
-            primaryListing: { symbol: 'SPCE', mic: 'XNYS', exchange: 'New York Stock Exchange' },
-          };
-          const discovery = await fetchTrustedNewsEvidence(company, { review: false, limit: 30, retrievedAt: new Date().toISOString() });
-          const browserUa = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
-
-          console.log('ACCEPTED_RECORDS');
-          for (const record of discovery.records || []) console.log(JSON.stringify({ id:record.id, sourceName:record.sourceName, sourceUrl:record.sourceUrl, title:record.title, publishedAt:record.publishedAt }));
-
-          for (const record of (discovery.records || []).slice(0, 5)) {
-            console.log(`\nPROBE ${record.id} ${record.sourceName}`);
-            const response = await fetch(record.sourceUrl, { redirect:'follow', headers:{ 'User-Agent':browserUa, Accept:'text/html,*/*', 'Accept-Language':'en-US,en;q=0.9' } });
-            const body = await response.text();
-            const lower = body.toLowerCase();
-            const publisherNeedle = String(record.sourceName || '').toLowerCase().replace(/[^a-z0-9]/g,'');
-            const rawIndex = lower.indexOf(String(record.sourceName || '').toLowerCase());
-            console.log(JSON.stringify({ status:response.status, url:response.url, contentType:response.headers.get('content-type'), bodyLength:body.length, sourceNameIndex:rawIndex }));
-            if (rawIndex >= 0) console.log('SOURCE_CONTEXT', body.slice(Math.max(0,rawIndex-1200), rawIndex+3000).replace(/\s+/g,' '));
-
-            const urlish = [...body.matchAll(/https?:\\?[/]\\?[/][^\s"'<>\\]{1,700}/gi)].map((m)=>m[0]);
-            const sourceMatches = urlish.filter((u)=>u.toLowerCase().replace(/[^a-z0-9]/g,'').includes(publisherNeedle)).slice(0,20);
-            console.log('URLISH_SOURCE_MATCHES', JSON.stringify(sourceMatches, null, 2));
-
-            const marketIndex = lower.indexOf('marketwatch');
-            if (marketIndex >= 0) console.log('MARKETWATCH_CONTEXT', body.slice(Math.max(0,marketIndex-1500), marketIndex+5000).replace(/\s+/g,' '));
-            const escapedDecoded = body.replace(/\\u002F/gi,'/').replace(/\\u003A/gi,':').replace(/\\\//g,'/');
-            const decodedIndex = escapedDecoded.toLowerCase().indexOf('marketwatch');
-            if (decodedIndex >= 0) console.log('DECODED_MARKETWATCH_CONTEXT', escapedDecoded.slice(Math.max(0,decodedIndex-1500),decodedIndex+5000).replace(/\s+/g,' '));
-            const direct = [...escapedDecoded.matchAll(/https?:\/\/[^\s"'<>]{1,900}/gi)].map((m)=>m[0]).filter((u)=>/marketwatch\.com/i.test(u)).slice(0,20);
-            console.log('DIRECT_MARKETWATCH_URLS', JSON.stringify(direct, null, 2));
+          const query = encodeURIComponent('"Virgin Galactic" SPCE');
+          const url = `https://www.bing.com/news/search?q=${query}&format=rss&mkt=en-US`;
+          const response = await fetch(url, { headers:{ 'User-Agent':'Mozilla/5.0 Investor-Control/1.0', Accept:'application/rss+xml,application/xml,text/xml,*/*' } });
+          const xml = await response.text();
+          console.log(JSON.stringify({ status:response.status, url:response.url, contentType:response.headers.get('content-type'), length:xml.length }));
+          console.log('XML_PREFIX', xml.slice(0,1500).replace(/\s+/g,' '));
+          const blocks = xml.match(/<item\b[\s\S]*?<\/item>/gi) || [];
+          console.log('ITEM_COUNT', blocks.length);
+          const tag = (block,name) => (block.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`,'i')) || [])[1] || null;
+          const clean = (v) => String(v||'').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,'$1').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+          for (const block of blocks.slice(0,20)) {
+            const title = clean(tag(block,'title'));
+            const link = clean(tag(block,'link'));
+            const source = clean(tag(block,'News:Source') || tag(block,'source'));
+            let direct = null;
+            try {
+              const parsed = new URL(link);
+              direct = parsed.searchParams.get('url') || parsed.searchParams.get('u') || null;
+              if (direct) direct = decodeURIComponent(direct);
+            } catch {}
+            console.log(JSON.stringify({ title, source, link, direct }));
+            if (direct && /marketwatch\.com|reuters\.com|cnbc\.com|bloomberg\.com|wsj\.com|ft\.com|fortune\.com|apnews\.com/i.test(direct)) {
+              try {
+                const article = await fetch(direct, { redirect:'follow', headers:{ 'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36', Accept:'text/html,*/*' } });
+                const body = await article.text();
+                console.log('DIRECT_ARTICLE_PROBE', JSON.stringify({ direct, status:article.status, finalUrl:article.url, contentType:article.headers.get('content-type'), bodyLength:body.length, prefix:body.slice(0,180).replace(/\s+/g,' ') }));
+              } catch (error) {
+                console.log('DIRECT_ARTICLE_ERROR', JSON.stringify({ direct, message:String(error) }));
+              }
+            }
           }
           NODE
