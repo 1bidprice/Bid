@@ -55,3 +55,48 @@ test('valuation cannot be marked ready without price and share count', () => {
   assert.equal(result.metricsReady, false);
   assert.equal(result.valuation.marketCapitalization, null);
 });
+
+test('specialized real-estate model suppresses generic valuation and risk interpretation', () => {
+  const snapshot = {
+    companyId: 'company:reit',
+    metricsReady: false,
+    dataReady: true,
+    model: {
+      type: 'REAL_ESTATE',
+      genericValuationEligible: false,
+      specializedModelRequired: true,
+      modelReady: false,
+      reasonCodes: ['REAL_ESTATE_NAME_SIGNAL'],
+    },
+    reporting: { currency: 'USD', periodMonths: 12, annualComparable: true },
+    annual: {
+      revenue: [fact(560_000_000)],
+      netIncome: [fact(135_967_000)],
+      dilutedShares: [{ ...fact(31_000_000), unit: 'shares' }],
+    },
+    instant: {
+      cash: fact(45_000_000),
+      assets: fact(4_100_000_000),
+      liabilities: fact(2_900_000_000),
+      equity: fact(1_200_000_000),
+    },
+    metrics: {
+      latestAnnualFreeCashFlowUSD: null,
+      dilutedSharesChangePct: -0.39,
+    },
+  };
+
+  const result = assessFundamentalRisk(snapshot, 42, { companyId: 'company:reit', currency: 'USD' });
+
+  assert.equal(result.model.type, 'REAL_ESTATE');
+  assert.equal(result.valuationModelStatus, 'SPECIALIZED_MODEL_REQUIRED');
+  assert.equal(result.valuation.marketCapitalization, 1_302_000_000);
+  assert.equal(result.valuation.priceToSales, null);
+  assert.equal(result.valuation.priceToBook, null);
+  assert.equal(result.profitability.netMarginPct, null);
+  assert.equal(result.balanceSheet.cashRunwayYears, null);
+  assert.equal(result.riskScore, null);
+  assert.equal(result.metricsReady, false);
+  assert.equal(result.riskDataStatus, 'INSUFFICIENT_DATA');
+  assert.equal(result.flags.includes('HIGH_LIABILITIES_TO_ASSETS'), false);
+});
