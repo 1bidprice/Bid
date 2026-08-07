@@ -1,0 +1,146 @@
+name: Investor Control Production Diagnostics
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/investor-control-production-diagnostics.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-production-diagnostics
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - name: Checkout verified intelligence source
+        uses: actions/checkout@v4
+        with:
+          ref: investor-control-v1-market-intelligence-foundation
+          path: source
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install PDF extraction runtime
+        run: |
+          set -euo pipefail
+          if ! command -v pdftotext >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y poppler-utils
+          fi
+
+      - name: Run deterministic source validation
+        working-directory: source/market-intelligence
+        run: npm test
+
+      - name: Build production-equivalent report without publishing
+        working-directory: source/market-intelligence
+        env:
+          SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          node src/run-autonomous-intelligence.js out/autonomous-intelligence.json
+          node src/build-mobile-feed.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json
+
+      - name: Capture Athens integrity diagnostics
+        working-directory: source/market-intelligence
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const report = require('./out/autonomous-intelligence.json');
+          const athens = (report.fundamentalSnapshots || [])
+            .filter((snapshot) => String(snapshot?.sourceProvider || '').includes('EURONEXT_ATHENS') || snapshot?.reporting?.currency === 'EUR')
+            .map((snapshot) => {
+              const facts = {
+                revenue: snapshot?.annual?.revenue || [],
+                netIncome: snapshot?.annual?.netIncome || [],
+                operatingCashFlow: snapshot?.annual?.operatingCashFlow || [],
+                capitalExpenditure: snapshot?.annual?.capitalExpenditure || [],
+                dilutedShares: snapshot?.annual?.dilutedShares || [],
+                cash: snapshot?.instant?.cash || null,
+                assets: snapshot?.instant?.assets || null,
+                liabilities: snapshot?.instant?.liabilities || null,
+                equity: snapshot?.instant?.equity || null,
+              };
+              const compactFact = (fact) => fact ? ({
+                value: fact.value,
+                unit: fact.unit,
+                end: fact.end,
+                pageNumber: fact?.provenance?.pageNumber ?? null,
+                extractedLine: fact?.provenance?.extractedLine ?? null,
+                metricExtractionPolicy: fact?.provenance?.metricExtractionPolicy ?? null,
+                selectionPolicy: fact?.provenance?.selectionPolicy ?? null,
+                statementContexts: fact?.provenance?.statementContexts ?? null,
+                contextScore: fact?.provenance?.contextScore ?? null,
+                labelScore: fact?.provenance?.labelScore ?? null,
+                numberMode: fact?.provenance?.numberMode ?? null,
+              }) : null;
+              return {
+                companyId: snapshot.companyId,
+                companyName: snapshot.companyName,
+                symbol: snapshot.symbol || null,
+                sourceProvider: snapshot.sourceProvider,
+                sourceUrl: snapshot.sourceUrl,
+                metricsReady: snapshot.metricsReady,
+                model: snapshot.model,
+                reporting: snapshot.reporting,
+                coverage: snapshot.coverage,
+                quality: snapshot.quality,
+                facts: {
+                  revenue: facts.revenue.map(compactFact),
+                  netIncome: facts.netIncome.map(compactFact),
+                  operatingCashFlow: facts.operatingCashFlow.map(compactFact),
+                  capitalExpenditure: facts.capitalExpenditure.map(compactFact),
+                  dilutedShares: facts.dilutedShares.map(compactFact),
+                  cash: compactFact(facts.cash),
+                  assets: compactFact(facts.assets),
+                  liabilities: compactFact(facts.liabilities),
+                  equity: compactFact(facts.equity),
+                },
+              };
+            });
+
+          const failures = athens.flatMap((snapshot) => {
+            const items = [];
+            if (snapshot.quality?.rowLabelPolicy !== 'ROW_LABEL_ANCHORED_V1') items.push('ROW_LABEL_POLICY_MISSING');
+            if (snapshot.quality?.numericSemanticsPolicy !== 'FINANCIAL_TABLE_NUMBER_V1') items.push('NUMERIC_SEMANTICS_POLICY_MISSING');
+            if (snapshot.quality?.balanceSheetIntegrity?.status === 'FAILED') items.push(...(snapshot.quality.balanceSheetIntegrity.issues || ['BALANCE_SHEET_FAILED']));
+            if (snapshot.metricsReady === true && snapshot.quality?.balanceSheetIntegrity?.status !== 'PASSED') items.push('READY_WITHOUT_PASSED_BALANCE_SHEET');
+            return items.map((issue) => ({ companyId: snapshot.companyId, companyName: snapshot.companyName, issue }));
+          });
+
+          const output = {
+            format: 'investor-control-production-diagnostics',
+            version: 1,
+            generatedAt: report.generatedAt,
+            sourceCommit: process.env.GITHUB_SHA,
+            athensSnapshotCount: athens.length,
+            failureCount: failures.length,
+            failures,
+            athens,
+          };
+          fs.writeFileSync('./out/production-diagnostics.json', JSON.stringify(output, null, 2) + '\n');
+          console.log(JSON.stringify({ athensSnapshotCount: athens.length, failureCount: failures.length, failures }, null, 2));
+          NODE
+
+      - name: Upload diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-production-diagnostics-${{ github.run_id }}
+          path: |
+            source/market-intelligence/out/production-diagnostics.json
+            source/market-intelligence/out/autonomous-intelligence.json
+            source/market-intelligence/out/mobile-intelligence-feed.json
+          if-no-files-found: warn
+          retention-days: 7
