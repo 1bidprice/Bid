@@ -26,12 +26,11 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Diagnose SPCE trusted-news discovery and review
+      - name: Diagnose SPCE Google News publisher payload
         working-directory: source/market-intelligence
         run: |
           node --input-type=module - <<'NODE'
           import { fetchTrustedNewsEvidence } from './src/adapters/trusted-news-rss.js';
-          import { reviewTrustedNewsRecord } from './src/trusted-news-review.js';
 
           const company = {
             companyId: 'company:virgin-galactic-holdings',
@@ -40,50 +39,32 @@ jobs:
             aliases: ['Virgin Galactic Holdings', 'Virgin Galactic'],
             primaryListing: { symbol: 'SPCE', mic: 'XNYS', exchange: 'New York Stock Exchange' },
           };
-
-          const discovery = await fetchTrustedNewsEvidence(company, {
-            review: false,
-            limit: 30,
-            retrievedAt: new Date().toISOString(),
-          });
+          const discovery = await fetchTrustedNewsEvidence(company, { review: false, limit: 30, retrievedAt: new Date().toISOString() });
+          const browserUa = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
 
           console.log('ACCEPTED_RECORDS');
-          for (const record of discovery.records || []) {
-            console.log(JSON.stringify({
-              id: record.id,
-              sourceName: record.sourceName,
-              sourceUrl: record.sourceUrl,
-              title: record.title,
-              publishedAt: record.publishedAt,
-              claimType: record.claimType,
-            }));
-          }
-          console.log('DISCOVERY_DIAGNOSTICS');
-          console.log(JSON.stringify(discovery.diagnostics || [], null, 2));
+          for (const record of discovery.records || []) console.log(JSON.stringify({ id:record.id, sourceName:record.sourceName, sourceUrl:record.sourceUrl, title:record.title, publishedAt:record.publishedAt }));
 
-          const browserUa = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
           for (const record of (discovery.records || []).slice(0, 5)) {
             console.log(`\nPROBE ${record.id} ${record.sourceName}`);
-            try {
-              const manual = await fetch(record.sourceUrl, { redirect: 'manual', headers: { 'User-Agent': browserUa, Accept: 'text/html,*/*' } });
-              console.log(JSON.stringify({ phase: 'manual', status: manual.status, location: manual.headers.get('location'), contentType: manual.headers.get('content-type'), url: manual.url }));
-            } catch (error) {
-              console.log(JSON.stringify({ phase: 'manual-error', message: String(error) }));
-            }
-            try {
-              const followed = await fetch(record.sourceUrl, { redirect: 'follow', headers: { 'User-Agent': browserUa, Accept: 'text/html,*/*', 'Accept-Language': 'en-US,en;q=0.9' } });
-              const body = await followed.text();
-              console.log(JSON.stringify({ phase: 'follow', status: followed.status, url: followed.url, contentType: followed.headers.get('content-type'), bodyLength: body.length, bodyPrefix: body.slice(0, 300).replace(/\s+/g, ' ') }));
-            } catch (error) {
-              console.log(JSON.stringify({ phase: 'follow-error', message: String(error) }));
-            }
-            const reviewed = await reviewTrustedNewsRecord(record, company, { userAgent: browserUa, reviewedAt: new Date().toISOString(), minText: 400 });
-            console.log('REVIEW_RESULT');
-            console.log(JSON.stringify({
-              document: reviewed.record?.document || null,
-              sourceUrl: reviewed.record?.sourceUrl,
-              claimType: reviewed.record?.claimType,
-              diagnostics: reviewed.diagnostics || [],
-            }, null, 2));
+            const response = await fetch(record.sourceUrl, { redirect:'follow', headers:{ 'User-Agent':browserUa, Accept:'text/html,*/*', 'Accept-Language':'en-US,en;q=0.9' } });
+            const body = await response.text();
+            const lower = body.toLowerCase();
+            const publisherNeedle = String(record.sourceName || '').toLowerCase().replace(/[^a-z0-9]/g,'');
+            const rawIndex = lower.indexOf(String(record.sourceName || '').toLowerCase());
+            console.log(JSON.stringify({ status:response.status, url:response.url, contentType:response.headers.get('content-type'), bodyLength:body.length, sourceNameIndex:rawIndex }));
+            if (rawIndex >= 0) console.log('SOURCE_CONTEXT', body.slice(Math.max(0,rawIndex-1200), rawIndex+3000).replace(/\s+/g,' '));
+
+            const urlish = [...body.matchAll(/https?:\\?[/]\\?[/][^\s"'<>\\]{1,700}/gi)].map((m)=>m[0]);
+            const sourceMatches = urlish.filter((u)=>u.toLowerCase().replace(/[^a-z0-9]/g,'').includes(publisherNeedle)).slice(0,20);
+            console.log('URLISH_SOURCE_MATCHES', JSON.stringify(sourceMatches, null, 2));
+
+            const marketIndex = lower.indexOf('marketwatch');
+            if (marketIndex >= 0) console.log('MARKETWATCH_CONTEXT', body.slice(Math.max(0,marketIndex-1500), marketIndex+5000).replace(/\s+/g,' '));
+            const escapedDecoded = body.replace(/\\u002F/gi,'/').replace(/\\u003A/gi,':').replace(/\\\//g,'/');
+            const decodedIndex = escapedDecoded.toLowerCase().indexOf('marketwatch');
+            if (decodedIndex >= 0) console.log('DECODED_MARKETWATCH_CONTEXT', escapedDecoded.slice(Math.max(0,decodedIndex-1500),decodedIndex+5000).replace(/\s+/g,' '));
+            const direct = [...escapedDecoded.matchAll(/https?:\/\/[^\s"'<>]{1,900}/gi)].map((m)=>m[0]).filter((u)=>/marketwatch\.com/i.test(u)).slice(0,20);
+            console.log('DIRECT_MARKETWATCH_URLS', JSON.stringify(direct, null, 2));
           }
           NODE
