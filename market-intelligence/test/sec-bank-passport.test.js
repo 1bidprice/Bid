@@ -88,6 +88,10 @@ test('regulatory capital cannot be inferred from equity/assets but reviewed capi
     tier1CapitalPct: 12.17,
     totalCapitalPct: 14.54,
     sourceRole: 'REVIEWED_SEC_FILING_TABLE',
+    evidenceId: 'evidence:sec:0001437958-26-000039',
+    accession: '0001437958-26-000039',
+    form: '10-Q',
+    sourceUrl: 'https://www.sec.gov/Archives/edgar/data/1437958/000143795826000039/cofs-20260331.htm',
   };
   const bank = buildSecBankPassport(bankPayload(), base, company, { regulatoryCapital: capital });
 
@@ -95,6 +99,7 @@ test('regulatory capital cannot be inferred from equity/assets but reviewed capi
   assert.equal(bank.decisionReady, true);
   assert.equal(bank.modelReady, true);
   assert.equal(bank.status, 'DECISION_MODEL_READY');
+  assert.equal(bank.regulatoryCapital.accession, '0001437958-26-000039');
   assert.equal(bank.accountingPolicy.regulatoryCapitalMayBeInferredFromEquityRatio, false);
 });
 
