@@ -1,4 +1,4 @@
-name: Investor Control Athens Fundamentals Diagnostics
+name: Investor Control Credia Bank Metrics Diagnostics
 
 on:
   push:
@@ -12,7 +12,7 @@ permissions:
 jobs:
   diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - name: Checkout intelligence source
         uses: actions/checkout@v4
@@ -26,49 +26,87 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Probe Athens issuer financial and announcement HTML
+      - name: Install PDF extraction runtime
+        run: |
+          set -euo pipefail
+          if ! command -v pdftotext >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y poppler-utils
+          fi
+
+      - name: Download current official Credia H1 2026 PDF
         working-directory: source/market-intelligence
         run: |
+          set -euo pipefail
           node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
           import { extractAthensFinancialDocuments } from './src/adapters/euronext-athens-fundamentals.js';
-
-          const targets = [
-            {
-              name:'CrediaBank',
-              company:{ companyId:'company:crediabank', displayName:'CrediaBank', legalName:'CrediaBank S.A.', aliases:['CrediaBank A.T.E.','ATTICA BANK'], issuerId:'50' },
-              urls:[
-                'https://athens.euronext.com/en/market-data/issuers/50/financial-data',
-                'https://athens.euronext.com/el/market-data/issuers/50/financial-data?page=0',
-              ],
-            },
-            {
-              name:'Allwyn',
-              company:{ companyId:'company:allwyn-ag', displayName:'Allwyn', legalName:'Allwyn AG', aliases:['OPAP','OPAP SA','OPAP S.A.'], issuerId:'863' },
-              urls:[
-                'https://athens.euronext.com/en/market-data/issuers/863/financial-data',
-                'https://athens.euronext.com/en/market-data/issuers/863/announcements',
-              ],
-            },
-          ];
-          const ua='Investor-Control-Market-Intelligence/1.0';
-          for (const target of targets) {
-            console.log(`\n===== ${target.name} =====`);
-            for (const url of target.urls) {
-              const response=await fetch(url,{headers:{Accept:'text/html,application/xhtml+xml','Cache-Control':'no-cache','User-Agent':ua}});
-              const html=await response.text();
-              console.log(JSON.stringify({url,status:response.status,finalUrl:response.url,contentType:response.headers.get('content-type'),length:html.length,trCount:(html.match(/<tr\b/gi)||[]).length,pdfCount:(html.match(/\.pdf/gi)||[]).length,downloadPdfCount:(html.match(/downloadpdf/gi)||[]).length}));
-              if (url.includes('/financial-data')) {
-                const docs=extractAthensFinancialDocuments(html,target.company);
-                console.log('DOCS',JSON.stringify(docs.slice(0,10),null,2));
-              }
-              const needles=target.name==='CrediaBank' ? ['CrediaBank','ATTICA BANK','2026,Three','2026,Τριμην'] : ['Q1 2026','Preliminary Unaudited','Allwyn','OPAP SA'];
-              for (const needle of needles) {
-                const i=html.toLowerCase().indexOf(needle.toLowerCase());
-                if(i>=0) console.log(`CONTEXT ${needle}`,html.slice(Math.max(0,i-1800),i+5000).replace(/\s+/g,' '));
-              }
-              const anchors=[...html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)].map(m=>({href:m[1],text:m[2].replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()}));
-              const relevant=anchors.filter(a=>/crediabank|attica|allwyn|opap|financial|q1|result|download|pdf/i.test(`${a.text} ${a.href}`)).slice(0,40);
-              console.log('RELEVANT_ANCHORS',JSON.stringify(relevant,null,2));
-            }
-          }
+          const company={companyId:'company:crediabank',displayName:'CrediaBank',legalName:'CrediaBank S.A.',issuerId:'50'};
+          const indexUrl='https://athens.euronext.com/el/market-data/issuers/50/financial-data?page=0';
+          const headers={Accept:'text/html,application/xhtml+xml','Cache-Control':'no-cache','User-Agent':'Investor-Control-Market-Intelligence/1.0'};
+          const index=await fetch(indexUrl,{headers});
+          if(!index.ok) throw new Error(`index HTTP ${index.status}`);
+          const html=await index.text();
+          const docs=extractAthensFinancialDocuments(html,company).filter(d=>d.identityVerified&&d.pdfUrl);
+          const doc=docs.find(d=>d.period?.year===2026&&d.period?.months===6) || docs[0];
+          if(!doc) throw new Error('Credia H1 document not found');
+          console.log('SELECTED_DOCUMENT',JSON.stringify(doc,null,2));
+          const pdf=await fetch(doc.pdfUrl,{headers:{Accept:'application/pdf','Cache-Control':'no-cache','User-Agent':'Investor-Control-Market-Intelligence/1.0'}});
+          if(!pdf.ok) throw new Error(`PDF HTTP ${pdf.status}`);
+          const buffer=Buffer.from(await pdf.arrayBuffer());
+          fs.writeFileSync('/tmp/credia-h1-2026.pdf',buffer);
+          fs.writeFileSync('/tmp/credia-document.json',JSON.stringify(doc,null,2));
+          console.log('PDF_BYTES',buffer.length);
           NODE
+          pdftotext -layout -enc UTF-8 /tmp/credia-h1-2026.pdf /tmp/credia-h1-2026.txt
+          echo "TEXT_BYTES $(wc -c </tmp/credia-h1-2026.txt)"
+          echo "PAGES $(python - <<'PY'
+          from pathlib import Path
+          print(len(Path('/tmp/credia-h1-2026.txt').read_text(errors='replace').split('\f')))
+          PY
+          )"
+
+      - name: Print bank metric evidence with page context
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          text=Path('/tmp/credia-h1-2026.txt').read_text(encoding='utf-8',errors='replace')
+          pages=text.split('\f')
+          patterns={
+            'CET1':[r'\bCET1\b',r'Common Equity Tier\s*1',r'Κεφάλαι[αο].{0,30}Κατηγορίας\s*1'],
+            'TOTAL_CAPITAL':[r'Total Capital Ratio',r'συνολικ[όη].{0,30}δείκτη κεφαλα',r'Δείκτης Συνολικ[ήης].{0,30}Κεφαλ'],
+            'NPE_NPL':[r'\bNPE\b',r'\bNPL\b',r'non[- ]performing',r'μη εξυπηρετούμεν'],
+            'LOANS':[r'loans and advances',r'δάνεια και απαιτήσεις',r'χορηγήσεις.{0,30}πελάτ'],
+            'DEPOSITS':[r'deposits',r'καταθέσεις πελατ',r'υποχρεώσεις προς πελάτ'],
+            'ROE_ROTE':[r'\bROTE\b',r'\bROE\b',r'Return on Tangible Equity',r'Return on Equity',r'απόδοση.{0,40}ιδίων κεφαλα'],
+            'PROFIT':[r'κέρδη.{0,30}μετά.{0,20}φόρ',r'profit.{0,20}after tax',r'net profit'],
+            'EQUITY':[r'σύνολο ιδίων κεφαλα',r'total equity'],
+            'ASSETS':[r'σύνολο ενεργητικού',r'total assets'],
+          }
+          for label, pats in patterns.items():
+            print(f'\n===== {label} =====')
+            hits=[]
+            for pageno,page in enumerate(pages,1):
+              lines=page.splitlines()
+              for i,line in enumerate(lines):
+                if any(re.search(p,line,re.I) for p in pats):
+                  start=max(0,i-3); end=min(len(lines),i+4)
+                  context='\n'.join(lines[start:end]).strip()
+                  key=(pageno,context)
+                  if key not in hits: hits.append(key)
+            for pageno,context in hits[:30]:
+              print(f'--- PAGE {pageno} ---')
+              print(context[:4000])
+          PY
+
+      - name: Upload extracted evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: credia-h1-2026-bank-metric-evidence-${{ github.run_id }}
+          path: |
+            /tmp/credia-document.json
+            /tmp/credia-h1-2026.txt
+          if-no-files-found: error
+          retention-days: 7
