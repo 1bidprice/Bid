@@ -1,4 +1,4 @@
-name: Investor Control Trusted News Diagnostics
+name: Investor Control Athens Fundamentals Diagnostics
 
 on:
   push:
@@ -26,43 +26,49 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Diagnose GDELT direct trusted publisher discovery
+      - name: Probe Athens issuer financial and announcement HTML
         working-directory: source/market-intelligence
         run: |
           node --input-type=module - <<'NODE'
+          import { extractAthensFinancialDocuments } from './src/adapters/euronext-athens-fundamentals.js';
+
           const targets = [
-            { name:'Virgin Galactic', query:'"Virgin Galactic"' },
-            { name:'Allwyn', query:'Allwyn' },
-            { name:'CrediaBank', query:'CrediaBank' },
+            {
+              name:'CrediaBank',
+              company:{ companyId:'company:crediabank', displayName:'CrediaBank', legalName:'CrediaBank S.A.', aliases:['CrediaBank A.T.E.','ATTICA BANK'], issuerId:'50' },
+              urls:[
+                'https://athens.euronext.com/en/market-data/issuers/50/financial-data',
+                'https://athens.euronext.com/el/market-data/issuers/50/financial-data?page=0',
+              ],
+            },
+            {
+              name:'Allwyn',
+              company:{ companyId:'company:allwyn-ag', displayName:'Allwyn', legalName:'Allwyn AG', aliases:['OPAP','OPAP SA','OPAP S.A.'], issuerId:'863' },
+              urls:[
+                'https://athens.euronext.com/en/market-data/issuers/863/financial-data',
+                'https://athens.euronext.com/en/market-data/issuers/863/announcements',
+              ],
+            },
           ];
-          const allow = /(?:^|\.)(reuters\.com|bloomberg\.com|ft\.com|wsj\.com|apnews\.com|cnbc\.com|marketwatch\.com|fortune\.com)$/i;
+          const ua='Investor-Control-Market-Intelligence/1.0';
           for (const target of targets) {
-            const params = new URLSearchParams({ query:target.query, mode:'ArtList', maxrecords:'75', format:'json', sort:'HybridRel' });
-            const url = `https://api.gdeltproject.org/api/v2/doc/doc?${params}`;
-            const response = await fetch(url, { headers:{ 'User-Agent':'Investor-Control-Market-Intelligence/1.0', Accept:'application/json' } });
-            const body = await response.text();
-            console.log(`\nTARGET ${target.name}`);
-            console.log(JSON.stringify({ status:response.status, contentType:response.headers.get('content-type'), length:body.length, url }));
-            let payload = null;
-            try { payload = JSON.parse(body); } catch { console.log('BODY_PREFIX', body.slice(0,1200).replace(/\s+/g,' ')); continue; }
-            const articles = Array.isArray(payload?.articles) ? payload.articles : [];
-            console.log('ARTICLE_COUNT', articles.length);
-            const trusted = [];
-            for (const article of articles) {
-              let host='';
-              try { host = new URL(article.url).hostname.replace(/^www\./,'').toLowerCase(); } catch {}
-              if (!allow.test(host)) continue;
-              trusted.push({ title:article.title, url:article.url, domain:article.domain || host, host, seendate:article.seendate, language:article.language, sourcecountry:article.sourcecountry });
-            }
-            console.log('TRUSTED_DIRECT', JSON.stringify(trusted.slice(0,20), null, 2));
-            for (const article of trusted.slice(0,5)) {
-              try {
-                const r = await fetch(article.url, { redirect:'follow', headers:{ 'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36', Accept:'text/html,*/*' } });
-                const html=await r.text();
-                console.log('ARTICLE_PROBE', JSON.stringify({ source:target.name, url:article.url, status:r.status, finalUrl:r.url, contentType:r.headers.get('content-type'), bodyLength:html.length, companyMention:html.toLowerCase().includes(target.name.toLowerCase()) }));
-              } catch (error) {
-                console.log('ARTICLE_ERROR', JSON.stringify({ source:target.name, url:article.url, message:String(error) }));
+            console.log(`\n===== ${target.name} =====`);
+            for (const url of target.urls) {
+              const response=await fetch(url,{headers:{Accept:'text/html,application/xhtml+xml','Cache-Control':'no-cache','User-Agent':ua}});
+              const html=await response.text();
+              console.log(JSON.stringify({url,status:response.status,finalUrl:response.url,contentType:response.headers.get('content-type'),length:html.length,trCount:(html.match(/<tr\b/gi)||[]).length,pdfCount:(html.match(/\.pdf/gi)||[]).length,downloadPdfCount:(html.match(/downloadpdf/gi)||[]).length}));
+              if (url.includes('/financial-data')) {
+                const docs=extractAthensFinancialDocuments(html,target.company);
+                console.log('DOCS',JSON.stringify(docs.slice(0,10),null,2));
               }
+              const needles=target.name==='CrediaBank' ? ['CrediaBank','ATTICA BANK','2026,Three','2026,Τριμην'] : ['Q1 2026','Preliminary Unaudited','Allwyn','OPAP SA'];
+              for (const needle of needles) {
+                const i=html.toLowerCase().indexOf(needle.toLowerCase());
+                if(i>=0) console.log(`CONTEXT ${needle}`,html.slice(Math.max(0,i-1800),i+5000).replace(/\s+/g,' '));
+              }
+              const anchors=[...html.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)].map(m=>({href:m[1],text:m[2].replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()}));
+              const relevant=anchors.filter(a=>/crediabank|attica|allwyn|opap|financial|q1|result|download|pdf/i.test(`${a.text} ${a.href}`)).slice(0,40);
+              console.log('RELEVANT_ANCHORS',JSON.stringify(relevant,null,2));
             }
           }
           NODE
