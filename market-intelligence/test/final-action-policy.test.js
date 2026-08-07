@@ -19,6 +19,11 @@ function dossier(overrides = {}) {
       currency: 'USD',
       timestamp: '2026-07-27T13:45:00.000Z',
       source: 'Test feed',
+      purpose: 'ANALYSIS_REFERENCE',
+      freshnessModel: 'VERIFIED_TIMESTAMP',
+      analysisReferenceEligible: true,
+      executionFreshnessEligible: true,
+      decisionEligible: true,
     },
     evidence: [{ evidenceId: 'a' }, { evidenceId: 'b' }],
     reviewDate: '2026-08-27',
@@ -49,10 +54,11 @@ test('autonomous policy emits BUY_NOW only when all freshness, evidence, risk, t
   assert.equal(result.holderAction, 'HOLD');
   assert.equal(result.urgency, 'IMMEDIATE');
   assert.ok(result.confidenceScore >= 80);
+  assert.equal(result.freshness.executionFreshnessEligible, true);
   assert.equal(result.execution.automaticBrokerOrder, false);
 });
 
-test('severe fundamental risk produces AVOID for non-holders and SELL_NOW for holders', () => {
+test('severe fundamental risk produces AVOID for non-holders and SELL_NOW for holders when execution-grade freshness is verified', () => {
   const input = dossier({
     proposedAction: 'CONSIDER_REDUCE',
     metrics: {
