@@ -12,6 +12,30 @@ function replaceRequired(from, to, label) {
   source = source.replace(from, to);
 }
 
+replaceRequired(
+  `function scaleFromText(text) {
+  const head = String(text || '').slice(0, 9000).toLowerCase();
+  if (/(amounts?|figures?).{0,20}(€|eur|euro).{0,12}(million|mn)|in millions of euro|€\\s*mn/.test(head)) return 1_000_000;
+  if (/(amounts?|figures?).{0,20}(€|eur|euro).{0,12}(thousand|000)|in thousands of euro|€\\s*['’]?000/.test(head)) return 1_000;
+  return 1;
+}`,
+  `function scaleFromText(text) {
+  const head = String(text || '').slice(0, 5000).toLowerCase();
+  // Unit scale must come from an explicit financial-statement declaration.
+  // A narrative sentence such as "revenue amounted to EUR 49.6 million" must
+  // never change the scale of every statement row in the document.
+  const declaration = head.match(/(?:amounts?|figures?)\\s*(?:are\\s*)?(?:presented|expressed|stated)?\\s*(?:in)?\\s*(?:€|eur|euro)?\\s*(thousand|thousands|000|million|millions|mn)\\b/i);
+  if (declaration) {
+    const unit = String(declaration[1] || '').toLowerCase();
+    return /million|mn/.test(unit) ? 1_000_000 : 1_000;
+  }
+  if (/\\bin thousands of (?:euro|euros)|(?:€|eur)\\s*['’]?000\\b/i.test(head)) return 1_000;
+  if (/\\bin millions of (?:euro|euros)|(?:€|eur)\\s*mn\\b/i.test(head)) return 1_000_000;
+  return 1;
+}`,
+  'declaration-driven document scale',
+);
+
 if (!source.includes('function looksLikeNarrativeMetricLine(')) {
   replaceRequired(
     `function metricLineScale(line) {`,
@@ -60,6 +84,7 @@ fs.writeFileSync(filePath, source);
 
 const verified = fs.readFileSync(filePath, 'utf8');
 for (const invariant of [
+  'Unit scale must come from an explicit financial-statement declaration',
   'looksLikeNarrativeMetricLine',
   "replace(/\\b\\d{1,2}[./-]\\d{1,2}[./-]\\d{2,4}\\b/g, ' ')",
   "replace(/\\b\\d+(?:st|nd|rd|th)\\b/gi, ' ')",
