@@ -108,7 +108,7 @@ test('issuer transition mismatch is fail-closed: OPAP historical documents are n
   assert.equal(documents[0].identityVerified, false);
 });
 
-test('Athens parser rejects table-of-contents numbers and preserves the first real financial columns', () => {
+test('Athens parser rejects table-of-contents and narrative numbers and preserves statement-row columns', () => {
   const premia = {
     companyId: 'company:xath:term-357',
     displayName: 'PREMIA REAL ESTATE INVESTMENT COMPANY SOCIETE ANOMYME',
@@ -126,7 +126,7 @@ test('Athens parser rejects table-of-contents numbers and preserves the first re
     `PREMIA R.E.I.C.\nINTERIM FINANCIAL REPORT\n(Amounts in €)`,
     `TABLE OF CONTENTS\n6.25 Revenue from sale of inventories ........................................................................ 57\n6.11 Cash and cash equivalents ................................................................................... 49`,
     `Profit after tax was formed at € 9.25 million against profit € 18.06 million in the corresponding half of 2024, presenting a decrease.`,
-    `Statement of comprehensive income\nRevenue from sale of inventories    12.500.000    10.000.000\nStatement of financial position\nCash and cash equivalents    6.110.000    5.500.000\nTotal assets    500.000.000    470.000.000    450.000.000\nTotal liabilities    250.000.000    240.000.000\nTotal equity    250.000.000    230.000.000`,
+    `Statement of comprehensive income\nRevenue from sale of inventories    12.500.000    10.000.000\nProfit after tax    9.250.000    18.060.000\nStatement of financial position\nCash and cash equivalents    6.110.000    5.500.000\nTotal assets    500.000.000    470.000.000    450.000.000\nTotal liabilities    250.000.000    240.000.000\nTotal equity    250.000.000    230.000.000`,
   ];
 
   const snapshot = buildAthensFundamentalSnapshotFromText(pages.join('\f'), document, premia, { pages, extractionStatus: 'REVIEWED_PDF' });
@@ -135,6 +135,7 @@ test('Athens parser rejects table-of-contents numbers and preserves the first re
   assert.equal(snapshot.annual.revenue[1].value, 10_000_000);
   assert.equal(snapshot.annual.netIncome[0].value, 9_250_000);
   assert.equal(snapshot.annual.netIncome[1].value, 18_060_000);
+  assert.equal(snapshot.annual.netIncome[0].provenance.pageNumber, 4);
   assert.equal(snapshot.instant.cash.value, 6_110_000);
   assert.equal(snapshot.instant.assets.value, 500_000_000);
   assert.equal(snapshot.instant.assets.provenance.extractedLine.includes('500.000.000'), true);
