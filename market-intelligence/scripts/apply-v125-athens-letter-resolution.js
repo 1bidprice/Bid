@@ -14,11 +14,27 @@ function replaceRequired(from, to, label) {
 
 replaceRequired(
   "export const ATHENS_DISCOVERY_VERSION = '2026-08-05.3';",
-  "export const ATHENS_DISCOVERY_VERSION = '2026-08-05.4';",
+  "export const ATHENS_DISCOVERY_VERSION = '2026-08-05.5';",
   'Athens discovery policy version',
 );
 
-const letterResolver = `function issuerDirectoryLetter(company) {
+const letterResolver = `const ATHENS_VERIFIED_SYMBOL_IDENTITIES = new Map([
+  ['ADMIE IPTO', { symbol: 'ADMIE', instrumentUrl: 'https://athens.euronext.com/en/market-data/instruments/stocks/ADMIE' }],
+]);
+
+function applyVerifiedSymbolIdentity(company) {
+  const key = normalizedName(company?.displayName || company?.legalName);
+  const verified = ATHENS_VERIFIED_SYMBOL_IDENTITIES.get(key);
+  if (!verified) return company;
+  return {
+    ...company,
+    primaryListing: { ...company.primaryListing, symbol: verified.symbol },
+    aliases: [...new Set([...(company.aliases || []), verified.symbol])],
+    instrumentUrl: verified.instrumentUrl,
+  };
+}
+
+function issuerDirectoryLetter(company) {
   const normalized = normalizedName(company?.displayName || company?.legalName);
   const first = normalized.match(/[A-Z0-9]/)?.[0] || null;
   return first;
@@ -60,8 +76,8 @@ async function fetchAthensLetterDirectory(fetchImpl, company, options = {}, diag
 
 replaceRequired(
   'async function resolveCompanySymbol(fetchImpl, company, options, diagnostics) {\n  let resolved = applyTradingDirectoryIdentity(company, options.tradingDirectory);\n  if (!resolved.primaryListing?.symbol) resolved = await resolveCompanyIdentity(fetchImpl, resolved, options, diagnostics);',
-  `${letterResolver}async function resolveCompanySymbol(fetchImpl, company, options, diagnostics) {\n  let resolved = applyTradingDirectoryIdentity(company, options.tradingDirectory);\n  if (!resolved.primaryListing?.symbol) {\n    const letterResolved = await fetchAthensLetterDirectory(fetchImpl, resolved, options, diagnostics);\n    if (letterResolved) resolved = letterResolved;\n  }\n  if (!resolved.primaryListing?.symbol) resolved = await resolveCompanyIdentity(fetchImpl, resolved, options, diagnostics);`,
-  'official letter-directory fallback',
+  `${letterResolver}async function resolveCompanySymbol(fetchImpl, company, options, diagnostics) {\n  let resolved = applyVerifiedSymbolIdentity(applyTradingDirectoryIdentity(company, options.tradingDirectory));\n  if (!resolved.primaryListing?.symbol) {\n    const letterResolved = await fetchAthensLetterDirectory(fetchImpl, resolved, options, diagnostics);\n    if (letterResolved) resolved = letterResolved;\n  }\n  if (!resolved.primaryListing?.symbol) resolved = await resolveCompanyIdentity(fetchImpl, resolved, options, diagnostics);`,
+  'official letter-directory fallback and verified ADMIE identity',
 );
 
 replaceRequired(
@@ -84,8 +100,10 @@ for (const invariant of [
   'fetchAthensLetterDirectory',
   'ATHENS_LETTER_DIRECTORY_FETCH_FAILED',
   'letterDirectoryCache',
+  'ATHENS_VERIFIED_SYMBOL_IDENTITIES',
+  "'ADMIE IPTO', { symbol: 'ADMIE'",
   'version: 6,',
 ]) {
   if (!verified.includes(invariant)) throw new Error(`v1.2.5 Athens letter-resolution verification failed: ${invariant}`);
 }
-console.log('Investor Control v1.2.5 official Athens letter-directory resolution applied.');
+console.log('Investor Control v1.2.5 official Athens letter-directory and verified ADMIE resolution applied.');
