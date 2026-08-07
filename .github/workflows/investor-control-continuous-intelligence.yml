@@ -90,14 +90,17 @@ jobs:
             if (quote.quoteContract.sourceRole === 'FALLBACK_UNVERIFIED' && (quote.quoteContract.valuationEligible || quote.quoteContract.decisionEligible)) throw new Error(`unsafe fallback ${symbol}`);
           }
 
-          const factsFromAthens = (snapshot) => [
-            ...(snapshot?.annual?.revenue || []),
-            ...(snapshot?.annual?.netIncome || []),
-            snapshot?.instant?.cash,
-            snapshot?.instant?.assets,
-            snapshot?.instant?.liabilities,
-            snapshot?.instant?.equity,
-          ].filter(Boolean).filter((fact) => fact?.provenance?.sourceRole === 'PRIMARY_EXCHANGE_FINANCIAL_DOCUMENT');
+          const athensFacts = (snapshot) => [
+            ...(snapshot?.annual?.revenue || []).map((fact) => ({ fact, expectedContext: 'INCOME_STATEMENT', metric: 'revenue' })),
+            ...(snapshot?.annual?.netIncome || []).map((fact) => ({ fact, expectedContext: 'INCOME_STATEMENT', metric: 'netIncome' })),
+            ...(snapshot?.annual?.operatingCashFlow || []).map((fact) => ({ fact, expectedContext: 'CASH_FLOW', metric: 'operatingCashFlow' })),
+            ...(snapshot?.annual?.capitalExpenditure || []).map((fact) => ({ fact, expectedContext: 'CASH_FLOW', metric: 'capitalExpenditure' })),
+            ...(snapshot?.annual?.dilutedShares || []).map((fact) => ({ fact, expectedContext: 'INCOME_STATEMENT', metric: 'dilutedShares' })),
+            { fact: snapshot?.instant?.cash, expectedContext: 'BALANCE_SHEET', metric: 'cash' },
+            { fact: snapshot?.instant?.assets, expectedContext: 'BALANCE_SHEET', metric: 'assets' },
+            { fact: snapshot?.instant?.liabilities, expectedContext: 'BALANCE_SHEET', metric: 'liabilities' },
+            { fact: snapshot?.instant?.equity, expectedContext: 'BALANCE_SHEET', metric: 'equity' },
+          ].filter((entry) => entry.fact?.provenance?.sourceRole === 'PRIMARY_EXCHANGE_FINANCIAL_DOCUMENT');
 
           for (const snapshot of report.fundamentalSnapshots || []) {
             const model = snapshot?.model || null;
@@ -112,11 +115,25 @@ jobs:
                 if (value !== null && value !== undefined) throw new Error(`generic metric leaked from specialized model: ${snapshot.companyId}`);
               }
             }
-            for (const fact of factsFromAthens(snapshot)) {
-              const line = String(fact?.provenance?.extractedLine || '');
-              if (narrativeMetricPattern.test(line)) throw new Error(`narrative Athens metric leaked: ${snapshot.companyId}`);
+
+            for (const { fact, expectedContext, metric } of athensFacts(snapshot)) {
+              const provenance = fact.provenance || {};
+              const line = String(provenance.extractedLine || '');
+              if (provenance.metricExtractionPolicy !== 'STATEMENT_ROW_ONLY_V2') {
+                throw new Error(`Athens metric missing statement-row policy: ${snapshot.companyId}:${metric}`);
+              }
+              if (provenance.selectionPolicy !== 'ACCOUNTING_STATEMENT_CONTEXT_V1') {
+                throw new Error(`Athens metric missing accounting-context policy: ${snapshot.companyId}:${metric}`);
+              }
+              if (!Array.isArray(provenance.statementContexts) || !provenance.statementContexts.includes(expectedContext)) {
+                throw new Error(`Athens metric wrong accounting context: ${snapshot.companyId}:${metric}:${expectedContext}`);
+              }
+              if (!(Number(provenance.contextScore) > 0)) {
+                throw new Error(`Athens metric missing context score: ${snapshot.companyId}:${metric}`);
+              }
+              if (narrativeMetricPattern.test(line)) throw new Error(`narrative Athens metric leaked: ${snapshot.companyId}:${metric}`);
               if (dateTokenPattern.test(line) && !/statement|total|revenue|sales|profit|income|cash|assets|liabilities|equity/i.test(line)) {
-                throw new Error(`date-contaminated Athens metric leaked: ${snapshot.companyId}`);
+                throw new Error(`date-contaminated Athens metric leaked: ${snapshot.companyId}:${metric}`);
               }
             }
           }
@@ -133,12 +150,14 @@ jobs:
 
             const risk = dossier?.metrics?.fundamentalRisk || null;
             if (risk?.currencyConsistent === false) throw new Error(`fundamental currency mismatch: ${dossier.companyId}`);
-            if (risk?.valuationModelStatus === 'SPECIALIZED_MODEL_REQUIRED') {
-              if (risk.metricsReady === true) throw new Error(`specialized risk falsely ready: ${dossier.companyId}`);
+            if (risk?.model?.specializedModelRequired === true) {
               if (risk.riskScore !== null) throw new Error(`generic risk score leaked from specialized model: ${dossier.companyId}`);
               if (risk?.valuation?.priceToSales !== null || risk?.valuation?.priceToBook !== null || risk?.profitability?.netMarginPct !== null) {
                 throw new Error(`generic valuation leaked from specialized model: ${dossier.companyId}`);
               }
+            }
+            if (risk?.specializedAnalysis?.type === 'BANK' && risk.specializedAnalysis.decisionReady !== true && risk.metricsReady === true) {
+              throw new Error(`incomplete bank passport marked fundamentals ready: ${dossier.companyId}`);
             }
           }
 
@@ -152,6 +171,7 @@ jobs:
             finalActions: feed.summary?.finalActionCount,
             blocked: feed.summary?.blockedDecisionCount,
             fundamentalIntegrity: 'VERIFIED',
+            athensStatementProvenance: 'REQUIRED',
           }, null, 2));
           NODE
 
