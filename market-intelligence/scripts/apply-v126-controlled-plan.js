@@ -23,9 +23,9 @@ function patchFinalActionPolicy() {
 
   source = replaceRequired(
     source,
-    "export const FINAL_ACTION_POLICY_VERSION = '2026-07-27.1';",
+    "export const FINAL_ACTION_POLICY_VERSION = '2026-07-30.1';",
     "export const FINAL_ACTION_POLICY_VERSION = '2026-08-07.1';",
-    'final action policy version',
+    'post-production final action policy version',
   );
 
   const controlledPlan = `function buildControlledPlan(dossier, blockers, flags, quality, confidence, now) {
@@ -122,7 +122,7 @@ patchFinalActionPolicy();
 patchExtremeMarginQuality();
 
 for (const [file, invariants] of Object.entries({
-  'src/final-action-policy.js': ['INTERIM_RISK_CONTROL', 'ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ', 'controlledPlan'],
+  'src/final-action-policy.js': ["FINAL_ACTION_POLICY_VERSION = '2026-08-07.1'", 'INTERIM_RISK_CONTROL', 'ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ', 'controlledPlan'],
   'src/fundamental-risk.js': ['netMarginComparable', 'Μη συγκρίσιμο λόγω πολύ χαμηλής βάσης εσόδων'],
   'src/evidence-synthesis.js': ['καθαρό περιθώριο μη συγκρίσιμο λόγω πολύ χαμηλής βάσης εσόδων'],
 })) {
