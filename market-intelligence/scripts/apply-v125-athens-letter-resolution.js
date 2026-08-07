@@ -14,7 +14,7 @@ function replaceRequired(from, to, label) {
 
 replaceRequired(
   "export const ATHENS_DISCOVERY_VERSION = '2026-08-05.3';",
-  "export const ATHENS_DISCOVERY_VERSION = '2026-08-05.5';",
+  "export const ATHENS_DISCOVERY_VERSION = '2026-08-05.6';",
   'Athens discovery policy version',
 );
 
@@ -24,7 +24,8 @@ const letterResolver = `const ATHENS_VERIFIED_SYMBOL_IDENTITIES = new Map([
 
 function applyVerifiedSymbolIdentity(company) {
   const key = normalizedName(company?.displayName || company?.legalName);
-  const verified = ATHENS_VERIFIED_SYMBOL_IDENTITIES.get(key);
+  const verified = ATHENS_VERIFIED_SYMBOL_IDENTITIES.get(key)
+    || [...ATHENS_VERIFIED_SYMBOL_IDENTITIES.entries()].find(([name]) => key.startsWith(name + ' '))?.[1];
   if (!verified) return company;
   return {
     ...company,
@@ -102,6 +103,7 @@ for (const invariant of [
   'letterDirectoryCache',
   'ATHENS_VERIFIED_SYMBOL_IDENTITIES',
   "'ADMIE IPTO', { symbol: 'ADMIE'",
+  "key.startsWith(name + ' ')",
   'version: 6,',
 ]) {
   if (!verified.includes(invariant)) throw new Error(`v1.2.5 Athens letter-resolution verification failed: ${invariant}`);
