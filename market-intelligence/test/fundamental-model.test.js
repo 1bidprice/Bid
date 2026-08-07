@@ -48,3 +48,23 @@ test('XBRL concept signatures can identify a specialized model even when issuer 
   assert.equal(realEstate.type, 'REAL_ESTATE');
   assert.equal(bank.type, 'FINANCIAL_INSTITUTION');
 });
+
+test('banking XBRL signals outrank incidental real-estate balance-sheet concepts', () => {
+  const model = classifyFundamentalModel({
+    displayName: 'COASTAL FINANCIAL',
+    legalName: 'COASTAL FINANCIAL CORP',
+  }, {
+    concepts: [
+      'LoansAndLeasesReceivableNetReportedAmount',
+      'Deposits',
+      'AllowanceForCreditLossesFinancingReceivables',
+      'RealEstateLoans',
+      'RealEstateOwned',
+      'Assets',
+    ],
+  });
+
+  assert.equal(model.type, 'FINANCIAL_INSTITUTION');
+  assert.equal(model.genericValuationEligible, false);
+  assert.ok(model.reasonCodes.includes('FINANCIAL_XBRL_SIGNAL'));
+});
