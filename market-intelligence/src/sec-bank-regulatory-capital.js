@@ -1,9 +1,9 @@
-export const SEC_BANK_REGULATORY_CAPITAL_VERSION = '2026-08-07.1';
+export const SEC_BANK_REGULATORY_CAPITAL_VERSION = '2026-08-07.2';
 
 const FORM_PATTERN = /\b(10-K\/A|10-Q\/A|10-K|10-Q)\b/i;
 const RATIO_PATTERNS = Object.freeze({
   commonEquityTier1Pct: /common\s+equity\s+tier\s*1(?:\s+capital)?(?:\s+ratio)?/i,
-  tier1CapitalPct: /(?<!common\s+equity\s+)tier\s*1\s+capital(?:\s+ratio)?/i,
+  tier1CapitalPct: /^(?!.*common\s+equity).*tier\s*1\s+capital(?:\s+ratio)?/i,
   totalCapitalPct: /total\s+capital(?:\s+ratio)?/i,
 });
 
@@ -27,7 +27,6 @@ function lineCandidates(lines, pattern) {
   for (let index = 0; index < lines.length; index += 1) {
     const line = String(lines[index] || '').trim();
     if (!pattern.test(line)) continue;
-    pattern.lastIndex = 0;
     const next = String(lines[index + 1] || '').trim();
     const window = [line, next].filter(Boolean).join(' ');
     const ratios = percentages(window);
