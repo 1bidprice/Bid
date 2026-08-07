@@ -26,38 +26,42 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Diagnose Bing News RSS direct publisher links
+      - name: Diagnose GDELT direct trusted publisher discovery
         working-directory: source/market-intelligence
         run: |
           node --input-type=module - <<'NODE'
-          const query = encodeURIComponent('"Virgin Galactic" SPCE');
-          const url = `https://www.bing.com/news/search?q=${query}&format=rss&mkt=en-US`;
-          const response = await fetch(url, { headers:{ 'User-Agent':'Mozilla/5.0 Investor-Control/1.0', Accept:'application/rss+xml,application/xml,text/xml,*/*' } });
-          const xml = await response.text();
-          console.log(JSON.stringify({ status:response.status, url:response.url, contentType:response.headers.get('content-type'), length:xml.length }));
-          console.log('XML_PREFIX', xml.slice(0,1500).replace(/\s+/g,' '));
-          const blocks = xml.match(/<item\b[\s\S]*?<\/item>/gi) || [];
-          console.log('ITEM_COUNT', blocks.length);
-          const tag = (block,name) => (block.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`,'i')) || [])[1] || null;
-          const clean = (v) => String(v||'').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,'$1').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
-          for (const block of blocks.slice(0,20)) {
-            const title = clean(tag(block,'title'));
-            const link = clean(tag(block,'link'));
-            const source = clean(tag(block,'News:Source') || tag(block,'source'));
-            let direct = null;
-            try {
-              const parsed = new URL(link);
-              direct = parsed.searchParams.get('url') || parsed.searchParams.get('u') || null;
-              if (direct) direct = decodeURIComponent(direct);
-            } catch {}
-            console.log(JSON.stringify({ title, source, link, direct }));
-            if (direct && /marketwatch\.com|reuters\.com|cnbc\.com|bloomberg\.com|wsj\.com|ft\.com|fortune\.com|apnews\.com/i.test(direct)) {
+          const targets = [
+            { name:'Virgin Galactic', query:'"Virgin Galactic"' },
+            { name:'Allwyn', query:'Allwyn' },
+            { name:'CrediaBank', query:'CrediaBank' },
+          ];
+          const allow = /(?:^|\.)(reuters\.com|bloomberg\.com|ft\.com|wsj\.com|apnews\.com|cnbc\.com|marketwatch\.com|fortune\.com)$/i;
+          for (const target of targets) {
+            const params = new URLSearchParams({ query:target.query, mode:'ArtList', maxrecords:'75', format:'json', sort:'HybridRel' });
+            const url = `https://api.gdeltproject.org/api/v2/doc/doc?${params}`;
+            const response = await fetch(url, { headers:{ 'User-Agent':'Investor-Control-Market-Intelligence/1.0', Accept:'application/json' } });
+            const body = await response.text();
+            console.log(`\nTARGET ${target.name}`);
+            console.log(JSON.stringify({ status:response.status, contentType:response.headers.get('content-type'), length:body.length, url }));
+            let payload = null;
+            try { payload = JSON.parse(body); } catch { console.log('BODY_PREFIX', body.slice(0,1200).replace(/\s+/g,' ')); continue; }
+            const articles = Array.isArray(payload?.articles) ? payload.articles : [];
+            console.log('ARTICLE_COUNT', articles.length);
+            const trusted = [];
+            for (const article of articles) {
+              let host='';
+              try { host = new URL(article.url).hostname.replace(/^www\./,'').toLowerCase(); } catch {}
+              if (!allow.test(host)) continue;
+              trusted.push({ title:article.title, url:article.url, domain:article.domain || host, host, seendate:article.seendate, language:article.language, sourcecountry:article.sourcecountry });
+            }
+            console.log('TRUSTED_DIRECT', JSON.stringify(trusted.slice(0,20), null, 2));
+            for (const article of trusted.slice(0,5)) {
               try {
-                const article = await fetch(direct, { redirect:'follow', headers:{ 'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36', Accept:'text/html,*/*' } });
-                const body = await article.text();
-                console.log('DIRECT_ARTICLE_PROBE', JSON.stringify({ direct, status:article.status, finalUrl:article.url, contentType:article.headers.get('content-type'), bodyLength:body.length, prefix:body.slice(0,180).replace(/\s+/g,' ') }));
+                const r = await fetch(article.url, { redirect:'follow', headers:{ 'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140 Safari/537.36', Accept:'text/html,*/*' } });
+                const html=await r.text();
+                console.log('ARTICLE_PROBE', JSON.stringify({ source:target.name, url:article.url, status:r.status, finalUrl:r.url, contentType:r.headers.get('content-type'), bodyLength:html.length, companyMention:html.toLowerCase().includes(target.name.toLowerCase()) }));
               } catch (error) {
-                console.log('DIRECT_ARTICLE_ERROR', JSON.stringify({ direct, message:String(error) }));
+                console.log('ARTICLE_ERROR', JSON.stringify({ source:target.name, url:article.url, message:String(error) }));
               }
             }
           }
