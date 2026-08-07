@@ -1,4 +1,4 @@
-export const FUNDAMENTAL_MODEL_VERSION = '2026-08-07.1';
+export const FUNDAMENTAL_MODEL_VERSION = '2026-08-07.2';
 
 function normalizedText(value) {
   return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9Α-Ω]+/g, ' ').replace(/\s+/g, ' ');
@@ -24,38 +24,46 @@ export function classifyFundamentalModel(company = {}, context = {}) {
   const concepts = conceptNames(context);
   const reasonCodes = [];
 
-  const realEstateName = /\b(REIT|REAL ESTATE|REALTY|PROPERTIES|PROPERTY TRUST|REIC|R E I C)\b/.test(name);
-  const realEstateSector = /\b(REAL ESTATE|PROPERTY|REIT)\b/.test(sector);
-  const realEstateConcept = containsConcept(concepts, [
-    /RealEstate/i,
+  const strongRealEstateName = /\b(REIT|REAL ESTATE|REALTY|PROPERTIES|PROPERTY TRUST|REIC|R E I C)\b/.test(name);
+  const strongRealEstateSector = /\b(REAL ESTATE|PROPERTY|REIT)\b/.test(sector);
+  const strongRealEstateConcept = containsConcept(concepts, [
+    /RealEstateInvestmentPropert/i,
     /InvestmentPropert/i,
     /RentalIncome/i,
-    /LeaseIncome/i,
-    /PropertyOperating/i,
+    /LeaseIncomeFromRealEstate/i,
+    /PropertyOperatingIncome/i,
   ]);
 
-  if (realEstateName) reasonCodes.push('REAL_ESTATE_NAME_SIGNAL');
-  if (realEstateSector) reasonCodes.push('REAL_ESTATE_SECTOR_SIGNAL');
-  if (realEstateConcept) reasonCodes.push('REAL_ESTATE_XBRL_SIGNAL');
-
-  const bankName = /\b(BANK|BANCORP|BANKING|CREDIT UNION|INSURANCE|INSURER)\b/.test(name);
-  const bankSector = /\b(BANK|BANKING|INSURANCE|FINANCIAL INSTITUTION|FINANCIAL SERVICES)\b/.test(sector);
-  const bankConcept = containsConcept(concepts, [
+  const strongBankName = /\b(BANK|BANCORP|BANKING|CREDIT UNION|INSURANCE|INSURER)\b/.test(name);
+  const strongBankSector = /\b(BANK|BANKING|INSURANCE|FINANCIAL INSTITUTION|FINANCIAL SERVICES)\b/.test(sector);
+  const strongBankConcept = containsConcept(concepts, [
     /LoansAndLeases/i,
     /Deposits/i,
     /AllowanceForCreditLoss/i,
     /TierOneCapital/i,
     /RiskWeightedAssets/i,
     /FederalFunds/i,
+    /InterestIncome.*Loans/i,
   ]);
+  const financialNameSupport = /\bFINANCIAL\b/.test(name) && strongBankConcept;
 
-  if (bankName) reasonCodes.push('FINANCIAL_NAME_SIGNAL');
-  if (bankSector) reasonCodes.push('FINANCIAL_SECTOR_SIGNAL');
-  if (bankConcept) reasonCodes.push('FINANCIAL_XBRL_SIGNAL');
+  if (strongRealEstateName) reasonCodes.push('REAL_ESTATE_NAME_SIGNAL');
+  if (strongRealEstateSector) reasonCodes.push('REAL_ESTATE_SECTOR_SIGNAL');
+  if (strongRealEstateConcept) reasonCodes.push('REAL_ESTATE_XBRL_SIGNAL');
+  if (strongBankName) reasonCodes.push('FINANCIAL_NAME_SIGNAL');
+  if (strongBankSector) reasonCodes.push('FINANCIAL_SECTOR_SIGNAL');
+  if (strongBankConcept) reasonCodes.push('FINANCIAL_XBRL_SIGNAL');
+  if (financialNameSupport) reasonCodes.push('FINANCIAL_NAME_XBRL_COMBINATION');
 
   let type = 'GENERIC_OPERATING';
-  if (realEstateName || realEstateSector || realEstateConcept) type = 'REAL_ESTATE';
-  else if (bankName || bankSector || bankConcept) type = 'FINANCIAL_INSTITUTION';
+  // Entity identity and sector outrank incidental balance-sheet concepts. Banks
+  // routinely report real-estate collateral, OREO and mortgage-related facts;
+  // those references must never turn a bank into a REIT. Conversely, an issuer
+  // explicitly identified as a REIT/real-estate company remains real estate even
+  // if it reports lending or deposit-like line items.
+  if (strongRealEstateName || strongRealEstateSector) type = 'REAL_ESTATE';
+  else if (strongBankName || strongBankSector || strongBankConcept || financialNameSupport) type = 'FINANCIAL_INSTITUTION';
+  else if (strongRealEstateConcept) type = 'REAL_ESTATE';
 
   const specializedModelRequired = type !== 'GENERIC_OPERATING';
   const requiredSpecializedMetrics = type === 'REAL_ESTATE'
