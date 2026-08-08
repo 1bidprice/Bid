@@ -1,6 +1,6 @@
 import { classifyFundamentalModel } from './fundamental-model.js';
 
-export const INSTRUMENT_PROFILE_VERSION = '2026-08-08.1';
+export const INSTRUMENT_PROFILE_VERSION = '2026-08-08.2';
 
 export const ASSET_CLASS = Object.freeze({
   EQUITY: 'EQUITY',
@@ -64,8 +64,6 @@ function inferredAssetClass(instrument = {}) {
   if (/\bMUTUAL FUND\b|\bUCITS FUND\b/.test(combined)) return { assetClass: ASSET_CLASS.FUND, reason: 'FUND_NAME_SIGNAL' };
   if (instrument.commodity || /\bCOMMODITY\b|\bGOLD\b|\bSILVER\b|\bBRENT\b|\bWTI\b/.test(combined)) return { assetClass: ASSET_CLASS.COMMODITY, reason: 'COMMODITY_SIGNAL' };
 
-  // Existing company registries historically omitted instrumentType. Listed
-  // operating issuers therefore remain equities by backward-compatible default.
   if (instrument.primaryListing?.symbol || instrument.cik || instrument.issuerId || instrument.isin) {
     return { assetClass: ASSET_CLASS.EQUITY, reason: 'LISTED_ISSUER_DEFAULT' };
   }
@@ -75,14 +73,15 @@ function inferredAssetClass(instrument = {}) {
 function analysisModel(assetClass, instrument, context) {
   if (assetClass === ASSET_CLASS.EQUITY) {
     const fundamental = classifyFundamentalModel(instrument, context);
-    return {
-      key: fundamental.type === 'FINANCIAL_INSTITUTION'
-        ? 'EQUITY_BANK'
-        : fundamental.type === 'REAL_ESTATE'
-          ? 'EQUITY_REAL_ESTATE'
-          : 'EQUITY_OPERATING',
-      fundamentalModel: fundamental,
-    };
+    const key = {
+      FINANCIAL_INSTITUTION: 'EQUITY_BANK',
+      REAL_ESTATE: 'EQUITY_REAL_ESTATE',
+      INSURANCE: 'EQUITY_INSURANCE',
+      SPAC: 'EQUITY_SPAC',
+      FINANCIAL_SERVICES_OTHER: 'EQUITY_FINANCIAL_SERVICES',
+      GENERIC_OPERATING: 'EQUITY_OPERATING',
+    }[fundamental.type] || 'EQUITY_UNSUPPORTED_SPECIALIZED';
+    return { key, fundamentalModel: fundamental };
   }
   return {
     key: {
@@ -105,6 +104,10 @@ const MODEL_REQUIREMENTS = Object.freeze({
   EQUITY_OPERATING: ['MARKET_PRICE', 'PRICE_HISTORY', 'OFFICIAL_FILINGS', 'FUNDAMENTALS', 'INDEPENDENT_CROSS_CHECK'],
   EQUITY_BANK: ['MARKET_PRICE', 'PRICE_HISTORY', 'OFFICIAL_FILINGS', 'BANK_CAPITAL', 'ASSET_QUALITY', 'LOANS_DEPOSITS', 'ROE_ROTE', 'INDEPENDENT_CROSS_CHECK'],
   EQUITY_REAL_ESTATE: ['MARKET_PRICE', 'PRICE_HISTORY', 'OFFICIAL_FILINGS', 'NOI_FFO', 'NAV', 'NET_DEBT', 'OCCUPANCY', 'INDEPENDENT_CROSS_CHECK'],
+  EQUITY_INSURANCE: ['MARKET_PRICE', 'PRICE_HISTORY', 'OFFICIAL_FILINGS', 'SOLVENCY_OR_RBC', 'COMBINED_OR_LOSS_RATIO', 'RESERVE_ADEQUACY', 'BOOK_VALUE_OR_ROE', 'INDEPENDENT_CROSS_CHECK'],
+  EQUITY_SPAC: ['MARKET_PRICE', 'PRICE_HISTORY', 'OFFICIAL_FILINGS', 'TRUST_VALUE_PER_SHARE', 'REDEMPTION_TERMS', 'DEAL_DEADLINE', 'SPONSOR_DILUTION', 'DEAL_STATUS'],
+  EQUITY_FINANCIAL_SERVICES: ['MARKET_PRICE', 'PRICE_HISTORY', 'OFFICIAL_FILINGS', 'REGULATORY_CAPITAL_OR_NET_CAPITAL', 'AUM_OR_CLIENT_ASSETS', 'FEE_ECONOMICS', 'ROE_OR_MARGIN', 'INDEPENDENT_CROSS_CHECK'],
+  EQUITY_UNSUPPORTED_SPECIALIZED: ['OFFICIAL_FILINGS', 'SPECIALIZED_MODEL_PROVIDER'],
   ETF_PORTFOLIO: ['MARKET_PRICE', 'PRICE_HISTORY', 'HOLDINGS', 'EXPENSE_RATIO', 'TRACKING_ERROR', 'LIQUIDITY', 'CONCENTRATION'],
   FUND_PORTFOLIO: ['NAV', 'HOLDINGS', 'FEES', 'BENCHMARK', 'PERFORMANCE_HISTORY'],
   BOND_CREDIT_DURATION: ['MARKET_PRICE', 'YIELD', 'COUPON', 'MATURITY', 'DURATION', 'CREDIT_QUALITY', 'SPREAD'],
@@ -121,7 +124,7 @@ export function buildInstrumentProfile(instrument = {}, context = {}) {
   const classification = explicitAssetClass(instrument) || inferredAssetClass(instrument);
   const model = analysisModel(classification.assetClass, instrument, context);
   const listing = instrument.primaryListing || null;
-  const profile = {
+  return {
     format: 'investor-control-instrument-profile',
     version: 1,
     policyVersion: INSTRUMENT_PROFILE_VERSION,
@@ -146,7 +149,6 @@ export function buildInstrumentProfile(instrument = {}, context = {}) {
     requiredCapabilities: [...(MODEL_REQUIREMENTS[model.key] || MODEL_REQUIREMENTS.UNSUPPORTED_UNKNOWN)],
     routingInvariant: 'NO_TICKER_SPECIFIC_MODEL_SELECTION',
   };
-  return profile;
 }
 
 export function isEquityLike(profile) {
