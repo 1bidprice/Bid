@@ -12,12 +12,13 @@ function replaceRequired(from, to, label) {
   source = source.replace(from, to);
 }
 
-const oldScale = `function scaleFromText(text) {
-  const head = String(text || '').slice(0, 9000).toLowerCase();
-  if (/(amounts?|figures?).{0,20}(€|eur|euro).{0,12}(million|mn)|in millions of euro|€\\s*mn/.test(head)) return 1_000_000;
-  if (/(amounts?|figures?).{0,20}(€|eur|euro).{0,12}(thousand|000)|in thousands of euro|€\\s*['’]?000/.test(head)) return 1_000;
-  return 1;
-}`;
+function replaceRegexRequired(regex, replacement, marker, label) {
+  if (source.includes(marker)) return;
+  regex.lastIndex = 0;
+  if (!regex.test(source)) throw new Error(`v1.5.8 patch failed: missing ${label}`);
+  regex.lastIndex = 0;
+  source = source.replace(regex, replacement);
+}
 
 const newScale = `function normalizePdfGlyphs(value) {
   return String(value || '')
@@ -52,11 +53,19 @@ function scaleFromText(text) {
   return 1;
 }`;
 
-replaceRequired(oldScale, newScale, 'bounded financial unit detector');
+replaceRegexRequired(
+  /function scaleFromText\(text\)\s*\{[\s\S]*?\n\}\s*\nfunction normalizeLine/,
+  `${newScale}\n\nfunction normalizeLine`,
+  'function normalizePdfGlyphs(value)',
+  'bounded financial unit detector',
+);
 
-replaceRequired(
-  "function normalizeLine(value) {\n  return plainText(value).toLowerCase().replace(/[’']/g, '').replace(/&/g, ' and ').replace(/\\s+/g, ' ').trim();\n}",
-  "function normalizeLine(value) {\n  return normalizePdfGlyphs(plainText(value)).toLowerCase().replace(/[’']/g, '').replace(/&/g, ' and ').replace(/\\s+/g, ' ').trim();\n}",
+replaceRegexRequired(
+  /function normalizeLine\(value\) \{[\s\S]*?\n\}/,
+  `function normalizeLine(value) {
+  return normalizePdfGlyphs(plainText(value)).toLowerCase().replace(/[’']/g, '').replace(/&/g, ' and ').replace(/\\s+/g, ' ').trim();
+}`,
+  'normalizePdfGlyphs(plainText(value))',
   'PDF glyph normalization in accounting labels and contexts',
 );
 
@@ -78,12 +87,14 @@ const verified = fs.readFileSync(filePath, 'utf8');
 for (const invariant of [
   'function normalizePdfGlyphs(value)',
   "replace(/[Ɵ]/g, 'ti')",
-  "slice(0, 60_000)",
+  'slice(0, 60_000)',
   'in\\s+millions?',
   'in\\s+thousands?',
   'normalizePdfGlyphs(plainText(value))',
   'net cash generated from (+)/used in (-) operating activities',
   'acquisition of property, plant and equipment and intangible assets',
+  'statementPageAuthorityScore',
+  'stripAlignedStatementNoteReference',
 ]) {
   if (!verified.includes(invariant)) throw new Error(`v1.5.8 verification failed: missing ${invariant}`);
 }
