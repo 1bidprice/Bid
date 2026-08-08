@@ -71,3 +71,4 @@ for (const invariant of [
 }
 
 console.log('Investor Control v1.4.7 Athens bank period-flow column policy applied.');
+await import('./apply-v1501-universal-compatibility.js');
