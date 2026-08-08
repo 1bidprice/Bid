@@ -33,6 +33,7 @@ for (const requiredPatch of [
   'apply-v151-direct-corroboration.js',
   'apply-v152-capability-engine.js',
   'apply-v153-decision-basis.js',
+  'apply-v154-baseline-and-euronext-resolver.js',
 ]) {
   if (!manifest.testPatches.includes(requiredPatch) || !manifest.buildPatches.includes(requiredPatch)) {
     throw new Error(`package integrity failed: current manifest missing ${requiredPatch}`);
