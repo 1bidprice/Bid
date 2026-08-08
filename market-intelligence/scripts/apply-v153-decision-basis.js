@@ -15,9 +15,9 @@ function replaceRequired(content, from, to, label) {
 function replaceRegexRequired(content, regex, replacement, marker, label) {
   if (content.includes(marker)) return content;
   let matched = false;
-  const next = content.replace(regex, () => {
+  const next = content.replace(regex, (...args) => {
     matched = true;
-    return replacement;
+    return typeof replacement === 'function' ? replacement(...args) : replacement;
   });
   if (!matched) throw new Error(`v1.5.3 decision-basis patch failed: missing ${label}`);
   return next;
@@ -32,16 +32,11 @@ function patchDaily() {
     'decision-basis imports',
   );
 
-  source = replaceRequired(
+  source = replaceRegexRequired(
     source,
-    `  const instrumentCapabilityPassports = [];
-  const instrumentCapabilityEvaluations = [];
-  const documentLimit =`,
-    `  const instrumentCapabilityPassports = [];
-  const instrumentCapabilityEvaluations = [];
-  const structuredDecisionEvidence = [];
-  const decisionCorroborations = [];
-  const documentLimit =`,
+    /(\s*const instrumentCapabilityPassports = \[\];\n\s*const instrumentCapabilityEvaluations = \[\];)/,
+    `$1\n  const structuredDecisionEvidence = [];\n  const decisionCorroborations = [];`,
+    'const structuredDecisionEvidence = [];',
     'decision-basis output arrays',
   );
 
@@ -141,18 +136,11 @@ function patchDaily() {
     'company decision-basis block',
   );
 
-  source = replaceRequired(
+  source = replaceRegexRequired(
     source,
-    `    instrumentCapabilityEvaluationCount: instrumentCapabilityEvaluations.length,
-    instrumentCapabilityEvaluations,
-    fundamentalSnapshotCount:`,
-    `    instrumentCapabilityEvaluationCount: instrumentCapabilityEvaluations.length,
-    instrumentCapabilityEvaluations,
-    structuredDecisionEvidenceCount: structuredDecisionEvidence.length,
-    structuredDecisionEvidence,
-    decisionCorroborationCount: decisionCorroborations.length,
-    decisionCorroborations,
-    fundamentalSnapshotCount:`,
+    /(\s*instrumentCapabilityEvaluationCount:\s*instrumentCapabilityEvaluations\.length,\n\s*instrumentCapabilityEvaluations,)/,
+    `$1\n    structuredDecisionEvidenceCount: structuredDecisionEvidence.length,\n    structuredDecisionEvidence,\n    decisionCorroborationCount: decisionCorroborations.length,\n    decisionCorroborations,`,
+    'structuredDecisionEvidenceCount:',
     'decision-basis report outputs',
   );
   write('src/run-daily-intelligence.js', source);
@@ -160,20 +148,28 @@ function patchDaily() {
 
 function patchReadiness() {
   let source = read('src/signal-readiness.js');
-  source = replaceRequired(
+
+  source = replaceRegexRequired(
     source,
-    `  if (input.crossCheck?.recommendationReady !== true) blockers.push('INDEPENDENT_CROSS_CHECK_REQUIRED');`,
-    `  const baselineDecisionReady = input.decisionBasis === 'FUNDAMENTAL_BASELINE' && input.decisionCorroboration?.ready === true;
-  if (input.crossCheck?.recommendationReady !== true && !baselineDecisionReady) blockers.push('INDEPENDENT_CROSS_CHECK_REQUIRED');`,
+    /(\s*const crossCheckReady\s*=\s*input\.crossCheck\?\.recommendationReady\s*===\s*true;)/,
+    `$1\n  const decisionBasis = input.decisionBasis || 'EVENT_DRIVEN';\n  const decisionCorroborationReady = input.decisionCorroboration?.ready === true;\n  const baselineDecisionReady = decisionBasis === 'FUNDAMENTAL_BASELINE' && decisionCorroborationReady;`,
+    'const baselineDecisionReady =',
+    'baseline readiness state',
+  );
+
+  source = replaceRegexRequired(
+    source,
+    /if\s*\(\s*!crossCheckReady\s*\)\s*blockers\.push\(['"]INDEPENDENT_CROSS_CHECK_REQUIRED['"]\);/,
+    `if (!crossCheckReady && !baselineDecisionReady) blockers.push('INDEPENDENT_CROSS_CHECK_REQUIRED');`,
+    'if (!crossCheckReady && !baselineDecisionReady)',
     'baseline decision cross-check readiness',
   );
-  source = replaceRequired(
+
+  source = replaceRegexRequired(
     source,
-    `    crossCheckReady: input.crossCheck?.recommendationReady === true,`,
-    `    crossCheckReady: input.crossCheck?.recommendationReady === true,
-    decisionBasis: input.decisionBasis || 'EVENT_DRIVEN',
-    decisionCorroborationReady: input.decisionCorroboration?.ready === true,
-    baselineDecisionReady,`,
+    /(\s*crossCheckReady,\n)/,
+    `$1      decisionBasis,\n      decisionCorroborationReady,\n      baselineDecisionReady,\n`,
+    'decisionCorroborationReady,',
     'readiness decision-basis output',
   );
   write('src/signal-readiness.js', source);
@@ -181,72 +177,80 @@ function patchReadiness() {
 
 function patchDossier() {
   let source = read('src/research-dossier.js');
-  source = replaceRequired(
+
+  source = replaceRegexRequired(
     source,
-    `  if (input.crossCheck?.recommendationReady !== true) blockers.push('INDEPENDENT_CROSS_CHECK_REQUIRED');`,
-    `  const baselineDecisionReady = input.decisionBasis === 'FUNDAMENTAL_BASELINE' && input.decisionCorroboration?.ready === true;
-  if (input.crossCheck?.recommendationReady !== true && !baselineDecisionReady) blockers.push('INDEPENDENT_CROSS_CHECK_REQUIRED');`,
-    'dossier baseline corroboration',
-  );
-  source = replaceRequired(
-    source,
-    `    crossCheck: input.crossCheck,
-    thesis: input.thesis,`,
-    `    crossCheck: input.crossCheck,
-    decisionBasis: input.decisionBasis || 'EVENT_DRIVEN',
-    decisionCorroboration: input.decisionCorroboration || null,
-    requireCanonicalClaim: input.requireCanonicalClaim === true,
-    thesis: input.thesis,`,
+    /(\s*crossCheck,\n\s*thesis:\s*input\.thesis,)/,
+    `    crossCheck,\n    decisionBasis: input.decisionBasis || 'EVENT_DRIVEN',\n    decisionCorroboration: input.decisionCorroboration || null,\n    thesis: input.thesis,`,
+    'decisionCorroboration: input.decisionCorroboration || null,',
     'readiness decision inputs',
   );
-  source = replaceRequired(
+
+  source = replaceRegexRequired(
     source,
-    `    origin: company.origin || 'FOCUS_UNIVERSE',`,
-    `    origin: company.origin || 'FOCUS_UNIVERSE',
-    decisionBasis: input.decisionBasis || 'EVENT_DRIVEN',`,
+    /(\s*listing:\s*company\.primaryListing\s*\|\|[^\n]+,\n)/,
+    `$1    decisionBasis: input.decisionBasis || 'EVENT_DRIVEN',\n`,
+    "decisionBasis: input.decisionBasis || 'EVENT_DRIVEN',",
     'dossier decision basis',
   );
-  source = replaceRequired(
+
+  source = replaceRegexRequired(
     source,
-    `      crossCheck: input.crossCheck || null,
-      canonicalClaim: input.leadClaim || null,`,
-    `      crossCheck: input.crossCheck || null,
-      decisionCorroboration: input.decisionCorroboration || null,
-      canonicalClaim: input.leadClaim || null,`,
+    /(\s*crossCheck,\n)(\s*\},\n\s*readiness:)/,
+    `$1      decisionCorroboration: input.decisionCorroboration || null,\n$2`,
+    'decisionCorroboration: input.decisionCorroboration || null,\n      canonicalClaim',
     'dossier decision corroboration metric',
   );
+
+  // v1.5.0 adds instrument passports to this same return object. Preserve them
+  // if present; the decision-basis patch must not depend on their exact location.
   write('src/research-dossier.js', source);
 }
 
 function patchFinalAction() {
   let source = read('src/final-action-policy.js');
-  source = replaceRequired(
+
+  source = replaceRegexRequired(
     source,
-    `  if (crossCheck.recommendationReady === true) score += 25;`,
-    `  const decisionCorroborated = dossier?.decisionBasis === 'FUNDAMENTAL_BASELINE' && dossier?.metrics?.decisionCorroboration?.ready === true;
-  if (crossCheck.recommendationReady === true || decisionCorroborated) score += 25;`,
-    'data-quality decision corroboration',
+    /(function dataQualityScore\(dossier\) \{[\s\S]*?const crossCheck = dossier\?\.metrics\?\.crossCheck \|\| \{\};)/,
+    `$1\n  const decisionCorroborated = dossier?.decisionBasis === 'FUNDAMENTAL_BASELINE' && dossier?.metrics?.decisionCorroboration?.ready === true;`,
+    "function dataQualityScore(dossier) {\n  const crossCheck = dossier?.metrics?.crossCheck || {};\n  const decisionCorroborated",
+    'data-quality decision corroboration state',
   );
-  source = replaceRequired(
+  source = source.replace(
+    /if \(crossCheck\.recommendationReady === true\) score \+= 25;/,
+    `if (crossCheck.recommendationReady === true || decisionCorroborated) score += 25;`,
+  );
+
+  source = replaceRegexRequired(
     source,
-    `  if (crossCheck.recommendationReady === true) score += 20;`,
-    `  const decisionCorroborated = dossier?.decisionBasis === 'FUNDAMENTAL_BASELINE' && dossier?.metrics?.decisionCorroboration?.ready === true;
-  if (crossCheck.recommendationReady === true || decisionCorroborated) score += 20;`,
-    'confidence decision corroboration',
+    /(function confidenceScore\(dossier, flags\) \{[\s\S]*?const crossCheck = dossier\?\.metrics\?\.crossCheck \|\| \{\};)/,
+    `$1\n  const decisionCorroborated = dossier?.decisionBasis === 'FUNDAMENTAL_BASELINE' && dossier?.metrics?.decisionCorroboration?.ready === true;`,
+    "function confidenceScore(dossier, flags) {\n  const crossCheck = dossier?.metrics?.crossCheck || {};\n  const decisionCorroborated",
+    'confidence decision corroboration state',
   );
-  source = replaceRequired(
+  source = source.replace(
+    /if \(crossCheck\.recommendationReady === true\) score \+= 20;/,
+    `if (crossCheck.recommendationReady === true || decisionCorroborated) score += 20;`,
+  );
+
+  source = replaceRegexRequired(
     source,
-    `  if (crossCheck?.recommendationReady !== true) blockers.push('CROSS_CHECK_NOT_READY');`,
-    `  const decisionCorroborated = dossier?.decisionBasis === 'FUNDAMENTAL_BASELINE' && dossier?.metrics?.decisionCorroboration?.ready === true;
-  if (crossCheck?.recommendationReady !== true && !decisionCorroborated) blockers.push('CROSS_CHECK_NOT_READY');`,
-    'final blocker decision corroboration',
+    /(\s*const crossCheck = dossier\?\.metrics\?\.crossCheck \|\| null;\n)/,
+    `$1  const decisionCorroborated = dossier?.decisionBasis === 'FUNDAMENTAL_BASELINE' && dossier?.metrics?.decisionCorroboration?.ready === true;\n`,
+    "const decisionCorroborated = dossier?.decisionBasis === 'FUNDAMENTAL_BASELINE' && dossier?.metrics?.decisionCorroboration?.ready === true;\n  const referencePriceAgeHours",
+    'final blocker decision corroboration state',
   );
-  source = replaceRequired(
-    source,
-    `  if (referencePriceAgeHours === null || referencePriceAgeHours > Number(options.maxReferencePriceAgeHours ?? 6)) blockers.push('REFERENCE_PRICE_STALE');`,
-    `  if (referencePriceAgeHours === null || referencePriceAgeHours > Number(options.maxAnalysisReferencePriceAgeHours ?? 96)) blockers.push('REFERENCE_PRICE_STALE');`,
-    'analysis reference freshness horizon',
+  source = source.replace(
+    /if \(crossCheck\?\.recommendationReady !== true\) blockers\.push\(['"]CROSS_CHECK_NOT_READY['"]\);/,
+    `if (crossCheck?.recommendationReady !== true && !decisionCorroborated) blockers.push('CROSS_CHECK_NOT_READY');`,
   );
+
+  source = source.replace(
+    /if \(referencePriceAgeHours === null \|\| referencePriceAgeHours > Number\(options\.maxReferencePriceAgeHours \?\? \d+\)\) blockers\.push\(['"]REFERENCE_PRICE_STALE['"]\);/,
+    `if (referencePriceAgeHours === null || referencePriceAgeHours > Number(options.maxAnalysisReferencePriceAgeHours ?? 96)) blockers.push('REFERENCE_PRICE_STALE');`,
+  );
+
   write('src/final-action-policy.js', source);
 }
 
@@ -257,8 +261,8 @@ patchFinalAction();
 
 for (const [file, invariants] of Object.entries({
   'src/run-daily-intelligence.js': ['buildStructuredDecisionEvidence', 'assessDecisionCorroboration', 'synthesizeFundamentalBaseline', "'FUNDAMENTAL_BASELINE' : 'EVENT_DRIVEN'", 'structuredDecisionEvidenceCount'],
-  'src/signal-readiness.js': ['baselineDecisionReady', 'decisionCorroborationReady'],
-  'src/research-dossier.js': ['decisionBasis: input.decisionBasis', 'decisionCorroboration: input.decisionCorroboration', 'baselineDecisionReady'],
+  'src/signal-readiness.js': ['baselineDecisionReady', 'decisionCorroborationReady', "!crossCheckReady && !baselineDecisionReady"],
+  'src/research-dossier.js': ["decisionBasis: input.decisionBasis || 'EVENT_DRIVEN'", 'decisionCorroboration: input.decisionCorroboration || null'],
   'src/final-action-policy.js': ['decisionCorroborated', 'maxAnalysisReferencePriceAgeHours'],
 })) {
   const source = read(file);
