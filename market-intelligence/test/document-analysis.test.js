@@ -35,49 +35,59 @@ function evidence(sourceUrl = 'https://example.test/announcement') {
     sourceType: 'ISSUER_IR',
     sourceName: 'Issuer IR',
     sourceUrl,
-    sourceDocumentId: 'doc-1',
+    sourceDocumentId: null,
     publishedAt: NOW,
     retrievedAt: NOW,
     eventAt: NOW,
-    title: 'Company purchased own shares',
+    title: 'Share buyback announcement',
     rawText: null,
-    contentHash: 'hash-document-1',
+    contentHash: '0123456789abcdef0123456789abcdef',
     language: 'en',
     companyIds: [ALLWYN.companyId],
     claimType: 'FACT',
     reliabilityTier: 1,
     isPrimarySource: true,
-    independenceGroup: 'issuer:test',
+    independenceGroup: 'issuer',
     supportsClaimIds: [],
     contradictsClaimIds: [],
     expiresAt: null,
-    notes: null,
+    notes: 'Official announcement.',
   };
 }
 
 test('HTML normalizer removes executable markup and keeps readable facts', () => {
   const text = htmlToPlainText(`
-    <html><head><style>.hidden{display:none}</style><script>alert(1)</script></head>
-    <body><h1>Share Buyback</h1><p>Purchased <strong>3,500 shares</strong> for EUR 47,600.00.</p></body></html>
+    <html><style>.hidden{display:none}</style><script>alert('x')</script>
+    <body><h1>Share buyback</h1><p>The company purchased 3,500 shares for EUR 47,600.00.</p></body></html>
   `);
-  assert.equal(text.includes('alert(1)'), false);
-  assert.match(text, /Share Buyback/);
+  assert.match(text, /Share buyback/);
   assert.match(text, /3,500 shares/);
-  assert.match(text, /47,600\.00/);
+  assert.doesNotMatch(text, /alert/);
+  assert.doesNotMatch(text, /display:none/);
 });
 
 test('official HTML document becomes reviewed evidence with deterministic observations', async () => {
+  const repeatedContext = 'The board approved the transaction after reviewing liquidity, capital allocation and shareholder interests. '.repeat(6);
+  const body = `<article><h1>Share buyback</h1><p>On 8 June 2026 the company purchased 3,500 shares for EUR 47,600.00, representing 0.04% of voting rights.</p><p>${repeatedContext}</p></article>`;
   const fetchImpl = async () => ({
     ok: true,
     status: 200,
-    headers: headers('text/html; charset=utf-8'),
-    text: async () => `<article><h1>Share buyback</h1><p>The company purchased 3,500 shares for EUR 47,600.00, equal to 0.04% of issued capital.</p><p>${'Official transaction details. '.repeat(12)}</p></article>`,
+    headers: headers('text/html; charset=utf-8', Buffer.byteLength(body)),
+    text: async () => body,
   });
-  const hydrated = await hydrateEvidenceDocument(evidence(), { fetchImpl, retrievedAt: NOW });
+
+  const hydrated = await hydrateEvidenceDocument(evidence(), {
+    fetchImpl,
+    retrievedAt: NOW,
+  });
+  assert.equal(hydrated.diagnostics.length, 0);
+  assert.equal(hydrated.record.document.status, 'REVIEWED_TEXT');
   assert.equal(hydrated.record.document.reviewed, true);
-  assert.equal(hydrated.record.document.status, 'REVIEWED_HTML');
-  assert.ok(hydrated.record.rawText.length >= 180);
+  assert.deepEqual(hydrated.record.document.pages, []);
+  assert.ok(hydrated.record.rawText.length >= 400);
+
   const observations = extractDocumentObservations(hydrated.record);
+  assert.equal(observations.documentReviewed, true);
   assert.equal(observations.extractionVersion, 2);
   assert.ok(observations.currencyAmounts.some((item) => item.raw.includes('47,600')));
   assert.ok(observations.percentages.some((item) => item.raw.includes('0.04%')));
