@@ -65,6 +65,13 @@ for (const snapshot of report.fundamentalSnapshots || []) {
     }
   }
 
+  if (snapshot?.format === 'investor-control-euronext-athens-fundamentals') {
+    const selection = snapshot?.sourceDocument?.candidateSelection || null;
+    if (selection?.reviewedSelected !== true) fail(`Athens fundamentals bypassed reviewed candidate selection: ${snapshot.companyId}`);
+    if (snapshot?.sourceDocument?.extractionStatus !== 'REVIEWED_PDF') fail(`Athens fundamentals selected unreviewed PDF: ${snapshot.companyId}:${snapshot?.sourceDocument?.extractionStatus || 'NONE'}`);
+    if (!(Number(selection?.accountingCoverage) >= 3)) fail(`Athens fundamentals selected insufficient accounting content: ${snapshot.companyId}:${selection?.accountingCoverage}`);
+  }
+
   const verifiedAthensFacts = athensFacts(snapshot);
   if (verifiedAthensFacts.length) {
     if (snapshot?.quality?.rowLabelPolicy !== 'ROW_LABEL_ANCHORED_V1') fail(`Athens snapshot missing row-label policy: ${snapshot.companyId}`);
@@ -148,6 +155,7 @@ console.log(JSON.stringify({
   blocked: feed.summary?.blockedDecisionCount,
   baselineDecisionSerialization: 'REQUIRED',
   eventClaimSeparation: 'REQUIRED',
+  euronextReviewedCandidateSelection: 'REQUIRED',
   ellaktorH1ConsolidatedRegression: 'VERIFIED',
   athensStatementAuthority: 'REQUIRED',
   athensCandidateAudit: 'REQUIRED'
