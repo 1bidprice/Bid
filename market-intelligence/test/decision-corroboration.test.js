@@ -55,6 +55,7 @@ test('fundamental baseline synthesis ignores the uncorroborated event and can ge
   const synthesis = synthesizeFundamentalBaseline({
     company,
     ...input,
+    historicalMarketMetrics: input.marketMetrics,
     decisionCorroboration,
     generatedAt: '2026-08-08T12:00:00.000Z',
   });
