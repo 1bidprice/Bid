@@ -30,7 +30,22 @@ function dossier(decisionBasis = 'FUNDAMENTAL_BASELINE') {
       fundamentals: { metricsReady: true },
       fundamentalRisk: { metricsReady: true, riskScore: 35, flags: [] },
       market: {
-        readiness: { marketMetricsReady: true },
+        readiness: {
+          priceHistoryReady: true,
+          liquidityReady: true,
+          relativeStrengthReady: true,
+          sourceReady: true,
+          crossCheckReady: true,
+          benchmarkReady: true,
+          marketMetricsReady: true,
+        },
+        dataQuality: {
+          sourceReady: true,
+          crossCheckReady: true,
+          benchmarkReady: true,
+          historySource: 'LICENSED_MARKET_DATA',
+          benchmarkSource: 'LICENSED_MARKET_DATA',
+        },
         latestTimestamp: 1786132800,
         liquidity: { score: 80 },
         relativeStrength: { excessReturnPct: 4 },
@@ -50,6 +65,9 @@ test('fundamental baseline can be FINAL HOLD with an analysis-grade close even w
   assert.equal(result.freshness.executionFreshnessEligible, false);
   assert.ok(!result.blockers.includes('CROSS_CHECK_NOT_READY'));
   assert.ok(!result.blockers.includes('REFERENCE_PRICE_STALE'));
+  assert.ok(!result.blockers.includes('MARKET_HISTORY_SOURCE_NOT_READY'));
+  assert.ok(!result.blockers.includes('MARKET_HISTORY_NOT_CROSSCHECKED'));
+  assert.ok(!result.blockers.includes('MARKET_BENCHMARK_NOT_READY'));
 });
 
 test('event-driven dossier remains blocked when its actual event claim lacks independent corroboration', () => {
