@@ -14,13 +14,10 @@ function replaceRequired(content, from, to, label) {
 
 function replaceRegexRequired(content, regex, replacement, marker, label) {
   if (content.includes(marker)) return content;
-  let matched = false;
-  const next = content.replace(regex, (...args) => {
-    matched = true;
-    return typeof replacement === 'function' ? replacement(...args) : replacement;
-  });
-  if (!matched) throw new Error(`v1.5.3 decision-basis patch failed: missing ${label}`);
-  return next;
+  regex.lastIndex = 0;
+  if (!regex.test(content)) throw new Error(`v1.5.3 decision-basis patch failed: missing ${label}`);
+  regex.lastIndex = 0;
+  return content.replace(regex, replacement);
 }
 
 function patchDaily() {
@@ -202,8 +199,6 @@ function patchDossier() {
     'dossier decision corroboration metric',
   );
 
-  // v1.5.0 adds instrument passports to this same return object. Preserve them
-  // if present; the decision-basis patch must not depend on their exact location.
   write('src/research-dossier.js', source);
 }
 
