@@ -87,9 +87,6 @@ for (const snapshot of report.fundamentalSnapshots || []) {
     if (dateTokenPattern.test(line) && !/statement|total|revenue|sales|profit|income|cash|assets|liabilities|equity/i.test(line)) fail(`date-contaminated Athens metric leaked: ${snapshot.companyId}:${metric}`);
   }
 
-  // Fixed regression anchor against the reviewed ELLAKTOR H1 2025 consolidated
-  // statement. This prevents Board Report/APM or Company columns from silently
-  // replacing the Group totals in production.
   if (snapshot.companyId === 'company:xath:term-490' && snapshot?.reporting?.periodEnd === '2025-06-30') {
     const revenue = values(snapshot?.annual?.revenue);
     const netIncome = values(snapshot?.annual?.netIncome);
@@ -109,11 +106,26 @@ for (const candidate of feed.discoveryRadar || []) {
   if (candidate.suggestedAction !== 'WATCH' || candidate.investmentScore !== null) fail('discovery leaked recommendation');
 }
 
+for (const record of report.structuredDecisionEvidence || []) {
+  if (record?.eventClaimEligible !== false) fail(`structured decision evidence became event-claim eligible: ${record?.id}`);
+  if (record?.document?.status !== 'VERIFIED_STRUCTURED_DATA' || record?.document?.reviewed !== true) fail(`unreviewed structured decision evidence: ${record?.id}`);
+}
+
 for (const dossier of report.researchDossiers || []) {
   const action = dossier.finalAction;
   if (!action || !allowedActions.has(action.marketAction)) fail(`invalid final action: ${dossier.companyId}`);
   if (action.execution?.automaticBrokerOrder !== false || action.execution?.requiresUserExecution !== true) fail(`broker boundary broken: ${dossier.companyId}`);
   if (action.status === 'BLOCKED' && action.marketAction !== 'WATCH') fail(`blocked action leaked direction: ${dossier.companyId}`);
+
+  const baseline = dossier.decisionBasis === 'FUNDAMENTAL_BASELINE';
+  const decisionReady = dossier?.metrics?.decisionCorroboration?.ready === true;
+  if (baseline && dossier?.readiness?.publishable === true) {
+    if (!decisionReady) fail(`publishable baseline dossier lost decision corroboration: ${dossier.companyId}`);
+    if (action?.blockers?.includes('CROSS_CHECK_NOT_READY')) fail(`baseline dossier falsely blocked by event cross-check: ${dossier.companyId}`);
+  }
+  if (dossier.decisionBasis === 'EVENT_DRIVEN' && action.status === 'FINAL' && dossier?.metrics?.crossCheck?.recommendationReady !== true) {
+    fail(`event-driven final action escaped claim corroboration: ${dossier.companyId}`);
+  }
 
   const risk = dossier?.metrics?.fundamentalRisk || null;
   if (risk?.currencyConsistent === false) fail(`fundamental currency mismatch: ${dossier.companyId}`);
@@ -134,7 +146,9 @@ console.log(JSON.stringify({
   fundamentals: report.fundamentalSnapshotCount,
   finalActions: feed.summary?.finalActionCount,
   blocked: feed.summary?.blockedDecisionCount,
+  baselineDecisionSerialization: 'REQUIRED',
+  eventClaimSeparation: 'REQUIRED',
   ellaktorH1ConsolidatedRegression: 'VERIFIED',
   athensStatementAuthority: 'REQUIRED',
-  athensCandidateAudit: 'REQUIRED',
+  athensCandidateAudit: 'REQUIRED'
 }, null, 2));
