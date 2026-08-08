@@ -32,10 +32,14 @@ const newScale = `function normalizePdfGlyphs(value) {
     .replace(/[‐‑‒–—−]/g, '-');
 }
 
-function scaleFromText(text) {
-  const head = normalizePdfGlyphs(String(text || '').slice(0, 60_000))
+function normalizedScaleText(value, maxChars = 60_000) {
+  return normalizePdfGlyphs(String(value || '').slice(0, maxChars))
     .toLowerCase()
     .replace(/\\s+/g, ' ');
+}
+
+function unitScaleMarker(value) {
+  const text = normalizedScaleText(value);
   const millionPatterns = [
     /\\bin\\s+millions?\\s+of\\s+(?:eur|euro|euros)\\b/,
     /\\b(?:amounts?|figures?)\\s+in\\s+(?:eur|euro|euros|€)\\s+millions?\\b/,
@@ -48,16 +52,32 @@ function scaleFromText(text) {
     /\\b(?:amounts?|figures?)\\s+in\\s+thousands?\\s+of\\s+(?:eur|euro|euros)\\b/,
     /(?:€|\\beur\\b|\\beuro(?:s)?\\b)\\s*(?:000|thousands?)\\b/,
   ];
-  if (millionPatterns.some((pattern) => pattern.test(head))) return 1_000_000;
-  if (thousandPatterns.some((pattern) => pattern.test(head))) return 1_000;
-  return 1;
+  if (millionPatterns.some((pattern) => pattern.test(text))) return 1_000_000;
+  if (thousandPatterns.some((pattern) => pattern.test(text))) return 1_000;
+  return null;
+}
+
+function primaryStatementPageForScale(value) {
+  const text = normalizedScaleText(value, 80_000);
+  return /(?:^|\\s)(?:condensed\\s+)?(?:income statement|statement of comprehensive income|statement of financial position|balance sheet|statement of cash flows?|cash flow statement)(?:\\s|$)/.test(text);
+}
+
+function scaleFromText(text, pages = []) {
+  const localScales = (Array.isArray(pages) ? pages : [])
+    .filter((page) => primaryStatementPageForScale(page))
+    .map((page) => unitScaleMarker(page))
+    .filter((value) => value !== null);
+  const uniqueLocalScales = [...new Set(localScales)];
+  if (uniqueLocalScales.length === 1) return uniqueLocalScales[0];
+  if (uniqueLocalScales.length > 1) return 1;
+  return unitScaleMarker(text) || 1;
 }`;
 
 replaceRegexRequired(
   /function scaleFromText\(text\)\s*\{[\s\S]*?\n\}\s*\nfunction normalizeLine/,
   `${newScale}\n\nfunction normalizeLine`,
-  'function normalizePdfGlyphs(value)',
-  'bounded financial unit detector',
+  'function primaryStatementPageForScale(value)',
+  'statement-local financial unit detector',
 );
 
 replaceRegexRequired(
@@ -67,6 +87,18 @@ replaceRegexRequired(
 }`,
   'normalizePdfGlyphs(plainText(value))',
   'PDF glyph normalization in accounting labels and contexts',
+);
+
+replaceRequired(
+  "  const scale = scaleFromText(text);",
+  "  const scale = scaleFromText(text, pages);",
+  'statement-local scale call',
+);
+
+replaceRequired(
+  "  const lines = rawCurrent.split(String.fromCharCode(10)).map((line) => line.trim()).filter(Boolean);",
+  "  const lines = rawCurrent.split(String.fromCharCode(10)).map((line) => normalizeLine(line)).filter(Boolean);",
+  'normalized statement-authority headings',
 );
 
 replaceRequired(
@@ -87,9 +119,11 @@ const verified = fs.readFileSync(filePath, 'utf8');
 for (const invariant of [
   'function normalizePdfGlyphs(value)',
   "replace(/[Ɵ]/g, 'ti')",
-  'slice(0, 60_000)',
-  'in\\s+millions?',
-  'in\\s+thousands?',
+  'function unitScaleMarker(value)',
+  'function primaryStatementPageForScale(value)',
+  'const uniqueLocalScales = [...new Set(localScales)]',
+  'scaleFromText(text, pages)',
+  'map((line) => normalizeLine(line))',
   'normalizePdfGlyphs(plainText(value))',
   'net cash generated from (+)/used in (-) operating activities',
   'acquisition of property, plant and equipment and intangible assets',
@@ -99,4 +133,4 @@ for (const invariant of [
   if (!verified.includes(invariant)) throw new Error(`v1.5.8 verification failed: missing ${invariant}`);
 }
 
-console.log('Investor Control v1.5.8 PDF glyph normalization and financial-unit taxonomy applied.');
+console.log('Investor Control v1.5.8 statement-local unit scaling and PDF glyph normalization applied.');
