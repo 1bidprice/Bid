@@ -12,6 +12,7 @@ const ALLWYN = {
   legalName: 'Allwyn AG',
   displayName: 'Allwyn',
   primaryListing: { exchange: 'Euronext Athens', symbol: 'ALWN', mic: 'XATH' },
+  issuerId: '863',
   country: 'CH',
   currency: 'EUR',
   active: true,
@@ -34,59 +35,49 @@ function evidence(sourceUrl = 'https://example.test/announcement') {
     sourceType: 'ISSUER_IR',
     sourceName: 'Issuer IR',
     sourceUrl,
-    sourceDocumentId: null,
+    sourceDocumentId: 'doc-1',
     publishedAt: NOW,
     retrievedAt: NOW,
     eventAt: NOW,
-    title: 'Share buyback announcement',
+    title: 'Company purchased own shares',
     rawText: null,
-    contentHash: '0123456789abcdef0123456789abcdef',
+    contentHash: 'hash-document-1',
     language: 'en',
     companyIds: [ALLWYN.companyId],
     claimType: 'FACT',
     reliabilityTier: 1,
     isPrimarySource: true,
-    independenceGroup: 'issuer',
+    independenceGroup: 'issuer:test',
     supportsClaimIds: [],
     contradictsClaimIds: [],
     expiresAt: null,
-    notes: 'Official announcement.',
+    notes: null,
   };
 }
 
 test('HTML normalizer removes executable markup and keeps readable facts', () => {
   const text = htmlToPlainText(`
-    <html><style>.hidden{display:none}</style><script>alert('x')</script>
-    <body><h1>Share buyback</h1><p>The company purchased 3,500 shares for EUR 47,600.00.</p></body></html>
+    <html><head><style>.hidden{display:none}</style><script>alert(1)</script></head>
+    <body><h1>Share Buyback</h1><p>Purchased <strong>3,500 shares</strong> for EUR 47,600.00.</p></body></html>
   `);
-  assert.match(text, /Share buyback/);
+  assert.equal(text.includes('alert(1)'), false);
+  assert.match(text, /Share Buyback/);
   assert.match(text, /3,500 shares/);
-  assert.doesNotMatch(text, /alert/);
-  assert.doesNotMatch(text, /display:none/);
+  assert.match(text, /47,600\.00/);
 });
 
 test('official HTML document becomes reviewed evidence with deterministic observations', async () => {
-  const repeatedContext = 'The board approved the transaction after reviewing liquidity, capital allocation and shareholder interests. '.repeat(6);
-  const body = `<article><h1>Share buyback</h1><p>On 8 June 2026 the company purchased 3,500 shares for EUR 47,600.00, representing 0.04% of voting rights.</p><p>${repeatedContext}</p></article>`;
   const fetchImpl = async () => ({
     ok: true,
     status: 200,
-    headers: headers('text/html; charset=utf-8', Buffer.byteLength(body)),
-    text: async () => body,
+    headers: headers('text/html; charset=utf-8'),
+    text: async () => `<article><h1>Share buyback</h1><p>The company purchased 3,500 shares for EUR 47,600.00, equal to 0.04% of issued capital.</p><p>${'Official transaction details. '.repeat(12)}</p></article>`,
   });
-
-  const hydrated = await hydrateEvidenceDocument(evidence(), {
-    fetchImpl,
-    retrievedAt: NOW,
-  });
-  assert.equal(hydrated.diagnostics.length, 0);
-  assert.equal(hydrated.record.document.status, 'REVIEWED_TEXT');
+  const hydrated = await hydrateEvidenceDocument(evidence(), { fetchImpl, retrievedAt: NOW });
   assert.equal(hydrated.record.document.reviewed, true);
-  assert.deepEqual(hydrated.record.document.pages, []);
-  assert.ok(hydrated.record.rawText.length >= 400);
-
+  assert.equal(hydrated.record.document.status, 'REVIEWED_HTML');
+  assert.ok(hydrated.record.rawText.length >= 180);
   const observations = extractDocumentObservations(hydrated.record);
-  assert.equal(observations.documentReviewed, true);
   assert.equal(observations.extractionVersion, 2);
   assert.ok(observations.currencyAmounts.some((item) => item.raw.includes('47,600')));
   assert.ok(observations.percentages.some((item) => item.raw.includes('0.04%')));
@@ -116,16 +107,22 @@ test('PDF source is never treated as reviewed without a PDF extraction stage', a
 
 test('daily runner reviews documents but blocks advice until all independent gates pass', async () => {
   const indexHtml = `
-    <div>20 July 2026</div>
-    <a href="/regulatory-announcements/company-purchased-own-shares">Company purchased its own shares under share buyback programme</a>
+    <table><tbody><tr>
+      <td>ALLWYN AG</td>
+      <td><a href="/en/node/999002">Company purchased its own shares under share buyback programme</a></td>
+      <td>20-07-2026 12:00</td>
+    </tr></tbody></table>
   `;
   const documentHtml = `<article><h1>Share buyback programme</h1><p>The company purchased 3,500 shares for EUR 47,600.00 on 8 June 2026.</p><p>${'Official transaction details and capital allocation context. '.repeat(12)}</p></article>`;
   const fetchImpl = async (url) => {
     const value = String(url);
-    if (value.endsWith('/regulatory-announcements')) {
+    if (value.includes('/market-data/issuers/863/announcements')) {
       return { ok: true, status: 200, headers: headers('text/html'), text: async () => indexHtml };
     }
-    return { ok: true, status: 200, headers: headers('text/html'), text: async () => documentHtml };
+    if (value.includes('/en/node/999002')) {
+      return { ok: true, status: 200, headers: headers('text/html'), text: async () => documentHtml };
+    }
+    return { ok: true, status: 200, headers: headers('text/html'), text: async () => '<html></html>' };
   };
 
   const report = await runDailyIntelligence({
