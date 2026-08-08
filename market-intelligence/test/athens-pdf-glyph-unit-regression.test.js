@@ -64,6 +64,12 @@ test('late million-unit marker and common PDF glyph substitutions preserve accou
   assert.equal(snapshot.instant.cash.value, 2_435_000_000);
   assert.equal(snapshot.instant.assets.value, 19_733_000_000);
   assert.equal(snapshot.instant.liabilities.value, 13_197_000_000);
+  assert.ok(snapshot.instant.equity, JSON.stringify({
+    instant: snapshot.instant,
+    coverage: snapshot.coverage,
+    quality: snapshot.quality,
+    annual: snapshot.annual,
+  }));
   assert.equal(snapshot.instant.equity.value, 6_536_000_000);
   assert.equal(snapshot.quality.balanceSheetIntegrity.status, 'PASSED');
   assert.equal(snapshot.metricsReady, true);
