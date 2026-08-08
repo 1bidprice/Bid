@@ -9,6 +9,7 @@ const feed = JSON.parse(fs.readFileSync(feedPath, 'utf8'));
 const allowedActions = new Set(['BUY_NOW', 'SELL_NOW', 'HOLD', 'DO_NOT_BUY', 'AVOID', 'WATCH']);
 const narrativeMetricPattern = /\b(amounted to|stood at|reached|was formed at|were formed at|compared (?:with|to)|versus|of which|representing|presenting|increased (?:to|by)|decreased (?:to|by)|rose (?:to|by)|fell (?:to|by))\b/i;
 const dateTokenPattern = /\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b/;
+const acceptedAthensFinancialRoles = new Set(['PRIMARY_EXCHANGE_FINANCIAL_DOCUMENT', 'PRIMARY_ISSUER_FINANCIAL_DOCUMENT']);
 
 function fail(message) {
   throw new Error(`PRODUCTION_SAFETY_REJECTED: ${message}`);
@@ -16,6 +17,14 @@ function fail(message) {
 
 function values(facts = []) {
   return facts.map((fact) => Number(fact?.value));
+}
+
+function organizationRoot(url) {
+  try {
+    const host = new URL(String(url || '')).hostname.toLowerCase().replace(/^www\./, '');
+    const parts = host.split('.').filter(Boolean);
+    return parts.length <= 2 ? host : parts.slice(-2).join('.');
+  } catch { return null; }
 }
 
 if (report.format !== 'investor-control-daily-intelligence' || report.version !== 8) fail('wrong report contract');
@@ -49,7 +58,7 @@ const athensFacts = (snapshot) => [
   { fact: snapshot?.instant?.assets, expectedContext: 'BALANCE_SHEET', metric: 'assets' },
   { fact: snapshot?.instant?.liabilities, expectedContext: 'BALANCE_SHEET', metric: 'liabilities' },
   { fact: snapshot?.instant?.equity, expectedContext: 'BALANCE_SHEET', metric: 'equity' },
-].filter((entry) => entry.fact?.provenance?.sourceRole === 'PRIMARY_EXCHANGE_FINANCIAL_DOCUMENT');
+].filter((entry) => acceptedAthensFinancialRoles.has(entry.fact?.provenance?.sourceRole));
 
 for (const snapshot of report.fundamentalSnapshots || []) {
   const model = snapshot?.model || null;
@@ -70,6 +79,16 @@ for (const snapshot of report.fundamentalSnapshots || []) {
     if (selection?.reviewedSelected !== true) fail(`Athens fundamentals bypassed reviewed candidate selection: ${snapshot.companyId}`);
     if (snapshot?.sourceDocument?.extractionStatus !== 'REVIEWED_PDF') fail(`Athens fundamentals selected unreviewed PDF: ${snapshot.companyId}:${snapshot?.sourceDocument?.extractionStatus || 'NONE'}`);
     if (!(Number(selection?.accountingCoverage) >= 3)) fail(`Athens fundamentals selected insufficient accounting content: ${snapshot.companyId}:${selection?.accountingCoverage}`);
+
+    const sourceRole = snapshot?.sourceDocument?.sourceRole || snapshot?.quality?.sourceRole || null;
+    if (!acceptedAthensFinancialRoles.has(sourceRole)) fail(`Athens fundamentals have unsupported source role: ${snapshot.companyId}:${sourceRole}`);
+    if (sourceRole === 'PRIMARY_ISSUER_FINANCIAL_DOCUMENT') {
+      if (snapshot?.sourceDocument?.sourceChannel !== 'ISSUER_IR_OFFICIAL') fail(`issuer fundamentals missing canonical IR channel: ${snapshot.companyId}`);
+      if (snapshot?.sourceDocument?.identityBinding !== 'CANONICAL_ISSUER_IR_DOMAIN') fail(`issuer fundamentals missing canonical-domain binding: ${snapshot.companyId}`);
+      const pdfRoot = organizationRoot(snapshot?.sourceUrl);
+      const indexRoot = organizationRoot(snapshot?.sourceDocument?.indexUrl || snapshot?.sourceDocument?.detailUrl);
+      if (!pdfRoot || !indexRoot || pdfRoot !== indexRoot) fail(`issuer financial PDF is off canonical IR organization domain: ${snapshot.companyId}:${pdfRoot}:${indexRoot}`);
+    }
   }
 
   const verifiedAthensFacts = athensFacts(snapshot);
@@ -156,6 +175,7 @@ console.log(JSON.stringify({
   baselineDecisionSerialization: 'REQUIRED',
   eventClaimSeparation: 'REQUIRED',
   euronextReviewedCandidateSelection: 'REQUIRED',
+  canonicalIssuerFinancialProvenance: 'REQUIRED',
   ellaktorH1ConsolidatedRegression: 'VERIFIED',
   athensStatementAuthority: 'REQUIRED',
   athensCandidateAudit: 'REQUIRED'
