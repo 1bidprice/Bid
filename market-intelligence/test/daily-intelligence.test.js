@@ -12,6 +12,7 @@ const ALLWYN = {
   legalName: 'Allwyn AG',
   displayName: 'Allwyn',
   primaryListing: { exchange: 'Euronext Athens', symbol: 'ALWN', mic: 'XATH' },
+  issuerId: '863',
   active: true,
 };
 
@@ -81,9 +82,14 @@ test('event classification recognises dilution, buyback and ownership events', (
 });
 
 test('daily runner emits guarded signals, draft dossiers and an empty production feed', async () => {
-  const allwynHtml = `
-    <div>20 July 2026</div>
-    <a href="/regulatory-announcements/company-purchased-own-shares">Company purchased its own shares under share buyback programme</a>
+  const athensAnnouncementHtml = `
+    <table><tbody>
+      <tr>
+        <td>ALLWYN AG</td>
+        <td><a href="/en/node/999001">Company purchased its own shares under share buyback programme</a></td>
+        <td>20-07-2026 12:00</td>
+      </tr>
+    </tbody></table>
   `;
   const secPayload = {
     filings: {
@@ -99,7 +105,7 @@ test('daily runner emits guarded signals, draft dossiers and an empty production
   };
   const fetchImpl = async (url) => {
     if (String(url).includes('data.sec.gov')) return { ok: true, json: async () => secPayload };
-    return { ok: true, headers: { get: () => 'text/html' }, text: async () => allwynHtml };
+    return { ok: true, headers: { get: () => 'text/html' }, text: async () => athensAnnouncementHtml };
   };
 
   const report = await runDailyIntelligence({
