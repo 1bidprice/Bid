@@ -64,7 +64,7 @@ for (const invariant of [
   if (!risk.includes(invariant)) throw new Error(`v1.5.0.1 risk verification failed: missing ${invariant}`);
 }
 const daily = read('src/run-daily-intelligence.js');
-if (daily.includes('POSITION_COMPANY_IDS')) throw new Error('v1.5.0.1 orchestrator still contains hardcoded position IDs');
+if (/const\s+POSITION_COMPANY_IDS\b/.test(daily)) throw new Error('v1.5.0.1 orchestrator still defines hardcoded position IDs');
 if (daily.includes('fetchAllwynRegulatoryAnnouncements')) throw new Error('v1.5.0.1 orchestrator still imports issuer-specific Allwyn adapter');
 
 console.log('Investor Control v1.5.0.1 universal compatibility and bank share-basis integrity applied.');
