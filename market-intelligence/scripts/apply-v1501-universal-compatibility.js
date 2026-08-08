@@ -68,6 +68,3 @@ if (/const\s+POSITION_COMPANY_IDS\b/.test(daily)) throw new Error('v1.5.0.1 orch
 if (/^import[^\n]*fetchAllwynRegulatoryAnnouncements/m.test(daily)) throw new Error('v1.5.0.1 orchestrator still imports issuer-specific Allwyn adapter');
 
 console.log('Investor Control v1.5.0.1 universal compatibility and bank share-basis integrity applied.');
-await import('./apply-v150-universal-instrument-architecture.js');
-await import('./apply-v151-direct-corroboration.js');
-await import('./apply-v152-capability-engine.js');
