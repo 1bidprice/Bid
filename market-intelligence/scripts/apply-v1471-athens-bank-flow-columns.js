@@ -28,8 +28,6 @@ replaceRequired(
       if (!matchesAny(value, patterns) || exclude.some((pattern) => pattern.test(value))) continue;
       const numbers = amountTokens(line);
       if (numbers.length < 2) continue;
-      // Consolidated flow statements can include H1 current/prior followed by
-      // Q2 current/prior. Bank Passport uses the first current/prior period pair.
       return {
         pageNumber: pageIndex + 1,
         line,
@@ -71,4 +69,3 @@ for (const invariant of [
 }
 
 console.log('Investor Control v1.4.7 Athens bank period-flow column policy applied.');
-await import('./apply-v1501-universal-compatibility.js');
