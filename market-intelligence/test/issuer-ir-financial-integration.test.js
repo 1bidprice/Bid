@@ -66,7 +66,16 @@ test('canonical issuer IR PDF is discovered generically and retains issuer prove
   });
 
   assert.ok(result.snapshot);
-  assert.equal(result.snapshot.metricsReady, true);
+  assert.equal(result.snapshot.metricsReady, true, JSON.stringify({
+    coverage: result.snapshot.coverage,
+    metrics: result.snapshot.metrics,
+    annual: result.snapshot.annual,
+    instant: result.snapshot.instant,
+    quality: result.snapshot.quality,
+    reporting: result.snapshot.reporting,
+    sourceDocument: result.snapshot.sourceDocument,
+    diagnostics: result.diagnostics,
+  }));
   assert.equal(result.snapshot.sourceDocument.sourceChannel, 'ISSUER_IR_OFFICIAL');
   assert.equal(result.snapshot.sourceDocument.sourceRole, 'PRIMARY_ISSUER_FINANCIAL_DOCUMENT');
   assert.equal(result.snapshot.sourceDocument.identityBinding, 'CANONICAL_ISSUER_IR_DOMAIN');
