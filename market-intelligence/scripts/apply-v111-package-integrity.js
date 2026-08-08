@@ -37,6 +37,7 @@ for (const requiredPatch of [
   'apply-v155-reviewed-financial-candidates.js',
   'apply-v156-closed-market-reference.js',
   'apply-v157-canonical-issuer-financials.js',
+  'apply-v1571-share-note-context.js',
 ]) {
   if (!manifest.testPatches.includes(requiredPatch) || !manifest.buildPatches.includes(requiredPatch)) {
     throw new Error(`package integrity failed: current manifest missing ${requiredPatch}`);
