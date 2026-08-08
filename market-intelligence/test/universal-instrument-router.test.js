@@ -1,0 +1,110 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { buildInstrumentProfile } from '../src/instrument-profile.js';
+import { buildInstrumentRoute } from '../src/instrument-router.js';
+
+const testDir = path.dirname(fileURLToPath(import.meta.url));
+
+const athensBank = {
+  companyId: 'company:test:unknown-athens-bank',
+  displayName: 'Example Hellenic Bank',
+  legalName: 'Example Hellenic Bank S.A.',
+  sector: 'Financial Services',
+  industry: 'Banking',
+  issuerId: '9999',
+  country: 'GR',
+  currency: 'EUR',
+  primaryListing: { exchange: 'Euronext Athens', mic: 'XATH', symbol: 'TESTB' },
+};
+
+const usOperating = {
+  companyId: 'company:test:unknown-us-industrial',
+  displayName: 'Example Industrial Systems',
+  sector: 'Industrials',
+  industry: 'Machinery',
+  cik: '0000009999',
+  country: 'US',
+  currency: 'USD',
+  primaryListing: { exchange: 'NYSE', mic: 'XNYS', symbol: 'TSTI' },
+};
+
+test('unknown Athens bank routes to the reusable bank model and Athens adapters without ticker-specific code', () => {
+  const profile = buildInstrumentProfile(athensBank);
+  const route = buildInstrumentRoute(athensBank, { profile });
+  assert.equal(profile.assetClass, 'EQUITY');
+  assert.equal(profile.analysisModel, 'EQUITY_BANK');
+  assert.equal(route.routes.market.adapter, 'EURONEXT_ATHENS_QUOTE');
+  assert.equal(route.routes.officialEvidence.adapter, 'EURONEXT_ATHENS_ANNOUNCEMENTS');
+  assert.equal(route.routes.fundamentals.adapter, 'EURONEXT_ATHENS_FINANCIALS');
+  assert.equal(route.profile.routingInvariant, 'NO_TICKER_SPECIFIC_MODEL_SELECTION');
+});
+
+test('unknown US operating company routes to generic equity + SEC with no companyId special case', () => {
+  const profile = buildInstrumentProfile(usOperating);
+  const route = buildInstrumentRoute(usOperating, { profile });
+  assert.equal(profile.assetClass, 'EQUITY');
+  assert.equal(profile.analysisModel, 'EQUITY_OPERATING');
+  assert.equal(route.routes.market.adapter, 'PROFESSIONAL_US_MARKET');
+  assert.equal(route.routes.officialEvidence.adapter, 'SEC_SUBMISSIONS');
+  assert.equal(route.routes.fundamentals.adapter, 'SEC_COMPANY_FACTS');
+  assert.equal(route.endToEndReady, true);
+});
+
+test('insurance, SPAC and non-bank financial issuers never leak into the generic operating or bank model', () => {
+  const cases = [
+    [{ companyId: 'company:test:insurer', displayName: 'Example Insurance Group', sector: 'Insurance', cik: '0000001001', primaryListing: { symbol: 'INSX', mic: 'XNYS' } }, 'EQUITY_INSURANCE', 'INSURANCE'],
+    [{ companyId: 'company:test:spac', displayName: 'Example Acquisition Corp', sector: 'Blank Check', cik: '0000001002', primaryListing: { symbol: 'SPAX', mic: 'XNAS' } }, 'EQUITY_SPAC', 'SPAC'],
+    [{ companyId: 'company:test:broker', displayName: 'Example Securities Holdings', sector: 'Capital Markets', cik: '0000001003', primaryListing: { symbol: 'BRKX', mic: 'XNYS' } }, 'EQUITY_FINANCIAL_SERVICES', 'FINANCIAL_SERVICES_OTHER'],
+  ];
+  for (const [instrument, model, fundamentalType] of cases) {
+    const profile = buildInstrumentProfile(instrument);
+    assert.equal(profile.analysisModel, model);
+    assert.equal(profile.fundamentalModel.type, fundamentalType);
+    assert.equal(profile.fundamentalModel.genericValuationEligible, false);
+    assert.equal(profile.fundamentalModel.specializedModelRequired, true);
+  }
+});
+
+test('ETF is automatically identified and fails closed only on missing ETF analytics provider', () => {
+  const instrument = {
+    instrumentId: 'instrument:test:world-etf',
+    instrumentType: 'ETF',
+    displayName: 'Example World UCITS ETF',
+    country: 'US',
+    primaryListing: { exchange: 'NYSE Arca', mic: 'ARCX', symbol: 'TETF' },
+  };
+  const profile = buildInstrumentProfile(instrument);
+  const route = buildInstrumentRoute(instrument, { profile });
+  assert.equal(profile.assetClass, 'ETF');
+  assert.equal(profile.analysisModel, 'ETF_PORTFOLIO');
+  assert.equal(route.routes.analytics.status, 'REQUIRES_PROVIDER');
+  assert.equal(route.endToEndReady, false);
+});
+
+test('bond, option, future, FX, crypto and commodity route by structure rather than ticker', () => {
+  const cases = [
+    [{ instrumentType: 'BOND', maturityDate: '2032-01-01' }, 'BOND', 'BOND_CREDIT_DURATION'],
+    [{ instrumentType: 'OPTION', strike: 100 }, 'OPTION', 'OPTION_VOLATILITY_GREEKS'],
+    [{ instrumentType: 'FUTURE', contractMonth: '2026-12' }, 'FUTURE', 'FUTURE_DERIVATIVE'],
+    [{ instrumentType: 'FX', baseCurrency: 'EUR', quoteCurrency: 'USD' }, 'FX', 'FX_MACRO_CARRY'],
+    [{ instrumentType: 'CRYPTO', baseAsset: 'BTC', quoteAsset: 'USD' }, 'CRYPTO', 'CRYPTO_NETWORK_MARKET'],
+    [{ instrumentType: 'COMMODITY', commodity: 'gold' }, 'COMMODITY', 'COMMODITY_CURVE_INVENTORY'],
+  ];
+  for (const [instrument, assetClass, model] of cases) {
+    const profile = buildInstrumentProfile(instrument);
+    assert.equal(profile.assetClass, assetClass);
+    assert.equal(profile.analysisModel, model);
+    assert.ok(profile.requiredCapabilities.length > 0);
+  }
+});
+
+test('central orchestration contains no hardcoded portfolio tickers or issuer-specific model branch', () => {
+  const source = fs.readFileSync(path.resolve(testDir, '../src/run-daily-intelligence.js'), 'utf8');
+  assert.equal(source.includes('POSITION_COMPANY_IDS'), false);
+  assert.equal(source.includes('fetchAllwynRegulatoryAnnouncements'), false);
+  assert.equal(/company\.companyId\s*===\s*['"]company:(?:allwyn-ag|virgin-galactic-holdings|crediabank)['"]/.test(source), false);
+  assert.ok(source.includes('buildInstrumentRoute'));
+});

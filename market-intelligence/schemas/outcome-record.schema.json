@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://investorcontrol.local/schemas/outcome-record.schema.json",
+  "title": "OutcomeRecord",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "outcomeId",
+    "version",
+    "dossierId",
+    "companyId",
+    "companyName",
+    "symbol",
+    "exchange",
+    "category",
+    "action",
+    "publishedAt",
+    "referencePrice",
+    "checkpoints",
+    "closeBasedExcursions",
+    "catalystOutcome",
+    "thesisOutcome",
+    "lastEvaluatedAt",
+    "status"
+  ],
+  "properties": {
+    "outcomeId": { "type": "string", "minLength": 12 },
+    "version": { "type": "integer", "minimum": 1 },
+    "dossierId": { "type": "string", "minLength": 12 },
+    "companyId": { "type": "string", "minLength": 3 },
+    "companyName": { "type": "string", "minLength": 1 },
+    "symbol": { "type": ["string", "null"] },
+    "exchange": { "type": ["string", "null"] },
+    "category": { "type": "string" },
+    "action": {
+      "type": "string",
+      "enum": ["WATCH", "CONSIDER_BUY", "HOLD", "CONSIDER_REDUCE", "AVOID"]
+    },
+    "publishedAt": { "type": "string", "format": "date-time" },
+    "referencePrice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "currency", "timestamp", "source"],
+      "properties": {
+        "value": { "type": "number", "exclusiveMinimum": 0 },
+        "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "source": { "type": "string", "minLength": 1 }
+      }
+    },
+    "checkpoints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["day1", "week1", "month1", "month3", "month6", "month12"],
+      "properties": {
+        "day1": { "$ref": "#/$defs/checkpointOrNull" },
+        "week1": { "$ref": "#/$defs/checkpointOrNull" },
+        "month1": { "$ref": "#/$defs/checkpointOrNull" },
+        "month3": { "$ref": "#/$defs/checkpointOrNull" },
+        "month6": { "$ref": "#/$defs/checkpointOrNull" },
+        "month12": { "$ref": "#/$defs/checkpointOrNull" }
+      }
+    },
+    "closeBasedExcursions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maximumFavourablePct", "maximumAdversePct", "observationCount"],
+      "properties": {
+        "maximumFavourablePct": { "type": ["number", "null"] },
+        "maximumAdversePct": { "type": ["number", "null"] },
+        "observationCount": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "catalystOutcome": {
+      "type": "string",
+      "enum": ["PENDING", "CONFIRMED", "PARTIAL", "FAILED", "UNKNOWN"]
+    },
+    "thesisOutcome": {
+      "type": "string",
+      "enum": ["PENDING", "VALID", "PARTIAL", "INVALIDATED", "UNKNOWN"]
+    },
+    "lastEvaluatedAt": { "type": ["string", "null"], "format": "date-time" },
+    "status": { "type": "string", "enum": ["OPEN", "MATURED", "CLOSED"] }
+  },
+  "$defs": {
+    "checkpointOrNull": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["timestamp", "close", "rawReturnPct", "actionAlignedReturnPct"],
+          "properties": {
+            "timestamp": { "type": "string", "format": "date-time" },
+            "close": { "type": "number", "exclusiveMinimum": 0 },
+            "rawReturnPct": { "type": "number" },
+            "actionAlignedReturnPct": { "type": ["number", "null"] }
+          }
+        }
+      ]
+    }
+  }
+}
