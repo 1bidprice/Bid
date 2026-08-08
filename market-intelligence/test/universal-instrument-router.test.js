@@ -53,6 +53,21 @@ test('unknown US operating company routes to generic equity + SEC with no compan
   assert.equal(route.endToEndReady, true);
 });
 
+test('insurance, SPAC and non-bank financial issuers never leak into the generic operating or bank model', () => {
+  const cases = [
+    [{ companyId: 'company:test:insurer', displayName: 'Example Insurance Group', sector: 'Insurance', cik: '0000001001', primaryListing: { symbol: 'INSX', mic: 'XNYS' } }, 'EQUITY_INSURANCE', 'INSURANCE'],
+    [{ companyId: 'company:test:spac', displayName: 'Example Acquisition Corp', sector: 'Blank Check', cik: '0000001002', primaryListing: { symbol: 'SPAX', mic: 'XNAS' } }, 'EQUITY_SPAC', 'SPAC'],
+    [{ companyId: 'company:test:broker', displayName: 'Example Securities Holdings', sector: 'Capital Markets', cik: '0000001003', primaryListing: { symbol: 'BRKX', mic: 'XNYS' } }, 'EQUITY_FINANCIAL_SERVICES', 'FINANCIAL_SERVICES_OTHER'],
+  ];
+  for (const [instrument, model, fundamentalType] of cases) {
+    const profile = buildInstrumentProfile(instrument);
+    assert.equal(profile.analysisModel, model);
+    assert.equal(profile.fundamentalModel.type, fundamentalType);
+    assert.equal(profile.fundamentalModel.genericValuationEligible, false);
+    assert.equal(profile.fundamentalModel.specializedModelRequired, true);
+  }
+});
+
 test('ETF is automatically identified and fails closed only on missing ETF analytics provider', () => {
   const instrument = {
     instrumentId: 'instrument:test:world-etf',
