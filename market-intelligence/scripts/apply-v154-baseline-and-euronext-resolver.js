@@ -31,6 +31,14 @@ function patchDossierDecisionCorroboration() {
     'decision corroboration inside dossier metrics',
   );
 
+  source = replaceRegexRequired(
+    source,
+    /(\s*listing:\s*company\.primaryListing\s*\|\|\s*\{[^\n]+\},\n)/,
+    `$1    decisionBasis: input.decisionBasis || 'EVENT_DRIVEN',\n`,
+    "listing: company.primaryListing || { exchange: 'Unknown', symbol: 'UNKNOWN', mic: null },\n    decisionBasis: input.decisionBasis || 'EVENT_DRIVEN',",
+    'decision basis at dossier top level',
+  );
+
   write('src/research-dossier.js', source);
 }
 
@@ -95,6 +103,7 @@ patchEuronextFinancialResolver();
 
 for (const [file, invariants] of Object.entries({
   'src/research-dossier.js': [
+    "decisionBasis: input.decisionBasis || 'EVENT_DRIVEN'",
     'decisionCorroboration: input.decisionCorroboration || null',
   ],
   'src/adapters/euronext-athens-fundamentals.js': [
