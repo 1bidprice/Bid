@@ -66,5 +66,5 @@ test('banking XBRL signals outrank incidental real-estate balance-sheet concepts
 
   assert.equal(model.type, 'FINANCIAL_INSTITUTION');
   assert.equal(model.genericValuationEligible, false);
-  assert.ok(model.reasonCodes.includes('FINANCIAL_XBRL_SIGNAL'));
+  assert.ok(model.reasonCodes.includes('BANK_XBRL_SIGNAL'));
 });
