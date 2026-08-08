@@ -12,15 +12,24 @@ function replaceRequired(from, to, label) {
   source = source.replace(from, to);
 }
 
-function replaceRegexRequired(regex, replacement, marker, label) {
-  if (source.includes(marker)) return;
-  regex.lastIndex = 0;
-  if (!regex.test(source)) throw new Error(`v1.5.7.3 patch failed: missing ${label}`);
-  regex.lastIndex = 0;
-  source = source.replace(regex, replacement);
-}
+const oldStatementValues = `function statementValues(numbers, pageText, contexts = []) {
+  const layout = statementColumnLayout(pageText, contexts);
+  let values = [...numbers];
+  if (
+    values.length === layout.expectedColumns + 1 &&
+    /^\\d{1,2}$/.test(String(values[0]?.raw || '').replace(/[()]/g, ''))
+  ) {
+    values = values.slice(1);
+  }
+  if (values.length < layout.expectedColumns) return null;
+  if (layout.expectedColumns > 2 && values.length > layout.expectedColumns) return null;
+  const current = values[layout.currentIndex];
+  const comparative = values[layout.comparativeIndex];
+  if (!current || !comparative) return null;
+  return { selected: [current, comparative], layout };
+}`;
 
-const noteHelpers = `function rawNumericStarts(line) {
+const noteHelpersAndStatementValues = `function rawNumericStarts(line) {
   const result = [];
   const pattern = /\\(?-?\\d[\\d.,]*\\)?/g;
   for (const match of String(line || '').matchAll(pattern)) {
@@ -55,24 +64,13 @@ function stripAlignedStatementNoteReference(numbers, rawRow, rawPageText) {
   return { numbers: numbers.slice(1), stripped: true, noteValue: first };
 }
 
-`;
-
-replaceRegexRequired(
-  /function statementValues\(numbers, pageText, contexts\s*=\s*\[\]\) \{/,
-  `${noteHelpers}function statementValues(numbers, pageText, contexts = [], rawRow = '') {`,
-  'function rawNumericStarts(line)',
-  'statement note-column helpers',
-);
-
-replaceRegexRequired(
-  /function statementValues\(numbers, pageText, contexts = \[\], rawRow = ''\) \{[\s\S]*?\n\}\n\nfunction findMetricRow/,
-  `function statementValues(numbers, pageText, contexts = [], rawRow = '') {
+function statementValues(numbers, pageText, contexts = [], rawRow = '') {
   const noteAdjusted = stripAlignedStatementNoteReference(numbers, rawRow, pageText);
   const layout = statementColumnLayout(pageText, contexts);
   let values = [...noteAdjusted.numbers];
 
-  // Preserve the existing bounded note-reference fallback for legacy statement
-  // layouts, but only after positional alignment had the first opportunity.
+  // Preserve the existing bounded legacy note-reference fallback only after
+  // positional Note-column alignment has had the first opportunity.
   if (
     values.length === layout.expectedColumns + 1 &&
     /^\\d{1,2}$/.test(String(values[0]?.raw || '').replace(/[()]/g, ''))
@@ -95,11 +93,12 @@ replaceRegexRequired(
     noteReferenceRemoved: noteAdjusted.stripped,
     noteReference: noteAdjusted.noteValue,
   };
-}
+}`;
 
-function findMetricRow`,
-  'ALIGNED_NOTE_COLUMN_VALUES_V1',
-  'statementValues body',
+replaceRequired(
+  oldStatementValues,
+  noteHelpersAndStatementValues,
+  'statementValues exact body',
 );
 
 replaceRequired(
@@ -168,6 +167,8 @@ for (const invariant of [
   'ALIGNED_NOTE_COLUMN_VALUES_V1',
   'const rawRow = entry.rawLine;',
   'statementValues(numbers, pageText, contexts, rawRow)',
+  'hasAuthoritativeFinancialStatementSection',
+  'statementPageAuthorityScore',
   'genericAuthorityReady',
   'STATEMENT_AUTHORITY_NOT_VERIFIED',
 ]) {
