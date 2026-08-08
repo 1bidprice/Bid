@@ -95,7 +95,7 @@ test('incomplete dossier stays draft and cannot leak a buy action', () => {
 
 test('complete evidence-backed dossier becomes review ready before explicit publication', () => {
   const dossier = buildResearchDossier(completeInput());
-  assert.equal(dossier.readiness.publishable, true);
+  assert.equal(dossier.readiness.publishable, true, JSON.stringify(dossier.readiness, null, 2));
   assert.equal(dossier.status, 'REVIEW_READY');
   assert.equal(dossier.proposedAction, 'CONSIDER_BUY');
   assert.equal(dossier.evidence.length, 2);
