@@ -57,8 +57,8 @@ function patchAthensAdapterProvenanceAndShareSearch() {
 
   source = replaceRequired(
     source,
-    "  const directSharesRow = findMetricRow(pages, ['weighted average number of diluted shares', 'weighted average number of shares', 'average number of shares'], { minimumNumbers: 1 });",
-    "  const directSharesRow = findMetricRow(pages, ['weighted average number of diluted shares', 'weighted average number of ordinary shares', 'weighted average number of shares', 'average number of shares'], { minimumNumbers: 1, maxPages: 40 });",
+    "  const directSharesRow = findMetricRow(pages, ['weighted average number of diluted shares', 'weighted average number of shares', 'average number of shares'], { statementContexts: ['INCOME_STATEMENT'], minimumNumbers: 1, maximumNumbers: 4 });",
+    "  const directSharesRow = findMetricRow(pages, ['weighted average number of diluted shares', 'weighted average number of ordinary shares', 'weighted average number of shares', 'average number of shares'], { statementContexts: ['INCOME_STATEMENT'], minimumNumbers: 1, maximumNumbers: 4, maxPages: 40 });",
     'deep direct share-count search',
   );
 
@@ -208,7 +208,7 @@ patchExtremeMarginNarrative();
 
 for (const [file, invariants] of Object.entries({
   'src/adapters/euronext-athens-financial-resolver.js': ['resolveCanonicalIssuerFinancialDocuments', "EURONEXT_FINANCIAL_RESOLVER_VERSION = '2026-08-08.2'", 'issuerIr.candidates'],
-  'src/adapters/euronext-athens-fundamentals.js': ['PRIMARY_ISSUER_FINANCIAL_DOCUMENT', 'stampFinancialSourceRole(candidateSnapshot, document);', 'weighted average number of ordinary shares'],
+  'src/adapters/euronext-athens-fundamentals.js': ['PRIMARY_ISSUER_FINANCIAL_DOCUMENT', 'stampFinancialSourceRole(candidateSnapshot, document);', 'weighted average number of ordinary shares', 'maxPages: 40'],
   'src/decision-evidence.js': ['canonicalIssuerFinancialHost', 'source.issuerBound', 'PRIMARY_ISSUER_FINANCIAL_DOCUMENT'],
   'src/fundamental-baseline-synthesis.js': ['marginComparable', 'καθαρό περιθώριο μη συγκρίσιμο λόγω πολύ χαμηλής βάσης εσόδων'],
 })) {
