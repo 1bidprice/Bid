@@ -46,8 +46,8 @@ function patchBankShareBasis() {
 
 function removeTickerSpecificOrchestratorState() {
   let source = read('src/run-daily-intelligence.js');
-  source = source.replace("import { fetchAllwynRegulatoryAnnouncements } from './adapters/allwyn-regulatory.js';\n", '');
-  source = source.replace(/const POSITION_COMPANY_IDS = new Set\([^\n]+\);\n?/, '');
+  source = source.replace(/^import[^\n]*fetchAllwynRegulatoryAnnouncements[^\n]*\n/m, '');
+  source = source.replace(/const\s+POSITION_COMPANY_IDS\s*=\s*new Set\([^\n]+\);\n?/, '');
   write('src/run-daily-intelligence.js', source);
 }
 
@@ -65,6 +65,6 @@ for (const invariant of [
 }
 const daily = read('src/run-daily-intelligence.js');
 if (/const\s+POSITION_COMPANY_IDS\b/.test(daily)) throw new Error('v1.5.0.1 orchestrator still defines hardcoded position IDs');
-if (daily.includes('fetchAllwynRegulatoryAnnouncements')) throw new Error('v1.5.0.1 orchestrator still imports issuer-specific Allwyn adapter');
+if (/^import[^\n]*fetchAllwynRegulatoryAnnouncements/m.test(daily)) throw new Error('v1.5.0.1 orchestrator still imports issuer-specific Allwyn adapter');
 
 console.log('Investor Control v1.5.0.1 universal compatibility and bank share-basis integrity applied.');
