@@ -12,34 +12,23 @@ function replaceRequired(from, to, label) {
   source = source.replace(from, to);
 }
 
+function replaceRegexRequired(regex, replacement, marker, label) {
+  if (source.includes(marker)) return;
+  let matched = false;
+  source = source.replace(regex, () => {
+    matched = true;
+    return replacement;
+  });
+  if (!matched) throw new Error(`v1.5.1 direct corroboration patch failed: missing ${label}`);
+}
+
 replaceRequired(
   "import { fetchTrustedNewsEvidence } from './adapters/trusted-news-rss.js';",
   "import { fetchTrustedNewsEvidence } from './adapters/trusted-news-rss.js';\nimport { fetchFinnhubIndependentNews } from './adapters/finnhub-independent-news.js';",
   'Finnhub direct-news import',
 );
 
-replaceRequired(
-`      let independentRecords = [];
-      if (options.collectTrustedNews !== false) {
-        try {
-          const newsResult = await fetchTrustedNewsEvidence(company, {
-            fetchImpl,
-            retrievedAt: now,
-            limit: Number(options.newsLimit || 12),
-            userAgent: options.newsUserAgent || 'Investor-Control-Market-Intelligence/0.5',
-          });
-          independentRecords = newsResult.records || [];
-          diagnostics.push(...(newsResult.diagnostics || []).map((item) => ({ ...item, companyId: item.companyId || company.companyId })));
-          evidence.push(...independentRecords);
-        } catch (error) {
-          diagnostics.push({
-            code: 'TRUSTED_NEWS_ADAPTER_FAILED',
-            companyId: company.companyId,
-            message: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }`,
-`      let independentRecords = [];
+const replacement = `      let independentRecords = [];
       if (options.collectTrustedNews !== false) {
         const mergeIndependent = (records = []) => {
           const byId = new Map(independentRecords.map((record) => [record.id, record]));
@@ -69,8 +58,8 @@ replaceRequired(
           }
         }
 
-        // Google RSS remains discovery fallback only. It is queried when the
-        // direct-URL route did not yield a reviewed independent article.
+        // Aggregator RSS remains discovery fallback only. It is queried only
+        // when the direct-URL route did not yield a reviewed publisher article.
         if (recommendationGradeCount() === 0 && options.collectAggregatorFallback !== false) {
           try {
             const newsResult = await fetchTrustedNewsEvidence(company, {
@@ -91,8 +80,15 @@ replaceRequired(
           }
         }
         evidence.push(...independentRecords);
-      }`,
-  'direct-first independent evidence collection',
+      }
+
+      const companyRecords =`;
+
+replaceRegexRequired(
+  /      let independentRecords = \[\];[\s\S]*?\n      const companyRecords =/,
+  replacement,
+  'FINNHUB_DIRECT_NEWS_ADAPTER_FAILED',
+  'independent evidence collection block',
 );
 
 fs.writeFileSync(filePath, source);
