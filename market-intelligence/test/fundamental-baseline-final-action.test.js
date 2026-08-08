@@ -43,7 +43,7 @@ function dossier(decisionBasis = 'FUNDAMENTAL_BASELINE') {
 
 test('fundamental baseline can be FINAL HOLD with an analysis-grade close even when the event cross-check is not ready', () => {
   const result = evaluateFinalAction(dossier(), { now: NOW });
-  assert.equal(result.status, 'FINAL');
+  assert.equal(result.status, 'FINAL', JSON.stringify(result, null, 2));
   assert.equal(result.marketAction, 'HOLD');
   assert.equal(result.holderAction, 'HOLD');
   assert.equal(result.nonHolderAction, 'WATCH');
