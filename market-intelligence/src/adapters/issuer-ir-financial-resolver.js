@@ -2,6 +2,17 @@ const COMMON_SECOND_LEVEL_SUFFIXES = new Set([
   'co.uk', 'org.uk', 'com.au', 'net.au', 'co.jp', 'co.nz', 'com.br', 'com.sg', 'com.hk', 'co.za',
 ]);
 
+const DISALLOWED_ISSUER_IR_ROOTS = new Set([
+  'euronext.com',
+  'sec.gov',
+  'nyse.com',
+  'nasdaq.com',
+  'finnhub.io',
+  'yahoo.com',
+  'google.com',
+  'bing.com',
+]);
+
 function decodeHtml(value) {
   return String(value || '')
     .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
@@ -32,21 +43,23 @@ function organizationRoot(hostname) {
   return lastTwo;
 }
 
-function rootsForCompany(company = {}) {
-  const roots = new Set();
-  for (const value of [company.website, company.investorRelationsUrl]) {
-    try {
-      const root = organizationRoot(new URL(String(value)).hostname);
-      if (root) roots.add(root);
-    } catch {}
-  }
-  return roots;
+function rootFromUrl(value) {
+  try { return organizationRoot(new URL(String(value)).hostname); } catch { return null; }
 }
 
-function withinCanonicalIssuerDomain(url, roots) {
+function canonicalIssuerRoot(company = {}) {
+  const websiteRoot = rootFromUrl(company.website);
+  const irRoot = rootFromUrl(company.investorRelationsUrl);
+  if (!websiteRoot || !irRoot) return { root: null, reason: 'WEBSITE_AND_IR_REQUIRED' };
+  if (websiteRoot !== irRoot) return { root: null, reason: 'WEBSITE_IR_ROOT_MISMATCH', websiteRoot, irRoot };
+  if (DISALLOWED_ISSUER_IR_ROOTS.has(websiteRoot)) return { root: null, reason: 'NON_ISSUER_PLATFORM_ROOT', websiteRoot, irRoot };
+  return { root: websiteRoot, reason: 'CANONICAL_ISSUER_ROOT_VERIFIED', websiteRoot, irRoot };
+}
+
+function withinCanonicalIssuerDomain(url, root) {
   try {
     const host = new URL(String(url)).hostname.toLowerCase();
-    return [...roots].some((root) => host === root || host.endsWith(`.${root}`));
+    return Boolean(root) && (host === root || host.endsWith(`.${root}`));
   } catch {
     return false;
   }
@@ -144,12 +157,22 @@ function makePdfCandidate({ company, detailUrl, indexUrl, title, pdfUrl, attachm
 export async function resolveCanonicalIssuerFinancialDocuments(company, options = {}) {
   const fetchImpl = options.fetchImpl || globalThis.fetch;
   const irUrl = company?.investorRelationsUrl || null;
-  const roots = rootsForCompany(company);
+  const canonical = canonicalIssuerRoot(company);
+  const root = canonical.root;
   const diagnostics = [];
   const candidates = [];
   const userAgent = options.userAgent || 'Investor-Control-Market-Intelligence/1.5';
-  if (!irUrl || !roots.size || !withinCanonicalIssuerDomain(irUrl, roots)) {
-    return { candidates, diagnostics: [{ code: 'ISSUER_IR_FINANCIAL_CHANNEL_UNAVAILABLE', companyId: company?.companyId || null }] };
+  if (!irUrl || !root || !withinCanonicalIssuerDomain(irUrl, root)) {
+    return {
+      candidates,
+      diagnostics: [{
+        code: 'ISSUER_IR_FINANCIAL_CHANNEL_UNAVAILABLE',
+        companyId: company?.companyId || null,
+        reason: canonical.reason,
+        websiteRoot: canonical.websiteRoot || null,
+        irRoot: canonical.irRoot || null,
+      }],
+    };
   }
 
   const index = await fetchText(fetchImpl, irUrl, userAgent);
@@ -158,7 +181,7 @@ export async function resolveCanonicalIssuerFinancialDocuments(company, options 
   }
 
   const indexLinks = anchors(index.text, index.url)
-    .filter((item) => withinCanonicalIssuerDomain(item.url, roots))
+    .filter((item) => withinCanonicalIssuerDomain(item.url, root))
     .map((item) => ({ ...item, score: financialScore(`${item.label} ${item.url}`) }))
     .filter((item) => item.score >= Number(options.minimumIssuerFinancialLinkScore || 35))
     .sort((a, b) => b.score - a.score || a.url.localeCompare(b.url));
@@ -183,7 +206,7 @@ export async function resolveCanonicalIssuerFinancialDocuments(company, options 
 
     const pdfLinks = anchors(detail.text, detail.url)
       .filter((item) => /\.pdf(?:$|[?#])/i.test(item.url))
-      .filter((item) => withinCanonicalIssuerDomain(item.url, roots))
+      .filter((item) => withinCanonicalIssuerDomain(item.url, root))
       .map((item) => ({ ...item, score: financialScore(`${link.label} ${item.label} ${detailText.slice(0, 2_500)}`) }))
       .filter((item) => item.score >= Number(options.minimumIssuerFinancialPdfScore || 65))
       .sort((a, b) => b.score - a.score || a.url.localeCompare(b.url));
@@ -208,9 +231,10 @@ export async function resolveCanonicalIssuerFinancialDocuments(company, options 
     code: resolved.length ? 'ISSUER_IR_FINANCIAL_CANDIDATES_DISCOVERED' : 'ISSUER_IR_FINANCIAL_DOCUMENT_NOT_FOUND',
     companyId: company?.companyId || null,
     investorRelationsUrl: irUrl,
+    canonicalRoot: root,
     candidateCount: resolved.length,
   });
   return { candidates: resolved, diagnostics };
 }
 
-export const ISSUER_IR_FINANCIAL_RESOLVER_VERSION = '2026-08-08.1';
+export const ISSUER_IR_FINANCIAL_RESOLVER_VERSION = '2026-08-08.2';
