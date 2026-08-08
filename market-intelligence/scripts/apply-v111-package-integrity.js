@@ -40,6 +40,7 @@ for (const requiredPatch of [
   'apply-v1571-share-note-context.js',
   'apply-v1572-total-revenue-label.js',
   'apply-v1573-note-column-and-authority.js',
+  'apply-v158-pdf-glyphs-and-units.js',
 ]) {
   if (!manifest.testPatches.includes(requiredPatch) || !manifest.buildPatches.includes(requiredPatch)) {
     throw new Error(`package integrity failed: current manifest missing ${requiredPatch}`);
