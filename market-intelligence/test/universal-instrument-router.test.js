@@ -1,7 +1,12 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildInstrumentProfile } from '../src/instrument-profile.js';
 import { buildInstrumentRoute } from '../src/instrument-router.js';
+
+const testDir = path.dirname(fileURLToPath(import.meta.url));
 
 const athensBank = {
   companyId: 'company:test:unknown-athens-bank',
@@ -79,4 +84,12 @@ test('bond, option, future, FX, crypto and commodity route by structure rather t
     assert.equal(profile.analysisModel, model);
     assert.ok(profile.requiredCapabilities.length > 0);
   }
+});
+
+test('central orchestration contains no hardcoded portfolio tickers or issuer-specific model branch', () => {
+  const source = fs.readFileSync(path.resolve(testDir, '../src/run-daily-intelligence.js'), 'utf8');
+  assert.equal(source.includes('POSITION_COMPANY_IDS'), false);
+  assert.equal(source.includes('fetchAllwynRegulatoryAnnouncements'), false);
+  assert.equal(/company\.companyId\s*===\s*['"]company:(?:allwyn-ag|virgin-galactic-holdings|crediabank)['"]/.test(source), false);
+  assert.ok(source.includes('buildInstrumentRoute'));
 });
