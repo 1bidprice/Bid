@@ -45,7 +45,7 @@ function statementNoteColumns(pageText) {
 
 function stripAlignedStatementNoteReference(numbers, rawRow, rawPageText) {
   if (!Array.isArray(numbers) || numbers.length < 3) return { numbers, stripped: false, noteValue: null };
-  const first = Number(numbers[0]);
+  const first = Number(numbers[0]?.value);
   if (!Number.isInteger(first) || first < 1 || first > 99) return { numbers, stripped: false, noteValue: null };
   const firstRaw = rawNumericStarts(rawRow)[0] || null;
   if (!firstRaw) return { numbers, stripped: false, noteValue: null };
@@ -57,48 +57,60 @@ function stripAlignedStatementNoteReference(numbers, rawRow, rawPageText) {
 
 `;
 
-replaceRequired(
-  'function statementValues(numbers, pageText, contexts) {',
-  `${noteHelpers}function statementValues(numbers, pageText, contexts, rawRow = '') {`,
+replaceRegexRequired(
+  /function statementValues\(numbers, pageText, contexts\s*=\s*\[\]\) \{/,
+  `${noteHelpers}function statementValues(numbers, pageText, contexts = [], rawRow = '') {`,
+  'function rawNumericStarts(line)',
   'statement note-column helpers',
 );
 
 replaceRegexRequired(
-  /function statementValues\(numbers, pageText, contexts, rawRow = ''\) \{[\s\S]*?\n\}\n\nfunction detectScaleMultiplier/,
-  `function statementValues(numbers, pageText, contexts, rawRow = '') {
+  /function statementValues\(numbers, pageText, contexts = \[\], rawRow = ''\) \{[\s\S]*?\n\}\n\nfunction findMetricRow/,
+  `function statementValues(numbers, pageText, contexts = [], rawRow = '') {
   const noteAdjusted = stripAlignedStatementNoteReference(numbers, rawRow, pageText);
-  const effectiveNumbers = noteAdjusted.numbers;
-  const layout = statementColumnLayout(pageText, contexts, effectiveNumbers);
-  if (!layout || layout.mode === 'STANDARD') {
-    return {
-      values: effectiveNumbers,
-      policy: noteAdjusted.stripped ? 'ALIGNED_NOTE_COLUMN_VALUES_V1' : 'STANDARD_STATEMENT_VALUES_V1',
-      layout,
-      noteReferenceRemoved: noteAdjusted.stripped,
-      noteReference: noteAdjusted.noteValue,
-    };
+  const layout = statementColumnLayout(pageText, contexts);
+  let values = [...noteAdjusted.numbers];
+
+  // Preserve the existing bounded note-reference fallback for legacy statement
+  // layouts, but only after positional alignment had the first opportunity.
+  if (
+    values.length === layout.expectedColumns + 1 &&
+    /^\\d{1,2}$/.test(String(values[0]?.raw || '').replace(/[()]/g, ''))
+  ) {
+    values = values.slice(1);
   }
-  if (layout.mode === 'INCOME_CONTINUING_DISCONTINUED_TOTAL') {
-    if (effectiveNumbers.length >= 6) return { values: [effectiveNumbers[2], effectiveNumbers[5]], policy: 'GROUP_TOTAL_CONTINUING_DISCONTINUED_V1', layout, noteReferenceRemoved: noteAdjusted.stripped, noteReference: noteAdjusted.noteValue };
-    if (effectiveNumbers.length >= 4) return { values: [effectiveNumbers[2], effectiveNumbers[3]], policy: 'GROUP_TOTAL_PARTIAL_COMPARATIVE_V1', layout, noteReferenceRemoved: noteAdjusted.stripped, noteReference: noteAdjusted.noteValue };
-  }
-  return { values: effectiveNumbers, policy: 'STANDARD_STATEMENT_VALUES_V1', layout, noteReferenceRemoved: noteAdjusted.stripped, noteReference: noteAdjusted.noteValue };
+
+  if (values.length < layout.expectedColumns) return null;
+  if (layout.expectedColumns > 2 && values.length > layout.expectedColumns) return null;
+  const current = values[layout.currentIndex];
+  const comparative = values[layout.comparativeIndex];
+  if (!current || !comparative) return null;
+
+  const reportedLayout = noteAdjusted.stripped && layout.expectedColumns === 2
+    ? { ...layout, underlyingPolicy: layout.policy, policy: 'ALIGNED_NOTE_COLUMN_VALUES_V1' }
+    : layout;
+  return {
+    selected: [current, comparative],
+    layout: reportedLayout,
+    noteReferenceRemoved: noteAdjusted.stripped,
+    noteReference: noteAdjusted.noteValue,
+  };
 }
 
-function detectScaleMultiplier`,
+function findMetricRow`,
   'ALIGNED_NOTE_COLUMN_VALUES_V1',
   'statementValues body',
 );
 
 replaceRequired(
-  "    const lines = pages[pageIndex].split(/\\r?\\n/).map(normalizeText).filter(Boolean);\n    for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {\n      const row = lines[lineIndex];",
-  "    const lineEntries = pages[pageIndex].split(/\\r?\\n/).map((rawLine) => ({ rawLine, row: normalizeText(rawLine) })).filter((entry) => entry.row);\n    const lines = lineEntries.map((entry) => entry.row);\n    for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {\n      const row = lines[lineIndex];\n      const rawRow = lineEntries[lineIndex]?.rawLine || row;",
+  "    const lines = pageText.split(/\\n+/).map((line) => line.trim()).filter(Boolean);\n    for (const line of lines) {\n      const normalized = normalizeLine(line);",
+  "    const lineEntries = pageText.split(/\\n+/).map((rawLine) => ({ rawLine, line: rawLine.trim() })).filter((entry) => entry.line);\n    for (const entry of lineEntries) {\n      const line = entry.line;\n      const rawRow = entry.rawLine;\n      const normalized = normalizeLine(line);",
   'raw statement row preservation',
 );
 
 replaceRequired(
   '      const columnSelection = statementValues(numbers, pageText, contexts);',
-  '      const columnSelection = statementValues(numbers, pages[pageIndex], contexts, rawRow);',
+  '      const columnSelection = statementValues(numbers, pageText, contexts, rawRow);',
   'raw note-column selection call',
 );
 
@@ -154,8 +166,8 @@ for (const invariant of [
   'statementNoteColumns',
   'stripAlignedStatementNoteReference',
   'ALIGNED_NOTE_COLUMN_VALUES_V1',
-  'const rawRow = lineEntries[lineIndex]?.rawLine || row;',
-  'statementValues(numbers, pages[pageIndex], contexts, rawRow)',
+  'const rawRow = entry.rawLine;',
+  'statementValues(numbers, pageText, contexts, rawRow)',
   'genericAuthorityReady',
   'STATEMENT_AUTHORITY_NOT_VERIFIED',
 ]) {
