@@ -121,6 +121,10 @@ jobs:
           }, null, 2));
           NODE
 
+      - name: Verify opportunity hunter safety
+        working-directory: source/market-intelligence
+        run: node scripts/verify-opportunity-hunter-output.js out/autonomous-intelligence.json
+
       - name: Publish verified production feed and audit history
         shell: bash
         run: |
@@ -141,6 +145,9 @@ jobs:
           const unresolvedGreek = greek.filter((item) => !item.symbol || item.identityStatus === 'SYMBOL_RESOLUTION_REQUIRED');
           const quotes = Object.values(feed.quoteRegistry || {});
           const readyHistory = (report.historicalMarketMetrics || []).filter((item) => item?.readiness?.marketMetricsReady === true).length;
+          const hunter = report.opportunityUniverse || {};
+          const hunterRanking = hunter.ranking || {};
+          const broad = report.broadOpportunityScan || {};
           const status = {
             format: 'investor-control-live-feed-status',
             version: 7,
@@ -157,6 +164,13 @@ jobs:
               greekCandidateCount: greek.length,
               unresolvedGreekIdentityCount: unresolvedGreek.length,
               controlledPlanCount: (report.researchDossiers || []).filter((item) => item.finalAction?.controlledPlan?.status === 'AVAILABLE').length,
+              broadOpportunityCandidateCount: (broad.candidates || []).length,
+              specializedOpportunityQuarantineCount: Number(broad.specializedQuarantineCount || 0),
+              opportunityScannedInstrumentCount: Number(hunter.uniqueInstrumentCount || 0),
+              opportunityScorableInstrumentCount: Number(hunter.scorableInstrumentCount || 0),
+              superOpportunityCount: Number(hunterRanking.superOpportunityCount || 0),
+              highPriorityOpportunityCount: Number(hunterRanking.highPriorityCount || 0),
+              deepVerificationQueueCount: (report.opportunityDeepVerificationQueue || []).length,
               lastSuccessfulPublicationAt: now,
               staleOutput: false,
             },
@@ -178,6 +192,14 @@ jobs:
               athensAnnouncementEventCount: report.discovery?.athensAnnouncementEventCount || 0,
               greekCandidateCount: greek.length,
               unresolvedGreekIdentityCount: unresolvedGreek.length,
+              broadEligibleUniverseCount: Number(broad.directoryEligibleCount || 0),
+              broadScreenCandidateCount: (broad.candidates || []).length,
+              specializedOpportunityQuarantineCount: Number(broad.specializedQuarantineCount || 0),
+              opportunityScannedInstrumentCount: Number(hunter.uniqueInstrumentCount || 0),
+              opportunityScorableInstrumentCount: Number(hunter.scorableInstrumentCount || 0),
+              superOpportunityCount: Number(hunterRanking.superOpportunityCount || 0),
+              highPriorityOpportunityCount: Number(hunterRanking.highPriorityCount || 0),
+              deepVerificationQueueCount: (report.opportunityDeepVerificationQueue || []).length,
             },
           };
           fs.writeFileSync('./live-feed/status.json', `${JSON.stringify(status, null, 2)}\n`);
@@ -218,7 +240,7 @@ jobs:
           if git diff --cached --quiet; then
             echo 'Live production feed already current'
           else
-            git commit -m "chore(feed): deploy v1.2.6 intelligence ${GITHUB_RUN_ID} [skip ci]"
+            git commit -m "chore(feed): deploy v1.7.0 intelligence ${GITHUB_RUN_ID} [skip ci]"
             git pull --rebase origin investor-control-live-feed
             git push origin HEAD:investor-control-live-feed
           fi
