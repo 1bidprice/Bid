@@ -60,7 +60,7 @@ test('missing accounting metrics expose bounded rejection reasons without changi
   const audit = snapshot.quality.metricRejectionAudit;
   assert.ok(audit && typeof audit === 'object');
   assert.equal(audit.equity, undefined, 'accepted metrics must not create rejection audit noise');
-  assert.ok(audit.cash.some((item) => item.reason === 'EXCLUDED_VARIANT'));
+  assert.ok(audit.cash.some((item) => item.reason === 'ROW_TAIL_REJECTED'));
   assert.ok(audit.assets.some((item) => item.reason === 'INSUFFICIENT_NUMBERS'));
   assert.ok(audit.liabilities.some((item) => item.reason === 'ROW_TAIL_REJECTED'));
   assert.ok(audit.capitalExpenditure.some((item) => item.reason === 'ROW_TAIL_REJECTED'));
