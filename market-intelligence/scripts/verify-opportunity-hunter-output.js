@@ -9,6 +9,13 @@ const ALLOWED_TIERS = new Set([
   'LOW_PRIORITY',
 ]);
 const ALLOWED_DISCOVERY_ACTIONS = new Set(['DEEP_VERIFY_NOW', 'DEEP_VERIFY', 'WATCH']);
+const ALLOWED_PURCHASE_STATUSES = new Set([
+  'BUY_CONFIRMED',
+  'WAIT_FOR_ENTRY_CONFIRMATION',
+  'REJECTED',
+  'BLOCKED',
+  'NO_DEEP_DOSSIER',
+]);
 
 function fail(message) {
   throw new Error(`OPPORTUNITY_HUNTER_SAFETY_REJECTED: ${message}`);
@@ -27,11 +34,13 @@ export function verifyOpportunityHunterReport(report = {}) {
   const universe = report.opportunityUniverse;
   const ranking = universe?.ranking;
   const queue = report.opportunityDeepVerificationQueue;
+  const reconciliation = report.opportunityPurchaseReconciliation;
 
   if (!broad || typeof broad !== 'object') fail('broadOpportunityScan missing');
   if (!universe || typeof universe !== 'object') fail('opportunityUniverse missing');
   if (!ranking || !Array.isArray(ranking.items)) fail('opportunityUniverse.ranking missing');
   if (!Array.isArray(queue)) fail('opportunityDeepVerificationQueue missing');
+  if (!reconciliation || !Array.isArray(reconciliation.decisions)) fail('opportunityPurchaseReconciliation missing');
 
   const broadCandidates = Array.isArray(broad.candidates) ? broad.candidates : [];
   const quarantine = Array.isArray(broad.specializedQuarantine) ? broad.specializedQuarantine : [];
@@ -132,6 +141,51 @@ export function verifyOpportunityHunterReport(report = {}) {
     if (item.action !== ranked.discoveryAction) fail(`deep queue action mismatch: ${id}`);
   }
 
+  const expectedPurchaseCandidates = ranking.items.filter((item) => ['SUPER_OPPORTUNITY_CANDIDATE', 'HIGH_PRIORITY_CANDIDATE'].includes(item.tier));
+  assertCount(reconciliation.candidateCount, expectedPurchaseCandidates.length, 'purchase reconciliation candidateCount');
+  assertCount(reconciliation.decisions.length, expectedPurchaseCandidates.length, 'purchase reconciliation decisions');
+  const purchaseIds = new Set();
+  let confirmedBuyCount = 0;
+  let waitingCount = 0;
+  let rejectedCount = 0;
+  let blockedPurchaseCount = 0;
+  let noDossierCount = 0;
+  for (const decision of reconciliation.decisions) {
+    const id = identity(decision);
+    if (!id) fail('purchase decision missing identity');
+    if (purchaseIds.has(id)) fail(`duplicate purchase decision: ${id}`);
+    purchaseIds.add(id);
+    if (!ALLOWED_PURCHASE_STATUSES.has(decision.status)) fail(`invalid purchase decision status: ${id}:${decision.status}`);
+    if (decision.automaticBrokerOrder !== false) fail(`purchase decision enabled automatic broker order: ${id}`);
+    const ranked = rankedById.get(id);
+    if (!ranked || !['SUPER_OPPORTUNITY_CANDIDATE', 'HIGH_PRIORITY_CANDIDATE'].includes(ranked.tier)) fail(`purchase decision not backed by High/Super ranking: ${id}`);
+    if (ranked.tier !== decision.tier) fail(`purchase decision tier mismatch: ${id}`);
+    if (Number(ranked.opportunityScore) !== Number(decision.opportunityScore)) fail(`purchase decision score mismatch: ${id}`);
+
+    if (decision.status === 'BUY_CONFIRMED') {
+      confirmedBuyCount += 1;
+      if (decision.buyNowEligible !== true) fail(`BUY_CONFIRMED is not buyNowEligible: ${id}`);
+      if (decision.strictAction?.status !== 'FINAL') fail(`BUY_CONFIRMED lacks FINAL strict action: ${id}`);
+      if (decision.strictAction?.marketAction !== 'BUY_NOW') fail(`BUY_CONFIRMED lacks BUY_NOW marketAction: ${id}`);
+      if (decision.strictAction?.nonHolderAction !== 'BUY_NOW') fail(`BUY_CONFIRMED lacks BUY_NOW nonHolderAction: ${id}`);
+      if (decision.strictAction?.execution?.automaticBrokerOrder !== false) fail(`BUY_CONFIRMED enabled automatic order: ${id}`);
+      if (decision.strictAction?.execution?.requiresUserExecution !== true) fail(`BUY_CONFIRMED does not require user execution: ${id}`);
+      if (decision.nextGate !== 'USER_EXECUTION_ONLY') fail(`BUY_CONFIRMED nextGate mismatch: ${id}`);
+    } else {
+      if (decision.buyNowEligible === true) fail(`non-confirmed purchase decision is buyNowEligible: ${id}:${decision.status}`);
+      if (decision.status === 'WAIT_FOR_ENTRY_CONFIRMATION') waitingCount += 1;
+      if (decision.status === 'REJECTED') rejectedCount += 1;
+      if (decision.status === 'BLOCKED') blockedPurchaseCount += 1;
+      if (decision.status === 'NO_DEEP_DOSSIER') noDossierCount += 1;
+    }
+  }
+  const counts = reconciliation.counts || {};
+  assertCount(counts.BUY_CONFIRMED, confirmedBuyCount, 'BUY_CONFIRMED count');
+  assertCount(counts.WAIT_FOR_ENTRY_CONFIRMATION, waitingCount, 'WAIT_FOR_ENTRY_CONFIRMATION count');
+  assertCount(counts.REJECTED, rejectedCount, 'REJECTED count');
+  assertCount(counts.BLOCKED, blockedPurchaseCount, 'purchase BLOCKED count');
+  assertCount(counts.NO_DEEP_DOSSIER, noDossierCount, 'NO_DEEP_DOSSIER count');
+
   const expansion = report.universeExpansion || {};
   if (expansion.broadScreenCompanyCount !== undefined) {
     assertCount(expansion.broadScreenCompanyCount, broadCandidates.length, 'broadScreenCompanyCount');
@@ -154,6 +208,9 @@ export function verifyOpportunityHunterReport(report = {}) {
     opportunityScorable: Number(universe.scorableInstrumentCount || 0),
     superOpportunityCount: superCount,
     highPriorityCount,
+    confirmedBuyCount,
+    waitingEntryCount: waitingCount,
+    rejectedPurchaseCount: rejectedCount,
     deepVerificationQueueCount: queue.length,
     invariant: 'OPPORTUNITY_DISCOVERY_NEVER_BYPASSES_FINAL_ACTION_POLICY',
   };
