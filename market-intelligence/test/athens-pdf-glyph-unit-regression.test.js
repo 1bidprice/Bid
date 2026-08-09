@@ -61,6 +61,13 @@ test('late million-unit marker and common PDF glyph substitutions preserve accou
   assert.deepEqual(snapshot.annual.revenue.slice(0, 2).map((fact) => fact.value), [767_000_000, 617_000_000]);
   assert.deepEqual(snapshot.annual.netIncome.slice(0, 2).map((fact) => fact.value), [111_000_000, 126_000_000]);
   assert.equal(snapshot.annual.dilutedShares[0].value, 388_691_108, 'share counts must remain unscaled');
+  assert.ok(snapshot.instant.cash, JSON.stringify({
+    instant: snapshot.instant,
+    coverage: snapshot.coverage,
+    quality: snapshot.quality,
+    annual: snapshot.annual,
+    reporting: snapshot.reporting,
+  }));
   assert.equal(snapshot.instant.cash.value, 2_435_000_000);
   assert.equal(snapshot.instant.assets.value, 19_733_000_000);
   assert.equal(snapshot.instant.liabilities.value, 13_197_000_000);
