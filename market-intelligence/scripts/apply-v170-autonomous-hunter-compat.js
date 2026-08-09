@@ -14,8 +14,8 @@ function replaceRequired(from, to, label) {
 
 replaceRequired(
   "import { buildSecFramesBroadEquityScreen } from './adapters/sec-frames-broad-equity-screen.js';",
-  "import { buildSecFramesBroadEquityScreen } from './adapters/sec-frames-broad-equity-screen.js';\nimport { classifyFundamentalModel } from './fundamental-model.js';",
-  'fundamental model classifier import',
+  "import { buildSecFramesBroadEquityScreen } from './adapters/sec-frames-broad-equity-screen.js';\nimport { gateBroadEquityOpportunityCandidate, gateDeepEquityOpportunityModel } from './opportunity-model-gate.js';",
+  'opportunity model gate import',
 );
 
 const canonical = `  const finalActionCount = Object.entries(finalActionCounts)
@@ -26,14 +26,9 @@ replaceRequired(compact, canonical, 'finalActionCount canonical formatting');
 
 replaceRequired(
   `    if (profile.assetClass !== 'EQUITY' || profile.analysisModel !== 'EQUITY_OPERATING') {`,
-  `    const deepFundamentalModel = fundamentals?.model || null;
-    const genericDeepModelReady =
-      deepFundamentalModel?.type === 'GENERIC_OPERATING' &&
-      deepFundamentalModel?.genericValuationEligible === true &&
-      deepFundamentalModel?.specializedModelRequired !== true &&
-      deepFundamentalModel?.modelReady !== false;
+  `    const deepOpportunityModelGate = gateDeepEquityOpportunityModel(profile, fundamentals);
 
-    if (profile.assetClass !== 'EQUITY' || profile.analysisModel !== 'EQUITY_OPERATING' || !genericDeepModelReady) {`,
+    if (!deepOpportunityModelGate.eligible) {`,
   'deep fundamental model quarantine',
 );
 
@@ -46,8 +41,9 @@ replaceRequired(
       candidates: (screen.candidates || []).filter((candidate) => Number(candidate.broadScreen?.preliminaryRiskScore || 100) < 80),
     };`,
   `    const riskFiltered = (screen.candidates || []).filter((candidate) => Number(candidate.broadScreen?.preliminaryRiskScore || 100) < 80);
-    const specializedQuarantine = riskFiltered.filter((candidate) => classifyFundamentalModel(candidate).specializedModelRequired === true);
-    const genericCandidates = riskFiltered.filter((candidate) => classifyFundamentalModel(candidate).genericValuationEligible === true);
+    const gated = riskFiltered.map((candidate) => ({ candidate, gate: gateBroadEquityOpportunityCandidate(candidate) }));
+    const genericCandidates = gated.filter((item) => item.gate.eligible).map((item) => item.candidate);
+    const specializedQuarantine = gated.filter((item) => !item.gate.eligible);
     return {
       ...screen,
       enabled: true,
@@ -55,13 +51,13 @@ replaceRequired(
       directoryTruncated: directory.truncated === true,
       candidates: genericCandidates,
       specializedQuarantineCount: specializedQuarantine.length,
-      specializedQuarantine: specializedQuarantine.map((candidate) => ({
+      specializedQuarantine: specializedQuarantine.map(({ candidate, gate }) => ({
         instrumentId: candidate.instrumentId,
         companyId: candidate.companyId,
         displayName: candidate.displayName,
         primaryListing: candidate.primaryListing,
-        model: classifyFundamentalModel(candidate),
-        reason: 'SPECIALIZED_MODEL_REQUIRES_DEDICATED_OPPORTUNITY_LANE',
+        model: gate.model,
+        reason: gate.reason,
       })),
     };`,
   'broad specialized model quarantine',
@@ -72,9 +68,8 @@ fs.writeFileSync(filePath, source);
 const verified = fs.readFileSync(filePath, 'utf8');
 for (const invariant of [
   canonical,
-  "classifyFundamentalModel } from './fundamental-model.js'",
-  "deepFundamentalModel?.type === 'GENERIC_OPERATING'",
-  'SPECIALIZED_MODEL_REQUIRES_DEDICATED_OPPORTUNITY_LANE',
+  "gateBroadEquityOpportunityCandidate, gateDeepEquityOpportunityModel } from './opportunity-model-gate.js'",
+  'const deepOpportunityModelGate = gateDeepEquityOpportunityModel(profile, fundamentals)',
   'specializedQuarantineCount',
   'broadOpportunityScan',
   'opportunityUniverse',
