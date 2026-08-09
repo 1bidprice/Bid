@@ -1,4 +1,4 @@
-export const SEC_FRAMES_BROAD_SCREEN_VERSION = '2026-08-09.1';
+export const SEC_FRAMES_BROAD_SCREEN_VERSION = '2026-08-09.2';
 
 const SEC_TICKERS_EXCHANGE_URL = 'https://www.sec.gov/files/company_tickers_exchange.json';
 const SEC_FRAMES_BASE = 'https://data.sec.gov/api/xbrl/frames';
@@ -18,6 +18,9 @@ const CONCEPTS = Object.freeze({
   equity: [
     { taxonomy: 'us-gaap', concept: 'StockholdersEquity', unit: 'USD', instant: true },
     { taxonomy: 'us-gaap', concept: 'StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest', unit: 'USD', instant: true },
+  ],
+  shares: [
+    { taxonomy: 'dei', concept: 'EntityCommonStockSharesOutstanding', unit: 'shares', instant: true },
   ],
 });
 
@@ -39,11 +42,16 @@ function previousCompletedQuarter(nowInput = new Date()) {
 }
 
 function frameCode(period, instant = false) {
+  if (!Number.isFinite(Number(period?.quarter))) return `CY${period.year}`;
   return `CY${period.year}Q${period.quarter}${instant ? 'I' : ''}`;
 }
 
 function sameQuarterPriorYear(period) {
   return { year: period.year - 1, quarter: period.quarter };
+}
+
+function previousCalendarYear(period) {
+  return { year: period.year - 1, quarter: null };
 }
 
 function parseTickerExchange(payload) {
@@ -186,6 +194,7 @@ export async function buildSecFramesBroadEquityScreen(instruments = [], options 
   const generatedAt = new Date(options.now || Date.now()).toISOString();
   const currentPeriod = options.period || previousCompletedQuarter(generatedAt);
   const previousPeriod = sameQuarterPriorYear(currentPeriod);
+  const annualPeriod = previousCalendarYear(currentPeriod);
   const diagnostics = [];
   const tickerPayload = await fetchJson(fetchImpl, SEC_TICKERS_EXCHANGE_URL, userAgent);
   if (!tickerPayload) return { candidates: [], diagnostics: [{ code: 'SEC_TICKER_EXCHANGE_UNAVAILABLE' }] };
@@ -194,12 +203,14 @@ export async function buildSecFramesBroadEquityScreen(instruments = [], options 
 
   const currentRevenue = await fetchConceptAliases(fetchImpl, userAgent, CONCEPTS.revenue, currentPeriod, diagnostics, 'revenueCurrent');
   const priorRevenue = await fetchConceptAliases(fetchImpl, userAgent, CONCEPTS.revenue, previousPeriod, diagnostics, 'revenuePrior');
+  const annualRevenue = await fetchConceptAliases(fetchImpl, userAgent, CONCEPTS.revenue, annualPeriod, diagnostics, 'annualRevenue');
   const netIncome = await fetchConceptAliases(fetchImpl, userAgent, CONCEPTS.netIncome, currentPeriod, diagnostics, 'netIncomeCurrent');
   const assets = await fetchConceptAliases(fetchImpl, userAgent, CONCEPTS.assets, currentPeriod, diagnostics, 'assets');
   const liabilities = await fetchConceptAliases(fetchImpl, userAgent, CONCEPTS.liabilities, currentPeriod, diagnostics, 'liabilities');
   const equity = await fetchConceptAliases(fetchImpl, userAgent, CONCEPTS.equity, currentPeriod, diagnostics, 'equity');
+  const shares = await fetchConceptAliases(fetchImpl, userAgent, CONCEPTS.shares, currentPeriod, diagnostics, 'sharesOutstanding');
 
-  for (const result of [...currentRevenue, ...priorRevenue, ...netIncome, ...assets, ...liabilities, ...equity]) {
+  for (const result of [...currentRevenue, ...priorRevenue, ...annualRevenue, ...netIncome, ...assets, ...liabilities, ...equity, ...shares]) {
     mergeConcept(merged, identityMap, result.payload, result.metric, result.priority);
   }
 
@@ -210,11 +221,13 @@ export async function buildSecFramesBroadEquityScreen(instruments = [], options 
       revenueCurrent: finite(facts.revenueCurrent),
       revenuePrior: finite(facts.revenuePrior),
       revenueGrowthPct: pctChange(finite(facts.revenueCurrent), finite(facts.revenuePrior)),
+      annualRevenue: finite(facts.annualRevenue),
       netIncomeCurrent: finite(facts.netIncomeCurrent),
       netMarginPct: ratioPct(finite(facts.netIncomeCurrent), finite(facts.revenueCurrent)),
       assets: finite(facts.assets),
       liabilities: finite(facts.liabilities),
       equity: finite(facts.equity),
+      sharesOutstanding: finite(facts.sharesOutstanding),
       liabilitiesToAssetsPct: ratioPct(finite(facts.liabilities), finite(facts.assets)),
     };
     const prelim = preliminaryRisk(signals);
@@ -237,6 +250,7 @@ export async function buildSecFramesBroadEquityScreen(instruments = [], options 
         riskFlags: prelim.flags,
         period: currentPeriod,
         comparisonPeriod: previousPeriod,
+        annualValuationPeriod: annualPeriod,
         provenance: entry.provenance,
         finalActionEligible: false,
       },
@@ -253,6 +267,7 @@ export async function buildSecFramesBroadEquityScreen(instruments = [], options 
     generatedAt,
     period: currentPeriod,
     comparisonPeriod: previousPeriod,
+    annualValuationPeriod: annualPeriod,
     universeInstrumentCount: instruments.length,
     secIdentityMatchCount: identityMap.size,
     scorableCount: candidates.length,
