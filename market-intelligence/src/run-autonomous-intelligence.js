@@ -8,6 +8,8 @@ import { buildOpportunitiesFeed } from './opportunities-feed.js';
 import { buildInstrumentProfile } from './instrument-profile.js';
 import { extractEquityOpportunityRawSignals, buildOpportunityFactorsForUniverse } from './opportunity-factor-engine.js';
 import { scanOpportunityUniverse } from './opportunity-universe-scanner.js';
+import { createNasdaqUsListedUniverseProvider } from './adapters/nasdaq-symbol-directory-universe.js';
+import { buildSecFramesBroadEquityScreen } from './adapters/sec-frames-broad-equity-screen.js';
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_UNIVERSE_PATH = path.resolve(MODULE_DIR, '../config/universe.seed.json');
@@ -19,15 +21,7 @@ async function loadSeedUniverse(universePath = DEFAULT_UNIVERSE_PATH) {
 }
 
 function countByAction(dossiers = []) {
-  const counts = {
-    BUY_NOW: 0,
-    SELL_NOW: 0,
-    HOLD: 0,
-    DO_NOT_BUY: 0,
-    AVOID: 0,
-    WATCH: 0,
-    BLOCKED: 0,
-  };
+  const counts = { BUY_NOW: 0, SELL_NOW: 0, HOLD: 0, DO_NOT_BUY: 0, AVOID: 0, WATCH: 0, BLOCKED: 0 };
   for (const dossier of dossiers) {
     const finalAction = dossier?.finalAction;
     if (!finalAction || finalAction.status !== 'FINAL') {
@@ -40,23 +34,64 @@ function countByAction(dossiers = []) {
   return counts;
 }
 
-function mergeUniverse(seedUniverse, discoveredCompanies) {
-  const map = new Map();
-  for (const company of [...seedUniverse, ...(discoveredCompanies || [])]) {
-    if (!company?.companyId) continue;
-    map.set(company.companyId, map.has(company.companyId) ? { ...company, ...map.get(company.companyId) } : company);
-  }
-  return [...map.values()];
+function normalizedCik(value) {
+  const digits = String(value || '').replace(/\D/g, '').replace(/^0+/, '');
+  return digits || null;
 }
 
-function annotateDiscovery(dossiers, discovery) {
-  const candidates = new Map((discovery?.shortlist || []).map((candidate) => [candidate.companyId, candidate]));
+function listingKey(value = {}) {
+  const listing = value.primaryListing || value.listing || {};
+  const symbol = String(listing.symbol || '').toUpperCase();
+  const mic = String(listing.mic || '').toUpperCase();
+  return symbol && mic ? `LISTING:${mic}:${symbol}` : null;
+}
+
+function universeIdentityKeys(company = {}) {
+  return [
+    company.companyId ? `COMPANY:${company.companyId}` : null,
+    normalizedCik(company.cik) ? `CIK:${normalizedCik(company.cik)}` : null,
+    listingKey(company),
+  ].filter(Boolean);
+}
+
+function mergeUniverse(...groups) {
+  const records = [];
+  const keyToIndex = new Map();
+  for (const company of groups.flat().filter(Boolean)) {
+    const keys = universeIdentityKeys(company);
+    const matchedIndex = keys.map((key) => keyToIndex.get(key)).find(Number.isInteger);
+    if (Number.isInteger(matchedIndex)) {
+      // Earlier groups have canonical priority (focus > event > broad). Later
+      // channels may fill missing metadata but cannot replace canonical identity.
+      records[matchedIndex] = { ...company, ...records[matchedIndex], primaryListing: { ...(company.primaryListing || {}), ...(records[matchedIndex].primaryListing || {}) } };
+      for (const key of universeIdentityKeys(records[matchedIndex])) keyToIndex.set(key, matchedIndex);
+      continue;
+    }
+    const index = records.length;
+    records.push(company);
+    for (const key of keys) keyToIndex.set(key, index);
+  }
+  return records;
+}
+
+function candidateByListing(items = []) {
+  return new Map(items.map((item) => [listingKey(item), item]).filter(([key]) => key));
+}
+
+function annotateDiscovery(dossiers, discovery, broadOpportunityScan, seedUniverse) {
+  const eventCandidates = new Map((discovery?.shortlist || []).map((candidate) => [candidate.companyId, candidate]));
+  const broadCandidates = candidateByListing(broadOpportunityScan?.candidates || []);
+  const focusCompanyIds = new Set(seedUniverse.map((company) => company.companyId).filter(Boolean));
+  const focusListings = new Set(seedUniverse.map(listingKey).filter(Boolean));
   return dossiers.map((dossier) => {
-    const candidate = candidates.get(dossier.companyId) || null;
+    const eventCandidate = eventCandidates.get(dossier.companyId) || null;
+    const broadCandidate = broadCandidates.get(listingKey(dossier)) || null;
+    const focus = focusCompanyIds.has(dossier.companyId) || focusListings.has(listingKey(dossier));
     return {
       ...dossier,
-      origin: candidate?.isExistingFocusCompany ? 'FOCUS_UNIVERSE' : candidate ? 'AUTONOMOUS_DISCOVERY' : 'FOCUS_UNIVERSE',
-      discovery: candidate,
+      origin: focus ? 'FOCUS_UNIVERSE' : eventCandidate ? 'AUTONOMOUS_EVENT_DISCOVERY' : broadCandidate ? 'BROAD_OPPORTUNITY_SCREEN' : 'FOCUS_UNIVERSE',
+      discovery: eventCandidate,
+      broadScreen: broadCandidate?.broadScreen || null,
     };
   });
 }
@@ -89,9 +124,7 @@ function opportunityDataQuality(fundamentals, marketMetrics, fundamentalRisk, do
 
 function severeOpportunityRiskFlags(fundamentalRisk, marketMetrics) {
   const flags = [...(fundamentalRisk?.flags || []), ...(marketMetrics?.risk?.flags || [])];
-  return [...new Set(flags.filter((flag) =>
-    /^SEVERE_|^EXTREME_|DISTRESS|SOLVENCY|DEFAULT|NON_POSITIVE_EQUITY|CASH_RUNWAY_UNDER_ONE_YEAR/.test(String(flag)),
-  ))];
+  return [...new Set(flags.filter((flag) => /^SEVERE_|^EXTREME_|DISTRESS|SOLVENCY|DEFAULT|NON_POSITIVE_EQUITY|CASH_RUNWAY_UNDER_ONE_YEAR/.test(String(flag))))];
 }
 
 function latestMarketAgeHours(companyId, marketByCompany) {
@@ -147,10 +180,7 @@ function buildAnalysedOpportunitySeeds(expandedUniverse, baseReport, options = {
     });
   }
 
-  const normalized = buildOpportunityFactorsForUniverse(rawRecords, {
-    minimumPeers: options.minimumOpportunityPeers || 5,
-  });
-
+  const normalized = buildOpportunityFactorsForUniverse(rawRecords, { minimumPeers: options.minimumOpportunityPeers || 5 });
   const factorized = normalized.map((record) => ({
     ...record.company,
     instrumentId: record.instrumentId,
@@ -162,7 +192,6 @@ function buildAnalysedOpportunitySeeds(expandedUniverse, baseReport, options = {
     contradictionCount: record.contradictionCount,
     severeRiskFlags: record.severeRiskFlags,
   }));
-
   return [...factorized, ...passthrough];
 }
 
@@ -185,35 +214,82 @@ function deepVerificationQueue(opportunityUniverse, limit = 25) {
     }));
 }
 
+async function runBroadOpportunityScreen(options, generatedAt, secUserAgent) {
+  const enabled = options.enableBroadOpportunityScan !== false && Boolean(secUserAgent);
+  if (!enabled) {
+    return {
+      format: 'investor-control-broad-opportunity-screen',
+      version: 1,
+      generatedAt,
+      enabled: false,
+      candidates: [],
+      diagnostics: [{ code: secUserAgent ? 'BROAD_OPPORTUNITY_SCAN_DISABLED' : 'SEC_USER_AGENT_MISSING' }],
+    };
+  }
+  try {
+    const provider = options.broadOpportunityUniverseProvider || createNasdaqUsListedUniverseProvider();
+    const directory = await provider.discover({
+      assetClasses: ['EQUITY'],
+      fetchImpl: options.fetchImpl || globalThis.fetch,
+      now: generatedAt,
+      limit: options.broadOpportunityUniverseLimit || 15_000,
+    });
+    const screen = await buildSecFramesBroadEquityScreen(directory.instruments || [], {
+      fetchImpl: options.fetchImpl || globalThis.fetch,
+      userAgent: secUserAgent,
+      now: generatedAt,
+      limit: options.broadOpportunityDeepAnalysisLimit || 12,
+    });
+    return {
+      ...screen,
+      enabled: true,
+      directoryEligibleCount: directory.totalEligibleCount ?? directory.instruments?.length ?? 0,
+      directoryTruncated: directory.truncated === true,
+      candidates: (screen.candidates || []).filter((candidate) => Number(candidate.broadScreen?.preliminaryRiskScore || 100) < 80),
+    };
+  } catch (error) {
+    return {
+      format: 'investor-control-broad-opportunity-screen',
+      version: 1,
+      generatedAt,
+      enabled: true,
+      candidates: [],
+      diagnostics: [{ code: 'BROAD_OPPORTUNITY_SCAN_FAILED', message: error instanceof Error ? error.message : String(error) }],
+    };
+  }
+}
+
+function broadCandidatesToCompanies(broadOpportunityScan) {
+  return (broadOpportunityScan?.candidates || []).map((candidate) => ({
+    companyId: candidate.companyId,
+    cik: candidate.cik,
+    legalName: candidate.displayName,
+    displayName: candidate.displayName,
+    country: 'US',
+    active: true,
+    primaryListing: candidate.primaryListing,
+    broadScreen: candidate.broadScreen,
+  }));
+}
+
 export async function runAutonomousIntelligence(options = {}) {
   const generatedAt = new Date(options.now || Date.now()).toISOString();
   const seedUniverse = options.universe || await loadSeedUniverse(options.universePath);
+  const secUserAgent = options.secUserAgent || process.env.SEC_USER_AGENT || '';
   let discovery;
   try {
-    discovery = await discoverAutonomousCandidates({
-      ...options,
-      now: generatedAt,
-      seedUniverse,
-      secUserAgent: options.secUserAgent || process.env.SEC_USER_AGENT || '',
-    });
+    discovery = await discoverAutonomousCandidates({ ...options, now: generatedAt, seedUniverse, secUserAgent });
   } catch (error) {
     discovery = {
-      format: 'investor-control-autonomous-discovery',
-      version: 1,
-      policyVersion: null,
-      generatedAt,
-      sourcePolicy: null,
-      registryCompanyCount: 0,
-      filingEventCount: 0,
-      candidateCount: 0,
-      deepAnalysisCompanyCount: 0,
-      shortlist: [],
-      discoveredCompanies: [],
-      diagnostics: [{ code: 'AUTONOMOUS_DISCOVERY_FAILED', message: error instanceof Error ? error.message : String(error) }],
+      format: 'investor-control-autonomous-discovery', version: 1, policyVersion: null, generatedAt, sourcePolicy: null,
+      registryCompanyCount: 0, filingEventCount: 0, candidateCount: 0, deepAnalysisCompanyCount: 0,
+      shortlist: [], discoveredCompanies: [], diagnostics: [{ code: 'AUTONOMOUS_DISCOVERY_FAILED', message: error instanceof Error ? error.message : String(error) }],
     };
   }
 
-  const expandedUniverse = mergeUniverse(seedUniverse, discovery.discoveredCompanies);
+  const broadOpportunityScan = await runBroadOpportunityScreen(options, generatedAt, secUserAgent);
+  const broadCompanies = broadCandidatesToCompanies(broadOpportunityScan);
+  const expandedUniverse = mergeUniverse(seedUniverse, discovery.discoveredCompanies, broadCompanies);
   const baseReport = await runDailyIntelligence({ ...options, now: generatedAt, universe: expandedUniverse });
 
   const analysedOpportunitySeeds = buildAnalysedOpportunitySeeds(expandedUniverse, baseReport, options);
@@ -238,26 +314,26 @@ export async function runAutonomousIntelligence(options = {}) {
     immediatePriceAgeHours: options.immediatePriceAgeHours,
     minimumImmediateLiquidityScore: options.minimumImmediateLiquidityScore,
   });
-  const researchDossiers = annotateDiscovery(policyDossiers, discovery);
+  const researchDossiers = annotateDiscovery(policyDossiers, discovery, broadOpportunityScan, seedUniverse);
   const opportunitiesFeed = buildOpportunitiesFeed(researchDossiers, { generatedAt });
   const finalActionCounts = countByAction(researchDossiers);
-  const finalActionCount = Object.entries(finalActionCounts)
-    .filter(([key]) => key !== 'BLOCKED')
-    .reduce((sum, [, value]) => sum + value, 0);
+  const finalActionCount = Object.entries(finalActionCounts).filter(([key]) => key !== 'BLOCKED').reduce((sum, [, value]) => sum + value, 0);
 
   return {
     ...baseReport,
-    version: 7,
+    version: 8,
     generatedAt,
     policyVersion: FINAL_ACTION_POLICY_VERSION,
     universeExpansion: {
       seedCompanyCount: seedUniverse.length,
-      discoveredCompanyCount: discovery.discoveredCompanies.length,
+      eventDiscoveredCompanyCount: discovery.discoveredCompanies.length,
+      broadScreenCompanyCount: broadCompanies.length,
       analysedCompanyCount: expandedUniverse.length,
       opportunityScannedInstrumentCount: opportunityUniverse.uniqueInstrumentCount,
       opportunityScorableInstrumentCount: opportunityUniverse.scorableInstrumentCount,
     },
     discovery,
+    broadOpportunityScan,
     opportunityUniverse,
     opportunityDeepVerificationQueue,
     researchDossiers,
@@ -274,7 +350,8 @@ async function main() {
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   console.log(`Wrote autonomous intelligence report to ${outputPath}`);
-  console.log(`Discovery: ${report.discovery.candidateCount} event candidates, ${report.discovery.deepAnalysisCompanyCount} event-driven additions`);
+  console.log(`Event discovery: ${report.discovery.candidateCount} candidates, ${report.discovery.deepAnalysisCompanyCount} additions`);
+  console.log(`Broad opportunity screen: ${report.broadOpportunityScan.directoryEligibleCount || 0} eligible, ${report.broadOpportunityScan.candidates?.length || 0} deep-analysis additions`);
   console.log(`Opportunity hunter: ${report.opportunityUniverse.uniqueInstrumentCount} scanned, ${report.opportunityUniverse.scorableInstrumentCount} scorable, ${report.opportunityUniverse.ranking.superOpportunityCount} super candidates`);
   console.log(`Deep verification queue: ${report.opportunityDeepVerificationQueue.length}`);
   console.log(`Final actions: ${JSON.stringify(report.finalActionCounts)}`);
@@ -283,10 +360,7 @@ async function main() {
 
 const invokedPath = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : '';
 if (import.meta.url === invokedPath) {
-  main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
+  main().catch((error) => { console.error(error); process.exitCode = 1; });
 }
 
 export const DEFAULT_AUTONOMOUS_OUTPUT = path.resolve(MODULE_DIR, '../out/autonomous-intelligence.json');
