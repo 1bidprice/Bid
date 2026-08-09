@@ -1,4 +1,4 @@
-name: Deploy Investor Control v1 Production Intelligence
+name: Validate Investor Control Production Candidate
 
 on:
   push:
@@ -10,30 +10,22 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: investor-control-v1-production-deployment
+  group: investor-control-production-candidate-validation
   cancel-in-progress: true
 
 jobs:
-  autonomous-intelligence:
+  validate-production-candidate:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 70
 
     steps:
       - name: Checkout production intelligence source
         uses: actions/checkout@v4
         with:
           ref: investor-control-v1-market-intelligence-foundation
-          path: source
-          fetch-depth: 1
-
-      - name: Checkout live feed channel
-        uses: actions/checkout@v4
-        with:
-          ref: investor-control-live-feed
-          path: live-feed
           fetch-depth: 1
 
       - name: Setup Node
@@ -50,12 +42,12 @@ jobs:
           fi
           pdftotext -v
 
-      - name: Apply contracts and run deterministic production tests once
-        working-directory: source/market-intelligence
+      - name: Run deterministic intelligence tests
+        working-directory: market-intelligence
         run: npm test
 
-      - name: Build from the exact tested source tree
-        working-directory: source/market-intelligence
+      - name: Build exact production candidate
+        working-directory: market-intelligence
         env:
           SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
           FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
@@ -64,195 +56,53 @@ jobs:
           node src/run-autonomous-intelligence.js out/autonomous-intelligence.json
           node src/build-mobile-feed.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json
 
-      - name: Verify production contracts and controlled-plan boundary
-        working-directory: source/market-intelligence
+      - name: Verify strict production contracts
+        working-directory: market-intelligence
+        run: |
+          set -euo pipefail
+          node scripts/verify-production-output.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json
+
+      - name: Verify opportunity hunter safety
+        working-directory: market-intelligence
+        run: |
+          set -euo pipefail
+          node scripts/verify-opportunity-hunter-output.js out/autonomous-intelligence.json
+
+      - name: Summarize candidate funnel
+        working-directory: market-intelligence
         run: |
           node - <<'NODE'
           const report = require('./out/autonomous-intelligence.json');
-          const feed = require('./out/mobile-intelligence-feed.json');
-          const allowed = new Set(['BUY_NOW','SELL_NOW','HOLD','DO_NOT_BUY','AVOID','WATCH']);
-          if (report.format !== 'investor-control-daily-intelligence' || report.version !== 8) throw new Error('wrong report contract');
-          if (feed.format !== 'investor-control-mobile-intelligence-feed' || feed.version !== 2) throw new Error('wrong mobile feed contract');
-          if (report.discovery?.sourcePolicy?.selector !== 'DETERMINISTIC_SOURCE_GOVERNOR') throw new Error('deterministic source governor missing');
-          if (report.discovery?.sourcePolicy?.runtimeAiSourceSelection !== false) throw new Error('runtime AI source selection boundary broken');
-          if (!report.discovery?.marketsScanned?.includes('US') || !report.discovery?.marketsScanned?.includes('GR')) throw new Error('US/GR discovery missing');
-          if (!feed.quoteRegistry || Array.isArray(feed.quoteRegistry)) throw new Error('canonical quote registry missing');
-
-          const generatedAt = new Date(report.generatedAt).getTime();
-          if (!Number.isFinite(generatedAt) || Math.abs(Date.now() - generatedAt) > 60 * 60 * 1000) throw new Error('production output is not fresh');
-
-          const greek = (report.discovery?.shortlist || []).filter((item) => item.market === 'GR');
-          const unresolvedGreek = greek.filter((item) => !item.symbol || item.identityStatus === 'SYMBOL_RESOLUTION_REQUIRED');
-          if (unresolvedGreek.length) throw new Error(`unresolved Greek identities: ${unresolvedGreek.map((item) => item.companyName).join(', ')}`);
-
-          for (const [symbol, quote] of Object.entries(feed.quoteRegistry)) {
-            if (!quote?.quoteContract || quote.appSymbol !== symbol) throw new Error(`invalid canonical quote ${symbol}`);
-            if (quote.quoteContract.sourceRole === 'FALLBACK_UNVERIFIED' && (quote.quoteContract.valuationEligible || quote.quoteContract.decisionEligible)) {
-              throw new Error(`unsafe fallback quote ${symbol}`);
-            }
-          }
-
-          for (const candidate of feed.discoveryRadar || []) {
-            if (candidate.suggestedAction !== 'WATCH' || candidate.investmentScore !== null) throw new Error('discovery candidate leaked an investment recommendation');
-          }
-
-          for (const dossier of report.researchDossiers || []) {
-            const finalAction = dossier.finalAction;
-            if (!finalAction || !allowed.has(finalAction.marketAction)) throw new Error('invalid final action');
-            if (finalAction.execution?.automaticBrokerOrder !== false || finalAction.execution?.requiresUserExecution !== true) throw new Error('broker execution boundary broken');
-            if (finalAction.status === 'BLOCKED' && finalAction.marketAction !== 'WATCH') throw new Error('blocked dossier leaked a final direction');
-            if (finalAction.status === 'BLOCKED') {
-              const plan = finalAction.controlledPlan;
-              if (!plan || plan.status !== 'AVAILABLE') throw new Error('blocked dossier missing controlled plan');
-              if (plan.holderAction !== 'HOLD' || plan.nonHolderAction !== 'DO_NOT_BUY' || plan.marketAction !== 'WATCH') throw new Error('unsafe controlled-plan actions');
-              if (plan.newBuyAllowed !== false || plan.sellSignalApproved !== false) throw new Error('controlled plan weakened final gates');
-            }
-          }
-
-          for (const item of feed.research || []) if (item.action !== 'WATCH') throw new Error('draft research leaked a final directional action');
+          const broad = report.broadOpportunityScan || {};
+          const hunter = report.opportunityUniverse || {};
+          const ranking = hunter.ranking || {};
           console.log(JSON.stringify({
             generatedAt: report.generatedAt,
-            marketSnapshots: report.marketSnapshotCount,
-            readyHistory: (report.historicalMarketMetrics || []).filter((item) => item?.readiness?.marketMetricsReady === true).length,
-            fundamentals: report.fundamentalSnapshotCount,
-            finalActions: feed.summary?.finalActionCount,
-            controlledPlans: (report.researchDossiers || []).filter((item) => item.finalAction?.controlledPlan?.status === 'AVAILABLE').length,
-            unresolvedGreek: unresolvedGreek.length,
+            release: require('./config/runtime-release-manifest.json').releaseVersion,
+            broadEligibleUniverseCount: Number(broad.directoryEligibleCount || 0),
+            fundamentalPoolCount: Number(broad.fundamentalPoolCount || 0),
+            fundamentalSelectedCount: Number(broad.fundamentalSelectedCount || 0),
+            marketScreenInputCount: Number(broad.marketScreenInputCount || 0),
+            marketScreenScorableCount: Number(broad.marketScreenScorableCount || 0),
+            marketScreenEligibleCount: Number(broad.marketScreenEligibleCount || 0),
+            deepAnalysisCandidateCount: (broad.candidates || []).length,
+            specializedQuarantineCount: Number(broad.specializedQuarantineCount || 0),
+            opportunityScannedInstrumentCount: Number(hunter.uniqueInstrumentCount || 0),
+            opportunityScorableInstrumentCount: Number(hunter.scorableInstrumentCount || 0),
+            superOpportunityCount: Number(ranking.superOpportunityCount || 0),
+            highPriorityOpportunityCount: Number(ranking.highPriorityCount || 0),
+            deepVerificationQueueCount: (report.opportunityDeepVerificationQueue || []).length,
+            finalActionCount: Number(report.finalActionCount || 0),
           }, null, 2));
           NODE
 
-      - name: Verify opportunity hunter safety
-        working-directory: source/market-intelligence
-        run: node scripts/verify-opportunity-hunter-output.js out/autonomous-intelligence.json
-
-      - name: Publish verified production feed and audit history
-        shell: bash
-        run: |
-          set -euo pipefail
-          cp source/market-intelligence/out/mobile-intelligence-feed.json live-feed/mobile-intelligence-feed.json
-          cp source/market-intelligence/out/autonomous-intelligence.json live-feed/autonomous-intelligence.json
-          node - <<'NODE'
-          const fs = require('fs');
-          const crypto = require('crypto');
-          const { execFileSync } = require('child_process');
-          const feedPath = './live-feed/mobile-intelligence-feed.json';
-          const reportPath = './live-feed/autonomous-intelligence.json';
-          const feed = JSON.parse(fs.readFileSync(feedPath, 'utf8'));
-          const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
-          const now = new Date().toISOString();
-          const sourceCommit = execFileSync('git', ['-C', 'source', 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-          const greek = (report.discovery?.shortlist || []).filter((item) => item.market === 'GR');
-          const unresolvedGreek = greek.filter((item) => !item.symbol || item.identityStatus === 'SYMBOL_RESOLUTION_REQUIRED');
-          const quotes = Object.values(feed.quoteRegistry || {});
-          const readyHistory = (report.historicalMarketMetrics || []).filter((item) => item?.readiness?.marketMetricsReady === true).length;
-          const hunter = report.opportunityUniverse || {};
-          const hunterRanking = hunter.ranking || {};
-          const broad = report.broadOpportunityScan || {};
-          const status = {
-            format: 'investor-control-live-feed-status',
-            version: 7,
-            generatedAt: feed.generatedAt,
-            publishedAt: now,
-            policyVersion: feed.policyVersion,
-            sourcePolicyVersion: feed.sourceSelection?.version || null,
-            sourceWorkflowRunId: process.env.GITHUB_RUN_ID,
-            sourceCommit,
-            feedSha256: crypto.createHash('sha256').update(fs.readFileSync(feedPath)).digest('hex'),
-            operationalHealth: {
-              ...(report.operationalHealth || {}),
-              readyHistoricalMarketMetricsCount: readyHistory,
-              greekCandidateCount: greek.length,
-              unresolvedGreekIdentityCount: unresolvedGreek.length,
-              controlledPlanCount: (report.researchDossiers || []).filter((item) => item.finalAction?.controlledPlan?.status === 'AVAILABLE').length,
-              broadOpportunityCandidateCount: (broad.candidates || []).length,
-              specializedOpportunityQuarantineCount: Number(broad.specializedQuarantineCount || 0),
-              opportunityScannedInstrumentCount: Number(hunter.uniqueInstrumentCount || 0),
-              opportunityScorableInstrumentCount: Number(hunter.scorableInstrumentCount || 0),
-              superOpportunityCount: Number(hunterRanking.superOpportunityCount || 0),
-              highPriorityOpportunityCount: Number(hunterRanking.highPriorityCount || 0),
-              deepVerificationQueueCount: (report.opportunityDeepVerificationQueue || []).length,
-              lastSuccessfulPublicationAt: now,
-              staleOutput: false,
-            },
-            counts: feed.summary,
-            sourceHealth: {
-              evidenceCount: report.evidenceCount,
-              documentReviewedCount: report.documentReviewedCount,
-              independentDiscoveryCount: report.independentDiscoveryCount,
-              fundamentalSnapshotCount: report.fundamentalSnapshotCount,
-              marketSnapshotCount: report.marketSnapshotCount,
-              historicalMarketMetricsCount: report.historicalMarketMetricsCount,
-              readyHistoricalMarketMetricsCount: readyHistory,
-              canonicalQuoteCount: quotes.length,
-              valuationEligibleQuoteCount: quotes.filter((q) => q?.quoteContract?.valuationEligible === true).length,
-              decisionEligibleQuoteCount: quotes.filter((q) => q?.quoteContract?.decisionEligible === true).length,
-              marketsScanned: report.discovery?.marketsScanned || [],
-              secRegistryCompanyCount: report.discovery?.secRegistryCompanyCount || 0,
-              athensActiveIssuerCount: report.discovery?.athensActiveIssuerCount || 0,
-              athensAnnouncementEventCount: report.discovery?.athensAnnouncementEventCount || 0,
-              greekCandidateCount: greek.length,
-              unresolvedGreekIdentityCount: unresolvedGreek.length,
-              broadEligibleUniverseCount: Number(broad.directoryEligibleCount || 0),
-              broadScreenCandidateCount: (broad.candidates || []).length,
-              specializedOpportunityQuarantineCount: Number(broad.specializedQuarantineCount || 0),
-              opportunityScannedInstrumentCount: Number(hunter.uniqueInstrumentCount || 0),
-              opportunityScorableInstrumentCount: Number(hunter.scorableInstrumentCount || 0),
-              superOpportunityCount: Number(hunterRanking.superOpportunityCount || 0),
-              highPriorityOpportunityCount: Number(hunterRanking.highPriorityCount || 0),
-              deepVerificationQueueCount: (report.opportunityDeepVerificationQueue || []).length,
-            },
-          };
-          fs.writeFileSync('./live-feed/status.json', `${JSON.stringify(status, null, 2)}\n`);
-
-          let history = [];
-          try {
-            const parsed = JSON.parse(fs.readFileSync('./live-feed/decision-history.json', 'utf8'));
-            history = Array.isArray(parsed.items) ? parsed.items : [];
-          } catch {}
-          const current = (feed.decisions || []).map((item) => ({
-            recordedAt: now,
-            feedGeneratedAt: feed.generatedAt,
-            policyVersion: feed.policyVersion,
-            dossierId: item.id,
-            companyId: item.companyId,
-            companyName: item.companyName,
-            symbol: item.symbol,
-            origin: item.origin,
-            marketAction: item.finalAction?.marketAction,
-            holderAction: item.finalAction?.holderAction,
-            nonHolderAction: item.finalAction?.nonHolderAction,
-            urgency: item.finalAction?.urgency,
-            confidenceScore: item.finalAction?.confidenceScore,
-            dataQualityScore: item.finalAction?.dataQualityScore,
-            referencePrice: item.referencePrice,
-            validUntil: item.finalAction?.validUntil,
-          }));
-          const identity = (item) => `${item.dossierId}|${item.marketAction}|${item.referencePrice?.timestamp || ''}`;
-          const seen = new Set(current.map(identity));
-          const merged = [...current, ...history.filter((item) => !seen.has(identity(item)))].slice(0, 500);
-          fs.writeFileSync('./live-feed/decision-history.json', `${JSON.stringify({ format: 'investor-control-decision-history', version: 2, updatedAt: now, items: merged }, null, 2)}\n`);
-          fs.writeFileSync('./live-feed/discovery-radar.json', `${JSON.stringify({ format: 'investor-control-discovery-radar', version: 3, updatedAt: now, sourcePolicy: feed.sourceSelection, marketsScanned: report.discovery?.marketsScanned || [], items: feed.discoveryRadar }, null, 2)}\n`);
-          NODE
-          cd live-feed
-          git config user.name 'Investor Control Intelligence'
-          git config user.email 'actions@users.noreply.github.com'
-          git add mobile-intelligence-feed.json autonomous-intelligence.json status.json decision-history.json discovery-radar.json
-          if git diff --cached --quiet; then
-            echo 'Live production feed already current'
-          else
-            git commit -m "chore(feed): deploy v1.7.0 intelligence ${GITHUB_RUN_ID} [skip ci]"
-            git pull --rebase origin investor-control-live-feed
-            git push origin HEAD:investor-control-live-feed
-          fi
-
-      - name: Upload production evidence package
+      - name: Upload verified production candidate
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: investor-control-v1-production-intelligence-${{ github.run_id }}
+          name: investor-control-v1.7-production-candidate-${{ github.run_id }}
           path: |
-            source/market-intelligence/out/autonomous-intelligence.json
-            source/market-intelligence/out/mobile-intelligence-feed.json
-            live-feed/status.json
+            market-intelligence/out/autonomous-intelligence.json
+            market-intelligence/out/mobile-intelligence-feed.json
           if-no-files-found: warn
-          retention-days: 90
+          retention-days: 30
