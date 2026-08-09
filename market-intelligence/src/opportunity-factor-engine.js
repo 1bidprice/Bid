@@ -1,6 +1,6 @@
 import { ASSET_CLASS } from './instrument-profile.js';
 
-export const OPPORTUNITY_FACTOR_ENGINE_VERSION = '2026-08-09.1';
+export const OPPORTUNITY_FACTOR_ENGINE_VERSION = '2026-08-09.2';
 
 const clamp = (value, min = 0, max = 100) => Math.max(min, Math.min(max, Number(value) || 0));
 const finite = (value) => {
@@ -30,14 +30,27 @@ function peerKey(record, level) {
   return profile.assetClass || 'UNKNOWN';
 }
 
+function specializedEquityModel(profile = {}) {
+  return profile.assetClass === ASSET_CLASS.EQUITY && profile.analysisModel && profile.analysisModel !== 'EQUITY_OPERATING';
+}
+
 function choosePeers(record, universe, minimumPeers = 5) {
-  for (let level = 0; level <= 2; level += 1) {
-    const key = peerKey(record, level);
-    const peers = universe.filter((item) => peerKey(item, level) === key);
-    if (peers.length >= minimumPeers) return { peers, level, key };
-  }
-  const sameClass = universe.filter((item) => item.profile?.assetClass === record.profile?.assetClass);
-  return { peers: sameClass, level: 2, key: record.profile?.assetClass || 'UNKNOWN' };
+  const sectorKey = peerKey(record, 0);
+  const sectorPeers = universe.filter((item) => peerKey(item, 0) === sectorKey);
+  if (sectorPeers.length >= minimumPeers) return { peers: sectorPeers, level: 0, key: sectorKey };
+
+  const modelKey = peerKey(record, 1);
+  const modelPeers = universe.filter((item) => peerKey(item, 1) === modelKey);
+  if (modelPeers.length >= minimumPeers) return { peers: modelPeers, level: 1, key: modelKey };
+
+  // A bank, REIT, insurer, SPAC or other specialized equity must never be
+  // normalized against ordinary operating companies merely to inflate the
+  // cohort. Small specialized cohorts remain explicitly insufficient.
+  if (specializedEquityModel(record.profile)) return { peers: modelPeers, level: 1, key: modelKey };
+
+  const classKey = peerKey(record, 2);
+  const sameClass = universe.filter((item) => peerKey(item, 2) === classKey);
+  return { peers: sameClass, level: 2, key: classKey };
 }
 
 function factor(score, meta = {}) {
