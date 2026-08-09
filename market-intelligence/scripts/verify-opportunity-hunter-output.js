@@ -37,6 +37,13 @@ export function verifyOpportunityHunterReport(report = {}) {
   const quarantine = Array.isArray(broad.specializedQuarantine) ? broad.specializedQuarantine : [];
   const quarantineIds = new Set(quarantine.map(identity).filter(Boolean));
   const broadIds = new Set();
+  const marketStageContractActive = Boolean(broad.marketScreenPolicyVersion || broad.marketScreenStatus);
+
+  if (marketStageContractActive && broad.marketScreenStatus === 'ACTIVE') {
+    if (!(Number(broad.marketScreenInputCount) > 0)) fail('active market screen has no input');
+    if (!(Number(broad.marketScreenScorableCount) > 0)) fail('active market screen has no scorable candidates');
+    if (Number(broad.marketScreenEligibleCount || 0) < broadCandidates.length) fail('market eligible count below deep-analysis candidate count');
+  }
 
   for (const candidate of broadCandidates) {
     const id = identity(candidate);
@@ -44,6 +51,13 @@ export function verifyOpportunityHunterReport(report = {}) {
     if (broadIds.has(id)) fail(`duplicate broad candidate: ${id}`);
     broadIds.add(id);
     if (candidate?.broadScreen?.finalActionEligible !== false) fail(`broad candidate can become final action: ${id}`);
+    if (marketStageContractActive) {
+      const marketScreen = candidate?.broadScreen?.marketScreen;
+      if (!marketScreen || typeof marketScreen !== 'object') fail(`broad candidate bypassed market screen: ${id}`);
+      if (marketScreen.finalActionEligible !== false) fail(`market screen can become final action: ${id}`);
+      if (marketScreen.severeMarketRisk === true) fail(`severe market-risk candidate leaked into deep lane: ${id}`);
+      if (!Number.isFinite(Number(marketScreen.score))) fail(`market-screen score missing: ${id}`);
+    }
     if (quarantineIds.has(id)) fail(`specialized candidate leaked into generic broad lane: ${id}`);
   }
 
@@ -132,6 +146,9 @@ export function verifyOpportunityHunterReport(report = {}) {
   return {
     status: 'VERIFIED',
     broadCandidates: broadCandidates.length,
+    marketStageContractActive,
+    marketScreenInput: Number(broad.marketScreenInputCount || 0),
+    marketScreenScorable: Number(broad.marketScreenScorableCount || 0),
     specializedQuarantine: quarantine.length,
     opportunityScanned: Number(universe.uniqueInstrumentCount || 0),
     opportunityScorable: Number(universe.scorableInstrumentCount || 0),
