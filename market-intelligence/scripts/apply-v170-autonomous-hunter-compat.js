@@ -14,7 +14,7 @@ function replaceRequired(from, to, label) {
 
 replaceRequired(
   "import { buildSecFramesBroadEquityScreen } from './adapters/sec-frames-broad-equity-screen.js';",
-  "import { buildSecFramesBroadEquityScreen } from './adapters/sec-frames-broad-equity-screen.js';\nimport { gateBroadEquityOpportunityCandidate, gateDeepEquityOpportunityModel } from './opportunity-model-gate.js';\nimport { selectBroadFundamentalCandidates } from './broad-equity-fundamental-selector.js';\nimport { screenBroadEquityMarketCandidates } from './broad-equity-market-screen.js';",
+  "import { buildSecFramesBroadEquityScreen } from './adapters/sec-frames-broad-equity-screen.js';\nimport { gateBroadEquityOpportunityCandidate, gateDeepEquityOpportunityModel } from './opportunity-model-gate.js';\nimport { selectBroadFundamentalCandidates } from './broad-equity-fundamental-selector.js';\nimport { screenBroadEquityMarketCandidates } from './broad-equity-market-screen.js';\nimport { reconcileOpportunityPurchaseDecisions } from './opportunity-purchase-reconciliation.js';",
   'opportunity hunter imports',
 );
 
@@ -88,6 +88,33 @@ replaceRequired(
   'broad specialized/model/market funnel',
 );
 
+replaceRequired(
+  `  const researchDossiers = annotateDiscovery(policyDossiers, discovery, broadOpportunityScan, seedUniverse);
+  const opportunitiesFeed = buildOpportunitiesFeed(researchDossiers, { generatedAt });`,
+  `  const researchDossiers = annotateDiscovery(policyDossiers, discovery, broadOpportunityScan, seedUniverse);
+  const opportunityPurchaseReconciliation = reconcileOpportunityPurchaseDecisions(opportunityUniverse, researchDossiers, {
+    now: generatedAt,
+    maxReferencePriceAgeHours: options.maxReferencePriceAgeHours,
+    maxDossierAgeHours: options.maxDossierAgeHours,
+    maxHistoricalMarketAgeHours: options.maxHistoricalMarketAgeHours,
+    immediatePriceAgeHours: options.immediatePriceAgeHours,
+    minimumImmediateLiquidityScore: options.minimumImmediateLiquidityScore,
+  });
+  const opportunitiesFeed = buildOpportunitiesFeed(researchDossiers, { generatedAt });`,
+  'opportunity purchase reconciliation',
+);
+
+replaceRequired(
+  `    opportunityUniverse,
+    opportunityDeepVerificationQueue,
+    researchDossiers,`,
+  `    opportunityUniverse,
+    opportunityDeepVerificationQueue,
+    opportunityPurchaseReconciliation,
+    researchDossiers,`,
+  'purchase reconciliation report output',
+);
+
 fs.writeFileSync(filePath, source);
 
 const verified = fs.readFileSync(filePath, 'utf8');
@@ -96,12 +123,15 @@ for (const invariant of [
   "gateBroadEquityOpportunityCandidate, gateDeepEquityOpportunityModel } from './opportunity-model-gate.js'",
   "selectBroadFundamentalCandidates } from './broad-equity-fundamental-selector.js'",
   "screenBroadEquityMarketCandidates } from './broad-equity-market-screen.js'",
+  "reconcileOpportunityPurchaseDecisions } from './opportunity-purchase-reconciliation.js'",
   'const deepOpportunityModelGate = gateDeepEquityOpportunityModel(profile, fundamentals)',
   'broadOpportunityFundamentalPoolLimit || 800',
   'broadOpportunityMarketScreenLimit || 240',
   'broadOpportunityDeepAnalysisLimit || 24',
   'marketScreenScorableCount',
   'specializedQuarantineCount',
+  'const opportunityPurchaseReconciliation = reconcileOpportunityPurchaseDecisions(opportunityUniverse, researchDossiers',
+  'opportunityPurchaseReconciliation,',
   'broadOpportunityScan',
   'opportunityUniverse',
   'opportunityDeepVerificationQueue',
@@ -110,4 +140,4 @@ for (const invariant of [
   if (!verified.includes(invariant)) throw new Error(`v1.7 hunter compatibility failed: missing ${invariant}`);
 }
 
-console.log('Investor Control v1.7 opportunity hunter compatibility, diversified market screen and specialized-equity quarantine applied.');
+console.log('Investor Control v1.7 opportunity hunter, market funnel, specialized quarantine and strict purchase reconciliation applied.');
