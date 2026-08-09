@@ -10,10 +10,22 @@ function validReport() {
       opportunityScorableInstrumentCount: 2,
     },
     broadOpportunityScan: {
+      marketScreenStatus: 'ACTIVE',
+      marketScreenPolicyVersion: '2026-08-09.1',
+      marketScreenInputCount: 10,
+      marketScreenScorableCount: 8,
+      marketScreenEligibleCount: 5,
       candidates: [{
         instrumentId: 'eq:alpha',
         companyId: 'sec-cik:1',
-        broadScreen: { finalActionEligible: false },
+        broadScreen: {
+          finalActionEligible: false,
+          marketScreen: {
+            score: 88,
+            finalActionEligible: false,
+            severeMarketRisk: false,
+          },
+        },
       }],
       specializedQuarantineCount: 1,
       specializedQuarantine: [{
@@ -85,25 +97,39 @@ function validReport() {
   };
 }
 
-test('hunter verifier accepts a valid broad-screen -> opportunity -> deep-verification chain', () => {
+test('hunter verifier accepts a valid broad-market-screen -> opportunity -> deep-verification chain', () => {
   const result = verifyOpportunityHunterReport(validReport());
   assert.equal(result.status, 'VERIFIED');
+  assert.equal(result.marketStageContractActive, true);
+  assert.equal(result.marketScreenScorable, 8);
   assert.equal(result.superOpportunityCount, 1);
   assert.equal(result.highPriorityCount, 1);
   assert.equal(result.deepVerificationQueueCount, 2);
 });
 
-test('hunter verifier rejects broad or ranked opportunity leakage into final-action eligibility', () => {
+test('hunter verifier rejects broad, market-stage or ranked opportunity leakage into final-action eligibility', () => {
   const broadLeak = validReport();
   broadLeak.broadOpportunityScan.candidates[0].broadScreen.finalActionEligible = true;
   assert.throws(() => verifyOpportunityHunterReport(broadLeak), /broad candidate can become final action/);
+
+  const marketLeak = validReport();
+  marketLeak.broadOpportunityScan.candidates[0].broadScreen.marketScreen.finalActionEligible = true;
+  assert.throws(() => verifyOpportunityHunterReport(marketLeak), /market screen can become final action/);
 
   const superLeak = validReport();
   superLeak.opportunityUniverse.ranking.items[0].finalActionEligible = true;
   assert.throws(() => verifyOpportunityHunterReport(superLeak), /opportunity score bypassed final-action gate/);
 });
 
-test('hunter verifier rejects specialized-lane leakage and weak super classification', () => {
+test('hunter verifier rejects market-stage bypass, severe market risk, specialized leakage and weak super classification', () => {
+  const missingMarket = validReport();
+  delete missingMarket.broadOpportunityScan.candidates[0].broadScreen.marketScreen;
+  assert.throws(() => verifyOpportunityHunterReport(missingMarket), /broad candidate bypassed market screen/);
+
+  const severeMarket = validReport();
+  severeMarket.broadOpportunityScan.candidates[0].broadScreen.marketScreen.severeMarketRisk = true;
+  assert.throws(() => verifyOpportunityHunterReport(severeMarket), /severe market-risk candidate leaked into deep lane/);
+
   const specializedLeak = validReport();
   specializedLeak.broadOpportunityScan.specializedQuarantine[0].instrumentId = 'eq:alpha';
   assert.throws(() => verifyOpportunityHunterReport(specializedLeak), /specialized candidate leaked into generic broad lane/);
