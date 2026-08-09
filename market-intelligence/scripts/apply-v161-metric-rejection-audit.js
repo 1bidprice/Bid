@@ -46,6 +46,7 @@ insertBefore(
       pageNumber: payload.pageNumber || null,
       physicalLine: String(payload.physicalLine || '').slice(0, 360),
       scopedLine: String(payload.scopedLine || '').slice(0, 280),
+      pageContextSample: String(payload.pageContextSample || '').slice(0, 520),
       label: payload.label || null,
       baseContextScore: Number.isFinite(Number(payload.baseContextScore)) ? Number(payload.baseContextScore) : null,
       statementAuthorityScore: Number.isFinite(Number(payload.statementAuthorityScore)) ? Number(payload.statementAuthorityScore) : null,
@@ -60,6 +61,7 @@ insertBefore(
     const baseContextScore = statementContextScore(pages, pageIndex, contexts);
     const authorityScore = statementPageAuthorityScore(pages, pageIndex, contexts);
     const entries = pageText.split(/\\n+/).map((rawLine) => ({ rawLine, line: rawLine.trim() })).filter((entry) => entry.line);
+    const pageContextSample = entries.slice(0, 10).map((entry) => normalizeLine(entry.line)).join(' | ').slice(0, 520);
 
     for (const entry of entries) {
       if (audit.length >= 12) break;
@@ -77,6 +79,7 @@ insertBefore(
         pageNumber: pageIndex + 1,
         physicalLine,
         scopedLine,
+        pageContextSample,
         label: labelMatch.label,
         baseContextScore,
         statementAuthorityScore: authorityScore,
@@ -165,6 +168,7 @@ fs.writeFileSync(filePath, source);
 const verified = fs.readFileSync(filePath, 'utf8');
 for (const invariant of [
   'function boundedMetricRejectionAudit(pages, labels, options = {})',
+  'pageContextSample:',
   "record('CONTEXT_REJECTED'",
   "record('AUTHORITY_REJECTED'",
   "record('ROW_TAIL_REJECTED'",
