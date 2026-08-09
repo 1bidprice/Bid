@@ -35,5 +35,6 @@ test('Athens real-estate issuer keeps raw audited facts but suppresses the gener
   assert.equal(snapshot.metrics.annualNetMarginPct, null);
   assert.equal(snapshot.metrics.latestFreeCashFlow, null);
   assert.equal(snapshot.quality.genericMetricsSuppressed, true);
+  assert.deepEqual(snapshot.quality.metricRejectionAudit, {}, 'generic extraction diagnostics must stay out of specialized-model snapshots');
   assert.equal(snapshot.metricsReady, false);
 });
