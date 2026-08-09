@@ -35,11 +35,11 @@ function horizontalLayoutChunks(rawRow) {
     const slice = raw.slice(start, end);
     const firstNonSpace = slice.search(/\\S/);
     if (firstNonSpace < 0) return;
-    const lastNonSpace = slice.search(/\\s*$/);
+    const trailingWhitespace = slice.match(/\\s*$/)?.[0]?.length || 0;
     const text = slice.trim();
     if (!text) return;
     const absoluteStart = start + firstNonSpace;
-    const absoluteEnd = start + (lastNonSpace >= 0 ? lastNonSpace : slice.length);
+    const absoluteEnd = start + slice.length - trailingWhitespace;
     chunks.push({ text, start: absoluteStart, end: absoluteEnd });
   };
 
@@ -150,10 +150,7 @@ replaceRequired(
 replaceRequired(
   `      const line = entry.line;
       const rawRow = entry.rawLine;
-      const needed = Number(options.minimumNumbers || 2);
-      const scopedLine = horizontalMetricRowSegment(rawRow, labels, needed) || line;
-      const scopedRawRow = scopedLine === line ? rawRow : scopedLine;
-      const normalized = normalizeLine(scopedLine);`,
+      const normalized = normalizeLine(line);`,
   `      const line = entry.line;
       const rawRow = entry.rawLine;
       const needed = Number(options.minimumNumbers || 2);
@@ -162,18 +159,26 @@ replaceRequired(
       const scopedRawRow = scopedSegment?.rawSegment || rawRow;
       const scopedRawOffset = Number(scopedSegment?.rawOffset || 0);
       const normalized = normalizeLine(scopedLine);`,
-  'scoped metric row geometry',
+  'scoped metric row geometry from canonical source',
 );
 
 replaceRequired(
-  `      const columnSelection = statementValues(numbers, pageText, contexts, scopedRawRow);`,
-  `      const columnSelection = statementValues(numbers, pageText, contexts, scopedRawRow, scopedRawOffset);`,
-  'scoped statement geometry selection',
+  `      if (looksLikeTableOfContentsLine(line)) continue;
+      if (looksLikeNarrativeMetricLine(line)) continue;
+      const numbers = financialNumericTokens(line, { decimalMode: options.decimalMode === true });
+      const needed = Number(options.minimumNumbers || 2);
+      if (numbers.length < needed) continue;
+      const columnSelection = statementValues(numbers, pageText, contexts, rawRow);`,
+  `      if (looksLikeTableOfContentsLine(scopedLine)) continue;
+      if (looksLikeNarrativeMetricLine(scopedLine)) continue;
+      const numbers = financialNumericTokens(scopedLine, { decimalMode: options.decimalMode === true });
+      if (numbers.length < needed) continue;
+      const columnSelection = statementValues(numbers, pageText, contexts, scopedRawRow, scopedRawOffset);`,
+  'scoped statement number and geometry extraction',
 );
 
 replaceRequired(
-  `        line: scopedLine,
-        physicalLine: line,
+  `        line,
         pageNumber: pageIndex + 1,`,
   `        line: scopedLine,
         physicalLine: line,
@@ -183,12 +188,13 @@ replaceRequired(
 );
 
 replaceRequired(
-  `      physicalLine: row.physicalLine || row.line || null,
+  `      candidateAudit: Array.isArray(row.candidateAudit) ? row.candidateAudit : [],
     },`,
-  `      physicalLine: row.physicalLine || row.line || null,
+  `      candidateAudit: Array.isArray(row.candidateAudit) ? row.candidateAudit : [],
+      physicalLine: row.physicalLine || row.line || null,
       rawRowOffset: Number.isFinite(Number(row.rawRowOffset)) ? Number(row.rawRowOffset) : 0,
     },`,
-  'row-offset provenance audit',
+  'row geometry provenance audit',
 );
 
 fs.writeFileSync(filePath, source);
@@ -202,6 +208,7 @@ for (const invariant of [
   'stripAlignedStatementNoteReference(numbers, rawRow, pageText, rawOffset)',
   'const scopedSegment = horizontalMetricRowSegment(rawRow, labels, needed);',
   'statementValues(numbers, pageText, contexts, scopedRawRow, scopedRawOffset)',
+  'physicalLine: row.physicalLine || row.line || null',
   'rawRowOffset: Number.isFinite(Number(row.rawRowOffset))',
   'statementPageAuthorityScore',
   'explicitGroupCompanyColumns',
