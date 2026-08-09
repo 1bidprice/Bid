@@ -100,10 +100,11 @@ function compactDossier(dossier, generatedAt) {
     id: dossier.dossierId,
     companyId: dossier.companyId,
     companyName: dossier.companyName,
-    symbol: dossier.listing?.symbol || null,
+    symbol: dossier.listing?.symbol || dossier.symbol || null,
     exchange: dossier.listing?.exchange || null,
     origin: dossier.origin || 'FOCUS_UNIVERSE',
     discovery: dossier.discovery || null,
+    broadScreen: dossier.broadScreen || null,
     status,
     statusLabel: status === 'PUBLISHED'
       ? 'Δημοσιευμένη ανάλυση'
@@ -153,6 +154,27 @@ function compactDiscovery(candidate) {
     latestEventAt: candidate.latestEventAt,
     events: candidate.events || [],
     isExistingFocusCompany: candidate.isExistingFocusCompany === true,
+  };
+}
+
+function compactOpportunityPurchaseDecision(item) {
+  return {
+    instrumentId: item.instrumentId,
+    companyId: item.companyId || item.instrumentId,
+    dossierId: item.dossierId || null,
+    companyName: item.displayName || null,
+    symbol: item.symbol || null,
+    assetClass: item.assetClass || null,
+    tier: item.tier,
+    opportunityScore: item.opportunityScore,
+    opportunityConfidenceScore: item.opportunityConfidenceScore ?? item.confidenceScore ?? null,
+    status: item.status,
+    statusLabel: item.statusLabel,
+    buyNowEligible: item.buyNowEligible === true,
+    strictAction: item.strictAction || null,
+    whyNotBuyNow: item.whyNotBuyNow || [],
+    nextGate: item.nextGate || null,
+    automaticBrokerOrder: false,
   };
 }
 
@@ -208,6 +230,11 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
   const decisions = dossiers.filter((item) => item.finalAction?.status === 'FINAL');
   const urgent = dossiers.filter((item) => item.finalAction?.urgency === 'IMMEDIATE' || ['EVENT_RISK', 'DETERIORATION'].includes(item.category)).slice(0, 5);
   const discoveryRadar = (report.discovery?.shortlist || []).filter((item) => !item.isExistingFocusCompany).map(compactDiscovery).slice(0, 12);
+  const opportunityPurchaseDecisions = (report.opportunityPurchaseReconciliation?.decisions || []).map(compactOpportunityPurchaseDecision);
+  const confirmedBuyOpportunities = opportunityPurchaseDecisions.filter((item) => item.status === 'BUY_CONFIRMED');
+  const waitingEntryOpportunities = opportunityPurchaseDecisions.filter((item) => item.status === 'WAIT_FOR_ENTRY_CONFIRMATION');
+  const rejectedOpportunities = opportunityPurchaseDecisions.filter((item) => item.status === 'REJECTED');
+  const blockedOpportunities = opportunityPurchaseDecisions.filter((item) => ['BLOCKED', 'NO_DEEP_DOSSIER'].includes(item.status));
   const actionCounts = countFinalActions(dossiers);
 
   return {
@@ -223,37 +250,64 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
       urgentCount: urgent.length,
       discoveryCandidateCount: discoveryRadar.length,
       discoveryDeepAnalysisCount: Number(report.discovery?.deepAnalysisCompanyCount || 0),
+      opportunityCandidateCount: opportunityPurchaseDecisions.length,
+      confirmedBuyOpportunityCount: confirmedBuyOpportunities.length,
+      waitingEntryOpportunityCount: waitingEntryOpportunities.length,
+      rejectedOpportunityCount: rejectedOpportunities.length,
+      blockedOpportunityCount: blockedOpportunities.length,
       unresolvedDiagnosticCount: Array.isArray(report.diagnostics) ? report.diagnostics.length : 0,
       ...actionCounts,
     },
     today: {
-      headline: actionCounts.sellNowCount
-        ? `${actionCounts.sellNowCount} σήμα άμεσης πώλησης ή μείωσης`
-        : actionCounts.buyNowCount
-          ? `${actionCounts.buyNowCount} επιβεβαιωμένο σήμα άμεσης αγοράς`
-          : actionCounts.avoidCount
-            ? `${actionCounts.avoidCount} περίπτωση για αποφυγή`
-            : discoveryRadar.length
-              ? `${discoveryRadar.length} νέες μετοχές εντοπίστηκαν αυτόματα για έλεγχο`
-              : urgent.length
-                ? `${urgent.length} υπόθεση${urgent.length === 1 ? '' : 'εις'} αυξημένης προτεραιότητας`
-                : reviewReady.length
-                  ? `${reviewReady.length} φάκελο${reviewReady.length === 1 ? 'ς' : 'ι'} έτοιμο για έλεγχο`
-                  : 'Δεν υπάρχει ακόμη δημοσιεύσιμη επενδυτική πρόταση',
-      primaryItem: urgent[0] || decisions[0] || reviewReady[0] || research[0] || null,
+      headline: confirmedBuyOpportunities.length
+        ? `${confirmedBuyOpportunities.length} ευκαιρία${confirmedBuyOpportunities.length === 1 ? '' : 'ες'} αγοράς επιβεβαιώθηκε από όλους τους ελέγχους`
+        : actionCounts.sellNowCount
+          ? `${actionCounts.sellNowCount} σήμα άμεσης πώλησης ή μείωσης`
+          : actionCounts.buyNowCount
+            ? `${actionCounts.buyNowCount} επιβεβαιωμένο σήμα άμεσης αγοράς`
+            : waitingEntryOpportunities.length
+              ? `${waitingEntryOpportunities.length} ισχυρή ευκαιρία υπό αναμονή επιβεβαίωσης εισόδου`
+              : actionCounts.avoidCount
+                ? `${actionCounts.avoidCount} περίπτωση για αποφυγή`
+                : discoveryRadar.length
+                  ? `${discoveryRadar.length} νέες μετοχές εντοπίστηκαν αυτόματα για έλεγχο`
+                  : urgent.length
+                    ? `${urgent.length} υπόθεση${urgent.length === 1 ? '' : 'εις'} αυξημένης προτεραιότητας`
+                    : reviewReady.length
+                      ? `${reviewReady.length} φάκελο${reviewReady.length === 1 ? 'ς' : 'ι'} έτοιμο για έλεγχο`
+                      : 'Δεν υπάρχει ακόμη δημοσιεύσιμη επενδυτική πρόταση',
+      primaryItem: confirmedBuyOpportunities[0] || waitingEntryOpportunities[0] || urgent[0] || decisions[0] || reviewReady[0] || research[0] || null,
     },
+    opportunityPurchaseDecisions,
+    confirmedBuyOpportunities,
+    waitingEntryOpportunities,
+    rejectedOpportunities,
+    blockedOpportunities,
     discoveryRadar,
     decisions,
     published,
     reviewReady,
     research,
     urgent,
+    opportunityAssistantContext: opportunityPurchaseDecisions.map((item) => ({
+      companyId: item.companyId,
+      companyName: item.companyName,
+      symbol: item.symbol,
+      tier: item.tier,
+      opportunityScore: item.opportunityScore,
+      status: item.status,
+      buyNowEligible: item.buyNowEligible,
+      whyNotBuyNow: item.whyNotBuyNow,
+      nextGate: item.nextGate,
+      strictAction: item.strictAction,
+    })),
     assistantContext: dossiers.map((item) => ({
       companyId: item.companyId,
       companyName: item.companyName,
       symbol: item.symbol,
       origin: item.origin,
       discovery: item.discovery,
+      broadScreen: item.broadScreen,
       status: item.status,
       category: item.category,
       action: item.action,
@@ -263,6 +317,6 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
       nextStep: item.nextStep,
       reviewDate: item.reviewDate,
     })),
-    disclosure: 'Οι νέες μετοχές εντοπίζονται αυτόματα από επίσημα γεγονότα και περνούν σε βαθιά ανάλυση. Καμία ανακάλυψη δεν γίνεται πρόταση αγοράς πριν περάσουν όλοι οι έλεγχοι πηγών, θεμελιωδών, αγοράς, ρευστότητας, φρεσκότητας και αντιφάσεων. Δεν εκτελούνται συναλλαγές.',
+    disclosure: 'Ο Opportunity Hunter σαρώνει ευρύ επενδυτικό universe και προτεραιοποιεί υποψήφιες ευκαιρίες. High/Super Opportunity δεν σημαίνει αγορά. Μόνο η δεύτερη αυστηρή αξιολόγηση BUY, με πλήρη έλεγχο πηγών, θεμελιωδών, αγοράς, ρευστότητας, φρεσκότητας, τάσης, ρίσκου και αντιφάσεων, μπορεί να εμφανίσει ΑΓΟΡΑ ΕΠΙΒΕΒΑΙΩΘΗΚΕ. Δεν εκτελούνται συναλλαγές.',
   };
 }
