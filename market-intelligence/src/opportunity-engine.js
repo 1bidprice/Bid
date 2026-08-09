@@ -1,6 +1,6 @@
 import { ASSET_CLASS } from './instrument-profile.js';
 
-export const OPPORTUNITY_ENGINE_VERSION = '2026-08-09.1';
+export const OPPORTUNITY_ENGINE_VERSION = '2026-08-09.2';
 
 const clamp = (value, min = 0, max = 100) => Math.max(min, Math.min(max, Number(value) || 0));
 const round = (value, digits = 2) => Number(Number(value || 0).toFixed(digits));
@@ -8,7 +8,9 @@ const unique = (values = []) => [...new Set(values.filter(Boolean))];
 
 const MODEL = Object.freeze({
   [ASSET_CLASS.EQUITY]: {
-    weights: { valuation: 0.20, quality: 0.18, growth: 0.12, momentum: 0.12, catalyst: 0.12, balanceSheet: 0.12, liquidity: 0.08, diversificationBenefit: 0.06 },
+    // A fundamental opportunity must be able to qualify without a discrete
+    // event catalyst or portfolio-fit score, but those dimensions improve rank.
+    weights: { valuation: 0.22, quality: 0.20, growth: 0.14, momentum: 0.14, catalyst: 0.08, balanceSheet: 0.12, liquidity: 0.06, diversificationBenefit: 0.04 },
     minimumStrongPillars: 4,
     maxRiskForSuper: 60,
   },
@@ -64,7 +66,7 @@ const MODEL = Object.freeze({
 function verifiedFactor(candidate, key) {
   const factor = candidate?.factors?.[key];
   if (factor === null || factor === undefined) return null;
-  if (typeof factor === 'number') return { score: clamp(factor), verified: true, sourceCount: 1, ageHours: null };
+  if (typeof factor === 'number') return { score: clamp(factor), verified: true, sourceCount: 1, ageHours: null, peerSampleSize: null };
   if (factor.verified !== true) return null;
   const score = Number(factor.score);
   if (!Number.isFinite(score)) return null;
@@ -73,6 +75,9 @@ function verifiedFactor(candidate, key) {
     verified: true,
     sourceCount: Math.max(1, Number(factor.sourceCount || 1)),
     ageHours: Number.isFinite(Number(factor.ageHours)) ? Math.max(0, Number(factor.ageHours)) : null,
+    peerSampleSize: Number.isFinite(Number(factor.peerSampleSize)) && Number(factor.peerSampleSize) > 0 ? Number(factor.peerSampleSize) : null,
+    peerKey: factor.peerKey || null,
+    components: factor.components || {},
   };
 }
 
@@ -98,7 +103,9 @@ function weightedFactors(candidate, model) {
   const factorScore = coveredWeight > 0 ? weighted / coveredWeight : 0;
   const coverageScore = coveredWeight * 100;
   const averageSourceDepth = Object.keys(factors).length ? sourceDepth / Object.keys(factors).length : 0;
-  return { factors, missing, factorScore, coverageScore, averageSourceDepth };
+  const trackedPeerSizes = Object.values(factors).map((factor) => factor.peerSampleSize).filter(Number.isFinite);
+  const minimumPeerSampleSize = trackedPeerSizes.length ? Math.min(...trackedPeerSizes) : null;
+  return { factors, missing, factorScore, coverageScore, averageSourceDepth, minimumPeerSampleSize };
 }
 
 function stalePenalty(factors) {
@@ -142,6 +149,9 @@ export function scoreOpportunityCandidate(candidate = {}) {
   const severeRiskFlags = Array.isArray(candidate.severeRiskFlags) ? candidate.severeRiskFlags : [];
   const strategyContextVerified = candidate.strategyContextVerified === true;
   const stale = stalePenalty(weighted.factors);
+  const peerTracked = weighted.minimumPeerSampleSize !== null;
+  const superPeerReady = !peerTracked || weighted.minimumPeerSampleSize >= 5;
+  const highPriorityPeerReady = !peerTracked || weighted.minimumPeerSampleSize >= 3;
 
   const qualityAdjustment = (evidenceQuality - 50) * 0.08;
   const executionAdjustment = (executionQuality - 50) * 0.05;
@@ -168,6 +178,7 @@ export function scoreOpportunityCandidate(candidate = {}) {
   if (severeRiskFlags.length) blockers.push('SEVERE_RISK_FLAG');
   if (contradictionCount > 0) blockers.push('CONTRADICTORY_EVIDENCE');
   if (model.requiresStrategyContext && !strategyContextVerified) blockers.push('STRATEGY_CONTEXT_REQUIRED');
+  if (!superPeerReady) blockers.push('PEER_SAMPLE_TOO_SMALL_FOR_SUPER_TIER');
 
   const superEligible =
     weighted.coverageScore >= 85 &&
@@ -178,6 +189,7 @@ export function scoreOpportunityCandidate(candidate = {}) {
     contradictionCount === 0 &&
     strongPillars.length >= model.minimumStrongPillars &&
     weakPillars.length === 0 &&
+    superPeerReady &&
     (!model.requiresStrategyContext || strategyContextVerified);
 
   const highPriorityEligible =
@@ -187,6 +199,7 @@ export function scoreOpportunityCandidate(candidate = {}) {
     riskScore <= Math.min(85, model.maxRiskForSuper + 15) &&
     severeRiskFlags.length === 0 &&
     contradictionCount === 0 &&
+    highPriorityPeerReady &&
     (!model.requiresStrategyContext || strategyContextVerified);
 
   const tier = tierFor(opportunityScore, { superEligible, highPriorityEligible });
@@ -210,6 +223,7 @@ export function scoreOpportunityCandidate(candidate = {}) {
     evidenceQualityScore: round(evidenceQuality),
     executionQualityScore: round(executionQuality),
     riskScore: round(riskScore),
+    peerSampleSize: weighted.minimumPeerSampleSize,
     strongPillars,
     weakPillars,
     missingFactors: weighted.missing,
