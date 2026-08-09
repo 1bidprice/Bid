@@ -38,7 +38,7 @@ insertBefore(
   const seen = new Set();
 
   const record = (reason, payload = {}) => {
-    const key = `${reason}|${payload.pageNumber || 0}|${String(payload.scopedLine || payload.physicalLine || '').slice(0, 120)}`;
+    const key = [reason, payload.pageNumber || 0, String(payload.scopedLine || payload.physicalLine || '').slice(0, 120)].join('|');
     if (seen.has(key) || audit.length >= 12) return;
     seen.add(key);
     audit.push({
@@ -165,7 +165,7 @@ fs.writeFileSync(filePath, source);
 const verified = fs.readFileSync(filePath, 'utf8');
 for (const invariant of [
   'function boundedMetricRejectionAudit(pages, labels, options = {})',
-  "reason: 'CONTEXT_REJECTED'".replace("reason: '", "'"),
+  "record('CONTEXT_REJECTED'",
   "record('AUTHORITY_REJECTED'",
   "record('ROW_TAIL_REJECTED'",
   "record('EXCLUDED_VARIANT'",
