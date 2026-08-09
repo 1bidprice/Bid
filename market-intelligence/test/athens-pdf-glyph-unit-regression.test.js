@@ -19,7 +19,7 @@ const document = {
   period: { year: 2026, months: 3, type: 'INTERIM_3M', periodEnd: '2026-03-31' },
 };
 
-test('production-shaped IFRS PDF preserves units, note columns and two-column statements despite Group/Company prose', () => {
+test('production-shaped two-pane IFRS PDF preserves target rows, units and statement authority', () => {
   const longFrontMatter = 'x'.repeat(10_500);
   const unitFooter = 'Condensed consolidated interim financial statements for the three months ended 31 March 2026 (in millions of Euro)';
   const pages = [
@@ -28,29 +28,30 @@ test('production-shaped IFRS PDF preserves units, note columns and two-column st
       'Condensed consolidated statement of comprehensive income',
       unitFooter,
       'The Group reviews the Company structure separately from these reported figures.',
-      '                              Note     2026 2025',
-      'Total Revenue                 6        767 617',
-      'Profit after tax                       111 126',
-      'Weighted average number of ordinary shares 388,691,108 358,603,478',
+      '                              Note     2026     2025',
+      'Total Revenue                 6        767      617            Remeasurement of hedging derivatives, net of tax     25     13',
+      'Profit after tax                       111      126',
+      'Weighted average number of ordinary shares     388,691,108     358,603,478',
     ].join('\n'),
     [
       'Condensed consolidated statement of financial posiƟon',
       unitFooter,
       'The Group and the Company are discussed in accompanying narrative disclosures.',
-      '                              Note     31/3/2026 31/12/2025',
-      'Cash and cash equivalents     18       2,435 767',
-      'Total assets                           19,733 2,181',
-      'Total liabiliƟes                       13,197 1,755 EQUITY Share capital 20 241 111',
-      'Total equity                            6,536 426',
-      'Total equity and liabiliƟes            19,733 2,181',
+      '                              Note     31/3/2026     31/12/2025              Note     31/3/2026     31/12/2025',
+      'Cash and cash equivalents     18       2,435          767                    Current tax liability          165          129',
+      'Total assets                           19,733        2,181                    Total current liabilities     3,764        1,009',
+      'The Notes on pages 7 to 36 are an integral part of these statements.              Total liabilities            13,197       1,755',
+      'Assets held for sale                    20             -                    EQUITY',
+      'Other receivables                      115            46                    Total equity                    6,536          426',
+      'Total current assets                 3,637           906                    Total equity and liabilities   19,733       2,181',
     ].join('\n'),
     [
       'Condensed consolidated statement of cash flows',
       unitFooter,
       'The Group monitors Company-level treasury information outside this statement.',
-      '2026 2025',
-      'Net cash generated from (+)/used in (-) operaƟng acƟviƟes 198 183',
-      'AcquisiƟon of property, plant and equipment and intangible assets (23) (16)',
+      '                              Note     2026     2025                         Note     2026     2025',
+      'Net cash generated from (+)/used in (-) operaƟng acƟviƟes     198     183            AcquisiƟon of property, plant and equipment and intangible assets     (23)     (16)',
+      'The Notes on pages 7 to 36 are an integral part of these statements.              Net cash generated from (+)/used in (-) investing activities          1,526     (18)',
     ].join('\n'),
   ];
 
@@ -73,6 +74,11 @@ test('production-shaped IFRS PDF preserves units, note columns and two-column st
   assert.equal(snapshot.metricsReady, true);
   assert.equal(snapshot.annual.operatingCashFlow[0].value, 198_000_000);
   assert.equal(snapshot.annual.capitalExpenditure[0].value, -23_000_000);
+
+  assert.equal(snapshot.annual.operatingCashFlow[0].provenance.extractedLine.includes('Acquisition of property'), false);
+  assert.equal(snapshot.annual.capitalExpenditure[0].provenance.extractedLine.includes('Net cash generated'), false);
+  assert.equal(snapshot.annual.operatingCashFlow[0].provenance.physicalLine.includes('AcquisiƟon of property'), true);
+  assert.equal(snapshot.annual.capitalExpenditure[0].provenance.physicalLine.includes('Net cash generated'), true);
 
   for (const fact of [
     snapshot.annual.revenue[0],
