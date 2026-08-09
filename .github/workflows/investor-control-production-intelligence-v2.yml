@@ -19,7 +19,7 @@ concurrency:
 jobs:
   autonomous-intelligence:
     runs-on: ubuntu-latest
-    timeout-minutes: 70
+    timeout-minutes: 80
     steps:
       - name: Checkout verified production source
         uses: actions/checkout@v4
@@ -62,11 +62,17 @@ jobs:
           node src/run-autonomous-intelligence.js out/autonomous-intelligence.json
           node src/build-mobile-feed.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json
 
-      - name: Verify production safety and ELLAKTOR regression
+      - name: Verify strict production safety
         working-directory: source/market-intelligence
         run: |
           set -euo pipefail
           node scripts/verify-production-output.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json
+
+      - name: Verify opportunity hunter safety
+        working-directory: source/market-intelligence
+        run: |
+          set -euo pipefail
+          node scripts/verify-opportunity-hunter-output.js out/autonomous-intelligence.json
 
       - name: Publish verified live feed transactionally
         shell: bash
@@ -92,10 +98,30 @@ jobs:
           const report = JSON.parse(fs.readFileSync('./live-feed/autonomous-intelligence.json','utf8'));
           const now = new Date().toISOString();
           const sourceCommit = execFileSync('git',['-C','source','rev-parse','HEAD'],{encoding:'utf8'}).trim();
+          const release = JSON.parse(fs.readFileSync('./source/market-intelligence/config/runtime-release-manifest.json','utf8')).releaseVersion;
           const greek = (report.discovery?.shortlist || []).filter((item) => item.market === 'GR');
           const unresolvedGreek = greek.filter((item) => !item.symbol || item.identityStatus === 'SYMBOL_RESOLUTION_REQUIRED');
           const quotes = Object.values(feed.quoteRegistry || {});
           const readyHistory = (report.historicalMarketMetrics || []).filter((item) => item?.readiness?.marketMetricsReady === true).length;
+          const broad = report.broadOpportunityScan || {};
+          const hunter = report.opportunityUniverse || {};
+          const ranking = hunter.ranking || {};
+          const deepQueue = report.opportunityDeepVerificationQueue || [];
+          const hunterTelemetry = {
+            broadEligibleUniverseCount:Number(broad.directoryEligibleCount || 0),
+            fundamentalPoolCount:Number(broad.fundamentalPoolCount || 0),
+            fundamentalSelectedCount:Number(broad.fundamentalSelectedCount || 0),
+            marketScreenInputCount:Number(broad.marketScreenInputCount || 0),
+            marketScreenScorableCount:Number(broad.marketScreenScorableCount || 0),
+            marketScreenEligibleCount:Number(broad.marketScreenEligibleCount || 0),
+            broadDeepAnalysisCandidateCount:(broad.candidates || []).length,
+            specializedOpportunityQuarantineCount:Number(broad.specializedQuarantineCount || 0),
+            opportunityScannedInstrumentCount:Number(hunter.uniqueInstrumentCount || 0),
+            opportunityScorableInstrumentCount:Number(hunter.scorableInstrumentCount || 0),
+            superOpportunityCount:Number(ranking.superOpportunityCount || 0),
+            highPriorityOpportunityCount:Number(ranking.highPriorityCount || 0),
+            deepVerificationQueueCount:deepQueue.length,
+          };
           const status = {
             format:'investor-control-live-feed-status', version:7,
             generatedAt:feed.generatedAt, publishedAt:now,
@@ -103,13 +129,16 @@ jobs:
             sourcePolicyVersion:feed.sourceSelection?.version || null,
             sourceWorkflowRunId:process.env.GITHUB_RUN_ID,
             sourceCommit,
-            publisherContract:'TRANSACTIONAL_V2',
+            runtimeReleaseVersion:release,
+            publisherContract:'TRANSACTIONAL_V2_SINGLE_WRITER',
             feedSha256:crypto.createHash('sha256').update(fs.readFileSync('./live-feed/mobile-intelligence-feed.json')).digest('hex'),
             operationalHealth:{
               ...(report.operationalHealth || {}),
               readyHistoricalMarketMetricsCount:readyHistory,
               greekCandidateCount:greek.length,
               unresolvedGreekIdentityCount:unresolvedGreek.length,
+              controlledPlanCount:(report.researchDossiers || []).filter((item)=>item.finalAction?.controlledPlan?.status==='AVAILABLE').length,
+              ...hunterTelemetry,
               lastSuccessfulPublicationAt:now,
               staleOutput:false,
             },
@@ -131,6 +160,7 @@ jobs:
               athensAnnouncementEventCount:report.discovery?.athensAnnouncementEventCount || 0,
               greekCandidateCount:greek.length,
               unresolvedGreekIdentityCount:unresolvedGreek.length,
+              ...hunterTelemetry,
             },
           };
           fs.writeFileSync('./live-feed/status.json',JSON.stringify(status,null,2)+'\n');
@@ -139,7 +169,7 @@ jobs:
           try { old=JSON.parse(fs.readFileSync('./live-feed/decision-history.json','utf8')).items || []; } catch {}
           const current=(feed.decisions || []).map((item)=>({
             recordedAt:now, feedGeneratedAt:feed.generatedAt, policyVersion:feed.policyVersion,
-            dossierId:item.id, companyId:item.companyId, companyName:item.companyName, symbol:item.symbol,
+            dossierId:item.id, companyId:item.companyId, companyName:item.companyName, symbol:item.symbol, origin:item.origin,
             marketAction:item.finalAction?.marketAction, holderAction:item.finalAction?.holderAction,
             nonHolderAction:item.finalAction?.nonHolderAction, urgency:item.finalAction?.urgency,
             confidenceScore:item.finalAction?.confidenceScore, dataQualityScore:item.finalAction?.dataQualityScore,
@@ -154,7 +184,7 @@ jobs:
             git -C live-feed add mobile-intelligence-feed.json autonomous-intelligence.json status.json decision-history.json discovery-radar.json
             HAS_CHANGES=0
             if ! git -C live-feed diff --cached --quiet; then
-              git -C live-feed commit -m "chore(feed): verified production ${GITHUB_RUN_ID} transactional-v2 [skip ci]"
+              git -C live-feed commit -m "chore(feed): verified hunter production ${GITHUB_RUN_ID} transactional-v2 [skip ci]"
               HAS_CHANGES=1
             fi
           }
@@ -191,16 +221,36 @@ jobs:
           node source/market-intelligence/scripts/verify-production-output.js \
             live-feed/autonomous-intelligence.json \
             live-feed/mobile-intelligence-feed.json
+          node source/market-intelligence/scripts/verify-opportunity-hunter-output.js \
+            live-feed/autonomous-intelligence.json
 
           node - <<'NODE'
           const fs=require('fs');
           const status=JSON.parse(fs.readFileSync('./live-feed/status.json','utf8'));
           const report=JSON.parse(fs.readFileSync('./live-feed/autonomous-intelligence.json','utf8'));
+          const broad=report.broadOpportunityScan || {};
+          const hunter=report.opportunityUniverse || {};
+          const ranking=hunter.ranking || {};
           if (String(status.sourceWorkflowRunId) !== String(process.env.GITHUB_RUN_ID)) throw new Error('remote status belongs to a different workflow run');
-          if (status.publisherContract !== 'TRANSACTIONAL_V2') throw new Error('transactional publisher marker missing');
+          if (status.publisherContract !== 'TRANSACTIONAL_V2_SINGLE_WRITER') throw new Error('single-writer transactional publisher marker missing');
           if (status.generatedAt !== report.generatedAt) throw new Error('remote status/report generation mismatch');
           if (status.operationalHealth?.staleOutput !== false) throw new Error('remote feed incorrectly marked stale');
-          console.log(JSON.stringify({remotePublication:'VERIFIED',sourceWorkflowRunId:status.sourceWorkflowRunId,sourceCommit:status.sourceCommit,publisherContract:status.publisherContract},null,2));
+          if (Number(status.sourceHealth?.marketScreenScorableCount || 0) !== Number(broad.marketScreenScorableCount || 0)) throw new Error('remote market-screen telemetry mismatch');
+          if (Number(status.sourceHealth?.superOpportunityCount || 0) !== Number(ranking.superOpportunityCount || 0)) throw new Error('remote super-opportunity telemetry mismatch');
+          console.log(JSON.stringify({
+            remotePublication:'VERIFIED',
+            sourceWorkflowRunId:status.sourceWorkflowRunId,
+            sourceCommit:status.sourceCommit,
+            runtimeReleaseVersion:status.runtimeReleaseVersion,
+            publisherContract:status.publisherContract,
+            broadEligibleUniverseCount:status.sourceHealth?.broadEligibleUniverseCount || 0,
+            fundamentalSelectedCount:status.sourceHealth?.fundamentalSelectedCount || 0,
+            marketScreenScorableCount:status.sourceHealth?.marketScreenScorableCount || 0,
+            broadDeepAnalysisCandidateCount:status.sourceHealth?.broadDeepAnalysisCandidateCount || 0,
+            opportunityScorableInstrumentCount:status.sourceHealth?.opportunityScorableInstrumentCount || 0,
+            superOpportunityCount:status.sourceHealth?.superOpportunityCount || 0,
+            highPriorityOpportunityCount:status.sourceHealth?.highPriorityOpportunityCount || 0,
+          },null,2));
           NODE
 
       - name: Record failure heartbeat safely
