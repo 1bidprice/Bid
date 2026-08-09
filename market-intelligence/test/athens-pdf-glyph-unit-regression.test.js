@@ -19,7 +19,7 @@ const document = {
   period: { year: 2026, months: 3, type: 'INTERIM_3M', periodEnd: '2026-03-31' },
 };
 
-test('production-shaped two-pane IFRS PDF preserves target rows, units and statement authority', () => {
+test('production-shaped two-pane IFRS PDF survives missing ti glyphs and hidden PDF characters', () => {
   const longFrontMatter = 'x'.repeat(10_500);
   const unitFooter = 'Condensed consolidated interim financial statements for the three months ended 31 March 2026 (in millions of Euro)';
   const pages = [
@@ -34,7 +34,7 @@ test('production-shaped two-pane IFRS PDF preserves target rows, units and state
       'Weighted average number of ordinary shares     388,691,108     358,603,478',
     ].join('\n'),
     [
-      'Condensed consolidated statement of financial posiƟon',
+      'Condensed consolidated statement of financial posi on',
       unitFooter,
       'The Group and the Company are discussed in accompanying narrative disclosures.',
       '                              Note     31/3/2026     31/12/2025              Note     31/3/2026     31/12/2025',
@@ -46,11 +46,11 @@ test('production-shaped two-pane IFRS PDF preserves target rows, units and state
       'Total current assets                 3,637           906                    Total equity and liabilities   19,733       2,181',
     ].join('\n'),
     [
-      'Condensed consolidated statement of cash flows',
+      'Condensed consolidated statement of cash\u200b flows',
       unitFooter,
       'The Group monitors Company-level treasury information outside this statement.',
       '                              Note     2026     2025                         Note     2026     2025',
-      'Net cash generated from (+)/used in (-) operaƟng acƟviƟes     198     183            AcquisiƟon of property, plant and equipment and intangible assets     (23)     (16)',
+      'Net cash generated from (+)/used in (-) operating activities     198     183            Acquisi on of property, plant and equipment and intangible assets     (23)     (16)',
       'The Notes on pages 7 to 36 are an integral part of these statements.              Net cash generated from (+)/used in (-) investing activities          1,526     (18)',
     ].join('\n'),
   ];
@@ -75,9 +75,9 @@ test('production-shaped two-pane IFRS PDF preserves target rows, units and state
   assert.equal(snapshot.annual.operatingCashFlow[0].value, 198_000_000);
   assert.equal(snapshot.annual.capitalExpenditure[0].value, -23_000_000);
 
-  assert.equal(snapshot.annual.operatingCashFlow[0].provenance.extractedLine.includes('Acquisition of property'), false);
+  assert.equal(snapshot.annual.operatingCashFlow[0].provenance.extractedLine.includes('acquisition of property'), false);
   assert.equal(snapshot.annual.capitalExpenditure[0].provenance.extractedLine.includes('Net cash generated'), false);
-  assert.equal(snapshot.annual.operatingCashFlow[0].provenance.physicalLine.includes('AcquisiƟon of property'), true);
+  assert.equal(snapshot.annual.operatingCashFlow[0].provenance.physicalLine.includes('Acquisi on of property'), true);
   assert.equal(snapshot.annual.capitalExpenditure[0].provenance.physicalLine.includes('Net cash generated'), true);
 
   for (const fact of [
