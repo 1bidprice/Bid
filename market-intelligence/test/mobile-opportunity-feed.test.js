@@ -10,7 +10,7 @@ function strictAction(marketAction, nonHolderAction) {
     marketAction,
     holderAction: 'HOLD',
     nonHolderAction,
-    urgency: marketAction === 'BUY_NOW' ? 'IMMEDIATE' : 'NONE',
+    urgency: ['BUY_NOW', 'SELL_NOW'].includes(marketAction) ? 'IMMEDIATE' : 'NONE',
     confidenceScore: 90,
     dataQualityScore: 90,
     execution: {
@@ -42,11 +42,40 @@ function purchaseDecision(overrides = {}) {
   };
 }
 
-function report(decisions) {
+function finalDossier(overrides = {}) {
+  return {
+    dossierId: 'dossier:final-buy',
+    companyId: 'company:final-buy',
+    companyName: 'Final Buy Holdings',
+    listing: { symbol: 'FINAL', exchange: 'NYSE' },
+    origin: 'FOCUS_UNIVERSE',
+    status: 'PUBLISHED',
+    category: 'MOMENTUM_CONFIRMED',
+    proposedAction: 'CONSIDER_BUY',
+    timeHorizon: 'MEDIUM_TERM',
+    referencePrice: { value: 25, currency: 'USD', timestamp: generatedAt },
+    thesis: 'Fully validated final-action fixture.',
+    causalMechanism: 'Validated fixture mechanism.',
+    bullCase: 'Validated fixture bull case.',
+    bearCase: 'Validated fixture bear case.',
+    catalysts: [],
+    risks: [],
+    invalidationCondition: 'Fixture invalidation.',
+    reviewDate: '2026-08-11',
+    readiness: { blockers: [] },
+    evidence: [],
+    metrics: {},
+    generatedAt,
+    finalAction: strictAction('BUY_NOW', 'BUY_NOW'),
+    ...overrides,
+  };
+}
+
+function report(decisions, researchDossiers = []) {
   return {
     generatedAt,
     policyVersion: '2026-08-09.1',
-    researchDossiers: [],
+    researchDossiers,
     discovery: {
       sourcePolicy: { selector: 'DETERMINISTIC_SOURCE_GOVERNOR' },
       shortlist: [{
@@ -150,4 +179,32 @@ test('waiting opportunity becomes today primary item when no BUY is confirmed', 
   assert.equal(feed.summary.waitingEntryOpportunityCount, 1);
   assert.match(feed.today.headline, /ισχυρή ευκαιρία υπό αναμονή επιβεβαίωσης εισόδου/);
   assert.equal(feed.today.primaryItem.instrumentId, 'company:wait');
+});
+
+test('today primary item follows a final BUY headline before an unrelated Hunter WAIT candidate', () => {
+  const waiting = purchaseDecision({
+    instrumentId: 'company:wait',
+    companyId: 'company:wait',
+    dossierId: 'dossier:wait',
+    displayName: 'Wait Opportunity',
+    symbol: 'WAIT',
+    tier: 'HIGH_PRIORITY_CANDIDATE',
+    opportunityScore: 82,
+    status: 'WAIT_FOR_ENTRY_CONFIRMATION',
+    statusLabel: 'ΠΕΡΙΜΕΝΕ — ΔΕΝ ΕΠΙΒΕΒΑΙΩΘΗΚΕ ΑΚΟΜΗ ΕΙΣΟΔΟΣ',
+    buyNowEligible: false,
+    strictAction: strictAction('WATCH', 'DO_NOT_BUY'),
+    whyNotBuyNow: ['BUY_SETUP_NOT_CONFIRMED'],
+    nextGate: 'RECHECK_STRICT_BUY_GATES',
+  });
+  const buy = finalDossier();
+
+  const feed = buildMobileIntelligenceFeed(report([waiting], [buy]), { generatedAt });
+
+  assert.equal(feed.summary.buyNowCount, 1);
+  assert.equal(feed.summary.waitingEntryOpportunityCount, 1);
+  assert.match(feed.today.headline, /επιβεβαιωμένο σήμα άμεσης αγοράς/);
+  assert.equal(feed.today.primaryItem.companyId, 'company:final-buy');
+  assert.equal(feed.today.primaryItem.finalAction.marketAction, 'BUY_NOW');
+  assert.notEqual(feed.today.primaryItem.companyId, 'company:wait');
 });
