@@ -1,4 +1,6 @@
-export const FORECAST_CALIBRATION_VERSION = '2026-08-11.1';
+export const FORECAST_CALIBRATION_VERSION = '2026-08-11.2';
+
+const OOS_VALIDATION_MODES = new Set(['WALK_FORWARD_OOS', 'LIVE_SHADOW_OOS']);
 
 function clamp(value, min = 0, max = 1) {
   return Math.max(min, Math.min(max, Number(value) || 0));
@@ -11,7 +13,7 @@ function round(value, digits = 6) {
 function validRecord(record) {
   const probability = Number(record?.rawProbabilityPositive ?? record?.probability);
   const outcome = Number(record?.positiveOutcome ?? record?.outcome);
-  return record?.validationMode === 'WALK_FORWARD_OOS' &&
+  return OOS_VALIDATION_MODES.has(record?.validationMode) &&
     Number.isFinite(probability) && probability >= 0 && probability <= 1 &&
     (outcome === 0 || outcome === 1);
 }
@@ -20,7 +22,8 @@ function oosRecords(records = []) {
   return records.filter(validRecord).map((record) => ({
     probability: Number(record.rawProbabilityPositive ?? record.probability),
     outcome: Number(record.positiveOutcome ?? record.outcome),
-    timestamp: record.timestamp || null,
+    timestamp: record.timestamp || record.forecastAt || null,
+    validationMode: record.validationMode,
   }));
 }
 
@@ -64,8 +67,9 @@ export function evaluateForecastCalibration(records = [], options = {}) {
       baseRate: null,
       naiveBrierScore: null,
       skillVsBaseRatePct: null,
+      validationModes: [],
       bins: [],
-      blockers: ['WALK_FORWARD_OOS_RECORDS_REQUIRED'],
+      blockers: ['OOS_FORECAST_RECORDS_REQUIRED'],
     };
   }
 
@@ -96,6 +100,7 @@ export function evaluateForecastCalibration(records = [], options = {}) {
     baseRate: round(baseRate),
     naiveBrierScore: round(naiveBrier),
     skillVsBaseRatePct: round(skill, 2),
+    validationModes: [...new Set(valid.map((item) => item.validationMode))].sort(),
     bins: bins.map((bin) => ({
       index: bin.index,
       lower: round(bin.lower, 4),
@@ -148,6 +153,7 @@ export function calibrateForecastProbability(rawProbability, records = [], optio
     localSampleSize: bin.count,
     baseRate: round(baseRate, 4),
     localEmpiricalRate: round(bin.empiricalRate, 4),
+    validationModes: [...new Set(valid.map((item) => item.validationMode))].sort(),
     method: 'OOS_HISTOGRAM_BETA_SHRINKAGE',
     blockers: [],
   };
@@ -169,3 +175,5 @@ export function evaluateForecastPromotionGate(calibrationSummary, options = {}) 
     thresholds: { minimumSample, minimumSkillPct, maximumEce },
   };
 }
+
+export const FORECAST_OOS_VALIDATION_MODES = Object.freeze([...OOS_VALIDATION_MODES]);

@@ -6,7 +6,7 @@ import {
   evaluateForecastPromotionGate,
 } from '../src/forecast-calibration.js';
 
-function calibratedHistory(count = 400) {
+function calibratedHistory(count = 400, validationMode = 'WALK_FORWARD_OOS') {
   const records = [];
   for (let i = 0; i < count; i += 1) {
     const bucket = i % 10;
@@ -15,7 +15,7 @@ function calibratedHistory(count = 400) {
     records.push({
       rawProbabilityPositive: probability,
       positiveOutcome: threshold < probability ? 1 : 0,
-      validationMode: 'WALK_FORWARD_OOS',
+      validationMode,
       timestamp: `t${i}`,
     });
   }
@@ -28,9 +28,22 @@ test('calibration ignores non-OOS records', () => {
   const summary = evaluateForecastCalibration(records, { minimumTotal: 100 });
   assert.equal(summary.sampleSize, 120);
   assert.equal(summary.status, 'OOS_METRICS_READY');
+  assert.deepEqual(summary.validationModes, ['WALK_FORWARD_OOS']);
 });
 
-test('probability calibration fails closed without enough walk-forward history', () => {
+test('matured live shadow outcomes are valid OOS calibration evidence while in-sample records remain excluded', () => {
+  const records = [
+    ...calibratedHistory(60, 'WALK_FORWARD_OOS'),
+    ...calibratedHistory(60, 'LIVE_SHADOW_OOS'),
+    ...calibratedHistory(500, 'IN_SAMPLE'),
+  ];
+  const summary = evaluateForecastCalibration(records, { minimumTotal: 100 });
+  assert.equal(summary.sampleSize, 120);
+  assert.equal(summary.status, 'OOS_METRICS_READY');
+  assert.deepEqual(summary.validationModes, ['LIVE_SHADOW_OOS', 'WALK_FORWARD_OOS']);
+});
+
+test('probability calibration fails closed without enough OOS history', () => {
   const result = calibrateForecastProbability(0.72, calibratedHistory(40), { minimumTotal: 100 });
   assert.equal(result.status, 'NOT_CALIBRATED');
   assert.equal(result.calibratedProbability, null);
