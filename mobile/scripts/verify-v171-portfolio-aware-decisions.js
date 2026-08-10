@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const parser = require('@babel/parser');
 
 const root = path.resolve(__dirname, '..');
 function read(relativePath) { return fs.readFileSync(path.join(root, relativePath), 'utf8'); }
@@ -44,13 +45,18 @@ const portfolio = read('PortfolioApp.js');
 const app = JSON.parse(read('app.json'));
 const pkg = JSON.parse(read('package.json'));
 
+parser.parse(finalCard, { sourceType: 'module', plugins: ['jsx'] });
+parser.parse(opportunities, { sourceType: 'module', plugins: ['jsx'] });
+parser.parse(portfolio, { sourceType: 'module', plugins: ['jsx'] });
+
 assert(finalCard.includes('canonicalPositionSymbol(position.symbol) === canonicalPositionSymbol(item?.symbol)'), 'FinalDecisionCard canonical holder match missing');
 assert(portfolio.includes('<OpportunitiesView portfolioPositions={positions} />'), 'portfolio positions are not bridged to OpportunitiesView');
 assert(opportunities.includes('personalizedDecisionCounts(feed, portfolioPositions)'), 'personalized decision counter missing');
 assert(opportunities.includes('inferredReferenceCurrency(referencePrice, item)'), 'safe currency inference missing');
+assert(opportunities.includes("style: 'currency',\n      currency,"), 'currency formatter syntax contract missing');
 assert(!opportunities.includes("currency: referencePrice.currency || 'EUR'"), 'false EUR fallback still present');
 assert(app.expo.version === '1.7.1', `app version mismatch: ${app.expo.version}`);
 assert(Number(app.expo.android.versionCode) === 29, `Android versionCode mismatch: ${app.expo.android.versionCode}`);
 assert(pkg.version === '1.7.1', `package version mismatch: ${pkg.version}`);
 
-console.log('PASS v1.7.1 portfolio-aware holder/non-holder decisions, personalized counters, safe currency inference, version 1.7.1 build 29.');
+console.log('PASS v1.7.1 portfolio-aware holder/non-holder decisions, personalized counters, safe currency inference, JSX parse, version 1.7.1 build 29.');
