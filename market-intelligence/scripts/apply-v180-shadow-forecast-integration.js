@@ -46,9 +46,9 @@ function patchAutonomousRunner() {
   );
   source = replaceRequired(
     source,
-    '  const researchDossiers = annotateDiscovery(policyDossiers, discovery, broadOpportunityScan, seedUniverse);\n  const opportunitiesFeed = buildOpportunitiesFeed(researchDossiers, { generatedAt });',
-    '  const researchDossiers = annotateDiscovery(policyDossiers, discovery, broadOpportunityScan, seedUniverse);\n  const shadowForecasts = buildShadowForecasts({\n    generatedAt,\n    universe: expandedUniverse,\n    researchDossiers,\n    opportunityUniverse,\n    historicalSeriesCollector,\n    options,\n  });\n  const opportunitiesFeed = buildOpportunitiesFeed(researchDossiers, { generatedAt });',
-    'shadow forecast generation after policy dossiers',
+    '  const opportunitiesFeed = buildOpportunitiesFeed(researchDossiers, { generatedAt });',
+    '  const shadowForecasts = buildShadowForecasts({\n    generatedAt,\n    universe: expandedUniverse,\n    researchDossiers,\n    opportunityUniverse,\n    historicalSeriesCollector,\n    options,\n  });\n  const opportunitiesFeed = buildOpportunitiesFeed(researchDossiers, { generatedAt });',
+    'shadow forecast generation after hunter reconciliation',
   );
   source = replaceRequired(
     source,
