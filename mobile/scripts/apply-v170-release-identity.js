@@ -33,6 +33,13 @@ function patchRuntimeVersion(relativePath) {
   write(relativePath, source);
 }
 
+function patchPackageIdentity() {
+  const packagePath = path.join(root, 'package.json');
+  const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+  packageJson.version = RELEASE_VERSION;
+  fs.writeFileSync(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
+}
+
 function patchAppConfig() {
   const appPath = path.join(root, 'app.json');
   const app = JSON.parse(fs.readFileSync(appPath, 'utf8'));
@@ -58,6 +65,7 @@ function patchAppConfig() {
 
 patchRuntimeVersion('PortfolioApp.js');
 patchRuntimeVersion('DecisionOverlay.js');
+patchPackageIdentity();
 patchAppConfig();
 
 console.log(`Investor Control mobile release identity ${RELEASE_VERSION} (${ANDROID_VERSION_CODE}) applied.`);
