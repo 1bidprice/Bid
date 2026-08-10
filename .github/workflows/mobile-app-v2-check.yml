@@ -25,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Verify v1.7 Opportunity Hunter mobile contract
+        run: npm run test:hunter-ui
+
       - name: Check Expo package compatibility
         run: npx expo install --check 2>&1 | tee package-check.log
 
