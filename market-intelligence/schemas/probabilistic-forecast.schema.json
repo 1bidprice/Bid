@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://investor-control.local/schemas/probabilistic-forecast.schema.json",
+  "title": "Investor Control Probabilistic Forecast",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "format",
+    "version",
+    "policyVersion",
+    "generatedAt",
+    "instrument",
+    "horizons",
+    "explainability",
+    "methodology",
+    "status",
+    "forecastMayInfluenceFinalAction",
+    "finalActionEligible",
+    "blockers"
+  ],
+  "properties": {
+    "format": { "const": "investor-control-probabilistic-forecast" },
+    "version": { "type": "integer", "minimum": 1 },
+    "policyVersion": { "type": "string", "minLength": 1 },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "asOf": { "type": ["string", "null"] },
+    "instrument": {
+      "type": "object",
+      "required": ["instrumentId", "assetClass"],
+      "properties": {
+        "instrumentId": { "type": ["string", "null"] },
+        "displayName": { "type": ["string", "null"] },
+        "assetClass": { "type": "string" },
+        "symbol": { "type": ["string", "null"] },
+        "exchange": { "type": ["string", "null"] }
+      }
+    },
+    "horizons": {
+      "type": "object",
+      "additionalProperties": {
+        "type": ["object", "null"],
+        "properties": {
+          "tradingDays": { "type": "integer", "minimum": 1 },
+          "status": { "type": "string" },
+          "rawPatternProbabilityPositive": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+          "probabilityPositive": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+          "expectedReturnPct": { "type": ["number", "null"] },
+          "distribution": { "type": ["object", "null"] },
+          "patternConfidenceScore": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+          "evidenceQualityScore": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+          "forecastMayInfluenceFinalAction": { "type": "boolean" },
+          "blockers": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "explainability": {
+      "type": "object",
+      "required": [
+        "supportingDrivers",
+        "opposingDrivers",
+        "neutralDrivers",
+        "unverifiedDriversExcludedFromDecision",
+        "unknowns",
+        "invalidationConditions",
+        "evidenceQualityScore",
+        "contradictionCount"
+      ]
+    },
+    "methodology": {
+      "type": "object",
+      "required": ["probabilityRule", "scoreRule", "decisionBoundary"]
+    },
+    "status": { "enum": ["RESEARCH_ONLY", "FORECAST_PROMOTION_ELIGIBLE"] },
+    "forecastMayInfluenceFinalAction": { "type": "boolean" },
+    "finalActionEligible": { "const": false },
+    "finalActionPolicy": { "const": "SEPARATE_FINAL_ACTION_ENGINE_REQUIRED" },
+    "blockers": { "type": "array", "items": { "type": "string" } }
+  }
+}
