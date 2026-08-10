@@ -79,7 +79,7 @@ function patchOpportunities() {
   source = replaceRequired(
     source,
     "  try {\n    return new Intl.NumberFormat('el-GR', {\n      style: 'currency',\n      currency: referencePrice.currency || 'EUR',",
-    "  const currency = inferredReferenceCurrency(referencePrice, item);\n  if (!currency) return `${value.toLocaleString('el-GR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} · νόμισμα μη διαθέσιμο`;\n  try {\n    return new Intl.NumberFormat('el-GR', {\n      style: 'currency',\n      currency:",
+    "  const currency = inferredReferenceCurrency(referencePrice, item);\n  if (!currency) return `${value.toLocaleString('el-GR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} · νόμισμα μη διαθέσιμο`;\n  try {\n    return new Intl.NumberFormat('el-GR', {\n      style: 'currency',\n      currency,",
     'no false EUR fallback',
   );
 
