@@ -28,6 +28,9 @@ jobs:
       - name: Verify v1.7 Opportunity Hunter mobile contract
         run: npm run test:hunter-ui
 
+      - name: Verify v1.7 mobile release identity
+        run: npm run test:release-identity
+
       - name: Check Expo package compatibility
         run: npx expo install --check 2>&1 | tee package-check.log
 
