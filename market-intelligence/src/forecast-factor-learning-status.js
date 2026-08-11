@@ -1,4 +1,4 @@
-export const FORECAST_FACTOR_LEARNING_STATUS_VERSION = '2026-08-11.1';
+export const FORECAST_FACTOR_LEARNING_STATUS_VERSION = '2026-08-11.2';
 
 const SCORE_BINS = Object.freeze([
   { lower: -1, upper: -0.6, includeUpper: false },
@@ -12,6 +12,10 @@ function finite(value) {
   if (value === null || value === undefined || value === '') return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
+}
+
+function binaryOutcome(value) {
+  return value === 0 || value === 1;
 }
 
 function round(value, digits = 6) {
@@ -39,7 +43,7 @@ function scoredRecord(record) {
 function maturedScoredRecord(record) {
   return scoredRecord(record) &&
     record?.status === 'MATURED' &&
-    [0, 1].includes(Number(record?.positiveOutcome));
+    binaryOutcome(record?.positiveOutcome);
 }
 
 function chronological(records = []) {
@@ -56,7 +60,7 @@ function groupKey(record = {}) {
 function auc(records = []) {
   const valid = records
     .filter(maturedScoredRecord)
-    .map((record) => ({ score: Number(record.latentFactorScore), outcome: Number(record.positiveOutcome) }))
+    .map((record) => ({ score: Number(record.latentFactorScore), outcome: record.positiveOutcome }))
     .sort((a, b) => a.score - b.score);
   const positiveCount = valid.filter((item) => item.outcome === 1).length;
   const negativeCount = valid.length - positiveCount;
@@ -93,8 +97,8 @@ function tailSpread(records = [], options = {}) {
   const tailSampleSize = Math.max(1, Math.floor(sorted.length * fraction));
   const bottom = sorted.slice(0, tailSampleSize);
   const top = sorted.slice(-tailSampleSize);
-  const topPositiveRate = mean(top.map((record) => Number(record.positiveOutcome)));
-  const bottomPositiveRate = mean(bottom.map((record) => Number(record.positiveOutcome)));
+  const topPositiveRate = mean(top.map((record) => record.positiveOutcome));
+  const bottomPositiveRate = mean(bottom.map((record) => record.positiveOutcome));
   const topReturn = mean(top.map((record) => record?.realisedOutcome?.realisedReturnPct));
   const bottomReturn = mean(bottom.map((record) => record?.realisedOutcome?.realisedReturnPct));
   return {
@@ -133,7 +137,7 @@ function scoreBins(records = [], options = {}) {
     if (index === null) continue;
     const bin = bins[index];
     bin.count += 1;
-    bin.outcomeSum += Number(record.positiveOutcome);
+    bin.outcomeSum += record.positiveOutcome;
     const realisedReturn = finite(record?.realisedOutcome?.realisedReturnPct);
     if (realisedReturn !== null) {
       bin.returnSum += realisedReturn;
@@ -193,7 +197,7 @@ export function evaluateFactorScoreTemporalStability(records = [], options = {})
   }
 
   const subperiods = splitContiguous(matured, blockCount).map((block, index) => {
-    const positiveCount = block.filter((record) => Number(record.positiveOutcome) === 1).length;
+    const positiveCount = block.filter((record) => record.positiveOutcome === 1).length;
     const negativeCount = block.length - positiveCount;
     const rocAuc = auc(block);
     const spread = tailSpread(block, options);
@@ -231,7 +235,8 @@ function evaluateGroup(records, options = {}) {
   const lineage = liveFactorLineage(records);
   const scored = lineage.filter(scoredRecord);
   const maturedScored = lineage.filter(maturedScoredRecord);
-  const positiveCount = maturedScored.filter((record) => Number(record.positiveOutcome) === 1).length;
+  const invalidMaturedOutcomeCount = scored.filter((record) => record?.status === 'MATURED' && !binaryOutcome(record?.positiveOutcome)).length;
+  const positiveCount = maturedScored.filter((record) => record.positiveOutcome === 1).length;
   const negativeCount = maturedScored.length - positiveCount;
   const minimumMaturedSample = Math.max(50, Number(options.factorMinimumMaturedSample || 200));
   const minimumClassCount = Math.max(10, Number(options.factorMinimumClassCount || 30));
@@ -249,6 +254,7 @@ function evaluateGroup(records, options = {}) {
   if (maturedScored.length < minimumMaturedSample) blockers.push('FACTOR_MATURED_OOS_SAMPLE_TOO_SMALL');
   if (positiveCount < minimumClassCount) blockers.push('FACTOR_POSITIVE_OUTCOME_SAMPLE_TOO_SMALL');
   if (negativeCount < minimumClassCount) blockers.push('FACTOR_NEGATIVE_OUTCOME_SAMPLE_TOO_SMALL');
+  if (invalidMaturedOutcomeCount > 0) blockers.push('INVALID_MATURED_BINARY_OUTCOME_RECORDS_EXCLUDED');
   if (!Number.isFinite(rocAuc) || rocAuc < minimumAuc) blockers.push('FACTOR_ROC_AUC_TOO_LOW');
   if (!Number.isFinite(Number(spread.positiveRateSpread)) || Number(spread.positiveRateSpread) < minimumPositiveRateSpread) blockers.push('FACTOR_TOP_BOTTOM_OUTCOME_SPREAD_TOO_SMALL');
   if (!Number.isFinite(Number(spread.realisedReturnSpreadPct)) || Number(spread.realisedReturnSpreadPct) <= minimumRealisedReturnSpreadPct) blockers.push('FACTOR_TOP_BOTTOM_RETURN_SPREAD_NOT_POSITIVE');
@@ -269,6 +275,7 @@ function evaluateGroup(records, options = {}) {
     scoreBlockedOrUnavailableRecordCount: lineage.length - scored.length,
     openScoredCount: scored.filter((record) => record?.status === 'OPEN').length,
     maturedScoredCount: maturedScored.length,
+    invalidMaturedOutcomeCount,
     maturedPositiveCount: positiveCount,
     maturedNegativeCount: negativeCount,
     minimumMaturedSample,
@@ -314,6 +321,7 @@ export function buildForecastFactorLearningStatus(input = {}) {
     );
   const candidateCount = groups.filter((group) => group.status === 'PROMOTION_CANDIDATE').length;
   const maturedScoredCount = groups.reduce((sum, group) => sum + group.maturedScoredCount, 0);
+  const invalidMaturedOutcomeCount = groups.reduce((sum, group) => sum + group.invalidMaturedOutcomeCount, 0);
   return {
     format: 'investor-control-forecast-factor-learning-status',
     version: 1,
@@ -323,6 +331,7 @@ export function buildForecastFactorLearningStatus(input = {}) {
     status: !lineage.length ? 'NO_FACTOR_OOS_LINEAGE' : candidateCount ? 'PROMOTION_CANDIDATES_EXIST' : 'RESEARCH_ONLY',
     lineageRecordCount: lineage.length,
     maturedScoredCount,
+    invalidMaturedOutcomeCount,
     groupCount: groups.length,
     promotionCandidateGroupCount: candidateCount,
     probabilityCalibrationEnabled: false,

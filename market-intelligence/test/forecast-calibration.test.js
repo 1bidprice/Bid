@@ -77,3 +77,18 @@ test('promotion gate requires sample, probabilistic skill and calibration accura
   assert.equal(allowed.status, 'PROMOTION_ELIGIBLE');
   assert.equal(allowed.forecastMayInfluenceFinalAction, true);
 });
+
+test('calibration rejects null and string outcomes instead of coercing them into binary evidence', () => {
+  const records = [
+    { rawProbabilityPositive: 0.8, positiveOutcome: 1, validationMode: 'LIVE_SHADOW_OOS' },
+    { rawProbabilityPositive: 0.2, positiveOutcome: 0, validationMode: 'LIVE_SHADOW_OOS' },
+    { rawProbabilityPositive: 0.8, positiveOutcome: null, validationMode: 'LIVE_SHADOW_OOS' },
+    { rawProbabilityPositive: 0.8, positiveOutcome: '1', validationMode: 'LIVE_SHADOW_OOS' },
+    { rawProbabilityPositive: 0.2, positiveOutcome: '0', validationMode: 'LIVE_SHADOW_OOS' },
+  ];
+  const summary = evaluateForecastCalibration(records, { minimumTotal: 20 });
+  assert.equal(summary.sampleSize, 2);
+  const result = calibrateForecastProbability(0.8, records, { minimumTotal: 20 });
+  assert.equal(result.sampleSize, 2);
+  assert.equal(result.status, 'NOT_CALIBRATED');
+});

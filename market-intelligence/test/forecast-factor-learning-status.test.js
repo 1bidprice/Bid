@@ -144,3 +144,18 @@ test('factor learning status never produces a probability mapping or silently en
   assert.equal(keys.includes('probabilityMapping'), false);
   assert.ok(status.groups.every((group) => group.probabilityCalibrationEnabled === false && group.decisionIntegrationEnabled === false));
 });
+
+test('malformed matured factor outcomes are excluded and block promotion rather than being coerced', () => {
+  const valid = Array.from({ length: 220 }, (_, index) => factorRecord(index));
+  const malformedOne = { ...factorRecord(500), forecastId: 'factor:malformed:one', positiveOutcome: '1' };
+  const malformedZero = { ...factorRecord(501), forecastId: 'factor:malformed:zero', positiveOutcome: '0' };
+  const malformedNull = { ...factorRecord(502), forecastId: 'factor:malformed:null', positiveOutcome: null };
+  const status = buildForecastFactorLearningStatus({ records: [...valid, malformedOne, malformedZero, malformedNull] });
+  const group = status.groups[0];
+  assert.equal(group.maturedScoredCount, 220);
+  assert.equal(group.invalidMaturedOutcomeCount, 3);
+  assert.equal(status.maturedScoredCount, 220);
+  assert.equal(status.invalidMaturedOutcomeCount, 3);
+  assert.notEqual(group.status, 'PROMOTION_CANDIDATE');
+  assert.ok(group.blockers.includes('INVALID_MATURED_BINARY_OUTCOME_RECORDS_EXCLUDED'));
+});

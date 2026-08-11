@@ -37,7 +37,6 @@ test('learning status exposes progress and blockers even before the first live o
 
 test('strong calibrated live OOS history is still blocked from decision integration until stability also passes', () => {
   const records = Array.from({ length: 220 }, (_, index) => liveRecord(index));
-  // Corrupt the oldest contiguous block so overall data can remain strong while temporal stability fails.
   for (let index = 0; index < 70; index += 1) {
     records[index] = liveRecord(index, {
       probability: index % 2 ? 0.95 : 0.05,
@@ -104,4 +103,19 @@ test('stability is chronological and requires non-negative skill in every contig
   assert.equal(unstable.status, 'UNSTABLE');
   assert.equal(unstable.subperiods[0].status, 'UNSTABLE');
   assert.ok(unstable.blockers.includes('PROBABILISTIC_SKILL_NOT_STABLE_ACROSS_SUBPERIODS'));
+});
+
+test('malformed matured binary outcomes are excluded and block promotion instead of being coerced', () => {
+  const valid = Array.from({ length: 220 }, (_, index) => liveRecord(index));
+  const malformedOne = { ...liveRecord(500), forecastId: 'malformed:string-one', positiveOutcome: '1' };
+  const malformedZero = { ...liveRecord(501), forecastId: 'malformed:string-zero', positiveOutcome: '0' };
+  const malformedNull = { ...liveRecord(502), forecastId: 'malformed:null', positiveOutcome: null };
+  const status = buildForecastLearningStatus({ records: [...valid, malformedOne, malformedZero, malformedNull] });
+  const group = status.groups[0];
+  assert.equal(group.maturedCount, 220);
+  assert.equal(group.invalidMaturedOutcomeCount, 3);
+  assert.equal(status.maturedCount, 220);
+  assert.equal(status.invalidMaturedOutcomeCount, 3);
+  assert.equal(group.promotionGate.promotionGateEligible, false);
+  assert.ok(group.promotionGate.blockers.includes('INVALID_MATURED_BINARY_OUTCOME_RECORDS_EXCLUDED'));
 });

@@ -1,9 +1,13 @@
 import { evaluateForecastCalibration, evaluateForecastPromotionGate } from './forecast-calibration.js';
 
-export const FORECAST_LEARNING_STATUS_VERSION = '2026-08-11.1';
+export const FORECAST_LEARNING_STATUS_VERSION = '2026-08-11.2';
 
 function round(value, digits = 2) {
   return Number.isFinite(value) ? Number(value.toFixed(digits)) : null;
+}
+
+function binaryOutcome(value) {
+  return value === 0 || value === 1;
 }
 
 function liveRecords(records = []) {
@@ -13,7 +17,7 @@ function liveRecords(records = []) {
 function validMatured(records = []) {
   return liveRecords(records).filter((record) =>
     record?.status === 'MATURED' &&
-    [0, 1].includes(Number(record?.positiveOutcome)) &&
+    binaryOutcome(record?.positiveOutcome) &&
     Number.isFinite(Number(record?.rawProbabilityPositive)),
   );
 }
@@ -118,6 +122,7 @@ function learningGroup(records, options = {}) {
   const all = liveRecords(records);
   const matured = validMatured(all);
   const openCount = all.filter((record) => record?.status === 'OPEN').length;
+  const invalidMaturedOutcomeCount = all.filter((record) => record?.status === 'MATURED' && !binaryOutcome(record?.positiveOutcome)).length;
   const minimumPromotionSample = Math.max(50, Number(options.minimumPromotionSample || 200));
   const calibrationMinimumTotal = Math.max(20, Number(options.calibrationMinimumTotal || 100));
   const calibration = evaluateForecastCalibration(matured, {
@@ -133,8 +138,9 @@ function learningGroup(records, options = {}) {
   const blockers = [...new Set([
     ...promotion.blockers,
     ...stability.blockers,
+    ...(invalidMaturedOutcomeCount ? ['INVALID_MATURED_BINARY_OUTCOME_RECORDS_EXCLUDED'] : []),
   ])];
-  const promotionGateEligible = promotion.status === 'PROMOTION_ELIGIBLE' && stability.status === 'STABILITY_READY';
+  const promotionGateEligible = promotion.status === 'PROMOTION_ELIGIBLE' && stability.status === 'STABILITY_READY' && invalidMaturedOutcomeCount === 0;
   const remaining = Math.max(0, minimumPromotionSample - matured.length);
   return {
     assetClass: all[0]?.assetClass || 'UNKNOWN',
@@ -142,6 +148,7 @@ function learningGroup(records, options = {}) {
     liveOosRecordCount: all.length,
     openCount,
     maturedCount: matured.length,
+    invalidMaturedOutcomeCount,
     maturityRatePct: all.length ? round(matured.length / all.length * 100) : 0,
     minimumPromotionSample,
     remainingMaturedSamplesToPromotionFloor: remaining,
@@ -171,7 +178,8 @@ export function buildForecastLearningStatus(input = {}) {
   const groupStatuses = [...groups.values()]
     .map((group) => learningGroup(group, input.options || {}))
     .sort((a, b) => String(a.assetClass).localeCompare(String(b.assetClass)) || String(a.horizon).localeCompare(String(b.horizon)));
-  const maturedCount = records.filter((record) => record?.status === 'MATURED').length;
+  const maturedCount = groupStatuses.reduce((sum, group) => sum + group.maturedCount, 0);
+  const invalidMaturedOutcomeCount = groupStatuses.reduce((sum, group) => sum + group.invalidMaturedOutcomeCount, 0);
   const openCount = records.filter((record) => record?.status === 'OPEN').length;
   const candidateGroups = groupStatuses.filter((group) => group.promotionGate.promotionGateEligible).length;
   return {
@@ -186,6 +194,7 @@ export function buildForecastLearningStatus(input = {}) {
     liveOosRecordCount: records.length,
     openCount,
     maturedCount,
+    invalidMaturedOutcomeCount,
     groupCount: groupStatuses.length,
     promotionCandidateGroupCount: candidateGroups,
     globalBlockers: candidateGroups ? ['DECISION_ENGINE_INTEGRATION_NOT_ENABLED'] : ['NO_FORECAST_GROUP_PASSED_PROMOTION_AND_STABILITY_GATES'],

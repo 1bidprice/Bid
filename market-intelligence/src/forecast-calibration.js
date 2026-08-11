@@ -1,4 +1,4 @@
-export const FORECAST_CALIBRATION_VERSION = '2026-08-11.2';
+export const FORECAST_CALIBRATION_VERSION = '2026-08-11.3';
 
 const OOS_VALIDATION_MODES = new Set(['WALK_FORWARD_OOS', 'LIVE_SHADOW_OOS']);
 
@@ -10,18 +10,22 @@ function round(value, digits = 6) {
   return Number.isFinite(value) ? Number(value.toFixed(digits)) : null;
 }
 
+function binaryOutcome(value) {
+  return value === 0 || value === 1;
+}
+
 function validRecord(record) {
   const probability = Number(record?.rawProbabilityPositive ?? record?.probability);
-  const outcome = Number(record?.positiveOutcome ?? record?.outcome);
+  const outcome = record?.positiveOutcome ?? record?.outcome;
   return OOS_VALIDATION_MODES.has(record?.validationMode) &&
     Number.isFinite(probability) && probability >= 0 && probability <= 1 &&
-    (outcome === 0 || outcome === 1);
+    binaryOutcome(outcome);
 }
 
 function oosRecords(records = []) {
   return records.filter(validRecord).map((record) => ({
     probability: Number(record.rawProbabilityPositive ?? record.probability),
-    outcome: Number(record.positiveOutcome ?? record.outcome),
+    outcome: record.positiveOutcome ?? record.outcome,
     timestamp: record.timestamp || record.forecastAt || null,
     validationMode: record.validationMode,
   }));
