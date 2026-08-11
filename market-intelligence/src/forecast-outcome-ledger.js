@@ -2,7 +2,7 @@ import { contentHash } from './content-hash.js';
 import { normalizeHistoricalSeries } from './historical-pattern-engine.js';
 import { evaluateForecastCalibration } from './forecast-calibration.js';
 
-export const FORECAST_OUTCOME_LEDGER_VERSION = '2026-08-11.3';
+export const FORECAST_OUTCOME_LEDGER_VERSION = '2026-08-11.4';
 
 function finite(value) {
   if (value === null || value === undefined || value === '') return null;
@@ -50,6 +50,9 @@ export function createLiveShadowForecastRecords(shadowForecasts = [], researchDo
       // One live OOS sample per model/instrument/horizon/trading date. Production
       // runs several times per day; using the exact generatedAt in the identity
       // would artificially inflate calibration sample size with near-duplicates.
+      // The factor score has its own version field but intentionally does not
+      // enter this identity: adding a new research feature must not create a
+      // second OOS sample for the same underlying daily forecast.
       const identity = {
         policyVersion: shadow.policyVersion,
         historicalPatternPolicyVersion: shadow?.historicalPatternForecast?.policyVersion || null,
@@ -58,6 +61,7 @@ export function createLiveShadowForecastRecords(shadowForecasts = [], researchDo
         horizon,
         forecastSampleDate,
       };
+      const factorScore = shadow?.multiFactorResearch?.horizons?.[horizon]?.factorScore || null;
       records.push({
         format: 'investor-control-forecast-outcome-record',
         version: 1,
@@ -66,6 +70,7 @@ export function createLiveShadowForecastRecords(shadowForecasts = [], researchDo
         validationMode: 'LIVE_SHADOW_OOS',
         forecastPolicyVersion: shadow.policyVersion,
         historicalPatternPolicyVersion: shadow?.historicalPatternForecast?.policyVersion || null,
+        factorScorePolicyVersion: factorScore?.policyVersion || null,
         companyId: shadow.companyId || null,
         instrumentId: shadow.instrumentId || null,
         displayName: shadow.displayName || null,
@@ -84,6 +89,9 @@ export function createLiveShadowForecastRecords(shadowForecasts = [], researchDo
         },
         rawProbabilityPositive,
         calibratedProbabilityPositive: finite(shadow?.forecast?.horizons?.[horizon]?.probabilityPositive),
+        latentFactorScore: finite(factorScore?.latentScore),
+        rawLatentFactorScore: finite(factorScore?.rawLatentScore),
+        factorScoreStatus: factorScore?.status || null,
         expectedReturnPct: finite(forecast?.expectedReturnPct),
         distribution: forecast?.distribution || null,
         patternConfidenceScore: finite(forecast?.patternConfidenceScore),

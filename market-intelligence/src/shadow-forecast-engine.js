@@ -2,6 +2,8 @@ import { buildInstrumentProfile } from './instrument-profile.js';
 import { buildHistoricalPatternForecast } from './historical-pattern-engine.js';
 import { synthesizeForecastDrivers } from './forecast-driver-synthesis.js';
 import { buildProbabilisticForecastContract } from './probabilistic-forecast-contract.js';
+import { buildForecastFeatureVector } from './forecast-feature-vector.js';
+import { buildForecastFactorScore } from './forecast-factor-score.js';
 
 export const SHADOW_FORECAST_ENGINE_VERSION = '2026-08-11.2';
 
@@ -130,6 +132,27 @@ export function buildShadowForecasts(input = {}) {
     });
 
     const driverSynthesis = synthesizeForecastDrivers({ dossier, opportunity: opportunity || {} });
+    const multiFactorHorizons = {};
+    for (const [horizon, patternHorizon] of Object.entries(historicalPatternForecast?.horizons || {})) {
+      const featureVector = buildForecastFeatureVector({
+        instrumentId,
+        assetClass: profile.assetClass,
+        horizon,
+        driverSynthesis,
+        patternHorizon,
+      });
+      const factorScore = buildForecastFactorScore(featureVector, input.options || {});
+      multiFactorHorizons[horizon] = { featureVector, factorScore };
+    }
+    const multiFactorResearch = {
+      format: 'investor-control-multifactor-shadow-research',
+      version: 1,
+      generatedAt,
+      decisionImpact: 'NONE',
+      finalActionEligible: false,
+      horizons: multiFactorHorizons,
+    };
+
     const forecast = buildProbabilisticForecastContract({
       historicalPatternForecast,
       generatedAt,
@@ -162,6 +185,7 @@ export function buildShadowForecasts(input = {}) {
       historySource: selectedHistory.source,
       existingFinalActionSnapshot: dossier.finalAction || null,
       historicalPatternForecast,
+      multiFactorResearch,
       forecast,
       diagnostics: [...selectedHistory.diagnostics, ...(diagnostic ? [diagnostic] : [])],
     });
