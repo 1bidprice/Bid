@@ -42,13 +42,8 @@ function patchDailyRunner() {
   let source = read('src/run-daily-intelligence.js');
   source = replaceRequired(
     source,
-    `  const claimClusters = [];
-  const researchDossiers = [];
-  const documentLimit =`,
-    `  const claimClusters = [];
-  const researchDossiers = [];
-  const classificationSnapshots = [];
-  const documentLimit =`,
+    '  const documentLimit =',
+    '  const classificationSnapshots = [];\n  const documentLimit =',
     'daily classification snapshot accumulator',
   );
   source = replaceRequired(
