@@ -12,12 +12,10 @@ const firstDirectoryPage = `
 const secondDirectoryPage = `
 <table><tr><th>Issuer</th><th>ISIN Code</th><th>OASIS Code</th><th>Market</th><th>MIFID</th><th>Market Segment</th><th>Product</th><th>Product Name</th></tr>
 <tr><td>FLEXOPACK S.A.</td><td>GRS550003009</td><td>FLEXO</td><td>SECURITIES MARKET</td><td>Regulated market</td><td>MAIN MARKET</td><td>Stock</td><td>FLEXOPACK</td></tr></table>`;
-const issuerProfile = '<table><tr><th>Sector / Sub-sector</th><td>Industrials / Containers & Packaging</td></tr></table>';
 
 function fetchFixture(firstPageWithPager) {
   return async (url) => {
     const value = String(url);
-    if (value.endsWith('/market-data/issuers/463')) return { ok: true, text: async () => issuerProfile };
     if (value.includes('/market-data/issuers?letter=')) return { ok: true, text: async () => '<html></html>' };
     if (value.endsWith('/market-data/announcements')) return { ok: true, text: async () => announcements };
     if (value.includes('/trading-products/trading-issuers?letter=All&page=1')) return { ok: true, text: async () => secondDirectoryPage };
@@ -33,8 +31,9 @@ function assertResolved(result, expectedFallback) {
   assert.equal(result.companies.length, 1);
   assert.equal(result.companies[0].primaryListing.symbol, 'FLEXO');
   assert.equal(result.companies[0].identitySource, 'EURONEXT_ATHENS_TRADING_ISSUERS');
-  assert.equal(result.classificationSnapshotCount, 1);
-  assert.equal(result.classificationSnapshots[0].taxonomy, 'FTSE_RUSSELL_ICB');
+  assert.equal(result.companies[0].issuerId, null);
+  assert.equal(result.classificationSnapshotCount, 0);
+  assert.deepEqual(result.classificationSnapshots, []);
   assert.deepEqual(result.tradingDirectoryHealth, {
     publishedLastPage: expectedFallback ? 0 : 1,
     selectedLastPage: 1,
@@ -44,7 +43,8 @@ function assertResolved(result, expectedFallback) {
     complete: true,
     instrumentCount: 2,
   });
-  assert.equal(result.diagnostics.length, 0);
+  assert.equal(result.diagnostics.filter((item) => item.code === 'ATHENS_ICB_ISSUER_ID_REQUIRED').length, 1);
+  assert.equal(result.diagnostics.filter((item) => item.code !== 'ATHENS_ICB_ISSUER_ID_REQUIRED').length, 0);
 }
 
 test('escaped Athens pager links are decoded and all pages are loaded', async () => {
