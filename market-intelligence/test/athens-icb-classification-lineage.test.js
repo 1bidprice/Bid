@@ -142,7 +142,7 @@ test('Athens classification stays outside sector mutation, opportunity scoring a
   const opportunityFactors = fs.readFileSync(new URL('src/opportunity-factor-engine.js', root), 'utf8');
 
   assert.match(daily, /const classificationSnapshots = \[\.\.\.\(options\.classificationSnapshots \|\| \[\]\)\];/);
-  assert.match(autonomous, /classificationSnapshots: discovery\.classificationSnapshots \|\| \[\],/);
+  assert.match(autonomous, /classificationSnapshots: discovery\.classificationSnapshots \|\| \[\]/);
   assert.match(discovery, /classificationSnapshots: athensResult\.classificationSnapshots \|\| \[\],/);
   assert.doesNotMatch(daily, /company\.sector\s*=\s*/);
   assert.doesNotMatch(daily, /company\.industry\s*=\s*/);
