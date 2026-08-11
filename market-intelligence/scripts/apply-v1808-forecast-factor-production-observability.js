@@ -30,9 +30,9 @@ function patchAutonomousRunner() {
 
   source = replaceRequired(
     source,
-    `      finalActionCount,\n      staleOutput: false,\n    },\n    autonomousPublicationCount:`,
-    `      finalActionCount,\n      staleOutput: false,\n      ...forecastFactorOperationalTelemetry,\n    },\n    autonomousPublicationCount:`,
-    'canonical production operational-health telemetry spread',
+    `      blockedDecisionCount,\n      staleOutput: false,\n    },\n    autonomousPublicationCount:`,
+    `      blockedDecisionCount,\n      staleOutput: false,\n      ...forecastFactorOperationalTelemetry,\n    },\n    autonomousPublicationCount:`,
+    'canonical unified operational-health telemetry spread',
   );
 
   write('src/run-autonomous-intelligence.js', source);
