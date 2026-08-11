@@ -17,6 +17,8 @@ function record(index) {
   const forecastAt = new Date(Date.UTC(2025, 0, 1 + index)).toISOString();
   return {
     forecastId: `prod-safe:${index}`,
+    companyId: `company:${index % 20}`,
+    instrumentId: `instrument:${index % 20}`,
     validationMode: 'LIVE_SHADOW_OOS',
     factorFeatureVectorPolicyVersion: FORECAST_FEATURE_VECTOR_VERSION,
     factorScorePolicyVersion: FORECAST_FACTOR_SCORE_VERSION,
