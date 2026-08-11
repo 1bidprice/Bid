@@ -3,7 +3,7 @@
   "version": 1,
   "policyVersion": "2026-08-11.1",
   "ledgerPolicyVersion": "2026-08-11.6",
-  "updatedAt": "2026-08-11T17:13:26.938Z",
+  "updatedAt": "2026-08-11T18:09:56.302Z",
   "records": [
     {
       "format": "investor-control-forecast-outcome-record",
@@ -21510,14 +21510,358 @@
         "horizon": "day1",
         "forecastSampleDate": "2026-08-11"
       }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-11.6",
+      "forecastId": "forecast:9e379555e54aeba6074ba271ed44",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:sec:0001037868",
+      "instrumentId": "company:sec:0001037868",
+      "displayName": "AMETEK INC/",
+      "symbol": "AME",
+      "listing": {
+        "symbol": "AME",
+        "mic": "XNYS",
+        "exchange": "NYSE",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001037868",
+        "instrumentId": "company:sec:0001037868",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0001037868.json",
+        "sourceDocumentId": "CIK0001037868",
+        "capturedAt": "2026-08-11T18:07:54.815Z",
+        "taxonomy": "SEC_SIC",
+        "code": "3823",
+        "description": "Industrial Instruments For Measurement, Display, and Control",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "week1",
+      "tradingDays": 5,
+      "forecastSampleDate": "2026-08-11",
+      "forecastAt": "2026-08-11T18:07:54.815Z",
+      "referencePrice": {
+        "value": 255.03,
+        "timestamp": "2026-08-11T18:07:37.000Z",
+        "currency": "USD",
+        "source": "Finnhub Quote API"
+      },
+      "rawProbabilityPositive": 0.5171,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": 0.036716,
+      "rawLatentFactorScore": 0.036716,
+      "factorScoreStatus": "LATENT_SCORE_READY",
+      "factorAvailableDomainCount": 8,
+      "factorAvailableWeight": 1,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": 0.022503,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "VALUATION",
+          "value": -0.4546,
+          "weight": 0.14,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "QUALITY",
+          "value": 0,
+          "weight": 0.12,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "GROWTH",
+          "value": 0,
+          "weight": 0.1,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": 0.219433,
+          "weight": 0.16,
+          "verifiedDriverCount": 3
+        },
+        {
+          "domain": "FUNDAMENTAL",
+          "value": 0.466667,
+          "weight": 0.12,
+          "verifiedDriverCount": 3
+        },
+        {
+          "domain": "RISK",
+          "value": -0.43,
+          "weight": 0.09,
+          "verifiedDriverCount": 4
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.86,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": -0.0479,
+      "distribution": {
+        "p10ReturnPct": -4.1263,
+        "p25ReturnPct": -1.5583,
+        "medianReturnPct": 0.1565,
+        "p75ReturnPct": 1.4961,
+        "p90ReturnPct": 3.5405,
+        "downsideProbabilityPct": 48.29,
+        "bullCaseReturnPct": 3.5405,
+        "baseCaseReturnPct": 0.1565,
+        "bearCaseReturnPct": -4.1263
+      },
+      "patternConfidenceScore": 65,
+      "evidenceQualityScore": 95,
+      "regime": "BULL_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-07.1",
+        "generatedAt": "2026-08-11T18:07:54.815Z",
+        "validUntil": "2026-08-11T20:07:54.815Z",
+        "status": "FINAL",
+        "marketAction": "BUY_NOW",
+        "marketActionLabel": "ΑΜΕΣΗ ΑΓΟΡΑ",
+        "holderAction": "HOLD",
+        "holderActionLabel": "ΚΡΑΤΑ",
+        "nonHolderAction": "BUY_NOW",
+        "nonHolderActionLabel": "ΑΜΕΣΗ ΑΓΟΡΑ",
+        "urgency": "IMMEDIATE",
+        "urgencyLabel": "Άμεση ενέργεια",
+        "confidenceScore": 100,
+        "dataQualityScore": 100,
+        "reasons": [
+          "BUY_GATES_CONFIRMED"
+        ],
+        "blockers": [],
+        "freshness": {
+          "referencePriceAgeHours": 0.004948611111111111,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 28.631893055555555,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "VERIFIED_TIMESTAMP",
+          "executionFreshnessEligible": true
+        },
+        "risk": {
+          "riskScore": 20,
+          "fundamentalFlags": [],
+          "marketFlags": []
+        },
+        "controlledPlan": null,
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001037868",
+        "instrumentId": "company:sec:0001037868",
+        "horizon": "week1",
+        "forecastSampleDate": "2026-08-11"
+      }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-11.6",
+      "forecastId": "forecast:cd07c67f8c495177309ba7e4f7a6",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:sec:0001037868",
+      "instrumentId": "company:sec:0001037868",
+      "displayName": "AMETEK INC/",
+      "symbol": "AME",
+      "listing": {
+        "symbol": "AME",
+        "mic": "XNYS",
+        "exchange": "NYSE",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001037868",
+        "instrumentId": "company:sec:0001037868",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0001037868.json",
+        "sourceDocumentId": "CIK0001037868",
+        "capturedAt": "2026-08-11T18:07:54.815Z",
+        "taxonomy": "SEC_SIC",
+        "code": "3823",
+        "description": "Industrial Instruments For Measurement, Display, and Control",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "day1",
+      "tradingDays": 1,
+      "forecastSampleDate": "2026-08-11",
+      "forecastAt": "2026-08-11T18:07:54.815Z",
+      "referencePrice": {
+        "value": 255.03,
+        "timestamp": "2026-08-11T18:07:37.000Z",
+        "currency": "USD",
+        "source": "Finnhub Quote API"
+      },
+      "rawProbabilityPositive": 0.4513,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": 0.016433,
+      "rawLatentFactorScore": 0.016433,
+      "factorScoreStatus": "LATENT_SCORE_READY",
+      "factorAvailableDomainCount": 8,
+      "factorAvailableWeight": 1,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": -0.069692,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "VALUATION",
+          "value": -0.4546,
+          "weight": 0.14,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "QUALITY",
+          "value": 0,
+          "weight": 0.12,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "GROWTH",
+          "value": 0,
+          "weight": 0.1,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": 0.219433,
+          "weight": 0.16,
+          "verifiedDriverCount": 3
+        },
+        {
+          "domain": "FUNDAMENTAL",
+          "value": 0.466667,
+          "weight": 0.12,
+          "verifiedDriverCount": 3
+        },
+        {
+          "domain": "RISK",
+          "value": -0.43,
+          "weight": 0.09,
+          "verifiedDriverCount": 4
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.86,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": -0.0504,
+      "distribution": {
+        "p10ReturnPct": -1.3915,
+        "p25ReturnPct": -0.8308,
+        "medianReturnPct": -0.1285,
+        "p75ReturnPct": 0.7187,
+        "p90ReturnPct": 1.3487,
+        "downsideProbabilityPct": 54.87,
+        "bullCaseReturnPct": 1.3487,
+        "baseCaseReturnPct": -0.1285,
+        "bearCaseReturnPct": -1.3915
+      },
+      "patternConfidenceScore": 65,
+      "evidenceQualityScore": 95,
+      "regime": "BULL_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-07.1",
+        "generatedAt": "2026-08-11T18:07:54.815Z",
+        "validUntil": "2026-08-11T20:07:54.815Z",
+        "status": "FINAL",
+        "marketAction": "BUY_NOW",
+        "marketActionLabel": "ΑΜΕΣΗ ΑΓΟΡΑ",
+        "holderAction": "HOLD",
+        "holderActionLabel": "ΚΡΑΤΑ",
+        "nonHolderAction": "BUY_NOW",
+        "nonHolderActionLabel": "ΑΜΕΣΗ ΑΓΟΡΑ",
+        "urgency": "IMMEDIATE",
+        "urgencyLabel": "Άμεση ενέργεια",
+        "confidenceScore": 100,
+        "dataQualityScore": 100,
+        "reasons": [
+          "BUY_GATES_CONFIRMED"
+        ],
+        "blockers": [],
+        "freshness": {
+          "referencePriceAgeHours": 0.004948611111111111,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 28.631893055555555,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "VERIFIED_TIMESTAMP",
+          "executionFreshnessEligible": true
+        },
+        "risk": {
+          "riskScore": 20,
+          "fundamentalFlags": [],
+          "marketFlags": []
+        },
+        "controlledPlan": null,
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001037868",
+        "instrumentId": "company:sec:0001037868",
+        "horizon": "day1",
+        "forecastSampleDate": "2026-08-11"
+      }
     }
   ],
   "summary": {
     "format": "investor-control-forecast-outcome-ledger-summary",
     "version": 1,
     "policyVersion": "2026-08-11.6",
-    "recordCount": 142,
-    "openCount": 140,
+    "recordCount": 144,
+    "openCount": 142,
     "maturedCount": 2,
     "groups": [
       {
@@ -21630,7 +21974,7 @@
   },
   "evaluation": {
     "baseRecordCount": 142,
-    "incomingRecordCount": 142,
-    "mergedRecordCount": 142
+    "incomingRecordCount": 144,
+    "mergedRecordCount": 144
   }
 }
