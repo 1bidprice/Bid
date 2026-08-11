@@ -24,8 +24,15 @@ function patchAutonomousRunner() {
   source = replaceRequired(
     source,
     `  const forecastFactorWeightGovernanceStatus = buildForecastFactorWeightGovernanceStatus({\n    generatedAt,\n    records: forecastOutcomeArchive.records,\n    attributionStatus: forecastFactorAttributionStatus,\n    options,\n  });\n  if (typeof options.forecastOutcomeLedgerSink === 'function') {`,
-    `  const forecastFactorWeightGovernanceStatus = buildForecastFactorWeightGovernanceStatus({\n    generatedAt,\n    records: forecastOutcomeArchive.records,\n    attributionStatus: forecastFactorAttributionStatus,\n    options,\n  });\n  const forecastFactorOperationalTelemetry = buildForecastFactorOperationalTelemetry({\n    forecastFactorLearningStatus,\n    forecastFactorAttributionStatus,\n    forecastFactorWeightGovernanceStatus,\n  });\n  baseReport.operationalHealth = {\n    ...(baseReport.operationalHealth || {}),\n    ...forecastFactorOperationalTelemetry,\n  };\n  if (typeof options.forecastOutcomeLedgerSink === 'function') {`,
-    'canonical base-report factor telemetry after governance',
+    `  const forecastFactorWeightGovernanceStatus = buildForecastFactorWeightGovernanceStatus({\n    generatedAt,\n    records: forecastOutcomeArchive.records,\n    attributionStatus: forecastFactorAttributionStatus,\n    options,\n  });\n  const forecastFactorOperationalTelemetry = buildForecastFactorOperationalTelemetry({\n    forecastFactorLearningStatus,\n    forecastFactorAttributionStatus,\n    forecastFactorWeightGovernanceStatus,\n  });\n  if (typeof options.forecastOutcomeLedgerSink === 'function') {`,
+    'factor production telemetry after governance',
+  );
+
+  source = replaceRequired(
+    source,
+    `      finalActionCount,\n      staleOutput: false,\n    },\n    autonomousPublicationCount:`,
+    `      finalActionCount,\n      staleOutput: false,\n      ...forecastFactorOperationalTelemetry,\n    },\n    autonomousPublicationCount:`,
+    'canonical production operational-health telemetry spread',
   );
 
   write('src/run-autonomous-intelligence.js', source);

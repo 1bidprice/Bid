@@ -14,15 +14,14 @@ test('v1.8 runtime publishes compact factor observability and production verifie
   assert.match(source, /forecastFactorLearningStatus,/);
   assert.match(source, /forecastFactorAttributionStatus,/);
   assert.match(source, /forecastFactorWeightGovernanceStatus,/);
-  assert.match(source, /baseReport\.operationalHealth = \{\s*\.\.\.\(baseReport\.operationalHealth \|\| \{\}\),\s*\.\.\.forecastFactorOperationalTelemetry,/s);
+  assert.match(source, /operationalHealth:\s*\{[\s\S]*?staleOutput:\s*false,[\s\S]*?\.\.\.forecastFactorOperationalTelemetry,[\s\S]*?\},\s*autonomousPublicationCount:/);
 
   const governanceIndex = source.indexOf('const forecastFactorWeightGovernanceStatus = buildForecastFactorWeightGovernanceStatus');
   const telemetryIndex = source.indexOf('const forecastFactorOperationalTelemetry = buildForecastFactorOperationalTelemetry');
-  const mutationIndex = source.indexOf('baseReport.operationalHealth = {');
+  const healthTelemetryIndex = source.indexOf('...forecastFactorOperationalTelemetry,');
   const finalReturnIndex = source.indexOf('  return {\n    ...baseReport,');
   assert.ok(governanceIndex >= 0 && telemetryIndex > governanceIndex);
-  assert.ok(mutationIndex > telemetryIndex);
-  assert.ok(finalReturnIndex > mutationIndex);
+  assert.ok(finalReturnIndex >= 0 && healthTelemetryIndex > finalReturnIndex);
 
   assert.match(verifier, /import \{ verifyForecastFactorProductionSafety \} from '\.\.\/src\/forecast-factor-production-safety\.js';/);
   assert.match(verifier, /verifyForecastFactorProductionSafety\(report\);/);
@@ -35,12 +34,12 @@ test('v1.8 runtime publishes compact factor observability and production verifie
   assert.equal(new Set(manifest.buildPatches).size, 56);
 });
 
-test('v1.8 factor telemetry is canonicalized on baseReport before final spread and never emitted as a duplicate return-level field', () => {
+test('v1.8 factor telemetry is written by the single canonical production operationalHealth object', () => {
   const source = fs.readFileSync(new URL('src/run-autonomous-intelligence.js', root), 'utf8');
-  const mutation = 'baseReport.operationalHealth = {';
-  const finalSpread = '  return {\n    ...baseReport,';
-  assert.ok(source.includes(mutation));
-  assert.ok(source.includes(finalSpread));
-  assert.ok(source.indexOf(mutation) < source.indexOf(finalSpread));
-  assert.doesNotMatch(source, /forecastFactorWeightGovernanceStatus,\s*operationalHealth:\s*\{/s);
+  const matches = source.match(/operationalHealth:\s*\{/g) || [];
+  assert.equal(matches.length, 1);
+  assert.doesNotMatch(source, /baseReport\.operationalHealth\s*=/);
+  const block = source.match(/operationalHealth:\s*\{([\s\S]*?)\n\s*\},\n\s*autonomousPublicationCount:/)?.[1] || '';
+  assert.ok(block.includes('staleOutput: false'));
+  assert.ok(block.includes('...forecastFactorOperationalTelemetry'));
 });
