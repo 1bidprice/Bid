@@ -2,7 +2,7 @@ import { contentHash } from './content-hash.js';
 import { normalizeHistoricalSeries } from './historical-pattern-engine.js';
 import { evaluateForecastCalibration } from './forecast-calibration.js';
 
-export const FORECAST_OUTCOME_LEDGER_VERSION = '2026-08-11.1';
+export const FORECAST_OUTCOME_LEDGER_VERSION = '2026-08-11.2';
 
 function finite(value) {
   if (value === null || value === undefined || value === '') return null;
@@ -18,6 +18,11 @@ function dossierMap(dossiers = []) {
   return new Map((Array.isArray(dossiers) ? dossiers : []).filter((item) => item?.companyId).map((item) => [item.companyId, item]));
 }
 
+function isoDate(value) {
+  const date = new Date(value || 0);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+}
+
 export function createLiveShadowForecastRecords(shadowForecasts = [], researchDossiers = [], options = {}) {
   const dossiers = dossierMap(researchDossiers);
   const records = [];
@@ -26,20 +31,23 @@ export function createLiveShadowForecastRecords(shadowForecasts = [], researchDo
     const dossier = dossiers.get(shadow.companyId) || null;
     const referenceValue = finite(dossier?.referencePrice?.value);
     const referenceTimestamp = dossier?.referencePrice?.timestamp || shadow?.historicalPatternForecast?.asOf || shadow?.generatedAt || null;
-    if (referenceValue === null || referenceValue <= 0 || !referenceTimestamp) continue;
+    const forecastSampleDate = isoDate(referenceTimestamp || shadow?.generatedAt);
+    if (referenceValue === null || referenceValue <= 0 || !referenceTimestamp || !forecastSampleDate) continue;
 
     for (const [horizon, forecast] of Object.entries(shadow?.historicalPatternForecast?.horizons || {})) {
       const rawProbabilityPositive = finite(forecast?.rawProbabilityPositive);
       const tradingDays = Math.max(0, Number(forecast?.tradingDays || 0));
       if (rawProbabilityPositive === null || rawProbabilityPositive < 0 || rawProbabilityPositive > 1 || tradingDays <= 0) continue;
+      // One live OOS sample per model/instrument/horizon/trading date. Production
+      // runs several times per day; using the exact generatedAt in the identity
+      // would artificially inflate calibration sample size with near-duplicates.
       const identity = {
         policyVersion: shadow.policyVersion,
         historicalPatternPolicyVersion: shadow?.historicalPatternForecast?.policyVersion || null,
         companyId: shadow.companyId,
         instrumentId: shadow.instrumentId,
         horizon,
-        generatedAt: shadow.generatedAt,
-        referenceTimestamp,
+        forecastSampleDate,
       };
       records.push({
         format: 'investor-control-forecast-outcome-record',
@@ -56,6 +64,7 @@ export function createLiveShadowForecastRecords(shadowForecasts = [], researchDo
         assetClass: shadow.assetClass || 'UNKNOWN',
         horizon,
         tradingDays,
+        forecastSampleDate,
         forecastAt: shadow.generatedAt,
         referencePrice: {
           value: referenceValue,
