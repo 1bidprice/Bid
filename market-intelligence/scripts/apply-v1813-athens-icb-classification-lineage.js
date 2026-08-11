@@ -60,6 +60,44 @@ function patchDailyRunner() {
   write('src/run-daily-intelligence.js', source);
 }
 
+function patchAthensTestFixture() {
+  const relativePath = 'test/euronext-athens-discovery.test.js';
+  if (!fs.existsSync(path.join(root, relativePath))) return;
+  let source = read(relativePath);
+  source = replaceRequired(source, `const searchAndro = \`
+  <div class="result"><a href="/en/market-data/issuers/410">ALPHA TRUST ANDROMEDA SA</a><a href="/en/market-data/instruments/stocks/ANDRO">ANDRO</a></div>
+\`;
+`, `const searchAndro = \`
+  <div class="result"><a href="/en/market-data/issuers/410">ALPHA TRUST ANDROMEDA SA</a><a href="/en/market-data/instruments/stocks/ANDRO">ANDRO</a></div>
+\`;
+
+const profileQuest = \`
+  <table><tr><th>Sector / Sub-sector</th><td>Technology / Computer Services</td></tr></table>
+\`;
+
+const profileAndro = \`
+  <table><tr><th>Sector / Sub-sector</th><td>Financials / Closed End Investments</td></tr></table>
+\`;
+`, 'Athens classification profile fixtures');
+  source = replaceRequired(source, `    if (value.includes('/trading-products/trading-issuers')) throw new Error('directory unavailable in unit fixture');
+    if (value.includes('QUEST HOLDINGS')) return { ok: true, text: async () => searchQuest };
+    if (value.includes('ALPHA TRUST ANDROMEDA')) return { ok: true, text: async () => searchAndro };`, `    if (value.includes('/trading-products/trading-issuers')) throw new Error('directory unavailable in unit fixture');
+    if (value.endsWith('/market-data/issuers/623')) return { ok: true, text: async () => profileQuest };
+    if (value.endsWith('/market-data/issuers/410')) return { ok: true, text: async () => profileAndro };
+    if (value.includes('QUEST HOLDINGS')) return { ok: true, text: async () => searchQuest };
+    if (value.includes('ALPHA TRUST ANDROMEDA')) return { ok: true, text: async () => searchAndro };`, 'Athens profile fetch fixtures');
+  source = replaceRequired(source, '  assert.equal(result.version, 6);', '  assert.equal(result.version, 7);', 'Athens discovery fixture version');
+  source = replaceRequired(source, `  assert.equal(result.companies.find((item) => item.taxonomyTermId === '549').primaryListing.symbol, 'ANDRO');
+  const unexpectedDiagnostics`, `  assert.equal(result.companies.find((item) => item.taxonomyTermId === '549').primaryListing.symbol, 'ANDRO');
+  assert.equal(result.classificationSnapshotCount, 2);
+  assert.equal(result.classificationSnapshots.length, 2);
+  assert.equal(result.classificationSnapshots.find((item) => item.companyId === 'company:xath:term-340').taxonomy, 'FTSE_RUSSELL_ICB');
+  assert.equal(result.classificationSnapshots.find((item) => item.companyId === 'company:xath:term-340').sector, 'Technology');
+  assert.equal(result.classificationSnapshots.find((item) => item.companyId === 'company:xath:term-549').subSector, 'Closed End Investments');
+  const unexpectedDiagnostics`, 'Athens classification fixture assertions');
+  write(relativePath, source);
+}
+
 function patchManifestAssertions() {
   let source = read('test/v180-factor-production-observability-runtime.test.js');
   source = replaceRequired(source, `  assert.ok(manifest.testPatches.includes('apply-v1811-oos-instrument-concentration.js'));
@@ -80,5 +118,6 @@ patchAthensDiscovery();
 patchAutonomousDiscovery();
 patchAutonomousRunner();
 patchDailyRunner();
+patchAthensTestFixture();
 patchManifestAssertions();
 console.log('Investor Control v1.8.0 Athens canonical ICB classification lineage applied.');
