@@ -15,10 +15,32 @@ import {
 import { FORECAST_FACTOR_SCORE_VERSION } from '../src/forecast-factor-score.js';
 
 const LEVELS = [-0.9, -0.6, -0.3, 0.3, 0.6, 0.9];
+const SIC_MAJOR_GROUPS = ['10', '20', '30', '40', '50', '60'];
 const DAY_MS = 86_400_000;
 
 function timestamp(dayIndex, spacingDays = 1) {
   return new Date(Date.UTC(2024, 0, 1) + dayIndex * spacingDays * DAY_MS).toISOString();
+}
+
+function classificationSnapshot(index, companyId, instrumentId, forecastAt) {
+  const majorGroup = SIC_MAJOR_GROUPS[index % SIC_MAJOR_GROUPS.length];
+  const code = `${majorGroup}00`;
+  const cik = String((index % 20) + 1).padStart(10, '0');
+  return {
+    contract: 'FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1',
+    policyVersion: '2026-08-11.1',
+    companyId,
+    instrumentId,
+    sourceAuthority: 'SEC_EDGAR_SUBMISSIONS',
+    sourceUrl: `https://data.sec.gov/submissions/CIK${cik}.json`,
+    sourceDocumentId: `CIK${cik}`,
+    capturedAt: forecastAt,
+    taxonomy: 'SEC_SIC',
+    code,
+    description: `Synthetic SIC ${code}`,
+    inferenceUsed: false,
+    decisionImpact: 'NONE',
+  };
 }
 
 function windowRecord(index, options = {}) {
@@ -27,10 +49,12 @@ function windowRecord(index, options = {}) {
   const tradingDays = options.tradingDays ?? 21;
   const start = timestamp(dateIndex, spacingDays);
   const end = new Date(new Date(start).getTime() + tradingDays * DAY_MS).toISOString();
+  const companyId = `company:${index % (options.instrumentCount || 20)}`;
+  const instrumentId = `instrument:${index % (options.instrumentCount || 20)}`;
   return {
     forecastId: `window:${index}`,
-    companyId: `company:${index % (options.instrumentCount || 20)}`,
-    instrumentId: `instrument:${index % (options.instrumentCount || 20)}`,
+    companyId,
+    instrumentId,
     validationMode: 'LIVE_SHADOW_OOS',
     assetClass: 'EQUITY',
     horizon: options.horizon || 'month1',
@@ -53,6 +77,7 @@ function researchRecord(index, options = {}) {
   const positive = value > 0;
   return {
     ...base,
+    classificationSnapshot: classificationSnapshot(index, base.companyId, base.instrumentId, base.forecastAt),
     factorFeatureVectorPolicyVersion: options.currentLineage === false ? 'fv-test' : FORECAST_FEATURE_VECTOR_VERSION,
     factorScorePolicyVersion: options.currentLineage === false ? 'score-test' : FORECAST_FACTOR_SCORE_VERSION,
     factorScoreStatus: 'LATENT_SCORE_READY',
