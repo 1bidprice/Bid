@@ -15,7 +15,29 @@ import {
 import { FORECAST_FACTOR_SCORE_VERSION } from '../src/forecast-factor-score.js';
 
 const LEVELS = [-0.9, -0.6, -0.3, 0.3, 0.6, 0.9];
+const SIC_MAJOR_GROUPS = ['10', '20', '30', '40', '50', '60'];
 const DAY_MS = 86_400_000;
+
+function classificationSnapshot(index, companyId, instrumentId, forecastAt) {
+  const majorGroup = SIC_MAJOR_GROUPS[index % SIC_MAJOR_GROUPS.length];
+  const code = `${majorGroup}00`;
+  const cik = String((index % 20) + 1).padStart(10, '0');
+  return {
+    contract: 'FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1',
+    policyVersion: '2026-08-11.1',
+    companyId,
+    instrumentId,
+    sourceAuthority: 'SEC_EDGAR_SUBMISSIONS',
+    sourceUrl: `https://data.sec.gov/submissions/CIK${cik}.json`,
+    sourceDocumentId: `CIK${cik}`,
+    capturedAt: forecastAt,
+    taxonomy: 'SEC_SIC',
+    code,
+    description: `Synthetic SIC ${code}`,
+    inferenceUsed: false,
+    decisionImpact: 'NONE',
+  };
+}
 
 function instrumentForLearningCluster(index) {
   if (index < 60) return 0;
@@ -40,6 +62,8 @@ function syntheticRecord(index, options = {}) {
   const forecastAt = new Date(Date.UTC(2000, 0, 1) + index * spacingDays * DAY_MS).toISOString();
   const outcomeAt = new Date(new Date(forecastAt).getTime() + tradingDays * DAY_MS).toISOString();
   const instrumentIndex = options.instrumentIndex ?? (index % (options.instrumentCount || 20));
+  const companyId = `company:${instrumentIndex}`;
+  const instrumentId = `instrument:${instrumentIndex}`;
   return {
     forecastId: `instrument-concentration:${index}`,
     validationMode: 'LIVE_SHADOW_OOS',
@@ -54,8 +78,9 @@ function syntheticRecord(index, options = {}) {
       weight: FORECAST_FACTOR_DOMAIN_WEIGHTS.MOMENTUM,
       verifiedDriverCount: 1,
     }],
-    companyId: `company:${instrumentIndex}`,
-    instrumentId: `instrument:${instrumentIndex}`,
+    companyId,
+    instrumentId,
+    classificationSnapshot: classificationSnapshot(index, companyId, instrumentId, forecastAt),
     assetClass: 'EQUITY',
     horizon: 'month1',
     tradingDays,
