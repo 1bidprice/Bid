@@ -98,7 +98,7 @@ Locked rules:
 - acquisition is bounded and prioritises final/recommendation-ready dossiers rather than crawling the entire universe;
 - no hardcoded company-specific provider identities are used.
 
-Production evidence exposed a real data constraint: the first live cohort had Yahoo as its recent canonical historical source for all eight long-history candidates. The independent-source rule therefore correctly rejected all eight instead of allowing Yahoo to validate Yahoo. Live telemetry recorded `longHistoryResearchReadyCount: 0` and `longHistoryResearchRejectedCount: 8`. This is a safety success, not a reason to weaken the gate. A second lawful and independently validated history source remains required to unlock serious multi-year pattern learning for those instruments.
+Production evidence exposed a real data constraint: the first live cohort had Yahoo as its recent canonical historical source for all eight long-history candidates. The independent-source rule therefore correctly rejected all eight instead of allowing Yahoo to validate Yahoo. Live telemetry recorded `longHistoryResearchReadyCount: 0` and `longHistoryResearchRejectedCount: 8`. This is a safety success, not a reason to weaken the gate.
 
 ### Persistent LIVE_SHADOW_OOS Forecast Outcome Archive
 
@@ -141,7 +141,7 @@ First live archive state after production activation:
 
 ### Due-Outcome Maturation Backstop
 
-Implemented in current source commit:
+Implemented in commit:
 
 - `43c7dbfd9ca180dd4f662dd515cfee4916b4f81b` — backfill due forecast outcome history.
 
@@ -158,19 +158,80 @@ The maturation backstop therefore:
 - supplements market history only for outcome measurement and has `finalActionImpact: NONE`;
 - leaves the forecast OPEN when a validated future market observation still does not exist.
 
-New live forecast records now retain an immutable listing snapshot (`symbol`, `MIC`, `exchange`, `currency`) specifically so they can be evaluated months later without relying on today's discovery cohort.
+New live forecast records retain an immutable listing snapshot (`symbol`, `MIC`, `exchange`, `currency`) specifically so they can be evaluated months later without relying on today's discovery cohort.
+
+### Forecast Learning Status
+
+Implemented in commit:
+
+- `f3ae57f3d0055c82591035b8456fb382f6f83c6f` — expose live forecast learning status.
+
+This contract is intentionally stricter than a simple sample-count threshold. Per asset class and horizon it reports:
+
+- total live OOS records, OPEN records and MATURED records;
+- maturity rate;
+- progress toward the default promotion floor of 200 matured samples;
+- Brier score, log loss, expected calibration error, base-rate benchmark and skill versus base rate;
+- chronological temporal-stability diagnostics;
+- explicit promotion blockers.
+
+Stability defaults to three contiguous chronological subperiods, at least 40 matured observations per subperiod and at least 150 matured observations overall before stability can be assessed. Each subperiod must preserve non-negative probabilistic skill versus the base rate and stay inside the bounded subperiod calibration-error threshold.
+
+The ordinary promotion gate still requires at least 200 matured live OOS observations, at least 5% probabilistic skill versus the base-rate Brier score and expected calibration error no greater than 0.08. Passing those metrics is still not enough by itself: temporal stability must also pass.
+
+Even after every statistical gate passes, the group can become only `PROMOTION_CANDIDATE`. The contract remains hard-coded to `decisionIntegrationEnabled:false` and `forecastMayInfluenceFinalAction:false`. Live learning therefore cannot silently grant itself BUY/SELL authority.
+
+Verification:
+
+- workflow run `31453370894`;
+- deterministic suite: **256/256 PASS, 0 FAIL**;
+- runtime migration chain: **53 unique patches**.
+
+### Independent US History Overlap Witness
+
+Implemented in commit:
+
+- `a1ac9ef00c4a221c8b711e9d40513e2da9ac8cc0` — add independent US history overlap witness.
+
+The purpose of this layer is narrow: break the Yahoo-self-validation deadlock for eligible US instruments without making a second provider a new source of truth.
+
+The current implementation uses Twelve Data only as an optional recent daily overlap witness for US listings. It is not a canonical quote provider, not a final-action input and not execution-grade data.
+
+Locked rules:
+
+- the witness is US-only in the current implementation;
+- it is normalized as `SECONDARY_UNVALIDATED`, `researchOnly:true`, `decisionEligible:false`, `executionEligible:false`;
+- only raw daily close is used for the overlap witness;
+- the witness must independently agree with the recent Yahoo series under the existing long-history return/scale cross-check before Yahoo `range=max` history is even requested;
+- if the witness is missing, rate-limited, malformed, too short or materially disagrees with Yahoo, long-history remains blocked;
+- non-US Yahoo history remains blocked rather than being forced through a US-only witness;
+- no hardcoded company-specific symbols are introduced;
+- acquisition remains bounded;
+- the API key is accepted only from runtime secret/configuration and is never written into the sanitized `sourceUrl`, diagnostics, report, archive or live status;
+- provider or exception messages are redacted defensively before diagnostics are persisted;
+- if no API key is configured, zero witness network calls are performed and the prior fail-closed behaviour remains intact.
+
+Verification:
+
+- workflow run `31453705867`;
+- deterministic suite: **263/263 PASS, 0 FAIL**;
+- all schemas parsed successfully;
+- source governor, canonical quote contract and feed registry verification passed;
+- runtime migration chain remains **53 unique patches**, because the provider is consumed by the already-installed long-history collector contract and required no additional migration patch.
+
+Production wiring for the optional secret and witness telemetry was added on `main` in commit `de3eb249552358a9528490ebc00f029a15cdd98d`. That workflow change does not prove the provider is configured or live by itself; production activation is considered verified only after the triggered production run completes and the remote live-feed telemetry is re-read.
 
 ### Current deterministic verification
 
-Current source branch: `investor-control-v1-market-intelligence-foundation`
+Current source branch: `investor-control-v1-market-intelligence-foundation`.
 
-Current source head before this documentation-only checkpoint: `43c7dbfd9ca180dd4f662dd515cfee4916b4f81b`.
+Current implementation head before this documentation-only checkpoint: `a1ac9ef00c4a221c8b711e9d40513e2da9ac8cc0`.
 
 Runtime release: **v1.8.0**.
 
-Runtime migration chain: **52 unique patches**.
+Runtime migration chain: **53 unique patches**.
 
-Market Intelligence deterministic suite: **250/250 PASS, 0 FAIL** on workflow run `31453073707`.
+Market Intelligence deterministic suite: **263/263 PASS, 0 FAIL** on workflow run `31453705867`.
 
 All JSON schemas parsed successfully. Source governor, canonical quote contract and feed registry verification also passed.
 
@@ -192,18 +253,22 @@ PR #14 remained **Draft / unmerged**.
 
 The existing short/recent market-history path is sufficient for ordinary market metrics but is not enough to claim serious multi-year historical-pattern learning on its own.
 
-The Yahoo Chart adapter can provide adjusted multi-year history and is classified as `SECONDARY_VALIDATED`, but multi-year research use is accepted only when overlapping recent observations are independently cross-checked. The production cohort demonstrated that the current recent-history fallback can itself be Yahoo, in which case the long-history collector must reject Yahoo self-validation.
+Yahoo can provide adjusted multi-year research history, but it is accepted only when overlapping recent observations are independently cross-checked. The optional Twelve Data witness can now provide that independence for eligible US instruments when a runtime API key is configured and the cross-check passes.
 
-This independent-source requirement is intentionally stricter than ordinary research availability. A secondary provider must never silently become execution-grade evidence, and an unverified second endpoint from the same provider must not be counted as independent corroboration.
+This does not solve non-US coverage. Athens and other non-US Yahoo-fallback histories remain blocked from multi-year pattern learning until a lawful, independent and operationally reliable overlap source exists for those markets.
+
+The independent-source requirement remains intentionally stricter than ordinary research availability. A secondary provider must never silently become execution-grade evidence, and an unverified second endpoint from the same provider must not be counted as independent corroboration.
 
 ## Next engineering target
 
-1. Preserve the independent-source gate and add/enable a lawful independent recent-history source where economically and operationally justified.
-2. Keep accumulating daily `LIVE_SHADOW_OOS` samples without correlated intraday duplication.
-3. Let the maturation backstop convert due records to MATURED only from validated future market observations.
-4. Expose an explicit forecast-learning-status contract by asset class and horizon: target OOS sample, matured count, Brier score, calibration error, skill versus base rate, stability and promotion blockers.
-5. Keep forecast influence on final action disabled while OOS sample/skill/calibration gates remain unmet.
-6. Only after sufficient OOS evidence exists, permit a calibrated forecast to become one bounded input to the existing evidence/risk/liquidity/execution decision system.
+1. Verify the production run triggered by the optional Twelve Data secret wiring and read the remote overlap telemetry; do not infer that a secret exists merely because the workflow accepts it.
+2. If the secret is absent, keep production fail-closed and configure it only through repository secrets rather than code or files.
+3. If the witness is active, measure actual overlap pass/fail rates before expanding provider usage or request volume.
+4. Keep accumulating one daily `LIVE_SHADOW_OOS` sample per model/instrument/horizon/trading date.
+5. Let the maturation backstop convert due records to MATURED only from validated future market observations.
+6. Maintain learning-status promotion blockers until live sample, calibration, skill and temporal-stability gates all pass.
+7. Keep forecast influence on final action disabled even for a `PROMOTION_CANDIDATE` until a separate reviewed decision-engine integration is designed and tested.
+8. Add a lawful independent overlap path for Athens/non-US only if it preserves the same fail-closed provenance and independence guarantees.
 
 ## Non-negotiable invariants
 
@@ -214,6 +279,8 @@ This independent-source requirement is intentionally stricter than ordinary rese
 - no uncalibrated historical hit rate presented as final probability;
 - no correlated intraday forecast duplication used to inflate OOS sample size;
 - no same-provider self-validation counted as independent history corroboration;
+- no API secret serialized into source URLs, diagnostics, reports, archives or live status;
+- no unvalidated secondary witness promoted to canonical or execution-grade market data;
 - no hidden contradictions or fabricated missing data;
 - no forecast may bypass evidence, risk, liquidity or execution gates;
 - no automatic broker order.
