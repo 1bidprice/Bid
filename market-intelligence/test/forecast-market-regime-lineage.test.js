@@ -93,8 +93,8 @@ function shadow(forecastAt, marketRegimeSnapshot = undefined) {
   };
 }
 
-function recordsFor(regime = undefined) {
-  const forecastAt = regime?.capturedAt || regimeSnapshot().capturedAt;
+function recordsFor(regime = undefined, forecastAtOverride = null) {
+  const forecastAt = forecastAtOverride || regime?.capturedAt || regimeSnapshot().capturedAt;
   return createLiveShadowForecastRecords([shadow(forecastAt, regime)], [dossier(forecastAt)]);
 }
 
@@ -148,7 +148,7 @@ test('NOT_READY or tampered regime metadata is not persisted into new OOS record
   const notReady = { ...valid, status: 'REGIME_NOT_READY', regimeKey: null, riskTone: null };
   const future = { ...valid, capturedAt: new Date(new Date(valid.capturedAt).getTime() + DAY_SECONDS * 1000).toISOString() };
   assert.equal(Object.prototype.hasOwnProperty.call(recordsFor(notReady)[0], 'marketRegimeSnapshot'), false);
-  assert.equal(Object.prototype.hasOwnProperty.call(recordsFor(future)[0], 'marketRegimeSnapshot'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(recordsFor(future, valid.capturedAt)[0], 'marketRegimeSnapshot'), false);
 });
 
 test('legacy forecast identity without regime cannot be backfilled during maturation merge', () => {
