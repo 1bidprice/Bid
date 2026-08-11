@@ -2,12 +2,12 @@ import { contentHash } from './content-hash.js';
 import { normalizeHistoricalSeries } from './historical-pattern-engine.js';
 import { evaluateForecastCalibration } from './forecast-calibration.js';
 
-export const FORECAST_OUTCOME_LEDGER_VERSION = '2026-08-11.2';
+export const FORECAST_OUTCOME_LEDGER_VERSION = '2026-08-11.3';
 
 function finite(value) {
   if (value === null || value === undefined || value === '') return null;
   const number = Number(value);
-  return Number.isFinite(number) ? number : null;
+  return Number.isFinite(value) ? number : null;
 }
 
 function round(value, digits = 4) {
@@ -21,6 +21,15 @@ function dossierMap(dossiers = []) {
 function isoDate(value) {
   const date = new Date(value || 0);
   return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+}
+
+function immutableListingSnapshot(dossier = {}, shadow = {}) {
+  const listing = dossier?.listing || {};
+  const symbol = listing.symbol || shadow.symbol || null;
+  const mic = listing.mic || null;
+  const exchange = listing.exchange || null;
+  const currency = listing.currency || dossier?.referencePrice?.currency || null;
+  return symbol ? { symbol, mic, exchange, currency } : null;
 }
 
 export function createLiveShadowForecastRecords(shadowForecasts = [], researchDossiers = [], options = {}) {
@@ -61,6 +70,7 @@ export function createLiveShadowForecastRecords(shadowForecasts = [], researchDo
         instrumentId: shadow.instrumentId || null,
         displayName: shadow.displayName || null,
         symbol: shadow.symbol || null,
+        listing: immutableListingSnapshot(dossier, shadow),
         assetClass: shadow.assetClass || 'UNKNOWN',
         horizon,
         tradingDays,
