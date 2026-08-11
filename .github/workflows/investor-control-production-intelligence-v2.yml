@@ -57,6 +57,7 @@ jobs:
         env:
           SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
           FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+          TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
           FORECAST_OUTCOME_LEDGER_PATH: ../../live-feed/forecast-outcome-ledger.json
           FORECAST_OUTCOME_LEDGER_OUTPUT: out/forecast-outcome-ledger.json
         run: |
@@ -145,6 +146,13 @@ jobs:
             forecastOutcomeMaturedCount:Number(forecastSummary.maturedCount || 0),
             longHistoryResearchReadyCount:Number(report.longHistoryResearchSummary?.readyCount || 0),
             longHistoryResearchRejectedCount:Number(report.longHistoryResearchSummary?.rejectedCount || 0),
+            independentHistoryOverlapAttemptedCount:Number(report.longHistoryResearchSummary?.independentOverlapAttemptedCount || 0),
+            independentHistoryOverlapReadyCount:Number(report.longHistoryResearchSummary?.independentOverlapReadyCount || 0),
+            independentHistoryOverlapRejectedCount:Number(report.longHistoryResearchSummary?.independentOverlapRejectedCount || 0),
+            forecastLearningLiveOosRecordCount:Number(report.forecastLearningStatus?.liveOosRecordCount || 0),
+            forecastLearningOpenCount:Number(report.forecastLearningStatus?.openCount || 0),
+            forecastLearningMaturedCount:Number(report.forecastLearningStatus?.maturedCount || 0),
+            forecastLearningPromotionCandidateGroupCount:Number(report.forecastLearningStatus?.promotionCandidateGroupCount || 0),
           };
           const status = {
             format:'investor-control-live-feed-status', version:8,
@@ -156,6 +164,7 @@ jobs:
             runtimeReleaseVersion:release,
             publisherContract:'TRANSACTIONAL_V2_SINGLE_WRITER',
             forecastArchiveContract:'DAILY_OOS_TRANSACTIONAL_V1',
+            forecastLearningContract:'LIVE_SHADOW_OOS_RESEARCH_ONLY_V1',
             feedSha256:crypto.createHash('sha256').update(fs.readFileSync('./live-feed/mobile-intelligence-feed.json')).digest('hex'),
             forecastArchiveSha256:crypto.createHash('sha256').update(fs.readFileSync('./live-feed/forecast-outcome-ledger.json')).digest('hex'),
             operationalHealth:{
@@ -266,6 +275,7 @@ jobs:
           if (String(status.sourceWorkflowRunId) !== String(process.env.GITHUB_RUN_ID)) throw new Error('remote status belongs to a different workflow run');
           if (status.publisherContract !== 'TRANSACTIONAL_V2_SINGLE_WRITER') throw new Error('single-writer transactional publisher marker missing');
           if (status.forecastArchiveContract !== 'DAILY_OOS_TRANSACTIONAL_V1') throw new Error('forecast archive transactional contract missing');
+          if (status.forecastLearningContract !== 'LIVE_SHADOW_OOS_RESEARCH_ONLY_V1') throw new Error('forecast learning research-only contract missing');
           if (status.generatedAt !== report.generatedAt) throw new Error('remote status/report generation mismatch');
           if (status.operationalHealth?.staleOutput !== false) throw new Error('remote feed incorrectly marked stale');
           if (Number(status.sourceHealth?.marketScreenScorableCount || 0) !== Number(broad.marketScreenScorableCount || 0)) throw new Error('remote market-screen telemetry mismatch');
@@ -273,6 +283,11 @@ jobs:
           if (Number(status.sourceHealth?.forecastOutcomeRecordCount || 0) !== Number(forecastSummary.recordCount || 0)) throw new Error('remote forecast record telemetry mismatch');
           if (Number(status.sourceHealth?.forecastOutcomeOpenCount || 0) !== Number(forecastSummary.openCount || 0)) throw new Error('remote forecast open telemetry mismatch');
           if (Number(status.sourceHealth?.forecastOutcomeMaturedCount || 0) !== Number(forecastSummary.maturedCount || 0)) throw new Error('remote forecast matured telemetry mismatch');
+          if (Number(status.sourceHealth?.independentHistoryOverlapAttemptedCount || 0) !== Number(report.longHistoryResearchSummary?.independentOverlapAttemptedCount || 0)) throw new Error('remote independent-overlap attempted telemetry mismatch');
+          if (Number(status.sourceHealth?.independentHistoryOverlapReadyCount || 0) !== Number(report.longHistoryResearchSummary?.independentOverlapReadyCount || 0)) throw new Error('remote independent-overlap ready telemetry mismatch');
+          if (Number(status.sourceHealth?.independentHistoryOverlapRejectedCount || 0) !== Number(report.longHistoryResearchSummary?.independentOverlapRejectedCount || 0)) throw new Error('remote independent-overlap rejected telemetry mismatch');
+          if (Number(status.sourceHealth?.forecastLearningMaturedCount || 0) !== Number(report.forecastLearningStatus?.maturedCount || 0)) throw new Error('remote forecast-learning matured telemetry mismatch');
+          if (report.forecastLearningStatus?.decisionIntegrationEnabled !== false || report.forecastLearningStatus?.forecastMayInfluenceFinalAction !== false) throw new Error('forecast learning decision isolation violated');
           console.log(JSON.stringify({
             remotePublication:'VERIFIED',
             sourceWorkflowRunId:status.sourceWorkflowRunId,
@@ -280,10 +295,15 @@ jobs:
             runtimeReleaseVersion:status.runtimeReleaseVersion,
             publisherContract:status.publisherContract,
             forecastArchiveContract:status.forecastArchiveContract,
+            forecastLearningContract:status.forecastLearningContract,
             forecastOutcomeRecordCount:status.sourceHealth?.forecastOutcomeRecordCount || 0,
             forecastOutcomeOpenCount:status.sourceHealth?.forecastOutcomeOpenCount || 0,
             forecastOutcomeMaturedCount:status.sourceHealth?.forecastOutcomeMaturedCount || 0,
+            forecastLearningPromotionCandidateGroupCount:status.sourceHealth?.forecastLearningPromotionCandidateGroupCount || 0,
             longHistoryResearchReadyCount:status.sourceHealth?.longHistoryResearchReadyCount || 0,
+            independentHistoryOverlapAttemptedCount:status.sourceHealth?.independentHistoryOverlapAttemptedCount || 0,
+            independentHistoryOverlapReadyCount:status.sourceHealth?.independentHistoryOverlapReadyCount || 0,
+            independentHistoryOverlapRejectedCount:status.sourceHealth?.independentHistoryOverlapRejectedCount || 0,
             broadEligibleUniverseCount:status.sourceHealth?.broadEligibleUniverseCount || 0,
             fundamentalSelectedCount:status.sourceHealth?.fundamentalSelectedCount || 0,
             marketScreenScorableCount:status.sourceHealth?.marketScreenScorableCount || 0,
