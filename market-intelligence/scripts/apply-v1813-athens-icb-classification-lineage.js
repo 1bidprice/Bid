@@ -45,12 +45,12 @@ function patchAutonomousDiscovery() {
 
 function patchAutonomousRunner() {
   let source = read('src/run-autonomous-intelligence.js');
-  source = replaceRequired(source, '  const baseReport = await runDailyIntelligence({ ...options, now: generatedAt, universe: expandedUniverse });', `  const baseReport = await runDailyIntelligence({
-    ...options,
-    now: generatedAt,
-    universe: expandedUniverse,
-    classificationSnapshots: discovery.classificationSnapshots || [],
-  });`, 'Athens classification seed into daily report');
+  source = replaceRequired(
+    source,
+    '  const baseReport = await runDailyIntelligence({ ...options, now: generatedAt, universe: expandedUniverse, historicalSeriesCollector });',
+    '  const baseReport = await runDailyIntelligence({ ...options, now: generatedAt, universe: expandedUniverse, historicalSeriesCollector, classificationSnapshots: discovery.classificationSnapshots || [] });',
+    'Athens classification seed into daily report',
+  );
   write('src/run-autonomous-intelligence.js', source);
 }
 
