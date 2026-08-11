@@ -2,8 +2,8 @@
   "format": "investor-control-forecast-outcome-archive",
   "version": 1,
   "policyVersion": "2026-08-11.1",
-  "ledgerPolicyVersion": "2026-08-11.5",
-  "updatedAt": "2026-08-11T11:56:51.188Z",
+  "ledgerPolicyVersion": "2026-08-11.6",
+  "updatedAt": "2026-08-11T12:56:05.183Z",
   "records": [
     {
       "format": "investor-control-forecast-outcome-record",
@@ -11558,20 +11558,906 @@
         "horizon": "week1",
         "forecastSampleDate": "2026-08-10"
       }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-11.6",
+      "forecastId": "forecast:2355970f3b1a7326545d37220208",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:sec:0000924168",
+      "instrumentId": "company:sec:0000924168",
+      "displayName": "ENERGY FOCUS, INC/DE",
+      "symbol": "EFOI",
+      "listing": {
+        "symbol": "EFOI",
+        "mic": "XNAS",
+        "exchange": "Nasdaq",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0000924168",
+        "instrumentId": "company:sec:0000924168",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0000924168.json",
+        "sourceDocumentId": "CIK0000924168",
+        "capturedAt": "2026-08-11T12:54:15.711Z",
+        "taxonomy": "SEC_SIC",
+        "code": "3640",
+        "description": "Electric Lighting & Wiring Equipment",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "day1",
+      "tradingDays": 1,
+      "forecastSampleDate": "2026-08-10",
+      "forecastAt": "2026-08-11T12:54:15.711Z",
+      "referencePrice": {
+        "value": 3.0878,
+        "timestamp": "2026-08-10T19:51:36.000Z",
+        "currency": "USD",
+        "source": "Finnhub Quote API"
+      },
+      "rawProbabilityPositive": 0.3555,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": -0.412737,
+      "rawLatentFactorScore": -0.412737,
+      "factorScoreStatus": "LATENT_SCORE_READY",
+      "factorAvailableDomainCount": 8,
+      "factorAvailableWeight": 1,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": -0.120329,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "VALUATION",
+          "value": 0,
+          "weight": 0.14,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "QUALITY",
+          "value": -0.8036,
+          "weight": 0.12,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "GROWTH",
+          "value": -0.8572,
+          "weight": 0.1,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": -0.5,
+          "weight": 0.16,
+          "verifiedDriverCount": 3
+        },
+        {
+          "domain": "FUNDAMENTAL",
+          "value": -0.77198,
+          "weight": 0.12,
+          "verifiedDriverCount": 5
+        },
+        {
+          "domain": "RISK",
+          "value": -0.8275,
+          "weight": 0.09,
+          "verifiedDriverCount": 8
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.86,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": 2.8036,
+      "distribution": {
+        "p10ReturnPct": -5.8824,
+        "p25ReturnPct": -2.1201,
+        "medianReturnPct": -0.6993,
+        "p75ReturnPct": 1.3216,
+        "p90ReturnPct": 4.4053,
+        "downsideProbabilityPct": 64.45,
+        "bullCaseReturnPct": 4.4053,
+        "baseCaseReturnPct": -0.6993,
+        "bearCaseReturnPct": -5.8824
+      },
+      "patternConfidenceScore": 65,
+      "evidenceQualityScore": 95,
+      "regime": "MIXED_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-07.1",
+        "generatedAt": "2026-08-11T12:54:15.711Z",
+        "validUntil": "2026-08-11T20:54:15.711Z",
+        "status": "FINAL",
+        "marketAction": "AVOID",
+        "marketActionLabel": "ΑΠΕΦΥΓΕ",
+        "holderAction": "HOLD",
+        "holderActionLabel": "ΚΡΑΤΑ",
+        "nonHolderAction": "AVOID",
+        "nonHolderActionLabel": "ΑΠΕΦΥΓΕ",
+        "urgency": "TODAY",
+        "urgencyLabel": "Ενέργεια σήμερα",
+        "confidenceScore": 71,
+        "dataQualityScore": 100,
+        "reasons": [
+          "SEVERE_RISK_CONFIGURATION",
+          "EXECUTION_PRICE_NOT_VERIFIED"
+        ],
+        "blockers": [],
+        "freshness": {
+          "referencePriceAgeHours": 17.044364166666668,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 23.404364166666667,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "CLOSED_MARKET_LAST_VERIFIED_CLOSE",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": 79,
+          "fundamentalFlags": [
+            "NEGATIVE_FREE_CASH_FLOW",
+            "CASH_RUNWAY_UNDER_ONE_YEAR",
+            "MATERIAL_DILUTION",
+            "NEGATIVE_NET_MARGIN"
+          ],
+          "marketFlags": [
+            "HIGH_VOLATILITY",
+            "SEVERE_DRAWDOWN",
+            "LOW_LIQUIDITY",
+            "BELOW_50_DAY_AVERAGE",
+            "WEAK_RELATIVE_STRENGTH"
+          ]
+        },
+        "controlledPlan": null,
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0000924168",
+        "instrumentId": "company:sec:0000924168",
+        "horizon": "day1",
+        "forecastSampleDate": "2026-08-10"
+      }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-11.6",
+      "forecastId": "forecast:7b2dff12f2b72524916810cf43b5",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "sec-cik:1447669",
+      "instrumentId": "sec-cik:1447669",
+      "displayName": "Twilio Inc. Class A Common Stock",
+      "symbol": "TWLO",
+      "listing": {
+        "symbol": "TWLO",
+        "mic": "XNYS",
+        "exchange": "New York Stock Exchange",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "sec-cik:1447669",
+        "instrumentId": "sec-cik:1447669",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0001447669.json",
+        "sourceDocumentId": "CIK0001447669",
+        "capturedAt": "2026-08-11T12:54:15.711Z",
+        "taxonomy": "SEC_SIC",
+        "code": "7372",
+        "description": "Services-Prepackaged Software",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "day1",
+      "tradingDays": 1,
+      "forecastSampleDate": "2026-08-10",
+      "forecastAt": "2026-08-11T12:54:15.711Z",
+      "referencePrice": {
+        "value": 250.06,
+        "timestamp": "2026-08-10T20:00:00.000Z",
+        "currency": null,
+        "source": "Finnhub Quote API"
+      },
+      "rawProbabilityPositive": 0.4987,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": 0.120073,
+      "rawLatentFactorScore": 0.120073,
+      "factorScoreStatus": "LATENT_SCORE_READY",
+      "factorAvailableDomainCount": 8,
+      "factorAvailableWeight": 1,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": 0.003354,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "VALUATION",
+          "value": -0.3334,
+          "weight": 0.14,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "QUALITY",
+          "value": -0.4108,
+          "weight": 0.12,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "GROWTH",
+          "value": 0,
+          "weight": 0.1,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": 0.955533,
+          "weight": 0.16,
+          "verifiedDriverCount": 3
+        },
+        {
+          "domain": "FUNDAMENTAL",
+          "value": 0.624975,
+          "weight": 0.12,
+          "verifiedDriverCount": 4
+        },
+        {
+          "domain": "RISK",
+          "value": -0.6175,
+          "weight": 0.09,
+          "verifiedDriverCount": 4
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.86,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": 0.1725,
+      "distribution": {
+        "p10ReturnPct": -4.504,
+        "p25ReturnPct": -1.8481,
+        "medianReturnPct": -0.0789,
+        "p75ReturnPct": 2.0446,
+        "p90ReturnPct": 3.6389,
+        "downsideProbabilityPct": 50.13,
+        "bullCaseReturnPct": 3.6389,
+        "baseCaseReturnPct": -0.0789,
+        "bearCaseReturnPct": -4.504
+      },
+      "patternConfidenceScore": 62.4,
+      "evidenceQualityScore": 95,
+      "regime": "BULL_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-07.1",
+        "generatedAt": "2026-08-11T12:54:15.711Z",
+        "validUntil": "2026-08-12T12:54:15.711Z",
+        "status": "FINAL",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "HOLD",
+        "holderActionLabel": "ΚΡΑΤΑ",
+        "nonHolderAction": "DO_NOT_BUY",
+        "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ",
+        "urgency": "NORMAL",
+        "urgencyLabel": "Κανονική παρακολούθηση",
+        "confidenceScore": 100,
+        "dataQualityScore": 100,
+        "reasons": [
+          "BUY_SETUP_NOT_CONFIRMED",
+          "EXECUTION_PRICE_NOT_VERIFIED"
+        ],
+        "blockers": [],
+        "freshness": {
+          "referencePriceAgeHours": 16.904364166666667,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 23.404364166666667,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "CLOSED_MARKET_LAST_VERIFIED_CLOSE",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": 20,
+          "fundamentalFlags": [],
+          "marketFlags": [
+            "HIGH_VOLATILITY"
+          ]
+        },
+        "controlledPlan": null,
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "sec-cik:1447669",
+        "instrumentId": "sec-cik:1447669",
+        "horizon": "day1",
+        "forecastSampleDate": "2026-08-10"
+      }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-11.6",
+      "forecastId": "forecast:8b5de1c53b7d6055c81732d6e691",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:sec:0001719714",
+      "instrumentId": "company:sec:0001719714",
+      "displayName": "Mereo BioPharma Group",
+      "symbol": "MREO",
+      "listing": {
+        "symbol": "MREO",
+        "mic": "XNAS",
+        "exchange": "Nasdaq",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001719714",
+        "instrumentId": "company:sec:0001719714",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0001719714.json",
+        "sourceDocumentId": "CIK0001719714",
+        "capturedAt": "2026-08-11T12:54:15.711Z",
+        "taxonomy": "SEC_SIC",
+        "code": "2834",
+        "description": "Pharmaceutical Preparations",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "week1",
+      "tradingDays": 5,
+      "forecastSampleDate": "2026-08-10",
+      "forecastAt": "2026-08-11T12:54:15.711Z",
+      "referencePrice": {
+        "value": 0.2724,
+        "timestamp": "2026-08-10T20:00:00.000Z",
+        "currency": "USD",
+        "source": "Finnhub Quote API"
+      },
+      "rawProbabilityPositive": 0.4958,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": -0.486858,
+      "rawLatentFactorScore": -0.486858,
+      "factorScoreStatus": "LATENT_SCORE_READY",
+      "factorAvailableDomainCount": 7,
+      "factorAvailableWeight": 0.9,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": 0.030205,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "VALUATION",
+          "value": -0.75,
+          "weight": 0.14,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "QUALITY",
+          "value": -1,
+          "weight": 0.12,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": -0.5926,
+          "weight": 0.16,
+          "verifiedDriverCount": 3
+        },
+        {
+          "domain": "FUNDAMENTAL",
+          "value": -0.77108,
+          "weight": 0.12,
+          "verifiedDriverCount": 5
+        },
+        {
+          "domain": "RISK",
+          "value": -0.838571,
+          "weight": 0.09,
+          "verifiedDriverCount": 7
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.86,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": 1.2087,
+      "distribution": {
+        "p10ReturnPct": -11.7794,
+        "p25ReturnPct": -5.8282,
+        "medianReturnPct": -1.5075,
+        "p75ReturnPct": 4.1096,
+        "p90ReturnPct": 8.2474,
+        "downsideProbabilityPct": 50.42,
+        "bullCaseReturnPct": 8.2474,
+        "baseCaseReturnPct": -1.5075,
+        "bearCaseReturnPct": -11.7794
+      },
+      "patternConfidenceScore": 53.03,
+      "evidenceQualityScore": 95,
+      "regime": "BEAR_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-07.1",
+        "generatedAt": "2026-08-11T12:54:15.711Z",
+        "validUntil": "2026-08-11T20:54:15.711Z",
+        "status": "FINAL",
+        "marketAction": "AVOID",
+        "marketActionLabel": "ΑΠΕΦΥΓΕ",
+        "holderAction": "HOLD",
+        "holderActionLabel": "ΚΡΑΤΑ",
+        "nonHolderAction": "AVOID",
+        "nonHolderActionLabel": "ΑΠΕΦΥΓΕ",
+        "urgency": "TODAY",
+        "urgencyLabel": "Ενέργεια σήμερα",
+        "confidenceScore": 71,
+        "dataQualityScore": 100,
+        "reasons": [
+          "SEVERE_RISK_CONFIGURATION",
+          "EXECUTION_PRICE_NOT_VERIFIED"
+        ],
+        "blockers": [],
+        "freshness": {
+          "referencePriceAgeHours": 16.904364166666667,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 23.404364166666667,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "CLOSED_MARKET_LAST_VERIFIED_CLOSE",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": 70,
+          "fundamentalFlags": [
+            "NEGATIVE_FREE_CASH_FLOW",
+            "CASH_RUNWAY_UNDER_ONE_YEAR",
+            "EXTREME_PRICE_TO_SALES"
+          ],
+          "marketFlags": [
+            "EXTREME_VOLATILITY",
+            "MATERIAL_DRAWDOWN",
+            "LOW_LIQUIDITY",
+            "BELOW_50_DAY_AVERAGE"
+          ]
+        },
+        "controlledPlan": null,
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001719714",
+        "instrumentId": "company:sec:0001719714",
+        "horizon": "week1",
+        "forecastSampleDate": "2026-08-10"
+      }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-11.6",
+      "forecastId": "forecast:9703f4c2209ca2d6af2b870ebc2d",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:sec:0001719714",
+      "instrumentId": "company:sec:0001719714",
+      "displayName": "Mereo BioPharma Group",
+      "symbol": "MREO",
+      "listing": {
+        "symbol": "MREO",
+        "mic": "XNAS",
+        "exchange": "Nasdaq",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001719714",
+        "instrumentId": "company:sec:0001719714",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0001719714.json",
+        "sourceDocumentId": "CIK0001719714",
+        "capturedAt": "2026-08-11T12:54:15.711Z",
+        "taxonomy": "SEC_SIC",
+        "code": "2834",
+        "description": "Pharmaceutical Preparations",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "day1",
+      "tradingDays": 1,
+      "forecastSampleDate": "2026-08-10",
+      "forecastAt": "2026-08-11T12:54:15.711Z",
+      "referencePrice": {
+        "value": 0.2724,
+        "timestamp": "2026-08-10T20:00:00.000Z",
+        "currency": "USD",
+        "source": "Finnhub Quote API"
+      },
+      "rawProbabilityPositive": 0.4216,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": -0.522767,
+      "rawLatentFactorScore": -0.522767,
+      "factorScoreStatus": "LATENT_SCORE_READY",
+      "factorAvailableDomainCount": 7,
+      "factorAvailableWeight": 0.9,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": -0.116698,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "VALUATION",
+          "value": -0.75,
+          "weight": 0.14,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "QUALITY",
+          "value": -1,
+          "weight": 0.12,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": -0.5926,
+          "weight": 0.16,
+          "verifiedDriverCount": 3
+        },
+        {
+          "domain": "FUNDAMENTAL",
+          "value": -0.77108,
+          "weight": 0.12,
+          "verifiedDriverCount": 5
+        },
+        {
+          "domain": "RISK",
+          "value": -0.838571,
+          "weight": 0.09,
+          "verifiedDriverCount": 7
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.86,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": -0.2313,
+      "distribution": {
+        "p10ReturnPct": -4.3614,
+        "p25ReturnPct": -2.9851,
+        "medianReturnPct": -0.9259,
+        "p75ReturnPct": 2.6059,
+        "p90ReturnPct": 4.4304,
+        "downsideProbabilityPct": 57.84,
+        "bullCaseReturnPct": 4.4304,
+        "baseCaseReturnPct": -0.9259,
+        "bearCaseReturnPct": -4.3614
+      },
+      "patternConfidenceScore": 65,
+      "evidenceQualityScore": 95,
+      "regime": "BEAR_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-07.1",
+        "generatedAt": "2026-08-11T12:54:15.711Z",
+        "validUntil": "2026-08-11T20:54:15.711Z",
+        "status": "FINAL",
+        "marketAction": "AVOID",
+        "marketActionLabel": "ΑΠΕΦΥΓΕ",
+        "holderAction": "HOLD",
+        "holderActionLabel": "ΚΡΑΤΑ",
+        "nonHolderAction": "AVOID",
+        "nonHolderActionLabel": "ΑΠΕΦΥΓΕ",
+        "urgency": "TODAY",
+        "urgencyLabel": "Ενέργεια σήμερα",
+        "confidenceScore": 71,
+        "dataQualityScore": 100,
+        "reasons": [
+          "SEVERE_RISK_CONFIGURATION",
+          "EXECUTION_PRICE_NOT_VERIFIED"
+        ],
+        "blockers": [],
+        "freshness": {
+          "referencePriceAgeHours": 16.904364166666667,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 23.404364166666667,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "CLOSED_MARKET_LAST_VERIFIED_CLOSE",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": 70,
+          "fundamentalFlags": [
+            "NEGATIVE_FREE_CASH_FLOW",
+            "CASH_RUNWAY_UNDER_ONE_YEAR",
+            "EXTREME_PRICE_TO_SALES"
+          ],
+          "marketFlags": [
+            "EXTREME_VOLATILITY",
+            "MATERIAL_DRAWDOWN",
+            "LOW_LIQUIDITY",
+            "BELOW_50_DAY_AVERAGE"
+          ]
+        },
+        "controlledPlan": null,
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001719714",
+        "instrumentId": "company:sec:0001719714",
+        "horizon": "day1",
+        "forecastSampleDate": "2026-08-10"
+      }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-11.6",
+      "forecastId": "forecast:b0ecd9c4b6ab239316e48df4b27c",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "sec-cik:1447669",
+      "instrumentId": "sec-cik:1447669",
+      "displayName": "Twilio Inc. Class A Common Stock",
+      "symbol": "TWLO",
+      "listing": {
+        "symbol": "TWLO",
+        "mic": "XNYS",
+        "exchange": "New York Stock Exchange",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "sec-cik:1447669",
+        "instrumentId": "sec-cik:1447669",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0001447669.json",
+        "sourceDocumentId": "CIK0001447669",
+        "capturedAt": "2026-08-11T12:54:15.711Z",
+        "taxonomy": "SEC_SIC",
+        "code": "7372",
+        "description": "Services-Prepackaged Software",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "week1",
+      "tradingDays": 5,
+      "forecastSampleDate": "2026-08-10",
+      "forecastAt": "2026-08-11T12:54:15.711Z",
+      "referencePrice": {
+        "value": 250.06,
+        "timestamp": "2026-08-10T20:00:00.000Z",
+        "currency": null,
+        "source": "Finnhub Quote API"
+      },
+      "rawProbabilityPositive": 0.2599,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": 0.035681,
+      "rawLatentFactorScore": 0.035681,
+      "factorScoreStatus": "LATENT_SCORE_READY",
+      "factorAvailableDomainCount": 8,
+      "factorAvailableWeight": 1,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": -0.380245,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "VALUATION",
+          "value": -0.3334,
+          "weight": 0.14,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "QUALITY",
+          "value": -0.4108,
+          "weight": 0.12,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "GROWTH",
+          "value": 0,
+          "weight": 0.1,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": 0.955533,
+          "weight": 0.16,
+          "verifiedDriverCount": 3
+        },
+        {
+          "domain": "FUNDAMENTAL",
+          "value": 0.624975,
+          "weight": 0.12,
+          "verifiedDriverCount": 4
+        },
+        {
+          "domain": "RISK",
+          "value": -0.6175,
+          "weight": 0.09,
+          "verifiedDriverCount": 4
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.86,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": -1.4809,
+      "distribution": {
+        "p10ReturnPct": -8.8753,
+        "p25ReturnPct": -5.9567,
+        "medianReturnPct": -2.7572,
+        "p75ReturnPct": 1.6444,
+        "p90ReturnPct": 4.7029,
+        "downsideProbabilityPct": 74.01,
+        "bullCaseReturnPct": 4.7029,
+        "baseCaseReturnPct": -2.7572,
+        "bearCaseReturnPct": -8.8753
+      },
+      "patternConfidenceScore": 55.4,
+      "evidenceQualityScore": 95,
+      "regime": "BULL_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-07.1",
+        "generatedAt": "2026-08-11T12:54:15.711Z",
+        "validUntil": "2026-08-12T12:54:15.711Z",
+        "status": "FINAL",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "HOLD",
+        "holderActionLabel": "ΚΡΑΤΑ",
+        "nonHolderAction": "DO_NOT_BUY",
+        "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ",
+        "urgency": "NORMAL",
+        "urgencyLabel": "Κανονική παρακολούθηση",
+        "confidenceScore": 100,
+        "dataQualityScore": 100,
+        "reasons": [
+          "BUY_SETUP_NOT_CONFIRMED",
+          "EXECUTION_PRICE_NOT_VERIFIED"
+        ],
+        "blockers": [],
+        "freshness": {
+          "referencePriceAgeHours": 16.904364166666667,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 23.404364166666667,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "CLOSED_MARKET_LAST_VERIFIED_CLOSE",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": 20,
+          "fundamentalFlags": [],
+          "marketFlags": [
+            "HIGH_VOLATILITY"
+          ]
+        },
+        "controlledPlan": null,
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "sec-cik:1447669",
+        "instrumentId": "sec-cik:1447669",
+        "horizon": "week1",
+        "forecastSampleDate": "2026-08-10"
+      }
     }
   ],
   "summary": {
     "format": "investor-control-forecast-outcome-ledger-summary",
     "version": 1,
-    "policyVersion": "2026-08-11.5",
-    "recordCount": 86,
-    "openCount": 86,
+    "policyVersion": "2026-08-11.6",
+    "recordCount": 91,
+    "openCount": 91,
     "maturedCount": 0,
     "groups": []
   },
   "evaluation": {
-    "baseRecordCount": 79,
-    "incomingRecordCount": 86,
-    "mergedRecordCount": 86
+    "baseRecordCount": 86,
+    "incomingRecordCount": 91,
+    "mergedRecordCount": 91
   }
 }
