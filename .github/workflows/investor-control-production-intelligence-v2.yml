@@ -57,6 +57,8 @@ jobs:
         env:
           SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
           FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+          FORECAST_OUTCOME_LEDGER_PATH: ../../live-feed/forecast-outcome-ledger.json
+          FORECAST_OUTCOME_LEDGER_OUTPUT: out/forecast-outcome-ledger.json
         run: |
           set -euo pipefail
           node src/run-autonomous-intelligence.js out/autonomous-intelligence.json
@@ -74,6 +76,12 @@ jobs:
           set -euo pipefail
           node scripts/verify-opportunity-hunter-output.js out/autonomous-intelligence.json
 
+      - name: Verify forecast outcome archive safety
+        working-directory: source/market-intelligence
+        run: |
+          set -euo pipefail
+          node scripts/verify-forecast-outcome-archive.js out/forecast-outcome-ledger.json
+
       - name: Publish verified live feed transactionally
         shell: bash
         run: |
@@ -90,12 +98,21 @@ jobs:
             cp source/market-intelligence/out/mobile-intelligence-feed.json live-feed/mobile-intelligence-feed.json
             cp source/market-intelligence/out/autonomous-intelligence.json live-feed/autonomous-intelligence.json
 
+            node source/market-intelligence/scripts/merge-forecast-outcome-archives.js \
+              live-feed/forecast-outcome-ledger.json \
+              source/market-intelligence/out/forecast-outcome-ledger.json \
+              live-feed/forecast-outcome-ledger.json
+            node source/market-intelligence/scripts/verify-forecast-outcome-archive.js \
+              live-feed/forecast-outcome-ledger.json
+
             node - <<'NODE'
           const fs = require('fs');
           const crypto = require('crypto');
           const { execFileSync } = require('child_process');
           const feed = JSON.parse(fs.readFileSync('./live-feed/mobile-intelligence-feed.json','utf8'));
           const report = JSON.parse(fs.readFileSync('./live-feed/autonomous-intelligence.json','utf8'));
+          const forecastArchive = JSON.parse(fs.readFileSync('./live-feed/forecast-outcome-ledger.json','utf8'));
+          const forecastSummary = forecastArchive.summary || {};
           const now = new Date().toISOString();
           const sourceCommit = execFileSync('git',['-C','source','rev-parse','HEAD'],{encoding:'utf8'}).trim();
           const release = JSON.parse(fs.readFileSync('./source/market-intelligence/config/runtime-release-manifest.json','utf8')).releaseVersion;
@@ -122,8 +139,15 @@ jobs:
             highPriorityOpportunityCount:Number(ranking.highPriorityCount || 0),
             deepVerificationQueueCount:deepQueue.length,
           };
+          const forecastTelemetry = {
+            forecastOutcomeRecordCount:Number(forecastSummary.recordCount || 0),
+            forecastOutcomeOpenCount:Number(forecastSummary.openCount || 0),
+            forecastOutcomeMaturedCount:Number(forecastSummary.maturedCount || 0),
+            longHistoryResearchReadyCount:Number(report.longHistoryResearchSummary?.readyCount || 0),
+            longHistoryResearchRejectedCount:Number(report.longHistoryResearchSummary?.rejectedCount || 0),
+          };
           const status = {
-            format:'investor-control-live-feed-status', version:7,
+            format:'investor-control-live-feed-status', version:8,
             generatedAt:feed.generatedAt, publishedAt:now,
             policyVersion:feed.policyVersion,
             sourcePolicyVersion:feed.sourceSelection?.version || null,
@@ -131,7 +155,9 @@ jobs:
             sourceCommit,
             runtimeReleaseVersion:release,
             publisherContract:'TRANSACTIONAL_V2_SINGLE_WRITER',
+            forecastArchiveContract:'DAILY_OOS_TRANSACTIONAL_V1',
             feedSha256:crypto.createHash('sha256').update(fs.readFileSync('./live-feed/mobile-intelligence-feed.json')).digest('hex'),
+            forecastArchiveSha256:crypto.createHash('sha256').update(fs.readFileSync('./live-feed/forecast-outcome-ledger.json')).digest('hex'),
             operationalHealth:{
               ...(report.operationalHealth || {}),
               readyHistoricalMarketMetricsCount:readyHistory,
@@ -139,6 +165,7 @@ jobs:
               unresolvedGreekIdentityCount:unresolvedGreek.length,
               controlledPlanCount:(report.researchDossiers || []).filter((item)=>item.finalAction?.controlledPlan?.status==='AVAILABLE').length,
               ...hunterTelemetry,
+              ...forecastTelemetry,
               lastSuccessfulPublicationAt:now,
               staleOutput:false,
             },
@@ -161,6 +188,7 @@ jobs:
               greekCandidateCount:greek.length,
               unresolvedGreekIdentityCount:unresolvedGreek.length,
               ...hunterTelemetry,
+              ...forecastTelemetry,
             },
           };
           fs.writeFileSync('./live-feed/status.json',JSON.stringify(status,null,2)+'\n');
@@ -181,10 +209,10 @@ jobs:
           fs.writeFileSync('./live-feed/discovery-radar.json',JSON.stringify({format:'investor-control-discovery-radar',version:3,updatedAt:now,sourcePolicy:feed.sourceSelection,marketsScanned:report.discovery?.marketsScanned || [],items:feed.discoveryRadar},null,2)+'\n');
           NODE
 
-            git -C live-feed add mobile-intelligence-feed.json autonomous-intelligence.json status.json decision-history.json discovery-radar.json
+            git -C live-feed add mobile-intelligence-feed.json autonomous-intelligence.json forecast-outcome-ledger.json status.json decision-history.json discovery-radar.json
             HAS_CHANGES=0
             if ! git -C live-feed diff --cached --quiet; then
-              git -C live-feed commit -m "chore(feed): verified hunter production ${GITHUB_RUN_ID} transactional-v2 [skip ci]"
+              git -C live-feed commit -m "chore(feed): verified forecast production ${GITHUB_RUN_ID} transactional-v2 [skip ci]"
               HAS_CHANGES=1
             fi
           }
@@ -198,7 +226,7 @@ jobs:
               exit 0
             fi
             if git -C live-feed push origin HEAD:investor-control-live-feed; then
-              echo 'Verified feed published successfully.'
+              echo 'Verified feed and forecast archive published successfully.'
               exit 0
             fi
             echo 'Remote changed before push; rebuilding publication from the newest remote base.'
@@ -223,26 +251,39 @@ jobs:
             live-feed/mobile-intelligence-feed.json
           node source/market-intelligence/scripts/verify-opportunity-hunter-output.js \
             live-feed/autonomous-intelligence.json
+          node source/market-intelligence/scripts/verify-forecast-outcome-archive.js \
+            live-feed/forecast-outcome-ledger.json
 
           node - <<'NODE'
           const fs=require('fs');
           const status=JSON.parse(fs.readFileSync('./live-feed/status.json','utf8'));
           const report=JSON.parse(fs.readFileSync('./live-feed/autonomous-intelligence.json','utf8'));
+          const forecastArchive=JSON.parse(fs.readFileSync('./live-feed/forecast-outcome-ledger.json','utf8'));
+          const forecastSummary=forecastArchive.summary || {};
           const broad=report.broadOpportunityScan || {};
           const hunter=report.opportunityUniverse || {};
           const ranking=hunter.ranking || {};
           if (String(status.sourceWorkflowRunId) !== String(process.env.GITHUB_RUN_ID)) throw new Error('remote status belongs to a different workflow run');
           if (status.publisherContract !== 'TRANSACTIONAL_V2_SINGLE_WRITER') throw new Error('single-writer transactional publisher marker missing');
+          if (status.forecastArchiveContract !== 'DAILY_OOS_TRANSACTIONAL_V1') throw new Error('forecast archive transactional contract missing');
           if (status.generatedAt !== report.generatedAt) throw new Error('remote status/report generation mismatch');
           if (status.operationalHealth?.staleOutput !== false) throw new Error('remote feed incorrectly marked stale');
           if (Number(status.sourceHealth?.marketScreenScorableCount || 0) !== Number(broad.marketScreenScorableCount || 0)) throw new Error('remote market-screen telemetry mismatch');
           if (Number(status.sourceHealth?.superOpportunityCount || 0) !== Number(ranking.superOpportunityCount || 0)) throw new Error('remote super-opportunity telemetry mismatch');
+          if (Number(status.sourceHealth?.forecastOutcomeRecordCount || 0) !== Number(forecastSummary.recordCount || 0)) throw new Error('remote forecast record telemetry mismatch');
+          if (Number(status.sourceHealth?.forecastOutcomeOpenCount || 0) !== Number(forecastSummary.openCount || 0)) throw new Error('remote forecast open telemetry mismatch');
+          if (Number(status.sourceHealth?.forecastOutcomeMaturedCount || 0) !== Number(forecastSummary.maturedCount || 0)) throw new Error('remote forecast matured telemetry mismatch');
           console.log(JSON.stringify({
             remotePublication:'VERIFIED',
             sourceWorkflowRunId:status.sourceWorkflowRunId,
             sourceCommit:status.sourceCommit,
             runtimeReleaseVersion:status.runtimeReleaseVersion,
             publisherContract:status.publisherContract,
+            forecastArchiveContract:status.forecastArchiveContract,
+            forecastOutcomeRecordCount:status.sourceHealth?.forecastOutcomeRecordCount || 0,
+            forecastOutcomeOpenCount:status.sourceHealth?.forecastOutcomeOpenCount || 0,
+            forecastOutcomeMaturedCount:status.sourceHealth?.forecastOutcomeMaturedCount || 0,
+            longHistoryResearchReadyCount:status.sourceHealth?.longHistoryResearchReadyCount || 0,
             broadEligibleUniverseCount:status.sourceHealth?.broadEligibleUniverseCount || 0,
             fundamentalSelectedCount:status.sourceHealth?.fundamentalSelectedCount || 0,
             marketScreenScorableCount:status.sourceHealth?.marketScreenScorableCount || 0,
@@ -269,7 +310,7 @@ jobs:
 
             node - <<'NODE'
           const fs=require('fs');
-          let status={format:'investor-control-live-feed-status',version:7};
+          let status={format:'investor-control-live-feed-status',version:8};
           try { status=JSON.parse(fs.readFileSync('./live-feed/status.json','utf8')); } catch {}
           const now=new Date().toISOString();
           status.publishedAt=now;
@@ -296,6 +337,8 @@ jobs:
           path: |
             source/market-intelligence/out/autonomous-intelligence.json
             source/market-intelligence/out/mobile-intelligence-feed.json
+            source/market-intelligence/out/forecast-outcome-ledger.json
+            live-feed/forecast-outcome-ledger.json
             live-feed/status.json
           if-no-files-found: warn
           retention-days: 30
