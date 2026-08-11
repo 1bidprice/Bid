@@ -12,7 +12,21 @@ function canonical(source = 'Finnhub Historical', count = 120) {
     candles: Array.from({ length: count }, (_, index) => ({
       timestamp: 1_700_000_000 + index * 86_400,
       close: 100 + index,
+      rawClose: 100 + index,
     })),
+  };
+}
+
+function twelveWitnessFrom(series) {
+  return {
+    usable: true,
+    source: 'Twelve Data Time Series',
+    sourceUrl: 'https://api.twelvedata.com/time_series?symbol=AAA&interval=1day',
+    sourceQuality: 'SECONDARY_UNVALIDATED',
+    researchOnly: true,
+    decisionEligible: false,
+    executionEligible: false,
+    candles: series.candles.map((candle) => ({ timestamp: candle.timestamp, close: candle.rawClose ?? candle.close, rawClose: candle.rawClose ?? candle.close })),
   };
 }
 
@@ -26,6 +40,7 @@ function readyRecord(symbol) {
     source: 'Test Long History',
     providerSymbol: symbol,
     crossCheck: { status: 'CROSSCHECK_PASS', overlapSessions: 120 },
+    diagnostics: [],
     series: { usable: true, candles: Array.from({ length: 1500 }, (_, index) => ({ timestamp: 1_500_000_000 + index * 86_400, close: 10 + index })) },
   };
 }
@@ -90,16 +105,101 @@ test('collector never performs a max-range provider request without sufficient c
   assert.ok(result.collector.get('company:a').blockers.includes('LONG_HISTORY_CANONICAL_OVERLAP_TOO_SMALL'));
 });
 
-test('built-in Yahoo acquisition is skipped when canonical overlap is already Yahoo and therefore non-independent', async () => {
+test('built-in Yahoo acquisition is skipped when canonical overlap is already Yahoo and no independent witness key exists', async () => {
   const result = await collectLongHistoryResearch({
     universe: [company('company:a', 'AAA')],
     researchDossiers: [dossier('company:a', 'final')],
     historicalSeriesCollector: new Map([['company:a', canonical('Yahoo Finance Chart', 120)]]),
-    options: {},
+    options: { twelveDataApiKey: '' },
   });
   assert.equal(result.summary.attemptedCount, 0);
+  assert.equal(result.summary.independentOverlapAttemptedCount, 0);
+  assert.equal(result.summary.independentOverlapRejectedCount, 1);
   assert.equal(result.summary.skippedNonIndependentCount, 1);
   assert.ok(result.collector.get('company:a').blockers.includes('INDEPENDENT_CANONICAL_OVERLAP_SOURCE_REQUIRED'));
+  assert.ok(result.collector.get('company:a').diagnostics.some((item) => item.code === 'TWELVE_DATA_API_KEY_MISSING'));
+});
+
+test('validated Twelve Data US overlap witness unlocks Yahoo long-history validation without becoming decision data', async () => {
+  const recentYahoo = canonical('Yahoo Finance Chart', 120);
+  const witnessCalls = [];
+  const longHistoryCalls = [];
+  const result = await collectLongHistoryResearch({
+    universe: [company('company:a', 'AAA')],
+    researchDossiers: [dossier('company:a', 'final')],
+    historicalSeriesCollector: new Map([['company:a', recentYahoo]]),
+    options: {
+      twelveDataApiKey: 'test-key',
+      longHistoryNeedsIndependentYahooWitness: true,
+      independentOverlapFetcher: async (symbol, options) => {
+        witnessCalls.push({ symbol, options });
+        return { series: twelveWitnessFrom(recentYahoo), diagnostics: [{ code: 'INDEPENDENT_HISTORY_OVERLAP_WITNESS_AVAILABLE' }] };
+      },
+      longHistoryFetcher: async (symbol, options) => {
+        longHistoryCalls.push({ symbol, canonicalSeries: options.canonicalSeries });
+        return readyRecord(symbol);
+      },
+    },
+  });
+  assert.equal(witnessCalls.length, 1);
+  assert.equal(witnessCalls[0].symbol, 'AAA');
+  assert.equal(witnessCalls[0].options.micCode, 'XNAS');
+  assert.equal(longHistoryCalls.length, 1);
+  assert.equal(longHistoryCalls[0].canonicalSeries.source, 'Twelve Data Time Series');
+  assert.equal(longHistoryCalls[0].canonicalSeries.decisionEligible, false);
+  assert.equal(result.summary.independentOverlapAttemptedCount, 1);
+  assert.equal(result.summary.independentOverlapReadyCount, 1);
+  assert.equal(result.summary.independentOverlapRejectedCount, 0);
+  assert.equal(result.summary.readyCount, 1);
+  assert.equal(result.collector.get('company:a').status, 'RESEARCH_READY');
+  assert.equal(result.collector.get('company:a').independentOverlapSource, 'Twelve Data Time Series');
+  assert.equal(result.collector.get('company:a').independentOverlapCrossCheck.status, 'CROSSCHECK_PASS');
+});
+
+test('failed independent overlap cross-check blocks the expensive Yahoo max-history request', async () => {
+  const recentYahoo = canonical('Yahoo Finance Chart', 120);
+  const distortedWitness = twelveWitnessFrom(recentYahoo);
+  distortedWitness.candles = distortedWitness.candles.map((candle, index) => ({ ...candle, close: candle.close * (1 + Math.sin(index / 2) * 0.08), rawClose: candle.rawClose * (1 + Math.sin(index / 2) * 0.08) }));
+  let longHistoryCalls = 0;
+  const result = await collectLongHistoryResearch({
+    universe: [company('company:a', 'AAA')],
+    researchDossiers: [dossier('company:a', 'final')],
+    historicalSeriesCollector: new Map([['company:a', recentYahoo]]),
+    options: {
+      twelveDataApiKey: 'test-key',
+      longHistoryNeedsIndependentYahooWitness: true,
+      independentOverlapFetcher: async () => ({ series: distortedWitness, diagnostics: [] }),
+      longHistoryFetcher: async () => { longHistoryCalls += 1; return readyRecord('AAA'); },
+    },
+  });
+  assert.equal(longHistoryCalls, 0);
+  assert.equal(result.summary.independentOverlapAttemptedCount, 1);
+  assert.equal(result.summary.independentOverlapReadyCount, 0);
+  assert.equal(result.summary.independentOverlapRejectedCount, 1);
+  assert.equal(result.summary.skippedNonIndependentCount, 1);
+  assert.ok(result.collector.get('company:a').diagnostics.some((item) => item.code === 'INDEPENDENT_OVERLAP_CROSSCHECK_FAILED'));
+});
+
+test('non-US Yahoo canonical history is never sent to the US-only Twelve Data witness lane', async () => {
+  let witnessCalls = 0;
+  let longHistoryCalls = 0;
+  const athens = company('company:athens', 'TEST', { country: 'GR', mic: 'XATH', exchange: 'Athens Exchange', currency: 'EUR' });
+  const result = await collectLongHistoryResearch({
+    universe: [athens],
+    researchDossiers: [dossier('company:athens', 'final')],
+    historicalSeriesCollector: new Map([['company:athens', canonical('Yahoo Finance Chart', 120)]]),
+    options: {
+      twelveDataApiKey: 'test-key',
+      longHistoryNeedsIndependentYahooWitness: true,
+      independentOverlapFetcher: async () => { witnessCalls += 1; return { series: null, diagnostics: [] }; },
+      longHistoryFetcher: async () => { longHistoryCalls += 1; return readyRecord('TEST.AT'); },
+    },
+  });
+  assert.equal(witnessCalls, 0);
+  assert.equal(longHistoryCalls, 0);
+  assert.equal(result.summary.independentOverlapAttemptedCount, 0);
+  assert.equal(result.summary.independentOverlapRejectedCount, 1);
+  assert.ok(result.collector.get('company:athens').diagnostics.some((item) => item.code === 'INDEPENDENT_OVERLAP_US_ONLY'));
 });
 
 test('provider symbols resolve generically for Athens and respect explicit market-data aliases', async () => {
