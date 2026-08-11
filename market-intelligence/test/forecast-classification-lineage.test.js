@@ -130,7 +130,7 @@ test('classification stays in a separate research lineage and is not written int
   const finalAction = fs.readFileSync(new URL('src/final-action-policy.js', root), 'utf8');
   const opportunityFactors = fs.readFileSync(new URL('src/opportunity-factor-engine.js', root), 'utf8');
 
-  assert.match(daily, /const classificationSnapshots = \[\];/);
+  assert.match(daily, /const classificationSnapshots = \[\.\.\.\(options\.classificationSnapshots \|\| \[\]\)\];/);
   assert.match(daily, /classificationSnapshotCount: classificationSnapshots\.length/);
   assert.match(daily, /if \(result\.classificationSnapshot\) classificationSnapshots\.push\(result\.classificationSnapshot\);/);
   assert.doesNotMatch(daily, /company\.sector\s*=\s*result\.classification/);
