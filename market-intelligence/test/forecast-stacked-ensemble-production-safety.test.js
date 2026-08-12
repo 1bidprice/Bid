@@ -102,7 +102,7 @@ test('production firewall rejects stacked research authority, weakened evidence 
   assert.throws(() => verifyForecastStackedEnsembleProductionSafety(mismatch), /telemetry mismatch/);
 });
 
-test('v1821 runtime publishes stacked research after Yahoo freshness recovery and invokes its independent production firewall', () => {
+test('v1821 runtime remains present after v1822 and still invokes its independent production firewall', () => {
   const manifest = JSON.parse(read('config/runtime-release-manifest.json'));
   const runner = read('src/run-autonomous-intelligence.js');
   const verifier = read('scripts/verify-production-output.js');
@@ -110,10 +110,12 @@ test('v1821 runtime publishes stacked research after Yahoo freshness recovery an
   assert.equal(manifest.releaseVersion, '1.8.0');
   assert.ok(manifest.testPatches.includes('apply-v1820-yahoo-history-freshness-recovery.js'));
   assert.ok(manifest.buildPatches.includes('apply-v1820-yahoo-history-freshness-recovery.js'));
-  assert.equal(manifest.testPatches.at(-1), 'apply-v1821-stacked-ensemble-research.js');
-  assert.equal(manifest.buildPatches.at(-1), 'apply-v1821-stacked-ensemble-research.js');
-  assert.equal(new Set(manifest.testPatches).size, 70);
-  assert.equal(new Set(manifest.buildPatches).size, 69);
+  assert.ok(manifest.testPatches.includes('apply-v1821-stacked-ensemble-research.js'));
+  assert.ok(manifest.buildPatches.includes('apply-v1821-stacked-ensemble-research.js'));
+  assert.equal(manifest.testPatches.at(-1), 'apply-v1822-regime-stacked-ensemble-research.js');
+  assert.equal(manifest.buildPatches.at(-1), 'apply-v1822-regime-stacked-ensemble-research.js');
+  assert.equal(new Set(manifest.testPatches).size, 71);
+  assert.equal(new Set(manifest.buildPatches).size, 70);
 
   assert.match(runner, /buildForecastStackedEnsembleResearchStatus/);
   assert.match(runner, /forecastStackedEnsembleResearchStatus/);
