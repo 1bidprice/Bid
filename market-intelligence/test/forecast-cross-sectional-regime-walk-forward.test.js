@@ -60,13 +60,11 @@ function build(instruments, options = {}) {
       maximumSingleInstrumentSharePct: 80,
       minimumEffectiveInstrumentCount: 1.5,
       minimumCalibrationSample: 20,
+      includeAuditSamples: true,
+      auditSampleLimit: 25,
       ...options,
     },
   });
-}
-
-function allGroupRecords(status) {
-  return status.groups.flatMap((group) => group.sampleRecords || []);
 }
 
 test('cross-sectional walk-forward creates historical OOS records only after per-instrument forecasts', () => {
@@ -76,6 +74,8 @@ test('cross-sectional walk-forward creates historical OOS records only after per
   assert.ok(status.validRegimeRecordCount > 0);
   assert.ok(status.groupCount > 0);
   assert.ok(status.instrumentSummaries.every((item) => item.generatedRecordCount > 0));
+  assert.ok(status.auditSampleRecords.length > 0);
+  assert.ok(status.auditSampleRecords.length <= 25);
   assert.equal(status.historicalResearchOnly, true);
   assert.equal(status.liveArchiveEligible, false);
   assert.equal(status.liveCalibrationEligible, false);
@@ -86,7 +86,7 @@ test('cross-sectional walk-forward creates historical OOS records only after per
 
 test('historical regime reconstruction never uses benchmark data after the forecast timestamp', () => {
   const status = build([instrument(0), instrument(1)]);
-  const records = status.researchRecords || [];
+  const records = status.auditSampleRecords;
   assert.ok(records.length > 0);
   for (const record of records.filter((item) => item.marketRegimeSnapshot)) {
     assert.ok(Date.parse(record.marketRegimeSnapshot.benchmarkAsOf) <= Date.parse(record.forecastAt));
@@ -97,7 +97,7 @@ test('historical regime reconstruction never uses benchmark data after the forec
 
 test('current classification input is never copied into historical walk-forward records', () => {
   const status = build([instrument(0), instrument(1)]);
-  const serialized = JSON.stringify(status.researchRecords || []);
+  const serialized = JSON.stringify(status.auditSampleRecords);
   assert.equal(serialized.includes('classificationSnapshot'), false);
   assert.equal(serialized.includes('Modern classification that must not leak backwards'), false);
   assert.equal(status.methodology.historicalClassificationBackfillAllowed, false);
@@ -109,7 +109,8 @@ test('missing historical benchmark leaves records explicitly regime-unavailable 
   assert.equal(status.validRegimeRecordCount, 0);
   assert.equal(status.groupCount, 0);
   assert.equal(status.regimeUnavailableRecordCount, status.generatedRecordCount);
-  assert.ok((status.researchRecords || []).every((record) => record.regimeStatus === 'REGIME_NOT_AVAILABLE'));
+  assert.ok(status.auditSampleRecords.length > 0);
+  assert.ok(status.auditSampleRecords.every((record) => record.regimeStatus === 'REGIME_NOT_AVAILABLE'));
 });
 
 test('bull and bear benchmark histories produce separate native historical regime research groups', () => {
@@ -136,12 +137,29 @@ test('instrument/date/window independence remains a hard blocker for concentrate
 
 test('historical evidence is explicitly WALK_FORWARD_OOS and can never masquerade as live shadow OOS', () => {
   const status = build([instrument(0), instrument(1)]);
-  const records = status.researchRecords || [];
+  const records = status.auditSampleRecords;
   assert.ok(records.length > 0);
   assert.ok(records.every((record) => record.validationMode === 'WALK_FORWARD_OOS'));
   assert.ok(records.every((record) => record.evidenceClass === 'HISTORICAL_CROSS_SECTIONAL_REGIME_WALK_FORWARD_RESEARCH'));
   assert.ok(records.every((record) => record.liveArchiveEligible === false && record.liveCalibrationEligible === false));
   assert.equal(JSON.stringify(records).includes('LIVE_SHADOW_OOS'), false);
+});
+
+test('raw historical records are omitted by default and audit samples are explicit and bounded', () => {
+  const status = buildCrossSectionalRegimeWalkForwardResearch({
+    generatedAt: '2026-08-13T00:00:00.000Z',
+    instruments: [instrument(0), instrument(1)],
+    options: {
+      horizons: { week1: 5 },
+      warmupObservations: 260,
+      minimumHistory: 200,
+      minAnalogCount: 5,
+      minEffectiveSample: 4,
+    },
+  });
+  assert.deepEqual(status.auditSampleRecords, []);
+  assert.equal(Object.prototype.hasOwnProperty.call(status, 'researchRecords'), false);
+  assert.equal(status.methodology.rawHistoricalRecordExportDefault, 'DISABLED');
 });
 
 test('research output never creates final actions, broker authority or live-archive mutation instructions', () => {
