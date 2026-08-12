@@ -13,10 +13,12 @@ test('v1818 transformed runtime publishes regime-factor governance and invokes i
   const verifier = read('scripts/verify-production-output.js');
 
   assert.equal(manifest.releaseVersion, '1.8.0');
-  assert.equal(manifest.testPatches.at(-1), 'apply-v1818-regime-factor-weight-governance.js');
-  assert.equal(manifest.buildPatches.at(-1), 'apply-v1818-regime-factor-weight-governance.js');
-  assert.equal(new Set(manifest.testPatches).size, 67);
-  assert.equal(new Set(manifest.buildPatches).size, 66);
+  assert.ok(manifest.testPatches.includes('apply-v1818-regime-factor-weight-governance.js'));
+  assert.ok(manifest.buildPatches.includes('apply-v1818-regime-factor-weight-governance.js'));
+  assert.equal(manifest.testPatches.at(-1), 'apply-v1819-history-session-alignment.js');
+  assert.equal(manifest.buildPatches.at(-1), 'apply-v1819-history-session-alignment.js');
+  assert.equal(new Set(manifest.testPatches).size, 68);
+  assert.equal(new Set(manifest.buildPatches).size, 67);
 
   assert.match(runner, /buildForecastRegimeFactorWeightGovernanceStatus/);
   assert.match(runner, /regimeFactorAttributionStatus: forecastRegimeFactorAttributionStatus/);
