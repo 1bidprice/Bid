@@ -136,6 +136,46 @@ function buildHistoricalResearchRecord(instrument, walkForwardRecord, options = 
   };
 }
 
+function compactAuditRecord(record = {}) {
+  return {
+    forecastId: record.forecastId || null,
+    evidenceClass: record.evidenceClass || null,
+    validationMode: record.validationMode || null,
+    instrumentId: record.instrumentId || null,
+    assetClass: record.assetClass || 'UNKNOWN',
+    horizon: record.horizon || null,
+    tradingDays: record.tradingDays || null,
+    forecastAt: record.forecastAt || null,
+    forecastSampleDate: record.forecastSampleDate || null,
+    outcomeKnownAt: record.outcomeKnownAt || null,
+    referencePrice: record.referencePrice ? { ...record.referencePrice } : null,
+    rawProbabilityPositive: record.rawProbabilityPositive ?? null,
+    positiveOutcome: record.positiveOutcome ?? null,
+    realisedOutcome: record.realisedOutcome ? { ...record.realisedOutcome } : null,
+    regimeStatus: record.regimeStatus || null,
+    regimeKey: record.regimeKey || null,
+    marketRegimeSnapshot: record.marketRegimeSnapshot ? {
+      contract: record.marketRegimeSnapshot.contract,
+      policyVersion: record.marketRegimeSnapshot.policyVersion,
+      capturedAt: record.marketRegimeSnapshot.capturedAt,
+      benchmarkAsOf: record.marketRegimeSnapshot.benchmarkAsOf,
+      benchmarkSymbol: record.marketRegimeSnapshot.benchmarkSymbol,
+      regimeKey: record.marketRegimeSnapshot.regimeKey,
+      riskTone: record.marketRegimeSnapshot.riskTone,
+      trendRegime: record.marketRegimeSnapshot.trendRegime,
+      momentumRegime: record.marketRegimeSnapshot.momentumRegime,
+      volatilityRegime: record.marketRegimeSnapshot.volatilityRegime,
+      decisionImpact: record.marketRegimeSnapshot.decisionImpact,
+    } : null,
+    historicalResearchOnly: record.historicalResearchOnly === true,
+    liveArchiveEligible: record.liveArchiveEligible === true,
+    liveCalibrationEligible: record.liveCalibrationEligible === true,
+    finalActionEligible: record.finalActionEligible === true,
+    brokerExecutionEligible: record.brokerExecutionEligible === true,
+    decisionImpact: record.decisionImpact || null,
+  };
+}
+
 function groupKey(record = {}) {
   return [record.historicalPatternPolicyVersion || 'NO_PATTERN_VERSION', record.assetClass || 'UNKNOWN', record.horizon || 'UNKNOWN', record.regimeKey || 'NO_REGIME'].join('|');
 }
@@ -261,6 +301,10 @@ export function buildCrossSectionalRegimeWalkForwardResearch(input = {}) {
     .sort((left, right) => [left.historicalPatternPolicyVersion, left.assetClass, left.horizon, left.regimeKey].join('|')
       .localeCompare([right.historicalPatternPolicyVersion, right.assetClass, right.horizon, right.regimeKey].join('|')));
   const readyGroupCount = groups.filter((group) => group.status === 'HISTORICAL_REGIME_RESEARCH_READY').length;
+  const auditSampleLimit = options.includeAuditSamples === true
+    ? Math.max(1, Math.min(25, Math.floor(Number(options.auditSampleLimit || 12))))
+    : 0;
+  const auditSampleRecords = auditSampleLimit ? allRecords.slice(0, auditSampleLimit).map(compactAuditRecord) : [];
 
   return {
     format: 'investor-control-cross-sectional-regime-walk-forward-research',
@@ -280,6 +324,7 @@ export function buildCrossSectionalRegimeWalkForwardResearch(input = {}) {
     instrumentSummaries,
     groups,
     diagnostics,
+    auditSampleRecords,
     methodology: {
       validationMode: 'WALK_FORWARD_OOS',
       instrumentForecastBoundary: 'EACH_INSTRUMENT_FORECAST_USES_ONLY_ITS_OWN_HISTORY_AVAILABLE_AT_FORECAST_AT',
@@ -288,6 +333,7 @@ export function buildCrossSectionalRegimeWalkForwardResearch(input = {}) {
       historicalClassificationBackfillAllowed: false,
       liveArchiveWriteAllowed: false,
       liveCalibrationUseAllowed: false,
+      rawHistoricalRecordExportDefault: 'DISABLED',
     },
     historicalResearchOnly: true,
     liveArchiveEligible: false,
