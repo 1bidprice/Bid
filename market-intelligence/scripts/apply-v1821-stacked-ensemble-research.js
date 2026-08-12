@@ -44,6 +44,12 @@ function patchEnsembleResearchSemantics() {
     `      minimumRelativeBrierImprovementPct,\n      minimumLogLossImprovement,`,
     'stacked ensemble calibration threshold removal',
   );
+  if (source.includes('      minimumEceImprovement,\n')) {
+    source = source.replace('      minimumEceImprovement,\n', '');
+  }
+  if (source.includes('minimumEceImprovement')) {
+    throw new Error('Investor Control v1.8 stacked-ensemble research patch failed: stale minimumEceImprovement reference remains');
+  }
   source = replaceRequired(
     source,
     "      probabilityUse: 'HISTORICAL_PREQUENTIAL_RESEARCH_EVALUATION_ONLY',",
