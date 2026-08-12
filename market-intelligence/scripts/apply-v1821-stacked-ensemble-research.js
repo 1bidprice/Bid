@@ -12,6 +12,77 @@ function replaceRequired(source, from, to, label) {
   return source.replace(from, to);
 }
 
+function patchEnsembleResearchSemantics() {
+  let source = read('src/forecast-stacked-ensemble-research.js');
+  source = replaceRequired(
+    source,
+    "export const FORECAST_STACKED_ENSEMBLE_RESEARCH_VERSION = '2026-08-12.1';",
+    "export const FORECAST_STACKED_ENSEMBLE_RESEARCH_VERSION = '2026-08-12.2';",
+    'stacked ensemble research policy version',
+  );
+  source = replaceRequired(
+    source,
+    `  const minimumRelativeBrierImprovementPct = Number(options.ensembleMinimumRelativeBrierImprovementPct ?? 3);\n  const minimumLogLossImprovement = Number(options.ensembleMinimumLogLossImprovement ?? 0);\n  const minimumEceImprovement = Number(options.ensembleMinimumEceImprovement ?? -0.01);`,
+    `  const minimumRelativeBrierImprovementPct = Number(options.ensembleMinimumRelativeBrierImprovementPct ?? 3);\n  const minimumLogLossImprovement = Number(options.ensembleMinimumLogLossImprovement ?? 0);\n  const calibrationStatus = 'UNCALIBRATED_RESEARCH_ONLY';`,
+    'stacked ensemble calibration boundary',
+  );
+  source = replaceRequired(
+    source,
+    `  if (!Number.isFinite(Number(comparison.improvement.expectedCalibrationErrorImprovement)) || comparison.improvement.expectedCalibrationErrorImprovement < minimumEceImprovement) {\n    blockers.push('ENSEMBLE_CALIBRATION_ERROR_MATERIALLY_WORSE');\n  }`,
+    `  if (!Number.isFinite(Number(comparison.stackedEnsemble.expectedCalibrationError))) {\n    blockers.push('ENSEMBLE_CALIBRATION_DIAGNOSTIC_UNAVAILABLE');\n  }`,
+    'stacked ensemble calibration diagnostic without false base-rate comparison',
+  );
+  source = replaceRequired(
+    source,
+    `    improvement: comparison.improvement,\n    sampleIndependence,`,
+    `    improvement: comparison.improvement,\n    calibrationStatus,\n    sampleIndependence,`,
+    'stacked ensemble explicit uncalibrated status',
+  );
+  source = replaceRequired(
+    source,
+    `      minimumRelativeBrierImprovementPct,\n      minimumLogLossImprovement,\n      minimumEceImprovement,`,
+    `      minimumRelativeBrierImprovementPct,\n      minimumLogLossImprovement,`,
+    'stacked ensemble calibration threshold removal',
+  );
+  source = replaceRequired(
+    source,
+    "      probabilityUse: 'HISTORICAL_PREQUENTIAL_RESEARCH_EVALUATION_ONLY',",
+    "      probabilityUse: 'UNCALIBRATED_HISTORICAL_PREQUENTIAL_RESEARCH_EVALUATION_ONLY',",
+    'stacked ensemble probability-use disclosure',
+  );
+  write('src/forecast-stacked-ensemble-research.js', source);
+
+  source = read('src/forecast-stacked-ensemble-production-safety.js');
+  source = replaceRequired(
+    source,
+    `  assert(finiteNumber(thresholds.minimumRelativeBrierImprovementPct) >= 3, \`${'${prefix}'} Brier improvement threshold too weak\`);\n  assert(finiteNumber(thresholds.minimumLogLossImprovement) >= 0, \`${'${prefix}'} log-loss threshold too weak\`);\n  assert(finiteNumber(thresholds.minimumEceImprovement) >= -0.01, \`${'${prefix}'} calibration-error threshold too weak\`);`,
+    `  assert(finiteNumber(thresholds.minimumRelativeBrierImprovementPct) >= 3, \`${'${prefix}'} Brier improvement threshold too weak\`);\n  assert(finiteNumber(thresholds.minimumLogLossImprovement) >= 0, \`${'${prefix}'} log-loss threshold too weak\`);\n  assert(group?.calibrationStatus === 'UNCALIBRATED_RESEARCH_ONLY', \`${'${prefix}'} calibration status must remain research-only\`);`,
+    'stacked ensemble production calibration boundary',
+  );
+  source = replaceRequired(
+    source,
+    `  assert(finiteNumber(improvement.relativeBrierImprovementPct) >= thresholds.minimumRelativeBrierImprovementPct, \`${'${prefix}'} Brier improvement below threshold\`);\n  assert(finiteNumber(improvement.logLossImprovement) >= thresholds.minimumLogLossImprovement, \`${'${prefix}'} log-loss improvement below threshold\`);\n  assert(finiteNumber(improvement.expectedCalibrationErrorImprovement) >= thresholds.minimumEceImprovement, \`${'${prefix}'} calibration-error improvement below threshold\`);`,
+    `  assert(finiteNumber(improvement.relativeBrierImprovementPct) >= thresholds.minimumRelativeBrierImprovementPct, \`${'${prefix}'} Brier improvement below threshold\`);\n  assert(finiteNumber(improvement.logLossImprovement) >= thresholds.minimumLogLossImprovement, \`${'${prefix}'} log-loss improvement below threshold\`);\n  const ensembleEce = finiteNumber(group?.ensembleMetrics?.expectedCalibrationError);\n  assert(ensembleEce !== null && ensembleEce >= 0 && ensembleEce <= 1, \`${'${prefix}'} calibration diagnostic invalid\`);`,
+    'stacked ensemble production calibration diagnostic',
+  );
+  write('src/forecast-stacked-ensemble-production-safety.js', source);
+
+  source = read('test/forecast-stacked-ensemble-research.test.js');
+  source = replaceRequired(
+    source,
+    `  const outcomePositive = options.outcome ?? (options.invert ? factorScore < 0 : factorScore > 0 ? 1 : 0);`,
+    `  const outcomePositive = options.outcome ?? ((options.invert ? factorScore < 0 : factorScore > 0) ? 1 : 0);`,
+    'stacked ensemble inverted-outcome fixture strict binary value',
+  );
+  source = replaceRequired(
+    source,
+    `  assert.ok(group.improvement.logLossImprovement >= 0);\n  assert.equal(group.sampleIndependence.status, 'INDEPENDENCE_READY');`,
+    `  assert.ok(group.improvement.logLossImprovement >= 0);\n  assert.equal(group.calibrationStatus, 'UNCALIBRATED_RESEARCH_ONLY');\n  assert.equal(group.probabilityCalibrationEnabled, false);\n  assert.equal(group.sampleIndependence.status, 'INDEPENDENCE_READY');`,
+    'stacked ensemble explicit research-only calibration assertion',
+  );
+  write('test/forecast-stacked-ensemble-research.test.js', source);
+}
+
 function patchAutonomousRunner() {
   let source = read('src/run-autonomous-intelligence.js');
   source = replaceRequired(
@@ -87,6 +158,7 @@ function patchManifestAssertions() {
   write('test/forecast-regime-factor-governance-runtime.test.js', source);
 }
 
+patchEnsembleResearchSemantics();
 patchAutonomousRunner();
 patchProductionVerifier();
 patchManifestAssertions();
