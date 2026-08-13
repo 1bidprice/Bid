@@ -89,7 +89,7 @@ function verifyResearch(status) {
       const sample = group.sampleIndependence || {};
       const windows = group.outcomeWindowIndependence || {};
       const instruments = group.instrumentConcentration || {};
-      assert(sample.status === 'OOS_SAMPLE_INDEPENDENCE_READY', `group ${index} sample independence not ready`);
+      assert(sample.status === 'INDEPENDENCE_READY', `group ${index} sample independence not ready`);
       assert(finiteNumber(sample?.thresholds?.minimumDistinctForecastDates) >= 30, `group ${index} date threshold too weak`);
       assert(finiteNumber(sample?.thresholds?.minimumDistinctInstruments) >= 8, `group ${index} instrument threshold too weak`);
       assert(finiteNumber(sample?.thresholds?.maximumSingleForecastDateSharePct) <= 15, `group ${index} date concentration threshold too weak`);
