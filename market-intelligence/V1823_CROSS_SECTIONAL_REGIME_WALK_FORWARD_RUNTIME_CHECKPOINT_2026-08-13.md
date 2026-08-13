@@ -4,18 +4,27 @@ Date: 2026-08-13
 
 ## Verified code boundary
 
-- Source head before this documentation commit: `e275132eefb7a115000e3b0047f64bd53012d377`
+- Source head before the original checkpoint documentation commit: `e275132eefb7a115000e3b0047f64bd53012d377`
 - Runtime release: `1.8.0`
 - Runtime migrations: 72 unique test patches / 71 build patches
 - Deterministic Market Intelligence suite: **459/459 PASS, 0 FAIL**
 - Mobile validation: **SUCCESS**
+- Standalone Android build: **SUCCESS**
 - PR #14 remains **open, draft, unmerged**
 
-## Android verification status
+## Android verification
 
-The exact-head standalone Android workflow for `e275132e...` remained in GitHub's Gradle release step at the time of this checkpoint and therefore is **not claimed as green here**.
+Exact-head standalone Android run `31652906380`, job `94300917451`, completed **SUCCESS** for source `e275132eefb7a115000e3b0047f64bd53012d377`.
 
-Diff safety was checked against the last exact-head Android-green v1822 source `faec8b8dd55854c92ee771894ae377bbcb179436`: all v1823 changes are confined to `market-intelligence/*`; no mobile, Android, portfolio, transaction, Opportunity Hunter, final-action, or broker-execution source file changed.
+Verified Android steps included:
+
+- release-identity verification
+- Android project generation
+- Gradle release build
+- embedded JavaScript bundle verification
+- standalone APK artifact upload
+
+Diff safety against the previous exact-head Android-green v1822 source `faec8b8dd55854c92ee771894ae377bbcb179436` also confirmed that all v1823 changes were confined to `market-intelligence/*`; no mobile, Android, portfolio, transaction, Opportunity Hunter, final-action, or broker-execution source file changed.
 
 ## Production verification
 
@@ -94,4 +103,4 @@ The next step is a **separate sparse historical-research execution path**. It mu
 4. publish no live feed and write no live forecast archive;
 5. produce a standalone research artifact only;
 6. pass the v1823 production firewall before artifact upload;
-7. begin as manual `workflow_dispatch` proof before any recurring schedule is enabled.
+7. begin as manual or one-off proof before any recurring schedule is enabled.
