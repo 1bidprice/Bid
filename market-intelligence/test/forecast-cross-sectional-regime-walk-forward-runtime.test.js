@@ -119,6 +119,56 @@ test('production firewall accepts both safe disabled and safe enabled research-o
   assert.equal(verifyCrossSectionalRegimeWalkForwardProductionSafety(report(enabled)).status, 'VERIFIED');
 });
 
+test('production firewall accepts canonical ready-group independence status and rejects the stale alias', () => {
+  const ready = clone(buildCrossSectionalRegimeWalkForwardRuntimeStatus({
+    enabled: true,
+    generatedAt: '2026-08-13T00:00:00.000Z',
+    researchDossiers: [],
+    historicalSeriesByCompany: new Map(),
+    benchmarkSeriesByCompany: new Map(),
+  }));
+  ready.research.groups = [{
+    status: 'HISTORICAL_REGIME_RESEARCH_READY',
+    historicalResearchOnly: true,
+    liveArchiveEligible: false,
+    liveCalibrationEligible: false,
+    decisionIntegrationEnabled: false,
+    forecastMayInfluenceFinalAction: false,
+    finalActionEligible: false,
+    decisionImpact: 'NONE',
+    sampleIndependence: {
+      status: 'INDEPENDENCE_READY',
+      thresholds: {
+        minimumDistinctForecastDates: 30,
+        minimumDistinctInstruments: 8,
+        maximumSingleForecastDateSharePct: 15,
+      },
+    },
+    outcomeWindowIndependence: {
+      status: 'WINDOW_INDEPENDENCE_READY',
+      thresholds: { minimumEffectiveNonOverlappingWindows: 12 },
+    },
+    instrumentConcentration: {
+      status: 'INSTRUMENT_DIVERSIFICATION_READY',
+      thresholds: {
+        maximumSingleInstrumentSharePct: 25,
+        minimumEffectiveInstrumentCount: 5,
+      },
+    },
+    calibration: { status: 'OOS_METRICS_READY' },
+    blockers: [],
+  }];
+  ready.research.groupCount = 1;
+  ready.research.readyGroupCount = 1;
+  ready.groupCount = 1;
+  ready.readyGroupCount = 1;
+  assert.equal(verifyCrossSectionalRegimeWalkForwardProductionSafety(report(ready)).status, 'VERIFIED');
+
+  const staleAlias = clone(ready);
+  staleAlias.research.groups[0].sampleIndependence.status = 'OOS_SAMPLE_INDEPENDENCE_READY';
+  assert.throws(() => verifyCrossSectionalRegimeWalkForwardProductionSafety(report(staleAlias)), /sample independence not ready/);
+});
+
 test('production firewall rejects network, raw-export, live-calibration, decision and broker authority tampering', () => {
   const base = report(buildCrossSectionalRegimeWalkForwardRuntimeStatus({ enabled: false, generatedAt: '2026-08-13T00:00:00.000Z' }));
 
