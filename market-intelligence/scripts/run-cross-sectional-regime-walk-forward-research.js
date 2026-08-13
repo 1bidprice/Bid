@@ -7,10 +7,11 @@ import {
   verifyCrossSectionalRegimeWalkForwardProductionSafety,
 } from '../src/forecast-cross-sectional-regime-walk-forward-production-safety.js';
 
-export const HISTORICAL_RESEARCH_JOB_VERSION = '2026-08-13.4';
+export const HISTORICAL_RESEARCH_JOB_VERSION = '2026-08-13.5';
 export const HISTORICAL_RESEARCH_JOB_CONTRACT = 'ARTIFACT_ONLY_CROSS_SECTIONAL_REGIME_WALK_FORWARD_JOB_V1';
 export const HISTORICAL_RESEARCH_READINESS_SUMMARY_CONTRACT = 'HISTORICAL_REGIME_WALK_FORWARD_READINESS_SUMMARY_V1';
 export const HISTORICAL_RESEARCH_SOURCE_COHORT_CONTRACT = 'HISTORICAL_RESEARCH_SOURCE_COHORT_SUMMARY_V1';
+export const HISTORICAL_RESEARCH_COHORT_EXPANSION_CONTRACT = 'RESEARCH_ONLY_EVENT_COHORT_EXPANSION_V1';
 
 function boundedInteger(value, fallback, minimum, maximum) {
   const number = Number(value);
@@ -161,10 +162,12 @@ export function summarizeHistoricalResearchReadiness(status = {}, options = {}) 
 export async function runCrossSectionalRegimeWalkForwardResearchJob(input = {}) {
   const startedAt = new Date(input.startedAt || Date.now());
   const maximumInstrumentCount = boundedInteger(input.maximumInstrumentCount, 24, 2, 40);
+  const eventDeepAnalysisLimit = boundedInteger(input.eventDeepAnalysisLimit, 8, 5, 12);
   const configuredResearchOptions = researchOptions(input.researchOptions || {});
   const runAutonomous = input.runAutonomous || runAutonomousIntelligence;
   const report = await runAutonomous({
     ...(input.autonomousOptions || {}),
+    deepAnalysisLimit: eventDeepAnalysisLimit,
     crossSectionalHistoricalRegimeWalkForwardEnabled: true,
     crossSectionalHistoricalRegimeWalkForwardMaxInstruments: maximumInstrumentCount,
     crossSectionalHistoricalRegimeWalkForwardOptions: configuredResearchOptions,
@@ -193,6 +196,16 @@ export async function runCrossSectionalRegimeWalkForwardResearchJob(input = {}) 
     sourceCommit: input.sourceCommit || process.env.INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT || null,
     executionState: status.executionState,
     maximumInstrumentCount,
+    cohortExpansion: {
+      contract: HISTORICAL_RESEARCH_COHORT_EXPANSION_CONTRACT,
+      eventDeepAnalysisLimit,
+      normalProductionDefaultChanged: false,
+      selectionThresholdsChanged: false,
+      statisticalReadinessThresholdsChanged: false,
+      historicalResearchOnly: true,
+      automaticPromotionAllowed: false,
+      decisionImpact: 'NONE',
+    },
     verification,
     telemetry,
     sourceCohortSummary,
@@ -229,6 +242,7 @@ async function main() {
   console.log(`Research groups: ${result.telemetry.forecastHistoricalWalkForwardGroupCount}; ready: ${result.telemetry.forecastHistoricalWalkForwardReadyGroupCount}`);
   console.log(`Universe coverage: dossiers=${result.universeCoverage?.dossierCount || 0}, loaded histories=${result.universeCoverage?.loadedHistoricalSeriesCount || 0}, eligible=${result.universeCoverage?.eligibleInstrumentCount || 0}, selected=${result.universeCoverage?.selectedInstrumentCount || 0}`);
   console.log(`Source cohort: analysed=${result.sourceCohortSummary.universeExpansion.analysedCompanyCount}, final dossiers=${result.sourceCohortSummary.finalResearchDossierCount}, long-history eligible=${result.sourceCohortSummary.longHistory.eligibleDossierCount}, selected=${result.sourceCohortSummary.longHistory.selectedCount}, skipped-by-limit=${result.sourceCohortSummary.longHistory.skippedByLimit}`);
+  console.log(`Research-only event deep-analysis limit: ${result.cohortExpansion.eventDeepAnalysisLimit}`);
   if (result.readinessSummary.blockerCounts.length) {
     console.log(`Readiness blockers: ${result.readinessSummary.blockerCounts.map((item) => `${item.code}=${item.groupCount}`).join(', ')}`);
   }
