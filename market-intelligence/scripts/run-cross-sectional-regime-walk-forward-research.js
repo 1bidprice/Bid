@@ -7,7 +7,7 @@ import {
   verifyCrossSectionalRegimeWalkForwardProductionSafety,
 } from '../src/forecast-cross-sectional-regime-walk-forward-production-safety.js';
 
-export const HISTORICAL_RESEARCH_JOB_VERSION = '2026-08-13.2';
+export const HISTORICAL_RESEARCH_JOB_VERSION = '2026-08-13.3';
 export const HISTORICAL_RESEARCH_JOB_CONTRACT = 'ARTIFACT_ONLY_CROSS_SECTIONAL_REGIME_WALK_FORWARD_JOB_V1';
 export const HISTORICAL_RESEARCH_READINESS_SUMMARY_CONTRACT = 'HISTORICAL_REGIME_WALK_FORWARD_READINESS_SUMMARY_V1';
 
@@ -131,6 +131,7 @@ export async function runCrossSectionalRegimeWalkForwardResearchJob(input = {}) 
     verification,
     telemetry,
     readinessSummary,
+    universeCoverage: status.universeCoverage,
     researchStatus: status,
     publication: {
       liveFeedWriteAllowed: false,
@@ -160,6 +161,7 @@ async function main() {
   console.log(`Historical records: ${result.telemetry.forecastHistoricalWalkForwardGeneratedRecordCount}`);
   console.log(`Valid regime records: ${result.telemetry.forecastHistoricalWalkForwardValidRegimeRecordCount}`);
   console.log(`Research groups: ${result.telemetry.forecastHistoricalWalkForwardGroupCount}; ready: ${result.telemetry.forecastHistoricalWalkForwardReadyGroupCount}`);
+  console.log(`Universe coverage: dossiers=${result.universeCoverage?.dossierCount || 0}, loaded histories=${result.universeCoverage?.loadedHistoricalSeriesCount || 0}, eligible=${result.universeCoverage?.eligibleInstrumentCount || 0}, selected=${result.universeCoverage?.selectedInstrumentCount || 0}`);
   if (result.readinessSummary.blockerCounts.length) {
     console.log(`Readiness blockers: ${result.readinessSummary.blockerCounts.map((item) => `${item.code}=${item.groupCount}`).join(', ')}`);
   }
