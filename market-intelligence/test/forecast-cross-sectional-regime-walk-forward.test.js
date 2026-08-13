@@ -67,7 +67,7 @@ function build(instruments, options = {}) {
   });
 }
 
-test('cross-sectional walk-forward creates historical OOS records only after per-instrument forecasts', () => {
+test('cross-sectional walk-forward creates matured historical OOS records with valid outcome windows only after per-instrument forecasts', () => {
   const status = build([instrument(0), instrument(1), instrument(2)]);
   assert.equal(status.evaluatedInstrumentCount, 3);
   assert.ok(status.generatedRecordCount > 0);
@@ -76,6 +76,9 @@ test('cross-sectional walk-forward creates historical OOS records only after per
   assert.ok(status.instrumentSummaries.every((item) => item.generatedRecordCount > 0));
   assert.ok(status.auditSampleRecords.length > 0);
   assert.ok(status.auditSampleRecords.length <= 25);
+  assert.ok(status.auditSampleRecords.every((record) => record.status === 'MATURED'));
+  assert.ok(status.groups.some((group) => group.outcomeWindowIndependence.validWindowRecordCount > 0));
+  assert.ok(status.groups.some((group) => group.outcomeWindowIndependence.invalidWindowRecordCount === 0));
   assert.equal(status.historicalResearchOnly, true);
   assert.equal(status.liveArchiveEligible, false);
   assert.equal(status.liveCalibrationEligible, false);
