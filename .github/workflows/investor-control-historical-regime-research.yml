@@ -1,0 +1,101 @@
+name: Investor Control Historical Regime Research
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/investor-control-historical-regime-research.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-historical-regime-research
+  cancel-in-progress: false
+
+jobs:
+  historical-regime-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout verified research source
+        uses: actions/checkout@v4
+        with:
+          ref: investor-control-v1-market-intelligence-foundation
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: market-intelligence/package-lock.json
+
+      - name: Install PDF extraction runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
+
+      - name: Record exact research source commit
+        working-directory: market-intelligence
+        run: echo "INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Apply source contracts and run deterministic tests
+        working-directory: market-intelligence
+        run: npm test
+
+      - name: Run artifact-only historical regime walk-forward research
+        working-directory: market-intelligence
+        env:
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
+          HISTORICAL_RESEARCH_MAX_INSTRUMENTS: '24'
+        run: node scripts/run-cross-sectional-regime-walk-forward-research.js out/historical-regime-walk-forward-research.json
+
+      - name: Verify historical research artifact safety
+        working-directory: market-intelligence
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const path = 'out/historical-regime-walk-forward-research.json';
+          const artifact = JSON.parse(fs.readFileSync(path, 'utf8'));
+          const fail = (message) => { throw new Error(message); };
+          if (artifact.contract !== 'ARTIFACT_ONLY_CROSS_SECTIONAL_REGIME_WALK_FORWARD_JOB_V1') fail('artifact contract mismatch');
+          if (artifact.executionState !== 'ENABLED_RESEARCH_ONLY') fail('historical research was not explicitly enabled');
+          if (artifact.verification?.status !== 'VERIFIED') fail('historical research firewall verification missing');
+          if (artifact.sourceCommit !== process.env.INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT) fail('source commit mismatch');
+          if (artifact.publication?.artifactOnly !== true) fail('artifact-only publication contract missing');
+          if (artifact.publication?.liveFeedWriteAllowed !== false) fail('live-feed writes must be forbidden');
+          if (artifact.publication?.forecastOutcomeLedgerWriteAllowed !== false) fail('forecast ledger writes must be forbidden');
+          if (artifact.publication?.decisionHistoryWriteAllowed !== false) fail('decision-history writes must be forbidden');
+          if (artifact.publication?.gitPushAllowed !== false) fail('git push must be forbidden');
+          if (artifact.automaticModelPromotionEnabled !== false) fail('automatic model promotion must be false');
+          if (artifact.probabilityCalibrationEnabled !== false) fail('probability calibration authority must be false');
+          if (artifact.decisionIntegrationEnabled !== false) fail('decision integration must be false');
+          if (artifact.forecastMayInfluenceFinalAction !== false) fail('final-action influence must be false');
+          if (artifact.brokerExecutionEligible !== false) fail('broker execution must be false');
+          if (artifact.researchStatus?.rawHistoricalRecordExported !== false) fail('raw historical export must be false');
+          if (artifact.researchStatus?.networkFetchPerformedByRuntime !== false) fail('v1823 runtime must perform no additional network fetch');
+          if (Array.isArray(artifact.researchStatus?.research?.auditSampleRecords) && artifact.researchStatus.research.auditSampleRecords.length !== 0) fail('audit samples must not be exported in production research artifact');
+          if (Object.prototype.hasOwnProperty.call(artifact.researchStatus?.research || {}, 'researchRecords')) fail('raw historical records leaked into artifact');
+          console.log(JSON.stringify({
+            sourceCommit: artifact.sourceCommit,
+            durationSeconds: artifact.durationSeconds,
+            selectedInstrumentCount: artifact.telemetry?.forecastHistoricalWalkForwardSelectedInstrumentCount,
+            generatedRecordCount: artifact.telemetry?.forecastHistoricalWalkForwardGeneratedRecordCount,
+            validRegimeRecordCount: artifact.telemetry?.forecastHistoricalWalkForwardValidRegimeRecordCount,
+            groupCount: artifact.telemetry?.forecastHistoricalWalkForwardGroupCount,
+            readyGroupCount: artifact.telemetry?.forecastHistoricalWalkForwardReadyGroupCount,
+          }, null, 2));
+          NODE
+
+      - name: Upload historical research artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-historical-regime-research-${{ github.run_id }}
+          path: market-intelligence/out/historical-regime-walk-forward-research.json
+          if-no-files-found: error
+          retention-days: 30
