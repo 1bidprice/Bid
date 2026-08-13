@@ -63,7 +63,7 @@ export function summarizeHistoricalResearchReadiness(status = {}, options = {}) 
     notReadyGroupCount: groups.length - readyGroupCount,
     blockerCounts,
     gateReadiness: {
-      sampleIndependenceReadyGroupCount: groups.filter((group) => group?.sampleIndependence?.status === 'OOS_SAMPLE_INDEPENDENCE_READY').length,
+      sampleIndependenceReadyGroupCount: groups.filter((group) => group?.sampleIndependence?.status === 'INDEPENDENCE_READY').length,
       outcomeWindowReadyGroupCount: groups.filter((group) => group?.outcomeWindowIndependence?.status === 'WINDOW_INDEPENDENCE_READY').length,
       instrumentDiversificationReadyGroupCount: groups.filter((group) => group?.instrumentConcentration?.status === 'INSTRUMENT_DIVERSIFICATION_READY').length,
       calibrationReadyGroupCount: groups.filter((group) => group?.calibration?.status === 'OOS_METRICS_READY').length,
