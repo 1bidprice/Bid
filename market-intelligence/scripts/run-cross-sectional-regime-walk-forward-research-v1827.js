@@ -3,6 +3,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { runV1826HistoricalResearchJob } from './run-cross-sectional-regime-walk-forward-research-v1826.js';
 import { buildHistoricalPredictiveSkillSummary } from '../src/forecast-historical-predictive-skill.js';
+import { verifyHistoricalMarketDomainStackCandidate } from '../src/forecast-historical-market-domain-stack-candidate-safety.js';
 
 export const V1827_PREDICTIVE_SKILL_ARTIFACT_CONTRACT = 'HISTORICAL_PREDICTIVE_SKILL_ARTIFACT_V1';
 export const V1827_DATASET_INTEGRITY_CONTRACT = 'HISTORICAL_PREDICTIVE_DATASET_INTEGRITY_V1';
@@ -82,14 +83,17 @@ export async function runV1827HistoricalPredictiveSkillResearchJob(input = {}) {
   const runBase = input.runV1826 || runV1826HistoricalResearchJob;
   const { runV1826: _ignored, ...baseInput } = input;
   const artifact = await runBase(baseInput);
-  const groups = Array.isArray(artifact?.researchStatus?.research?.groups)
-    ? artifact.researchStatus.research.groups
-    : [];
+  const research = artifact?.researchStatus?.research || null;
+  const groups = Array.isArray(research?.groups) ? research.groups : [];
   const datasetIntegrity = buildV1827DatasetIntegrity(artifact);
   const predictiveSkillSummary = blockPredictiveSummary(
     buildHistoricalPredictiveSkillSummary(groups),
     datasetIntegrity,
   );
+  const domainSeparatedCandidate = research?.historicalMarketStackResearch?.domainSeparatedCandidate || null;
+  const domainCandidateSafety = verifyHistoricalMarketDomainStackCandidate(domainSeparatedCandidate, {
+    sourceRecordCount: count(research?.validRegimeRecordCount),
+  });
 
   return {
     ...artifact,
@@ -97,6 +101,7 @@ export async function runV1827HistoricalPredictiveSkillResearchJob(input = {}) {
     evaluationReadinessMeaning: 'SUFFICIENT_FOR_EVALUATION_NOT_PREDICTIVE_SKILL',
     datasetIntegrity,
     predictiveSkillSummary,
+    domainCandidateSafety,
     automaticModelPromotionEnabled: false,
     probabilityCalibrationEnabled: false,
     decisionIntegrationEnabled: false,
@@ -123,6 +128,12 @@ async function main() {
     console.log(`Historical market stack source records: ${marketStack.sourceRecordCount}`);
     console.log(`Historical market stack OOS predictions: ${marketStack.predictionCount}`);
     console.log(`Historical market stack predictive-ready groups: ${marketStack.predictiveReadyGroupCount}/${marketStack.groupCount}`);
+    const domain = marketStack.domainSeparatedCandidate || null;
+    if (domain) {
+      console.log(`Historical domain stack OOS predictions: ${domain.predictionCount}`);
+      console.log(`Historical domain stack predictive-ready groups: ${domain.predictiveReadyGroupCount}/${domain.groupCount}`);
+      console.log(`Historical domain stack safety: ${result.domainCandidateSafety.status}`);
+    }
   }
   if (result.predictiveSkillSummary.blockerCounts.length) {
     console.log(`Predictive blockers: ${result.predictiveSkillSummary.blockerCounts.map((item) => `${item.code}=${item.groupCount}`).join(', ')}`);
