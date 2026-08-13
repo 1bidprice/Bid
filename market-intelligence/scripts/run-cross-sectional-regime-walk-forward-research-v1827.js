@@ -118,6 +118,12 @@ async function main() {
   console.log(`Dataset integrity: ${result.datasetIntegrity.status} (${result.datasetIntegrity.validRegimeRecordCount}/${result.datasetIntegrity.generatedRecordCount})`);
   console.log(`Evaluation-ready groups: ${result.predictiveSkillSummary.evaluationReadyGroupCount}`);
   console.log(`Predictive-skill-ready groups: ${result.predictiveSkillSummary.predictiveSkillReadyGroupCount}`);
+  const marketStack = result?.researchStatus?.research?.historicalMarketStackResearch || null;
+  if (marketStack) {
+    console.log(`Historical market stack source records: ${marketStack.sourceRecordCount}`);
+    console.log(`Historical market stack OOS predictions: ${marketStack.predictionCount}`);
+    console.log(`Historical market stack predictive-ready groups: ${marketStack.predictiveReadyGroupCount}/${marketStack.groupCount}`);
+  }
   if (result.predictiveSkillSummary.blockerCounts.length) {
     console.log(`Predictive blockers: ${result.predictiveSkillSummary.blockerCounts.map((item) => `${item.code}=${item.groupCount}`).join(', ')}`);
   }
