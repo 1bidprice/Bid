@@ -1,0 +1,103 @@
+name: Investor Control v1826 Historical Research
+
+on:
+  push:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - '.github/workflows/run-v1826-historical-research.yml'
+      - 'market-intelligence/scripts/run-cross-sectional-regime-walk-forward-research-v1826.js'
+      - 'market-intelligence/test/research-history-depth-v1826.test.js'
+      - 'market-intelligence/test/research-history-depth.test.js'
+      - 'market-intelligence/src/professional-market-data.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-v1826-historical-research-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: market-intelligence
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install PDF extraction runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y poppler-utils
+
+      - name: Run full deterministic safety gate
+        run: npm test
+
+      - name: Run v1826 five-year artifact-only historical research
+        env:
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+          TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
+          INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT: ${{ github.sha }}
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          mkdir -p out
+          node scripts/run-cross-sectional-regime-walk-forward-research-v1826.js out/v1826-historical-regime-walk-forward-research.json
+
+      - name: Verify v1826 artifact safety and unchanged statistical floor
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const file = 'out/v1826-historical-regime-walk-forward-research.json';
+          const artifact = JSON.parse(fs.readFileSync(file, 'utf8'));
+          const fail = (message) => { throw new Error(message); };
+          if (artifact?.historyDepth?.lookbackDays !== 1825) fail('v1826 lookback must be exactly 1825 days');
+          if (artifact?.historyDepth?.expectedYahooRange !== '5y') fail('v1826 Yahoo range must be 5y');
+          if (artifact?.historyDepth?.normalProductionDefaultChanged !== false) fail('production history default changed');
+          if (artifact?.historyDepth?.qualityValidationChanged !== false) fail('quality validation changed');
+          if (artifact?.historyDepth?.statisticalReadinessThresholdsChanged !== false) fail('statistical thresholds changed');
+          if (artifact?.historyDepth?.historicalResearchOnly !== true) fail('history depth escaped research-only mode');
+          if (artifact?.readinessSummary?.thresholds?.minimumDistinctForecastDates !== 30) fail('30-date floor changed');
+          if (artifact?.executionState !== 'ENABLED_RESEARCH_ONLY') fail('research execution state is not isolated');
+          if (artifact?.publication?.artifactOnly !== true) fail('artifact-only publication contract broken');
+          if (artifact?.publication?.liveFeedWriteAllowed !== false) fail('live feed write authority detected');
+          if (artifact?.publication?.forecastOutcomeLedgerWriteAllowed !== false) fail('forecast ledger write authority detected');
+          if (artifact?.publication?.decisionHistoryWriteAllowed !== false) fail('decision history write authority detected');
+          if (artifact?.publication?.gitPushAllowed !== false) fail('git push authority detected');
+          if (artifact?.automaticModelPromotionEnabled !== false) fail('automatic model promotion detected');
+          if (artifact?.decisionIntegrationEnabled !== false) fail('decision integration detected');
+          if (artifact?.forecastMayInfluenceFinalAction !== false) fail('final-action influence detected');
+          if (artifact?.brokerExecutionEligible !== false) fail('broker execution authority detected');
+          if (artifact?.decisionImpact !== 'NONE') fail('decision impact must remain NONE');
+          if (artifact?.readinessSummary?.rawHistoricalRecordsIncluded !== false) fail('raw historical records leaked');
+          if (artifact?.sourceCohortSummary?.rawHistoricalCandlesIncluded !== false) fail('raw historical candles leaked');
+          console.log('PASS v1826 artifact safety contract');
+          console.log(JSON.stringify({
+            historyDepth: artifact.historyDepth,
+            universeCoverage: artifact.universeCoverage,
+            observedMaxima: artifact.readinessSummary?.observedMaxima,
+            blockerCounts: artifact.readinessSummary?.blockerCounts,
+            readyGroupCount: artifact.readinessSummary?.readyGroupCount,
+            historicalRecords: artifact.telemetry?.forecastHistoricalWalkForwardGeneratedRecordCount,
+            validRegimeRecords: artifact.telemetry?.forecastHistoricalWalkForwardValidRegimeRecordCount,
+          }, null, 2));
+          NODE
+
+      - name: Upload v1826 research artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1826-historical-research-${{ github.run_id }}
+          path: market-intelligence/out/v1826-historical-regime-walk-forward-research.json
+          if-no-files-found: warn
+          retention-days: 30
