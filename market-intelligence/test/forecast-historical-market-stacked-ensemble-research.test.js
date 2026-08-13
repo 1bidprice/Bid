@@ -42,7 +42,7 @@ function strongRecords(count = 520, options = {}) {
     ...options,
     positiveOutcome: index % 2,
     factorScore: index % 2 ? 1 : -1,
-    rawProbabilityPositive: 0.5,
+    rawProbabilityPositive: 0.6,
   }));
 }
 
