@@ -1,0 +1,294 @@
+import { evaluateForecastCalibration, evaluateForecastPromotionGate } from './forecast-calibration.js';
+import { evaluateOosSampleIndependence, splitChronologicalDateBlocks } from './forecast-oos-sample-independence.js';
+import { evaluateOosOutcomeWindowIndependence } from './forecast-oos-outcome-window-independence.js';
+import { evaluateOosInstrumentConcentration } from './forecast-oos-instrument-concentration.js';
+import { buildHistoricalMarketFactorPrequentialStackPredictions } from './forecast-historical-market-prequential-stack.js';
+
+export const HISTORICAL_MARKET_STACK_RESEARCH_VERSION = '2026-08-13.1';
+export const HISTORICAL_MARKET_STACK_RESEARCH_CONTRACT = 'HISTORICAL_MARKET_STACK_PREDICTIVE_RESEARCH_V1';
+
+function strictNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function round(value, digits = 6) {
+  return Number.isFinite(value) ? Number(value.toFixed(digits)) : null;
+}
+
+function probabilityRecord(prediction, probability) {
+  return {
+    forecastId: prediction.forecastId || null,
+    validationMode: 'WALK_FORWARD_OOS',
+    status: 'MATURED',
+    rawProbabilityPositive: probability,
+    positiveOutcome: prediction.positiveOutcome,
+    instrumentId: prediction.instrumentId || null,
+    companyId: prediction.companyId || null,
+    assetClass: prediction.assetClass || 'UNKNOWN',
+    horizon: prediction.horizon || null,
+    tradingDays: prediction.tradingDays || null,
+    forecastAt: prediction.forecastAt || null,
+    forecastSampleDate: prediction.forecastSampleDate || null,
+    outcomeKnownAt: prediction.outcomeKnownAt || null,
+    referencePrice: {
+      timestamp: prediction.referencePrice?.timestamp || prediction.forecastAt || null,
+    },
+    realisedOutcome: {
+      timestamp: prediction.realisedOutcome?.timestamp || prediction.outcomeKnownAt || null,
+    },
+  };
+}
+
+function metricRecords(predictions, field) {
+  return predictions.map((prediction) => probabilityRecord(prediction, prediction[field]));
+}
+
+function improvementPct(baselineValue, candidateValue) {
+  const baseline = strictNumber(baselineValue);
+  const candidate = strictNumber(candidateValue);
+  if (baseline === null || candidate === null || baseline <= 0) return null;
+  return ((baseline - candidate) / baseline) * 100;
+}
+
+function absoluteImprovement(baselineValue, candidateValue) {
+  const baseline = strictNumber(baselineValue);
+  const candidate = strictNumber(candidateValue);
+  return baseline === null || candidate === null ? null : baseline - candidate;
+}
+
+function lineageKey(prediction = {}) {
+  return [
+    prediction.historicalPatternPolicyVersion || 'NO_PATTERN_VERSION',
+    prediction.historicalMarketFactorPolicyVersion || 'NO_MARKET_FACTOR_VERSION',
+    prediction.assetClass || 'UNKNOWN',
+    prediction.horizon || 'UNKNOWN',
+    prediction.regimeKey || 'NO_REGIME',
+  ].join('|');
+}
+
+function evaluationMetrics(predictions, options = {}) {
+  const minimumMetricsSample = Math.max(20, Number(options.minimumMetricsSample ?? 20));
+  const binCount = Math.max(4, Number(options.calibrationBinCount ?? 8));
+  const baselineRecords = metricRecords(predictions, 'baselinePatternProbabilityPositive');
+  const ensembleRecords = metricRecords(predictions, 'ensembleResearchProbabilityPositive');
+  const baseline = evaluateForecastCalibration(baselineRecords, { minimumTotal: minimumMetricsSample, binCount });
+  const ensemble = evaluateForecastCalibration(ensembleRecords, { minimumTotal: minimumMetricsSample, binCount });
+  return {
+    baseline,
+    ensemble,
+    brierImprovementPct: round(improvementPct(baseline.brierScore, ensemble.brierScore), 4),
+    logLossImprovementPct: round(improvementPct(baseline.logLoss, ensemble.logLoss), 4),
+    eceImprovement: round(absoluteImprovement(baseline.expectedCalibrationError, ensemble.expectedCalibrationError), 6),
+  };
+}
+
+function chronologicalStability(predictions, options = {}) {
+  const blockCount = Math.max(3, Number(options.chronologicalBlockCount ?? 3));
+  const minimumBlockSample = Math.max(20, Number(options.minimumChronologicalBlockSample ?? 20));
+  const blocks = splitChronologicalDateBlocks(predictions, blockCount).map((block, index) => {
+    const metrics = evaluationMetrics(block, { ...options, minimumMetricsSample: minimumBlockSample });
+    const skill = strictNumber(metrics.ensemble.skillVsBaseRatePct);
+    const brierImprovement = strictNumber(metrics.brierImprovementPct);
+    const logLossImprovement = strictNumber(metrics.logLossImprovementPct);
+    const ready = block.length >= minimumBlockSample &&
+      metrics.ensemble.status === 'OOS_METRICS_READY' &&
+      skill !== null && skill >= 0 &&
+      brierImprovement !== null && brierImprovement >= 0 &&
+      logLossImprovement !== null && logLossImprovement >= 0;
+    return {
+      block: index + 1,
+      sampleSize: block.length,
+      firstForecastAt: block[0]?.forecastAt || null,
+      lastForecastAt: block.at(-1)?.forecastAt || null,
+      ensembleSkillVsBaseRatePct: metrics.ensemble.skillVsBaseRatePct,
+      brierImprovementVsRawPatternPct: metrics.brierImprovementPct,
+      logLossImprovementVsRawPatternPct: metrics.logLossImprovementPct,
+      ensembleEce: metrics.ensemble.expectedCalibrationError,
+      ready,
+    };
+  });
+  return {
+    status: blocks.length === blockCount && blocks.every((block) => block.ready)
+      ? 'CHRONOLOGICAL_STABILITY_READY'
+      : 'CHRONOLOGICAL_STABILITY_NOT_READY',
+    blockCount,
+    minimumBlockSample,
+    blocks,
+  };
+}
+
+function evaluateGroup(predictions, options = {}) {
+  const minimumEvaluationSample = Math.max(200, Number(options.minimumEvaluationSample ?? 200));
+  const minimumClassCount = Math.max(40, Number(options.minimumClassCount ?? 40));
+  const minimumSkillPct = Math.max(5, Number(options.minimumSkillPct ?? 5));
+  const maximumEce = Math.min(0.08, Number(options.maximumEce ?? 0.08));
+  const minimumBrierImprovementPct = Math.max(3, Number(options.minimumBrierImprovementPct ?? 3));
+  const minimumLogLossImprovementPct = Math.max(0, Number(options.minimumLogLossImprovementPct ?? 0));
+  const minimumEceImprovement = Math.max(-0.01, Number(options.minimumEceImprovement ?? -0.01));
+  const metrics = evaluationMetrics(predictions, options);
+  const promotionEvidence = evaluateForecastPromotionGate(metrics.ensemble, {
+    minimumSample: minimumEvaluationSample,
+    minimumSkillPct,
+    maximumEce,
+  });
+  const sampleIndependence = evaluateOosSampleIndependence(predictions, {
+    minimumDistinctForecastDates: Math.max(40, Number(options.minimumDistinctForecastDates ?? 40)),
+    minimumDistinctInstruments: Math.max(10, Number(options.minimumDistinctInstruments ?? 10)),
+    maximumSingleForecastDateSharePct: Math.min(10, Number(options.maximumSingleForecastDateSharePct ?? 10)),
+  });
+  const outcomeWindowIndependence = evaluateOosOutcomeWindowIndependence(metricRecords(predictions, 'ensembleResearchProbabilityPositive'), {
+    minimumEffectiveNonOverlappingWindows: Math.max(12, Number(options.minimumEffectiveNonOverlappingWindows ?? 12)),
+  });
+  const instrumentConcentration = evaluateOosInstrumentConcentration(predictions, {
+    maximumSingleInstrumentSharePct: Math.min(25, Number(options.maximumSingleInstrumentSharePct ?? 25)),
+    minimumEffectiveInstrumentCount: Math.max(6, Number(options.minimumEffectiveInstrumentCount ?? 6)),
+  });
+  const stability = chronologicalStability(predictions, options);
+  const positiveCount = predictions.filter((item) => item.positiveOutcome === 1).length;
+  const negativeCount = predictions.length - positiveCount;
+  const blockers = [];
+
+  if (predictions.length < minimumEvaluationSample) blockers.push('HISTORICAL_MARKET_STACK_PREDICTION_SAMPLE_TOO_SMALL');
+  if (positiveCount < minimumClassCount || negativeCount < minimumClassCount) blockers.push('HISTORICAL_MARKET_STACK_CLASS_SAMPLE_TOO_SMALL');
+  for (const blocker of promotionEvidence.blockers || []) {
+    if (blocker === 'OOS_SAMPLE_TOO_SMALL_FOR_PROMOTION') blockers.push('HISTORICAL_MARKET_STACK_PREDICTION_SAMPLE_TOO_SMALL');
+    else if (blocker === 'INSUFFICIENT_PROBABILISTIC_SKILL') blockers.push('HISTORICAL_MARKET_STACK_PROBABILISTIC_SKILL_TOO_SMALL');
+    else if (blocker === 'CALIBRATION_ERROR_TOO_HIGH') blockers.push('HISTORICAL_MARKET_STACK_ECE_TOO_HIGH');
+    else blockers.push(`HISTORICAL_MARKET_STACK_${blocker}`);
+  }
+  if (strictNumber(metrics.brierImprovementPct) === null || metrics.brierImprovementPct < minimumBrierImprovementPct) blockers.push('HISTORICAL_MARKET_STACK_BRIER_IMPROVEMENT_TOO_SMALL');
+  if (strictNumber(metrics.logLossImprovementPct) === null || metrics.logLossImprovementPct < minimumLogLossImprovementPct) blockers.push('HISTORICAL_MARKET_STACK_LOGLOSS_REGRESSION');
+  if (strictNumber(metrics.eceImprovement) === null || metrics.eceImprovement < minimumEceImprovement) blockers.push('HISTORICAL_MARKET_STACK_ECE_REGRESSION');
+  blockers.push(...sampleIndependence.blockers, ...outcomeWindowIndependence.blockers, ...instrumentConcentration.blockers);
+  if (stability.status !== 'CHRONOLOGICAL_STABILITY_READY') blockers.push('HISTORICAL_MARKET_STACK_CHRONOLOGICAL_STABILITY_NOT_READY');
+  const uniqueBlockers = [...new Set(blockers)];
+
+  return {
+    historicalPatternPolicyVersion: predictions[0]?.historicalPatternPolicyVersion || null,
+    historicalMarketFactorPolicyVersion: predictions[0]?.historicalMarketFactorPolicyVersion || null,
+    assetClass: predictions[0]?.assetClass || 'UNKNOWN',
+    horizon: predictions[0]?.horizon || null,
+    regimeKey: predictions[0]?.regimeKey || null,
+    status: uniqueBlockers.length
+      ? 'HISTORICAL_MARKET_STACK_PREDICTIVE_NOT_READY'
+      : 'HISTORICAL_MARKET_STACK_PREDICTIVE_READY',
+    sampleSize: predictions.length,
+    positiveCount,
+    negativeCount,
+    baselinePatternMetrics: {
+      brierScore: metrics.baseline.brierScore,
+      logLoss: metrics.baseline.logLoss,
+      expectedCalibrationError: metrics.baseline.expectedCalibrationError,
+      skillVsBaseRatePct: metrics.baseline.skillVsBaseRatePct,
+      baseRate: metrics.baseline.baseRate,
+    },
+    ensembleMetrics: {
+      brierScore: metrics.ensemble.brierScore,
+      logLoss: metrics.ensemble.logLoss,
+      expectedCalibrationError: metrics.ensemble.expectedCalibrationError,
+      skillVsBaseRatePct: metrics.ensemble.skillVsBaseRatePct,
+      baseRate: metrics.ensemble.baseRate,
+    },
+    brierImprovementVsRawPatternPct: metrics.brierImprovementPct,
+    logLossImprovementVsRawPatternPct: metrics.logLossImprovementPct,
+    eceImprovementVsRawPattern: metrics.eceImprovement,
+    sampleIndependence,
+    outcomeWindowIndependence,
+    instrumentConcentration,
+    chronologicalStability: stability,
+    thresholds: {
+      minimumEvaluationSample,
+      minimumClassCount,
+      minimumSkillPct,
+      maximumEce,
+      minimumBrierImprovementPct,
+      minimumLogLossImprovementPct,
+      minimumEceImprovement,
+      minimumDistinctForecastDates: sampleIndependence.thresholds.minimumDistinctForecastDates,
+      minimumDistinctInstruments: sampleIndependence.thresholds.minimumDistinctInstruments,
+      maximumSingleForecastDateSharePct: sampleIndependence.thresholds.maximumSingleForecastDateSharePct,
+      minimumEffectiveNonOverlappingWindows: outcomeWindowIndependence.thresholds.minimumEffectiveNonOverlappingWindows,
+      maximumSingleInstrumentSharePct: instrumentConcentration.thresholds.maximumSingleInstrumentSharePct,
+      minimumEffectiveInstrumentCount: instrumentConcentration.thresholds.minimumEffectiveInstrumentCount,
+      chronologicalBlockCount: stability.blockCount,
+      minimumChronologicalBlockSample: stability.minimumBlockSample,
+    },
+    blockers: uniqueBlockers,
+    taxonomyHistoricalBackfillAllowed: false,
+    taxonomyPromotionEligible: false,
+    historicalResearchOnly: true,
+    automaticModelPromotionEnabled: false,
+    probabilityCalibrationEnabled: false,
+    decisionIntegrationEnabled: false,
+    forecastMayInfluenceFinalAction: false,
+    finalActionEligible: false,
+    brokerExecutionEligible: false,
+    decisionImpact: 'NONE',
+  };
+}
+
+export function buildHistoricalMarketStackResearch(records = [], options = {}) {
+  const input = Array.isArray(records) ? records : [];
+  const prequential = buildHistoricalMarketFactorPrequentialStackPredictions(input, options);
+  const groupsMap = new Map();
+  for (const prediction of prequential.predictions) {
+    const key = lineageKey(prediction);
+    const items = groupsMap.get(key) || [];
+    items.push(prediction);
+    groupsMap.set(key, items);
+  }
+  const groups = [...groupsMap.values()]
+    .map((predictions) => evaluateGroup(predictions, options))
+    .sort((left, right) => [left.historicalPatternPolicyVersion, left.historicalMarketFactorPolicyVersion, left.assetClass, left.horizon, left.regimeKey].join('|')
+      .localeCompare([right.historicalPatternPolicyVersion, right.historicalMarketFactorPolicyVersion, right.assetClass, right.horizon, right.regimeKey].join('|')));
+  const predictiveReadyGroupCount = groups.filter((group) => group.status === 'HISTORICAL_MARKET_STACK_PREDICTIVE_READY').length;
+  const blockerCounts = new Map();
+  for (const group of groups) {
+    for (const blocker of group.blockers || []) blockerCounts.set(blocker, (blockerCounts.get(blocker) || 0) + 1);
+  }
+
+  return {
+    format: 'investor-control-historical-market-stacked-ensemble-research',
+    version: 1,
+    policyVersion: HISTORICAL_MARKET_STACK_RESEARCH_VERSION,
+    contract: HISTORICAL_MARKET_STACK_RESEARCH_CONTRACT,
+    status: predictiveReadyGroupCount
+      ? 'HISTORICAL_MARKET_STACK_PREDICTIVE_READY_GROUPS_EXIST'
+      : 'HISTORICAL_MARKET_STACK_PREDICTIVE_NOT_READY',
+    sourceRecordCount: input.length,
+    eligibleRecordCount: prequential.eligibleRecordCount,
+    rejectedRecordCount: prequential.rejectedRecordCount,
+    predictionCount: prequential.predictionCount,
+    skippedInsufficientTrainingCount: prequential.skippedInsufficientTrainingCount,
+    modelFitCount: prequential.modelFitCount,
+    groupCount: groups.length,
+    predictiveReadyGroupCount,
+    predictiveNotReadyGroupCount: groups.length - predictiveReadyGroupCount,
+    groups,
+    blockerCounts: [...blockerCounts.entries()]
+      .map(([code, groupCount]) => ({ code, groupCount }))
+      .sort((left, right) => right.groupCount - left.groupCount || left.code.localeCompare(right.code)),
+    methodology: {
+      model: 'PREQUENTIAL_L2_LOGISTIC_STACK',
+      features: ['PATTERN_LOGIT', 'HISTORICAL_MARKET_FACTOR_SCORE'],
+      historicalMarketFactorDomains: ['MOMENTUM', 'RISK'],
+      trainingRule: prequential.antiLeakRule,
+      comparisonRule: 'ENSEMBLE_AND_RAW_PATTERN_EVALUATED_ON_IDENTICAL_TARGET_PREDICTION_SAMPLE',
+      chronologyRule: 'THREE_CONTIGUOUS_FORECAST_DATE_BLOCKS_EACH_REQUIRE_NON_NEGATIVE_BASE_RATE_SKILL_AND_NON_REGRESSION_VS_RAW_PATTERN',
+      taxonomyHistoricalBackfillAllowed: false,
+      rawPredictionExportAllowed: false,
+    },
+    rawPredictionsIncluded: false,
+    rawHistoricalRecordsIncluded: false,
+    rawHistoricalCandlesIncluded: false,
+    taxonomyPromotionEligible: false,
+    historicalResearchOnly: true,
+    automaticModelPromotionEnabled: false,
+    probabilityCalibrationEnabled: false,
+    decisionIntegrationEnabled: false,
+    forecastMayInfluenceFinalAction: false,
+    finalActionEligible: false,
+    brokerExecutionEligible: false,
+    decisionImpact: 'NONE',
+  };
+}
