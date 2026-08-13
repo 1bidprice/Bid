@@ -63,6 +63,21 @@ function blockPredictiveSummary(summary, datasetIntegrity) {
   };
 }
 
+export function assertV1827DatasetIntegrityReady(datasetIntegrity = {}) {
+  if (datasetIntegrity?.contract !== V1827_DATASET_INTEGRITY_CONTRACT || datasetIntegrity?.ready !== true) {
+    const blockers = Array.isArray(datasetIntegrity?.blockers) && datasetIntegrity.blockers.length
+      ? datasetIntegrity.blockers.join(',')
+      : 'UNKNOWN_DATASET_INTEGRITY_FAILURE';
+    throw new Error(`v1827 predictive dataset integrity blocked: ${blockers}`);
+  }
+  if (datasetIntegrity.validRegimeRecordCount !== datasetIntegrity.generatedRecordCount
+      || datasetIntegrity.regimeUnavailableRecordCount !== 0
+      || datasetIntegrity.regimeCoveragePct !== 100) {
+    throw new Error('v1827 predictive dataset integrity inconsistent');
+  }
+  return true;
+}
+
 export async function runV1827HistoricalPredictiveSkillResearchJob(input = {}) {
   const runBase = input.runV1826 || runV1826HistoricalResearchJob;
   const { runV1826: _ignored, ...baseInput } = input;
@@ -106,6 +121,7 @@ async function main() {
   if (result.predictiveSkillSummary.blockerCounts.length) {
     console.log(`Predictive blockers: ${result.predictiveSkillSummary.blockerCounts.map((item) => `${item.code}=${item.groupCount}`).join(', ')}`);
   }
+  assertV1827DatasetIntegrityReady(result.datasetIntegrity);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : '';
