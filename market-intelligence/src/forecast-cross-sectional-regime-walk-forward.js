@@ -6,8 +6,9 @@ import { evaluateOosSampleIndependence } from './forecast-oos-sample-independenc
 import { evaluateOosOutcomeWindowIndependence } from './forecast-oos-outcome-window-independence.js';
 import { evaluateOosInstrumentConcentration } from './forecast-oos-instrument-concentration.js';
 import { buildHistoricalMarketFactorSnapshot, HISTORICAL_MARKET_FACTOR_VERSION } from './forecast-historical-market-factor.js';
+import { buildHistoricalMarketStackResearch } from './forecast-historical-market-stacked-ensemble-research.js';
 
-export const FORECAST_CROSS_SECTIONAL_REGIME_WALK_FORWARD_VERSION = '2026-08-13.2';
+export const FORECAST_CROSS_SECTIONAL_REGIME_WALK_FORWARD_VERSION = '2026-08-14.1';
 export const FORECAST_CROSS_SECTIONAL_REGIME_WALK_FORWARD_CONTRACT = 'CROSS_SECTIONAL_HISTORICAL_REGIME_WALK_FORWARD_RESEARCH_V1';
 export const FORECAST_CROSS_SECTIONAL_REGIME_WALK_FORWARD_EVIDENCE_CLASS = 'HISTORICAL_CROSS_SECTIONAL_REGIME_WALK_FORWARD_RESEARCH';
 
@@ -356,6 +357,7 @@ export function buildCrossSectionalRegimeWalkForwardResearch(input = {}) {
 
   const validRegimeRecords = allRecords.filter((record) => record.regimeStatus === 'REGIME_READY' && record.regimeKey);
   const historicalMarketFactorReadyRecordCount = allRecords.filter((record) => record.historicalMarketFactorStatus === 'HISTORICAL_MARKET_FACTOR_READY' && finite(record.historicalMarketFactorScore) !== null).length;
+  const historicalMarketStackResearch = buildHistoricalMarketStackResearch(validRegimeRecords, options);
   const groupsMap = new Map();
   for (const record of validRegimeRecords) {
     const key = groupKey(record);
@@ -390,6 +392,7 @@ export function buildCrossSectionalRegimeWalkForwardResearch(input = {}) {
     historicalMarketFactorBlockedRecordCount: allRecords.length - historicalMarketFactorReadyRecordCount,
     groupCount: groups.length,
     readyGroupCount,
+    historicalMarketStackResearch,
     instrumentSummaries,
     groups,
     diagnostics,
@@ -402,6 +405,7 @@ export function buildCrossSectionalRegimeWalkForwardResearch(input = {}) {
       historicalMarketFactorPolicyVersion: HISTORICAL_MARKET_FACTOR_VERSION,
       historicalMarketFactorAllowedDomains: ['MOMENTUM', 'RISK'],
       historicalMarketFactorFundamentalBackfillAllowed: false,
+      historicalMarketStackBoundary: 'PREQUENTIAL_WITHIN_SAME_PATTERN_FACTOR_ASSET_HORIZON_REGIME_LINEAGE_TRAIN_ONLY_ON_OUTCOMES_REALIZED_STRICTLY_BEFORE_TARGET_FORECAST_TIME',
       crossSectionalPooling: 'POOL_ONLY_AFTER_PER_INSTRUMENT_FORECAST_GENERATION',
       historicalClassificationBackfillAllowed: false,
       liveArchiveWriteAllowed: false,
