@@ -7,14 +7,20 @@ import {
   verifyCrossSectionalRegimeWalkForwardProductionSafety,
 } from '../src/forecast-cross-sectional-regime-walk-forward-production-safety.js';
 
-export const HISTORICAL_RESEARCH_JOB_VERSION = '2026-08-13.3';
+export const HISTORICAL_RESEARCH_JOB_VERSION = '2026-08-13.4';
 export const HISTORICAL_RESEARCH_JOB_CONTRACT = 'ARTIFACT_ONLY_CROSS_SECTIONAL_REGIME_WALK_FORWARD_JOB_V1';
 export const HISTORICAL_RESEARCH_READINESS_SUMMARY_CONTRACT = 'HISTORICAL_REGIME_WALK_FORWARD_READINESS_SUMMARY_V1';
+export const HISTORICAL_RESEARCH_SOURCE_COHORT_CONTRACT = 'HISTORICAL_RESEARCH_SOURCE_COHORT_SUMMARY_V1';
 
 function boundedInteger(value, fallback, minimum, maximum) {
   const number = Number(value);
   if (!Number.isFinite(number)) return fallback;
   return Math.max(minimum, Math.min(maximum, Math.floor(number)));
+}
+
+function nonNegativeNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : 0;
 }
 
 function researchOptions(input = {}) {
@@ -40,6 +46,64 @@ function researchOptions(input = {}) {
 function finiteMaximum(values = []) {
   const finite = values.filter((value) => typeof value === 'number' && Number.isFinite(value));
   return finite.length ? Math.max(...finite) : 0;
+}
+
+export function summarizeHistoricalResearchSourceCohort(report = {}, status = {}) {
+  const expansion = report?.universeExpansion || {};
+  const discovery = report?.discovery || {};
+  const broad = report?.broadOpportunityScan || {};
+  const longHistory = report?.longHistoryResearchSummary || {};
+  return {
+    contract: HISTORICAL_RESEARCH_SOURCE_COHORT_CONTRACT,
+    universeExpansion: {
+      seedCompanyCount: nonNegativeNumber(expansion.seedCompanyCount),
+      eventDiscoveredCompanyCount: nonNegativeNumber(expansion.eventDiscoveredCompanyCount),
+      broadScreenCompanyCount: nonNegativeNumber(expansion.broadScreenCompanyCount),
+      analysedCompanyCount: nonNegativeNumber(expansion.analysedCompanyCount),
+      opportunityScannedInstrumentCount: nonNegativeNumber(expansion.opportunityScannedInstrumentCount),
+      opportunityScorableInstrumentCount: nonNegativeNumber(expansion.opportunityScorableInstrumentCount),
+    },
+    discovery: {
+      registryCompanyCount: nonNegativeNumber(discovery.registryCompanyCount),
+      secRegistryCompanyCount: nonNegativeNumber(discovery.secRegistryCompanyCount),
+      athensActiveIssuerCount: nonNegativeNumber(discovery.athensActiveIssuerCount),
+      candidateCount: nonNegativeNumber(discovery.candidateCount),
+      deepAnalysisCompanyCount: nonNegativeNumber(discovery.deepAnalysisCompanyCount),
+      unresolvedIdentityCount: nonNegativeNumber(discovery.unresolvedIdentityCount),
+    },
+    broadOpportunity: {
+      enabled: broad.enabled === true,
+      directoryEligibleCount: nonNegativeNumber(broad.directoryEligibleCount),
+      candidateCount: Array.isArray(broad.candidates) ? broad.candidates.length : 0,
+    },
+    longHistory: {
+      enabled: longHistory.enabled === true,
+      eligibleDossierCount: nonNegativeNumber(longHistory.eligibleDossierCount),
+      selectedCount: nonNegativeNumber(longHistory.selectedCount),
+      attemptedCount: nonNegativeNumber(longHistory.attemptedCount),
+      readyCount: nonNegativeNumber(longHistory.readyCount),
+      rejectedCount: nonNegativeNumber(longHistory.rejectedCount),
+      skippedByLimit: nonNegativeNumber(longHistory.skippedByLimit),
+      skippedNoCanonicalCount: nonNegativeNumber(longHistory.skippedNoCanonicalCount),
+      skippedNonIndependentCount: nonNegativeNumber(longHistory.skippedNonIndependentCount),
+      independentOverlapAttemptedCount: nonNegativeNumber(longHistory.independentOverlapAttemptedCount),
+      independentOverlapReadyCount: nonNegativeNumber(longHistory.independentOverlapReadyCount),
+      independentOverlapRejectedCount: nonNegativeNumber(longHistory.independentOverlapRejectedCount),
+      minimumOverlapSessions: nonNegativeNumber(longHistory.minimumOverlapSessions),
+      minimumObservations: nonNegativeNumber(longHistory.minimumObservations),
+    },
+    finalResearchDossierCount: Array.isArray(report?.researchDossiers) ? report.researchDossiers.length : 0,
+    walkForwardDossierCount: nonNegativeNumber(status?.universeCoverage?.dossierCount),
+    walkForwardLoadedHistoryCount: nonNegativeNumber(status?.universeCoverage?.loadedHistoricalSeriesCount),
+    walkForwardEligibleInstrumentCount: nonNegativeNumber(status?.eligibleInstrumentCount),
+    walkForwardSelectedInstrumentCount: nonNegativeNumber(status?.selectedInstrumentCount),
+    rawCompanyRecordsIncluded: false,
+    rawHistoricalCandlesIncluded: false,
+    selectionRulesChanged: false,
+    thresholdsChanged: false,
+    historicalResearchOnly: true,
+    decisionImpact: 'NONE',
+  };
 }
 
 export function summarizeHistoricalResearchReadiness(status = {}, options = {}) {
@@ -115,6 +179,7 @@ export async function runCrossSectionalRegimeWalkForwardResearchJob(input = {}) 
     operationalHealth: telemetry,
   });
   const readinessSummary = summarizeHistoricalResearchReadiness(status, configuredResearchOptions);
+  const sourceCohortSummary = summarizeHistoricalResearchSourceCohort(report, status);
   const completedAt = new Date();
   return {
     format: 'investor-control-historical-regime-walk-forward-research-artifact',
@@ -130,6 +195,7 @@ export async function runCrossSectionalRegimeWalkForwardResearchJob(input = {}) 
     maximumInstrumentCount,
     verification,
     telemetry,
+    sourceCohortSummary,
     readinessSummary,
     universeCoverage: status.universeCoverage,
     researchStatus: status,
@@ -162,6 +228,7 @@ async function main() {
   console.log(`Valid regime records: ${result.telemetry.forecastHistoricalWalkForwardValidRegimeRecordCount}`);
   console.log(`Research groups: ${result.telemetry.forecastHistoricalWalkForwardGroupCount}; ready: ${result.telemetry.forecastHistoricalWalkForwardReadyGroupCount}`);
   console.log(`Universe coverage: dossiers=${result.universeCoverage?.dossierCount || 0}, loaded histories=${result.universeCoverage?.loadedHistoricalSeriesCount || 0}, eligible=${result.universeCoverage?.eligibleInstrumentCount || 0}, selected=${result.universeCoverage?.selectedInstrumentCount || 0}`);
+  console.log(`Source cohort: analysed=${result.sourceCohortSummary.universeExpansion.analysedCompanyCount}, final dossiers=${result.sourceCohortSummary.finalResearchDossierCount}, long-history eligible=${result.sourceCohortSummary.longHistory.eligibleDossierCount}, selected=${result.sourceCohortSummary.longHistory.selectedCount}, skipped-by-limit=${result.sourceCohortSummary.longHistory.skippedByLimit}`);
   if (result.readinessSummary.blockerCounts.length) {
     console.log(`Readiness blockers: ${result.readinessSummary.blockerCounts.map((item) => `${item.code}=${item.groupCount}`).join(', ')}`);
   }
