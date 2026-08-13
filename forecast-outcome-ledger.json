@@ -3,7 +3,7 @@
   "version": 1,
   "policyVersion": "2026-08-11.1",
   "ledgerPolicyVersion": "2026-08-12.1",
-  "updatedAt": "2026-08-13T08:45:56.143Z",
+  "updatedAt": "2026-08-13T10:24:09.321Z",
   "records": [
     {
       "format": "investor-control-forecast-outcome-record",
@@ -49755,14 +49755,1488 @@
         "horizon": "week1",
         "forecastSampleDate": "2026-08-13"
       }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-12.1",
+      "forecastId": "forecast:0d0cd677e0ebb264b55adfd34edb",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:sec:0001347858",
+      "instrumentId": "company:sec:0001347858",
+      "displayName": "22nd Century Group,",
+      "symbol": "XXII",
+      "listing": {
+        "symbol": "XXII",
+        "mic": "XNAS",
+        "exchange": "Nasdaq",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001347858",
+        "instrumentId": "company:sec:0001347858",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0001347858.json",
+        "sourceDocumentId": "CIK0001347858",
+        "capturedAt": "2026-08-13T10:21:26.847Z",
+        "taxonomy": "SEC_SIC",
+        "code": "2111",
+        "description": "Cigarettes",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "marketRegimeSnapshot": {
+        "contract": "FORECAST_TIME_MARKET_REGIME_SNAPSHOT_V1",
+        "policyVersion": "2026-08-12.1",
+        "capturedAt": "2026-08-13T10:21:26.847Z",
+        "benchmarkAsOf": "2026-08-12T13:30:00.000Z",
+        "benchmarkSymbol": "SPY",
+        "benchmarkSource": "Yahoo Finance Chart",
+        "benchmarkSourceQuality": "SECONDARY_VALIDATED",
+        "observationCount": 501,
+        "status": "REGIME_READY",
+        "regimeKey": "NEUTRAL|BULL_TREND|HIGH_VOLATILITY|POSITIVE_MOMENTUM",
+        "riskTone": "NEUTRAL",
+        "trendRegime": "BULL_TREND",
+        "momentumRegime": "POSITIVE_MOMENTUM",
+        "volatilityRegime": "HIGH_VOLATILITY",
+        "metrics": {
+          "latestClose": 772.48999,
+          "return20Pct": 2.3423,
+          "return60Pct": 4.777,
+          "return120Pct": 13.4577,
+          "sma50": 747.658975,
+          "sma200": 701.738448,
+          "annualizedVolatility20Pct": 14.0286,
+          "annualizedVolatility60Pct": 13.9555,
+          "volatility20Percentile": 71.43,
+          "maxDrawdown120Pct": -8.5774
+        },
+        "blockers": [],
+        "researchOnly": true,
+        "modelDerived": true,
+        "finalActionEligible": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "week1",
+      "tradingDays": 5,
+      "forecastSampleDate": "2026-08-12",
+      "forecastAt": "2026-08-13T10:21:26.847Z",
+      "referencePrice": {
+        "value": 4.31,
+        "timestamp": "2026-08-12T20:00:00.000Z",
+        "currency": "USD",
+        "source": "Finnhub Quote API"
+      },
+      "rawProbabilityPositive": 0.2292,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": null,
+      "rawLatentFactorScore": -0.618904,
+      "factorScoreStatus": "RESEARCH_SCORE_BLOCKED",
+      "factorAvailableDomainCount": 4,
+      "factorAvailableWeight": 0.52,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": -0.595773,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": -1,
+          "weight": 0.16,
+          "verifiedDriverCount": 2
+        },
+        {
+          "domain": "RISK",
+          "value": -0.864,
+          "weight": 0.09,
+          "verifiedDriverCount": 5
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.94,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": -9.1218,
+      "distribution": {
+        "p10ReturnPct": -24.918,
+        "p25ReturnPct": -14.4828,
+        "medianReturnPct": -5.0279,
+        "p75ReturnPct": -0.2268,
+        "p90ReturnPct": 3.0682,
+        "downsideProbabilityPct": 77.08,
+        "bullCaseReturnPct": 3.0682,
+        "baseCaseReturnPct": -5.0279,
+        "bearCaseReturnPct": -24.918
+      },
+      "patternConfidenceScore": 65,
+      "evidenceQualityScore": 20,
+      "regime": "BEAR_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-07.1",
+        "generatedAt": "2026-08-13T10:21:26.847Z",
+        "validUntil": "2026-08-14T10:21:26.847Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 33,
+        "dataQualityScore": 30,
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 14.3574575,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 20.8574575,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "CLOSED_MARKET_LAST_VERIFIED_CLOSE",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": null,
+          "fundamentalFlags": [
+            "SEVERE_DILUTION"
+          ],
+          "marketFlags": [
+            "EXTREME_VOLATILITY",
+            "SEVERE_DRAWDOWN",
+            "LOW_LIQUIDITY",
+            "BELOW_50_DAY_AVERAGE",
+            "WEAK_RELATIVE_STRENGTH"
+          ]
+        },
+        "controlledPlan": {
+          "status": "AVAILABLE",
+          "level": "INTERIM_RISK_CONTROL",
+          "title": "Πλάνο τώρα",
+          "holderAction": "HOLD",
+          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ — ΕΠΑΝΕΞΕΤΑΣΗ ΚΙΝΔΥΝΟΥ",
+          "nonHolderAction": "DO_NOT_BUY",
+          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
+          "marketAction": "WATCH",
+          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+          "newBuyAllowed": false,
+          "sellSignalApproved": false,
+          "confidenceScore": 33,
+          "dataQualityScore": 30,
+          "rationale": "Υπάρχουν επαληθευμένες ενδείξεις αυξημένου κινδύνου, αλλά δεν έχουν περάσει ακόμη όλοι οι έλεγχοι που απαιτούνται για τελικό σήμα πώλησης ή μείωσης.",
+          "blockers": [
+            "DOSSIER_NOT_PUBLISHABLE",
+            "DOSSIER_NOT_READY",
+            "CROSS_CHECK_NOT_READY",
+            "FUNDAMENTALS_NOT_READY"
+          ],
+          "validUntil": "2026-08-14T10:21:26.847Z"
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001347858",
+        "instrumentId": "company:sec:0001347858",
+        "horizon": "week1",
+        "forecastSampleDate": "2026-08-12"
+      }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-12.1",
+      "forecastId": "forecast:0e8e9ea50d7501bc7face55581bd",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:sec:0001347858",
+      "instrumentId": "company:sec:0001347858",
+      "displayName": "22nd Century Group,",
+      "symbol": "XXII",
+      "listing": {
+        "symbol": "XXII",
+        "mic": "XNAS",
+        "exchange": "Nasdaq",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001347858",
+        "instrumentId": "company:sec:0001347858",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0001347858.json",
+        "sourceDocumentId": "CIK0001347858",
+        "capturedAt": "2026-08-13T10:21:26.847Z",
+        "taxonomy": "SEC_SIC",
+        "code": "2111",
+        "description": "Cigarettes",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "marketRegimeSnapshot": {
+        "contract": "FORECAST_TIME_MARKET_REGIME_SNAPSHOT_V1",
+        "policyVersion": "2026-08-12.1",
+        "capturedAt": "2026-08-13T10:21:26.847Z",
+        "benchmarkAsOf": "2026-08-12T13:30:00.000Z",
+        "benchmarkSymbol": "SPY",
+        "benchmarkSource": "Yahoo Finance Chart",
+        "benchmarkSourceQuality": "SECONDARY_VALIDATED",
+        "observationCount": 501,
+        "status": "REGIME_READY",
+        "regimeKey": "NEUTRAL|BULL_TREND|HIGH_VOLATILITY|POSITIVE_MOMENTUM",
+        "riskTone": "NEUTRAL",
+        "trendRegime": "BULL_TREND",
+        "momentumRegime": "POSITIVE_MOMENTUM",
+        "volatilityRegime": "HIGH_VOLATILITY",
+        "metrics": {
+          "latestClose": 772.48999,
+          "return20Pct": 2.3423,
+          "return60Pct": 4.777,
+          "return120Pct": 13.4577,
+          "sma50": 747.658975,
+          "sma200": 701.738448,
+          "annualizedVolatility20Pct": 14.0286,
+          "annualizedVolatility60Pct": 13.9555,
+          "volatility20Percentile": 71.43,
+          "maxDrawdown120Pct": -8.5774
+        },
+        "blockers": [],
+        "researchOnly": true,
+        "modelDerived": true,
+        "finalActionEligible": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "day1",
+      "tradingDays": 1,
+      "forecastSampleDate": "2026-08-12",
+      "forecastAt": "2026-08-13T10:21:26.847Z",
+      "referencePrice": {
+        "value": 4.31,
+        "timestamp": "2026-08-12T20:00:00.000Z",
+        "currency": "USD",
+        "source": "Finnhub Quote API"
+      },
+      "rawProbabilityPositive": 0.4058,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": null,
+      "rawLatentFactorScore": -0.426873,
+      "factorScoreStatus": "RESEARCH_SCORE_BLOCKED",
+      "factorAvailableDomainCount": 4,
+      "factorAvailableWeight": 0.52,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": -0.141881,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": -1,
+          "weight": 0.16,
+          "verifiedDriverCount": 2
+        },
+        {
+          "domain": "RISK",
+          "value": -0.864,
+          "weight": 0.09,
+          "verifiedDriverCount": 5
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.94,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": -0.3335,
+      "distribution": {
+        "p10ReturnPct": -5.2326,
+        "p25ReturnPct": -2.5,
+        "medianReturnPct": -0.641,
+        "p75ReturnPct": 2.649,
+        "p90ReturnPct": 5.2632,
+        "downsideProbabilityPct": 59.42,
+        "bullCaseReturnPct": 5.2632,
+        "baseCaseReturnPct": -0.641,
+        "bearCaseReturnPct": -5.2326
+      },
+      "patternConfidenceScore": 65,
+      "evidenceQualityScore": 20,
+      "regime": "BEAR_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-07.1",
+        "generatedAt": "2026-08-13T10:21:26.847Z",
+        "validUntil": "2026-08-14T10:21:26.847Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 33,
+        "dataQualityScore": 30,
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 14.3574575,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 20.8574575,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "CLOSED_MARKET_LAST_VERIFIED_CLOSE",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": null,
+          "fundamentalFlags": [
+            "SEVERE_DILUTION"
+          ],
+          "marketFlags": [
+            "EXTREME_VOLATILITY",
+            "SEVERE_DRAWDOWN",
+            "LOW_LIQUIDITY",
+            "BELOW_50_DAY_AVERAGE",
+            "WEAK_RELATIVE_STRENGTH"
+          ]
+        },
+        "controlledPlan": {
+          "status": "AVAILABLE",
+          "level": "INTERIM_RISK_CONTROL",
+          "title": "Πλάνο τώρα",
+          "holderAction": "HOLD",
+          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ — ΕΠΑΝΕΞΕΤΑΣΗ ΚΙΝΔΥΝΟΥ",
+          "nonHolderAction": "DO_NOT_BUY",
+          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
+          "marketAction": "WATCH",
+          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+          "newBuyAllowed": false,
+          "sellSignalApproved": false,
+          "confidenceScore": 33,
+          "dataQualityScore": 30,
+          "rationale": "Υπάρχουν επαληθευμένες ενδείξεις αυξημένου κινδύνου, αλλά δεν έχουν περάσει ακόμη όλοι οι έλεγχοι που απαιτούνται για τελικό σήμα πώλησης ή μείωσης.",
+          "blockers": [
+            "DOSSIER_NOT_PUBLISHABLE",
+            "DOSSIER_NOT_READY",
+            "CROSS_CHECK_NOT_READY",
+            "FUNDAMENTALS_NOT_READY"
+          ],
+          "validUntil": "2026-08-14T10:21:26.847Z"
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001347858",
+        "instrumentId": "company:sec:0001347858",
+        "horizon": "day1",
+        "forecastSampleDate": "2026-08-12"
+      }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-12.1",
+      "forecastId": "forecast:1c8940322285d46bbeb0f9cc22fe",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "sec-cik:795403",
+      "instrumentId": "sec-cik:795403",
+      "displayName": "Watts Water Technologies, Inc. Class A Common Stock",
+      "symbol": "WTS",
+      "listing": {
+        "symbol": "WTS",
+        "mic": "XNYS",
+        "exchange": "New York Stock Exchange",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "sec-cik:795403",
+        "instrumentId": "sec-cik:795403",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0000795403.json",
+        "sourceDocumentId": "CIK0000795403",
+        "capturedAt": "2026-08-13T10:21:26.847Z",
+        "taxonomy": "SEC_SIC",
+        "code": "3490",
+        "description": "Miscellaneous Fabricated Metal Products",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "marketRegimeSnapshot": {
+        "contract": "FORECAST_TIME_MARKET_REGIME_SNAPSHOT_V1",
+        "policyVersion": "2026-08-12.1",
+        "capturedAt": "2026-08-13T10:21:26.847Z",
+        "benchmarkAsOf": "2026-08-12T13:30:00.000Z",
+        "benchmarkSymbol": "SPY",
+        "benchmarkSource": "Yahoo Finance Chart",
+        "benchmarkSourceQuality": "SECONDARY_VALIDATED",
+        "observationCount": 501,
+        "status": "REGIME_READY",
+        "regimeKey": "NEUTRAL|BULL_TREND|HIGH_VOLATILITY|POSITIVE_MOMENTUM",
+        "riskTone": "NEUTRAL",
+        "trendRegime": "BULL_TREND",
+        "momentumRegime": "POSITIVE_MOMENTUM",
+        "volatilityRegime": "HIGH_VOLATILITY",
+        "metrics": {
+          "latestClose": 772.48999,
+          "return20Pct": 2.3423,
+          "return60Pct": 4.777,
+          "return120Pct": 13.4577,
+          "sma50": 747.658975,
+          "sma200": 701.738448,
+          "annualizedVolatility20Pct": 14.0286,
+          "annualizedVolatility60Pct": 13.9555,
+          "volatility20Percentile": 71.43,
+          "maxDrawdown120Pct": -8.5774
+        },
+        "blockers": [],
+        "researchOnly": true,
+        "modelDerived": true,
+        "finalActionEligible": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "day1",
+      "tradingDays": 1,
+      "forecastSampleDate": "2026-08-12",
+      "forecastAt": "2026-08-13T10:21:26.847Z",
+      "referencePrice": {
+        "value": 386.37,
+        "timestamp": "2026-08-12T20:00:00.000Z",
+        "currency": null,
+        "source": "Finnhub Quote API"
+      },
+      "rawProbabilityPositive": 0.5067,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": 0.059605,
+      "rawLatentFactorScore": 0.059605,
+      "factorScoreStatus": "LATENT_SCORE_READY",
+      "factorAvailableDomainCount": 8,
+      "factorAvailableWeight": 1,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": 0.022955,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "VALUATION",
+          "value": -0.3334,
+          "weight": 0.14,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "QUALITY",
+          "value": -0.5272,
+          "weight": 0.12,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "GROWTH",
+          "value": 0,
+          "weight": 0.1,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": 0.666267,
+          "weight": 0.16,
+          "verifiedDriverCount": 3
+        },
+        {
+          "domain": "FUNDAMENTAL",
+          "value": 0.4466,
+          "weight": 0.12,
+          "verifiedDriverCount": 3
+        },
+        {
+          "domain": "RISK",
+          "value": -0.43,
+          "weight": 0.09,
+          "verifiedDriverCount": 4
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.86,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": 0.4528,
+      "distribution": {
+        "p10ReturnPct": -2.4486,
+        "p25ReturnPct": -1.308,
+        "medianReturnPct": 0.1305,
+        "p75ReturnPct": 1.7163,
+        "p90ReturnPct": 4.0067,
+        "downsideProbabilityPct": 49.33,
+        "bullCaseReturnPct": 4.0067,
+        "baseCaseReturnPct": 0.1305,
+        "bearCaseReturnPct": -2.4486
+      },
+      "patternConfidenceScore": 63.24,
+      "evidenceQualityScore": 95,
+      "regime": "BULL_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-07.1",
+        "generatedAt": "2026-08-13T10:21:26.847Z",
+        "validUntil": "2026-08-14T10:21:26.847Z",
+        "status": "FINAL",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "HOLD",
+        "holderActionLabel": "ΚΡΑΤΑ",
+        "nonHolderAction": "DO_NOT_BUY",
+        "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ",
+        "urgency": "NORMAL",
+        "urgencyLabel": "Κανονική παρακολούθηση",
+        "confidenceScore": 100,
+        "dataQualityScore": 100,
+        "reasons": [
+          "BUY_SETUP_NOT_CONFIRMED",
+          "EXECUTION_PRICE_NOT_VERIFIED"
+        ],
+        "blockers": [],
+        "freshness": {
+          "referencePriceAgeHours": 14.3574575,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 20.8574575,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "CLOSED_MARKET_LAST_VERIFIED_CLOSE",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": 20,
+          "fundamentalFlags": [],
+          "marketFlags": []
+        },
+        "controlledPlan": null,
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "sec-cik:795403",
+        "instrumentId": "sec-cik:795403",
+        "horizon": "day1",
+        "forecastSampleDate": "2026-08-12"
+      }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-12.1",
+      "forecastId": "forecast:1f22d20287c86e94e581a09fd5eb",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "sec-cik:795403",
+      "instrumentId": "sec-cik:795403",
+      "displayName": "Watts Water Technologies, Inc. Class A Common Stock",
+      "symbol": "WTS",
+      "listing": {
+        "symbol": "WTS",
+        "mic": "XNYS",
+        "exchange": "New York Stock Exchange",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "sec-cik:795403",
+        "instrumentId": "sec-cik:795403",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0000795403.json",
+        "sourceDocumentId": "CIK0000795403",
+        "capturedAt": "2026-08-13T10:21:26.847Z",
+        "taxonomy": "SEC_SIC",
+        "code": "3490",
+        "description": "Miscellaneous Fabricated Metal Products",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "marketRegimeSnapshot": {
+        "contract": "FORECAST_TIME_MARKET_REGIME_SNAPSHOT_V1",
+        "policyVersion": "2026-08-12.1",
+        "capturedAt": "2026-08-13T10:21:26.847Z",
+        "benchmarkAsOf": "2026-08-12T13:30:00.000Z",
+        "benchmarkSymbol": "SPY",
+        "benchmarkSource": "Yahoo Finance Chart",
+        "benchmarkSourceQuality": "SECONDARY_VALIDATED",
+        "observationCount": 501,
+        "status": "REGIME_READY",
+        "regimeKey": "NEUTRAL|BULL_TREND|HIGH_VOLATILITY|POSITIVE_MOMENTUM",
+        "riskTone": "NEUTRAL",
+        "trendRegime": "BULL_TREND",
+        "momentumRegime": "POSITIVE_MOMENTUM",
+        "volatilityRegime": "HIGH_VOLATILITY",
+        "metrics": {
+          "latestClose": 772.48999,
+          "return20Pct": 2.3423,
+          "return60Pct": 4.777,
+          "return120Pct": 13.4577,
+          "sma50": 747.658975,
+          "sma200": 701.738448,
+          "annualizedVolatility20Pct": 14.0286,
+          "annualizedVolatility60Pct": 13.9555,
+          "volatility20Percentile": 71.43,
+          "maxDrawdown120Pct": -8.5774
+        },
+        "blockers": [],
+        "researchOnly": true,
+        "modelDerived": true,
+        "finalActionEligible": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "week1",
+      "tradingDays": 5,
+      "forecastSampleDate": "2026-08-12",
+      "forecastAt": "2026-08-13T10:21:26.847Z",
+      "referencePrice": {
+        "value": 386.37,
+        "timestamp": "2026-08-12T20:00:00.000Z",
+        "currency": null,
+        "source": "Finnhub Quote API"
+      },
+      "rawProbabilityPositive": 0.606,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": 0.095132,
+      "rawLatentFactorScore": 0.095132,
+      "factorScoreStatus": "LATENT_SCORE_READY",
+      "factorAvailableDomainCount": 8,
+      "factorAvailableWeight": 1,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": 0.184444,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "VALUATION",
+          "value": -0.3334,
+          "weight": 0.14,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "QUALITY",
+          "value": -0.5272,
+          "weight": 0.12,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "GROWTH",
+          "value": 0,
+          "weight": 0.1,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": 0.666267,
+          "weight": 0.16,
+          "verifiedDriverCount": 3
+        },
+        {
+          "domain": "FUNDAMENTAL",
+          "value": 0.4466,
+          "weight": 0.12,
+          "verifiedDriverCount": 3
+        },
+        {
+          "domain": "RISK",
+          "value": -0.43,
+          "weight": 0.09,
+          "verifiedDriverCount": 4
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.86,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": 1.2073,
+      "distribution": {
+        "p10ReturnPct": -4.9675,
+        "p25ReturnPct": -2.0585,
+        "medianReturnPct": 0.7146,
+        "p75ReturnPct": 4.7286,
+        "p90ReturnPct": 6.1923,
+        "downsideProbabilityPct": 39.4,
+        "bullCaseReturnPct": 6.1923,
+        "baseCaseReturnPct": 0.7146,
+        "bearCaseReturnPct": -4.9675
+      },
+      "patternConfidenceScore": 55.89,
+      "evidenceQualityScore": 95,
+      "regime": "BULL_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-07.1",
+        "generatedAt": "2026-08-13T10:21:26.847Z",
+        "validUntil": "2026-08-14T10:21:26.847Z",
+        "status": "FINAL",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "HOLD",
+        "holderActionLabel": "ΚΡΑΤΑ",
+        "nonHolderAction": "DO_NOT_BUY",
+        "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ",
+        "urgency": "NORMAL",
+        "urgencyLabel": "Κανονική παρακολούθηση",
+        "confidenceScore": 100,
+        "dataQualityScore": 100,
+        "reasons": [
+          "BUY_SETUP_NOT_CONFIRMED",
+          "EXECUTION_PRICE_NOT_VERIFIED"
+        ],
+        "blockers": [],
+        "freshness": {
+          "referencePriceAgeHours": 14.3574575,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 20.8574575,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "CLOSED_MARKET_LAST_VERIFIED_CLOSE",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": 20,
+          "fundamentalFlags": [],
+          "marketFlags": []
+        },
+        "controlledPlan": null,
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "sec-cik:795403",
+        "instrumentId": "sec-cik:795403",
+        "horizon": "week1",
+        "forecastSampleDate": "2026-08-12"
+      }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-12.1",
+      "forecastId": "forecast:279160740e405610d370ddd5c0d3",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:sec:0001526113",
+      "instrumentId": "company:sec:0001526113",
+      "displayName": "Global Net Lease,",
+      "symbol": "GNL",
+      "listing": {
+        "symbol": "GNL",
+        "mic": "XNYS",
+        "exchange": "NYSE",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001526113",
+        "instrumentId": "company:sec:0001526113",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0001526113.json",
+        "sourceDocumentId": "CIK0001526113",
+        "capturedAt": "2026-08-13T10:21:26.847Z",
+        "taxonomy": "SEC_SIC",
+        "code": "6798",
+        "description": "Real Estate Investment Trusts",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "marketRegimeSnapshot": {
+        "contract": "FORECAST_TIME_MARKET_REGIME_SNAPSHOT_V1",
+        "policyVersion": "2026-08-12.1",
+        "capturedAt": "2026-08-13T10:21:26.847Z",
+        "benchmarkAsOf": "2026-08-12T13:30:00.000Z",
+        "benchmarkSymbol": "SPY",
+        "benchmarkSource": "Yahoo Finance Chart",
+        "benchmarkSourceQuality": "SECONDARY_VALIDATED",
+        "observationCount": 501,
+        "status": "REGIME_READY",
+        "regimeKey": "NEUTRAL|BULL_TREND|HIGH_VOLATILITY|POSITIVE_MOMENTUM",
+        "riskTone": "NEUTRAL",
+        "trendRegime": "BULL_TREND",
+        "momentumRegime": "POSITIVE_MOMENTUM",
+        "volatilityRegime": "HIGH_VOLATILITY",
+        "metrics": {
+          "latestClose": 772.48999,
+          "return20Pct": 2.3423,
+          "return60Pct": 4.777,
+          "return120Pct": 13.4577,
+          "sma50": 747.658975,
+          "sma200": 701.738448,
+          "annualizedVolatility20Pct": 14.0286,
+          "annualizedVolatility60Pct": 13.9555,
+          "volatility20Percentile": 71.43,
+          "maxDrawdown120Pct": -8.5774
+        },
+        "blockers": [],
+        "researchOnly": true,
+        "modelDerived": true,
+        "finalActionEligible": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "day1",
+      "tradingDays": 1,
+      "forecastSampleDate": "2026-08-12",
+      "forecastAt": "2026-08-13T10:21:26.847Z",
+      "referencePrice": {
+        "value": 8.99,
+        "timestamp": "2026-08-12T20:00:00.000Z",
+        "currency": "USD",
+        "source": "Finnhub Quote API"
+      },
+      "rawProbabilityPositive": 0.4795,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": null,
+      "rawLatentFactorScore": 0.088395,
+      "factorScoreStatus": "RESEARCH_SCORE_BLOCKED",
+      "factorAvailableDomainCount": 4,
+      "factorAvailableWeight": 0.52,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": -0.030803,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": 0.25245,
+          "weight": 0.16,
+          "verifiedDriverCount": 2
+        },
+        {
+          "domain": "RISK",
+          "value": -0.385,
+          "weight": 0.09,
+          "verifiedDriverCount": 4
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.94,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": -0.0701,
+      "distribution": {
+        "p10ReturnPct": -2.0106,
+        "p25ReturnPct": -1.0799,
+        "medianReturnPct": 0,
+        "p75ReturnPct": 0.9504,
+        "p90ReturnPct": 1.7632,
+        "downsideProbabilityPct": 52.05,
+        "bullCaseReturnPct": 1.7632,
+        "baseCaseReturnPct": 0,
+        "bearCaseReturnPct": -2.0106
+      },
+      "patternConfidenceScore": 65,
+      "evidenceQualityScore": 20,
+      "regime": "BULL_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-07.1",
+        "generatedAt": "2026-08-13T10:21:26.847Z",
+        "validUntil": "2026-08-14T10:21:26.847Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 70,
+        "dataQualityScore": 35,
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 14.3574575,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 20.8574575,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "CLOSED_MARKET_LAST_VERIFIED_CLOSE",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": null,
+          "fundamentalFlags": [],
+          "marketFlags": []
+        },
+        "controlledPlan": {
+          "status": "AVAILABLE",
+          "level": "INTERIM_RISK_CONTROL",
+          "title": "Πλάνο τώρα",
+          "holderAction": "HOLD",
+          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ",
+          "nonHolderAction": "DO_NOT_BUY",
+          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
+          "marketAction": "WATCH",
+          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+          "newBuyAllowed": false,
+          "sellSignalApproved": false,
+          "confidenceScore": 70,
+          "dataQualityScore": 35,
+          "rationale": "Δεν έχουν ολοκληρωθεί όλοι οι υποχρεωτικοί έλεγχοι για τελική αγορά ή πώληση. Μέχρι τότε η πειθαρχημένη στάση είναι διατήρηση υπάρχουσας θέσης χωρίς νέα ενίσχυση και αποφυγή νέας εισόδου.",
+          "blockers": [
+            "DOSSIER_NOT_PUBLISHABLE",
+            "DOSSIER_NOT_READY",
+            "CROSS_CHECK_NOT_READY",
+            "FUNDAMENTALS_NOT_READY"
+          ],
+          "validUntil": "2026-08-14T10:21:26.847Z"
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001526113",
+        "instrumentId": "company:sec:0001526113",
+        "horizon": "day1",
+        "forecastSampleDate": "2026-08-12"
+      }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-12.1",
+      "forecastId": "forecast:e1de0f64473bd0757b37da19d1c2",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:sec:0001526113",
+      "instrumentId": "company:sec:0001526113",
+      "displayName": "Global Net Lease,",
+      "symbol": "GNL",
+      "listing": {
+        "symbol": "GNL",
+        "mic": "XNYS",
+        "exchange": "NYSE",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001526113",
+        "instrumentId": "company:sec:0001526113",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0001526113.json",
+        "sourceDocumentId": "CIK0001526113",
+        "capturedAt": "2026-08-13T10:21:26.847Z",
+        "taxonomy": "SEC_SIC",
+        "code": "6798",
+        "description": "Real Estate Investment Trusts",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "marketRegimeSnapshot": {
+        "contract": "FORECAST_TIME_MARKET_REGIME_SNAPSHOT_V1",
+        "policyVersion": "2026-08-12.1",
+        "capturedAt": "2026-08-13T10:21:26.847Z",
+        "benchmarkAsOf": "2026-08-12T13:30:00.000Z",
+        "benchmarkSymbol": "SPY",
+        "benchmarkSource": "Yahoo Finance Chart",
+        "benchmarkSourceQuality": "SECONDARY_VALIDATED",
+        "observationCount": 501,
+        "status": "REGIME_READY",
+        "regimeKey": "NEUTRAL|BULL_TREND|HIGH_VOLATILITY|POSITIVE_MOMENTUM",
+        "riskTone": "NEUTRAL",
+        "trendRegime": "BULL_TREND",
+        "momentumRegime": "POSITIVE_MOMENTUM",
+        "volatilityRegime": "HIGH_VOLATILITY",
+        "metrics": {
+          "latestClose": 772.48999,
+          "return20Pct": 2.3423,
+          "return60Pct": 4.777,
+          "return120Pct": 13.4577,
+          "sma50": 747.658975,
+          "sma200": 701.738448,
+          "annualizedVolatility20Pct": 14.0286,
+          "annualizedVolatility60Pct": 13.9555,
+          "volatility20Percentile": 71.43,
+          "maxDrawdown120Pct": -8.5774
+        },
+        "blockers": [],
+        "researchOnly": true,
+        "modelDerived": true,
+        "finalActionEligible": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "week1",
+      "tradingDays": 5,
+      "forecastSampleDate": "2026-08-12",
+      "forecastAt": "2026-08-13T10:21:26.847Z",
+      "referencePrice": {
+        "value": 8.99,
+        "timestamp": "2026-08-12T20:00:00.000Z",
+        "currency": "USD",
+        "source": "Finnhub Quote API"
+      },
+      "rawProbabilityPositive": 0.6301,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": null,
+      "rawLatentFactorScore": 0.182218,
+      "factorScoreStatus": "RESEARCH_SCORE_BLOCKED",
+      "factorAvailableDomainCount": 4,
+      "factorAvailableWeight": 0.52,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": 0.19096,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": 0.25245,
+          "weight": 0.16,
+          "verifiedDriverCount": 2
+        },
+        {
+          "domain": "RISK",
+          "value": -0.385,
+          "weight": 0.09,
+          "verifiedDriverCount": 4
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.94,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": 0.2941,
+      "distribution": {
+        "p10ReturnPct": -3.6959,
+        "p25ReturnPct": -1.6824,
+        "medianReturnPct": 1.2422,
+        "p75ReturnPct": 2.1171,
+        "p90ReturnPct": 3.4118,
+        "downsideProbabilityPct": 36.99,
+        "bullCaseReturnPct": 3.4118,
+        "baseCaseReturnPct": 1.2422,
+        "bearCaseReturnPct": -3.6959
+      },
+      "patternConfidenceScore": 60.44,
+      "evidenceQualityScore": 20,
+      "regime": "BULL_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-07.1",
+        "generatedAt": "2026-08-13T10:21:26.847Z",
+        "validUntil": "2026-08-14T10:21:26.847Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 70,
+        "dataQualityScore": 35,
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 14.3574575,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 20.8574575,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "CLOSED_MARKET_LAST_VERIFIED_CLOSE",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": null,
+          "fundamentalFlags": [],
+          "marketFlags": []
+        },
+        "controlledPlan": {
+          "status": "AVAILABLE",
+          "level": "INTERIM_RISK_CONTROL",
+          "title": "Πλάνο τώρα",
+          "holderAction": "HOLD",
+          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ",
+          "nonHolderAction": "DO_NOT_BUY",
+          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
+          "marketAction": "WATCH",
+          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+          "newBuyAllowed": false,
+          "sellSignalApproved": false,
+          "confidenceScore": 70,
+          "dataQualityScore": 35,
+          "rationale": "Δεν έχουν ολοκληρωθεί όλοι οι υποχρεωτικοί έλεγχοι για τελική αγορά ή πώληση. Μέχρι τότε η πειθαρχημένη στάση είναι διατήρηση υπάρχουσας θέσης χωρίς νέα ενίσχυση και αποφυγή νέας εισόδου.",
+          "blockers": [
+            "DOSSIER_NOT_PUBLISHABLE",
+            "DOSSIER_NOT_READY",
+            "CROSS_CHECK_NOT_READY",
+            "FUNDAMENTALS_NOT_READY"
+          ],
+          "validUntil": "2026-08-14T10:21:26.847Z"
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001526113",
+        "instrumentId": "company:sec:0001526113",
+        "horizon": "week1",
+        "forecastSampleDate": "2026-08-12"
+      }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-12.1",
+      "forecastId": "forecast:fe0b6907b29c5397190eac907f74",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:sec:0001041024",
+      "instrumentId": "company:sec:0001041024",
+      "displayName": "ROCKWELL MEDICAL,",
+      "symbol": "RMTI",
+      "listing": {
+        "symbol": "RMTI",
+        "mic": "XNAS",
+        "exchange": "Nasdaq",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001041024",
+        "instrumentId": "company:sec:0001041024",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0001041024.json",
+        "sourceDocumentId": "CIK0001041024",
+        "capturedAt": "2026-08-13T10:21:26.847Z",
+        "taxonomy": "SEC_SIC",
+        "code": "2834",
+        "description": "Pharmaceutical Preparations",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "marketRegimeSnapshot": {
+        "contract": "FORECAST_TIME_MARKET_REGIME_SNAPSHOT_V1",
+        "policyVersion": "2026-08-12.1",
+        "capturedAt": "2026-08-13T10:21:26.847Z",
+        "benchmarkAsOf": "2026-08-12T13:30:00.000Z",
+        "benchmarkSymbol": "SPY",
+        "benchmarkSource": "Yahoo Finance Chart",
+        "benchmarkSourceQuality": "SECONDARY_VALIDATED",
+        "observationCount": 501,
+        "status": "REGIME_READY",
+        "regimeKey": "NEUTRAL|BULL_TREND|HIGH_VOLATILITY|POSITIVE_MOMENTUM",
+        "riskTone": "NEUTRAL",
+        "trendRegime": "BULL_TREND",
+        "momentumRegime": "POSITIVE_MOMENTUM",
+        "volatilityRegime": "HIGH_VOLATILITY",
+        "metrics": {
+          "latestClose": 772.48999,
+          "return20Pct": 2.3423,
+          "return60Pct": 4.777,
+          "return120Pct": 13.4577,
+          "sma50": 747.658975,
+          "sma200": 701.738448,
+          "annualizedVolatility20Pct": 14.0286,
+          "annualizedVolatility60Pct": 13.9555,
+          "volatility20Percentile": 71.43,
+          "maxDrawdown120Pct": -8.5774
+        },
+        "blockers": [],
+        "researchOnly": true,
+        "modelDerived": true,
+        "finalActionEligible": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "day1",
+      "tradingDays": 1,
+      "forecastSampleDate": "2026-08-12",
+      "forecastAt": "2026-08-13T10:21:26.847Z",
+      "referencePrice": {
+        "value": 7.51,
+        "timestamp": "2026-08-12T20:00:00.000Z",
+        "currency": "USD",
+        "source": "Finnhub Quote API"
+      },
+      "rawProbabilityPositive": 0.5119,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": null,
+      "rawLatentFactorScore": -0.137942,
+      "factorScoreStatus": "RESEARCH_SCORE_BLOCKED",
+      "factorAvailableDomainCount": 4,
+      "factorAvailableWeight": 0.52,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": 0.049338,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": -0.3464,
+          "weight": 0.16,
+          "verifiedDriverCount": 2
+        },
+        {
+          "domain": "RISK",
+          "value": -0.824,
+          "weight": 0.09,
+          "verifiedDriverCount": 5
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.94,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": 1.0936,
+      "distribution": {
+        "p10ReturnPct": -4.2017,
+        "p25ReturnPct": -2.8302,
+        "medianReturnPct": 0.5563,
+        "p75ReturnPct": 3.1579,
+        "p90ReturnPct": 6.0735,
+        "downsideProbabilityPct": 48.81,
+        "bullCaseReturnPct": 6.0735,
+        "baseCaseReturnPct": 0.5563,
+        "bearCaseReturnPct": -4.2017
+      },
+      "patternConfidenceScore": 64.29,
+      "evidenceQualityScore": 20,
+      "regime": "MIXED_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-07.1",
+        "generatedAt": "2026-08-13T10:21:26.847Z",
+        "validUntil": "2026-08-14T10:21:26.847Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 49,
+        "dataQualityScore": 30,
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 14.3574575,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 20.8574575,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "CLOSED_MARKET_LAST_VERIFIED_CLOSE",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": null,
+          "fundamentalFlags": [
+            "MATERIAL_DILUTION"
+          ],
+          "marketFlags": [
+            "HIGH_VOLATILITY",
+            "SEVERE_DRAWDOWN",
+            "LOW_LIQUIDITY"
+          ]
+        },
+        "controlledPlan": {
+          "status": "AVAILABLE",
+          "level": "INTERIM_RISK_CONTROL",
+          "title": "Πλάνο τώρα",
+          "holderAction": "HOLD",
+          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ — ΕΠΑΝΕΞΕΤΑΣΗ ΚΙΝΔΥΝΟΥ",
+          "nonHolderAction": "DO_NOT_BUY",
+          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
+          "marketAction": "WATCH",
+          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+          "newBuyAllowed": false,
+          "sellSignalApproved": false,
+          "confidenceScore": 49,
+          "dataQualityScore": 30,
+          "rationale": "Υπάρχουν επαληθευμένες ενδείξεις αυξημένου κινδύνου, αλλά δεν έχουν περάσει ακόμη όλοι οι έλεγχοι που απαιτούνται για τελικό σήμα πώλησης ή μείωσης.",
+          "blockers": [
+            "DOSSIER_NOT_PUBLISHABLE",
+            "DOSSIER_NOT_READY",
+            "CROSS_CHECK_NOT_READY",
+            "FUNDAMENTALS_NOT_READY"
+          ],
+          "validUntil": "2026-08-14T10:21:26.847Z"
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001041024",
+        "instrumentId": "company:sec:0001041024",
+        "horizon": "day1",
+        "forecastSampleDate": "2026-08-12"
+      }
     }
   ],
   "summary": {
     "format": "investor-control-forecast-outcome-ledger-summary",
     "version": 1,
     "policyVersion": "2026-08-12.1",
-    "recordCount": 276,
-    "openCount": 165,
+    "recordCount": 283,
+    "openCount": 172,
     "maturedCount": 111,
     "groups": [
       {
@@ -49873,7 +51347,7 @@
   },
   "evaluation": {
     "baseRecordCount": 276,
-    "incomingRecordCount": 276,
-    "mergedRecordCount": 276
+    "incomingRecordCount": 283,
+    "mergedRecordCount": 283
   }
 }
