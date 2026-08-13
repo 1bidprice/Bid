@@ -13,6 +13,16 @@ function round(value, digits = 4) {
   return Number.isFinite(value) ? Number(value.toFixed(digits)) : null;
 }
 
+export function resolveYahooHistoryRange(options = {}) {
+  const explicit = String(options.range || '').trim();
+  if (explicit) return explicit;
+  const lookbackDays = Number(options.lookbackDays);
+  if (!Number.isFinite(lookbackDays) || lookbackDays <= 730) return '2y';
+  if (lookbackDays <= 1825) return '5y';
+  if (lookbackDays <= 3650) return '10y';
+  return 'max';
+}
+
 function isAthensListing(company) {
   return company?.primaryListing?.mic === 'XATH' || /Athens/i.test(String(company?.primaryListing?.exchange || ''));
 }
@@ -172,7 +182,7 @@ async function fetchCompanyHistorySeries(company, options, diagnostics) {
     symbol: company.primaryListing?.symbol,
     alternateSymbols: yahooSymbols.slice(1),
     currency: company.currency || company.listings?.[0]?.currency || null,
-    range: options.range || '2y',
+    range: resolveYahooHistoryRange(options),
     interval: '1d',
     excludeIncompleteSession: true,
   });
@@ -182,7 +192,7 @@ async function fetchCompanyHistorySeries(company, options, diagnostics) {
 
 async function fetchBenchmarkSeries(company, options, diagnostics) {
   const candidates = benchmarkYahooSymbols(company);
-  const cacheKey = `YAHOO:${candidates.join('|')}`;
+  const cacheKey = `YAHOO:${candidates.join('|')}:${resolveYahooHistoryRange(options)}`;
   if (options.benchmarkCache?.has(cacheKey)) return options.benchmarkCache.get(cacheKey);
 
   if (company.country === 'US' && String(options.token || '').trim()) {
@@ -203,7 +213,7 @@ async function fetchBenchmarkSeries(company, options, diagnostics) {
     symbol: isAthensListing(company) ? 'ATHEX_BENCHMARK' : 'SPY',
     alternateSymbols: candidates.slice(1),
     currency: company.currency || 'USD',
-    range: options.range || '2y',
+    range: resolveYahooHistoryRange(options),
     interval: '1d',
     excludeIncompleteSession: true,
   });
