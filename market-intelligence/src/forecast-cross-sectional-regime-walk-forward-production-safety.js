@@ -6,6 +6,7 @@ import {
 import {
   FORECAST_CROSS_SECTIONAL_REGIME_WALK_FORWARD_RUNTIME_CONTRACT,
   FORECAST_CROSS_SECTIONAL_REGIME_WALK_FORWARD_RUNTIME_VERSION,
+  FORECAST_HISTORICAL_UNIVERSE_COVERAGE_CONTRACT,
 } from './forecast-cross-sectional-regime-walk-forward-runtime.js';
 
 export const FORECAST_CROSS_SECTIONAL_REGIME_WALK_FORWARD_OBSERVABILITY_CONTRACT = 'HISTORICAL_REGIME_WALK_FORWARD_RUNTIME_OBSERVABILITY_V1';
@@ -36,6 +37,7 @@ function authoritySafe(value = {}) {
 }
 
 export function buildCrossSectionalRegimeWalkForwardOperationalTelemetry(status = {}) {
+  const coverage = status?.universeCoverage || null;
   return {
     forecastHistoricalWalkForwardObservabilityContract: FORECAST_CROSS_SECTIONAL_REGIME_WALK_FORWARD_OBSERVABILITY_CONTRACT,
     forecastHistoricalWalkForwardRuntimePolicyVersion: status?.runtimePolicyVersion || null,
@@ -48,12 +50,48 @@ export function buildCrossSectionalRegimeWalkForwardOperationalTelemetry(status 
     forecastHistoricalWalkForwardValidRegimeRecordCount: Number(status?.validRegimeRecordCount || 0),
     forecastHistoricalWalkForwardGroupCount: Number(status?.groupCount || 0),
     forecastHistoricalWalkForwardReadyGroupCount: Number(status?.readyGroupCount || 0),
+    forecastHistoricalWalkForwardCoverageContract: coverage?.contract || null,
+    forecastHistoricalWalkForwardDossierCount: Number(coverage?.dossierCount || 0),
+    forecastHistoricalWalkForwardLoadedHistoryCount: Number(coverage?.loadedHistoricalSeriesCount || 0),
+    forecastHistoricalWalkForwardExcludedDossierCount: Number(coverage?.excludedDossierCount || 0),
+    forecastHistoricalWalkForwardLoadedHistoryWithoutDossierCount: Number(coverage?.loadedHistoryWithoutDossierCount || 0),
     forecastHistoricalWalkForwardLiveArchiveEligible: false,
     forecastHistoricalWalkForwardLiveCalibrationEligible: false,
     forecastHistoricalWalkForwardDecisionIntegrationEnabled: false,
     forecastHistoricalWalkForwardMayInfluenceFinalAction: false,
     forecastHistoricalWalkForwardBrokerExecutionEligible: false,
   };
+}
+
+function verifyCoverage(status) {
+  const coverage = status.universeCoverage;
+  assert(coverage && typeof coverage === 'object', 'historical universe coverage missing');
+  assert(coverage.format === 'investor-control-historical-walk-forward-universe-coverage', 'historical universe coverage format invalid');
+  assert(coverage.version === 1, 'historical universe coverage version invalid');
+  assert(coverage.contract === FORECAST_HISTORICAL_UNIVERSE_COVERAGE_CONTRACT, 'historical universe coverage contract invalid');
+  assert(nonNegativeInteger(coverage.dossierCount) !== null, 'historical universe dossier count invalid');
+  assert(nonNegativeInteger(coverage.uniqueDossierCompanyCount) !== null, 'historical universe unique dossier count invalid');
+  assert(nonNegativeInteger(coverage.loadedHistoricalSeriesCount) !== null, 'historical universe loaded history count invalid');
+  assert(nonNegativeInteger(coverage.loadedBenchmarkSeriesCount) !== null, 'historical universe loaded benchmark count invalid');
+  assert(nonNegativeInteger(coverage.eligibleInstrumentCount) === nonNegativeInteger(status.eligibleInstrumentCount), 'historical universe eligible count mismatch');
+  assert(nonNegativeInteger(coverage.selectedInstrumentCount) === nonNegativeInteger(status.selectedInstrumentCount), 'historical universe selected count mismatch');
+  assert(nonNegativeInteger(coverage.omittedByBoundCount) === nonNegativeInteger(status.omittedInstrumentCount), 'historical universe omitted count mismatch');
+  assert(nonNegativeInteger(coverage.excludedDossierCount) !== null, 'historical universe exclusion count invalid');
+  assert(nonNegativeInteger(coverage.loadedHistoryWithoutDossierCount) !== null, 'historical universe unmatched history count invalid');
+  assert(nonNegativeInteger(coverage.eligibleWithBenchmarkCount) !== null, 'historical universe benchmark coverage count invalid');
+  assert(nonNegativeInteger(coverage.eligibleWithoutBenchmarkCount) !== null, 'historical universe missing benchmark count invalid');
+  assert(coverage.eligibleWithBenchmarkCount + coverage.eligibleWithoutBenchmarkCount === coverage.eligibleInstrumentCount, 'historical universe benchmark counts mismatch');
+  assert(Array.isArray(coverage.selectedInstruments) && coverage.selectedInstruments.length === coverage.selectedInstrumentCount, 'historical universe selected diagnostics mismatch');
+  assert(Array.isArray(coverage.omittedByBound) && coverage.omittedByBound.length <= 40, 'historical universe omitted diagnostics not bounded');
+  assert(Array.isArray(coverage.excludedDossiers) && coverage.excludedDossiers.length <= 40, 'historical universe exclusion diagnostics not bounded');
+  assert(Array.isArray(coverage.loadedHistoriesWithoutDossier) && coverage.loadedHistoriesWithoutDossier.length <= 40, 'historical universe unmatched-history diagnostics not bounded');
+  assert(coverage.rawHistoricalCandlesIncluded === false, 'raw historical candles export forbidden');
+  assert(coverage.selectionRulesChanged === false, 'coverage diagnostics must not change selection rules');
+  assert(coverage.thresholdsChanged === false, 'coverage diagnostics must not change thresholds');
+  assert(coverage.networkFetchPerformed === false, 'coverage diagnostics network fetch forbidden');
+  assert(coverage.historicalResearchOnly === true, 'coverage diagnostics must remain historical research only');
+  assert(coverage.decisionImpact === 'NONE', 'coverage diagnostics decision impact forbidden');
+  assert(!JSON.stringify(coverage).includes('"candles"'), 'raw candle arrays leaked into universe coverage');
 }
 
 function verifyResearch(status) {
@@ -121,6 +159,7 @@ export function verifyCrossSectionalRegimeWalkForwardProductionSafety(report = {
   if (status.executionState === 'DISABLED_BY_CADENCE') {
     assert(status.cadenceRequested === false, 'disabled runtime cadence flag invalid');
     assert(status.research === null, 'disabled runtime must not contain research payload');
+    assert(status.universeCoverage === null, 'disabled runtime must not inspect universe coverage');
     for (const key of ['eligibleInstrumentCount', 'selectedInstrumentCount', 'omittedInstrumentCount', 'generatedRecordCount', 'validRegimeRecordCount', 'groupCount', 'readyGroupCount']) {
       assert(nonNegativeInteger(status[key]) === 0, `disabled runtime ${key} must be zero`);
     }
@@ -131,6 +170,7 @@ export function verifyCrossSectionalRegimeWalkForwardProductionSafety(report = {
     assert(nonNegativeInteger(status.selectedInstrumentCount) !== null && status.selectedInstrumentCount <= status.maximumInstrumentCount, 'selected instrument bound exceeded');
     assert(nonNegativeInteger(status.eligibleInstrumentCount) !== null && status.eligibleInstrumentCount >= status.selectedInstrumentCount, 'eligible instrument count invalid');
     assert(nonNegativeInteger(status.omittedInstrumentCount) === status.eligibleInstrumentCount - status.selectedInstrumentCount, 'omitted instrument count mismatch');
+    verifyCoverage(status);
     verifyResearch(status);
   }
 
