@@ -67,6 +67,23 @@ function build(instruments, options = {}) {
   });
 }
 
+function mutateSeriesAfter(input, cutoffIso, multiplier) {
+  const cutoff = Date.parse(cutoffIso) / 1000;
+  return {
+    ...input,
+    candles: input.candles.map((candle) => candle.timestamp > cutoff
+      ? {
+        ...candle,
+        open: candle.open * multiplier,
+        high: candle.high * multiplier,
+        low: candle.low * multiplier,
+        close: candle.close * multiplier,
+        volume: candle.volume * Math.max(1, multiplier),
+      }
+      : { ...candle }),
+  };
+}
+
 test('cross-sectional walk-forward creates matured historical OOS records with valid outcome windows only after per-instrument forecasts', () => {
   const status = build([instrument(0), instrument(1), instrument(2)]);
   assert.equal(status.evaluatedInstrumentCount, 3);
@@ -87,6 +104,54 @@ test('cross-sectional walk-forward creates matured historical OOS records with v
   assert.equal(status.brokerExecutionEligible, false);
 });
 
+test('historical market factor lineage is attached only from forecast-time market history', () => {
+  const status = build([instrument(0), instrument(1)]);
+  assert.ok(status.historicalMarketFactorReadyRecordCount > 0);
+  assert.equal(status.historicalMarketFactorReadyRecordCount + status.historicalMarketFactorBlockedRecordCount, status.generatedRecordCount);
+  assert.ok(status.instrumentSummaries.every((item) => item.historicalMarketFactorReadyRecordCount + item.historicalMarketFactorBlockedRecordCount === item.generatedRecordCount));
+  const readyRecords = status.auditSampleRecords.filter((record) => record.historicalMarketFactorStatus === 'HISTORICAL_MARKET_FACTOR_READY');
+  assert.ok(readyRecords.length > 0);
+  for (const record of readyRecords) {
+    assert.equal(typeof record.historicalMarketFactorScore, 'number');
+    assert.ok(record.historicalMarketFactorScore >= -1 && record.historicalMarketFactorScore <= 1);
+    assert.ok(record.historicalMarketFactorPolicyVersion);
+    assert.equal(record.historicalMarketFactorSnapshot.usesOnlyMarketHistoryAvailableAtForecastTime, true);
+    assert.ok(Date.parse(record.historicalMarketFactorSnapshot.companyHistoryAsOf) <= Date.parse(record.forecastAt));
+    assert.ok(Date.parse(record.historicalMarketFactorSnapshot.benchmarkHistoryAsOf) <= Date.parse(record.forecastAt));
+    assert.deepEqual(record.historicalMarketFactorSnapshot.domainContributions.map((item) => item.domain), ['MOMENTUM', 'RISK']);
+    assert.equal(record.historicalMarketFactorSnapshot.fundamentalsBackfilled, false);
+    assert.equal(record.historicalMarketFactorSnapshot.valuationBackfilled, false);
+    assert.equal(record.historicalMarketFactorSnapshot.qualityBackfilled, false);
+    assert.equal(record.historicalMarketFactorSnapshot.growthBackfilled, false);
+    assert.equal(record.historicalMarketFactorSnapshot.catalystsBackfilled, false);
+    assert.equal(record.historicalMarketFactorSnapshot.newsBackfilled, false);
+    assert.equal(record.historicalMarketFactorSnapshot.liquidityUsedAsReturnFactor, false);
+  }
+  assert.deepEqual(status.methodology.historicalMarketFactorAllowedDomains, ['MOMENTUM', 'RISK']);
+  assert.equal(status.methodology.historicalMarketFactorFundamentalBackfillAllowed, false);
+});
+
+test('future company and benchmark mutations cannot change an already-issued historical market factor', () => {
+  const originalInstrument = instrument(0);
+  const original = build([originalInstrument]);
+  const target = original.auditSampleRecords.find((record) => record.historicalMarketFactorStatus === 'HISTORICAL_MARKET_FACTOR_READY');
+  assert.ok(target);
+
+  const mutatedInstrument = {
+    ...originalInstrument,
+    series: mutateSeriesAfter(originalInstrument.series, target.forecastAt, 25),
+    benchmarkSeries: mutateSeriesAfter(originalInstrument.benchmarkSeries, target.forecastAt, 0.08),
+  };
+  const mutated = build([mutatedInstrument]);
+  const sameForecast = mutated.auditSampleRecords.find((record) => record.forecastId === target.forecastId);
+  assert.ok(sameForecast);
+  assert.equal(sameForecast.historicalMarketFactorStatus, 'HISTORICAL_MARKET_FACTOR_READY');
+  assert.equal(sameForecast.historicalMarketFactorScore, target.historicalMarketFactorScore);
+  assert.deepEqual(sameForecast.historicalMarketFactorSnapshot.domainContributions, target.historicalMarketFactorSnapshot.domainContributions);
+  assert.equal(sameForecast.historicalMarketFactorSnapshot.companyHistoryAsOf, target.historicalMarketFactorSnapshot.companyHistoryAsOf);
+  assert.equal(sameForecast.historicalMarketFactorSnapshot.benchmarkHistoryAsOf, target.historicalMarketFactorSnapshot.benchmarkHistoryAsOf);
+});
+
 test('historical regime reconstruction never uses benchmark data after the forecast timestamp', () => {
   const status = build([instrument(0), instrument(1)]);
   const records = status.auditSampleRecords;
@@ -98,22 +163,35 @@ test('historical regime reconstruction never uses benchmark data after the forec
   }
 });
 
-test('current classification input is never copied into historical walk-forward records', () => {
-  const status = build([instrument(0), instrument(1)]);
+test('current classification and current non-market inputs are never copied into historical walk-forward records', () => {
+  const contaminated = instrument(0);
+  contaminated.currentFundamentals = { revenue: 999999999999 };
+  contaminated.currentNews = [{ headline: 'future news must not leak' }];
+  contaminated.currentCatalysts = [{ type: 'future catalyst' }];
+  contaminated.currentValuation = { score: 100 };
+  const status = build([contaminated, instrument(1)]);
   const serialized = JSON.stringify(status.auditSampleRecords);
   assert.equal(serialized.includes('classificationSnapshot'), false);
   assert.equal(serialized.includes('Modern classification that must not leak backwards'), false);
+  assert.equal(serialized.includes('future news must not leak'), false);
+  assert.equal(serialized.includes('future catalyst'), false);
+  assert.equal(serialized.includes('999999999999'), false);
   assert.equal(status.methodology.historicalClassificationBackfillAllowed, false);
+  assert.equal(status.methodology.historicalMarketFactorFundamentalBackfillAllowed, false);
 });
 
-test('missing historical benchmark leaves records explicitly regime-unavailable instead of inventing a regime', () => {
+test('missing historical benchmark leaves regime and historical market factor explicitly unavailable', () => {
   const status = build([instrument(0, { noBenchmark: true })]);
   assert.ok(status.generatedRecordCount > 0);
   assert.equal(status.validRegimeRecordCount, 0);
   assert.equal(status.groupCount, 0);
   assert.equal(status.regimeUnavailableRecordCount, status.generatedRecordCount);
+  assert.equal(status.historicalMarketFactorReadyRecordCount, 0);
+  assert.equal(status.historicalMarketFactorBlockedRecordCount, status.generatedRecordCount);
   assert.ok(status.auditSampleRecords.length > 0);
   assert.ok(status.auditSampleRecords.every((record) => record.regimeStatus === 'REGIME_NOT_AVAILABLE'));
+  assert.ok(status.auditSampleRecords.every((record) => record.historicalMarketFactorStatus === 'HISTORICAL_MARKET_FACTOR_BLOCKED'));
+  assert.ok(status.auditSampleRecords.every((record) => record.historicalMarketFactorScore === null));
 });
 
 test('bull and bear benchmark histories produce separate native historical regime research groups', () => {
@@ -146,6 +224,7 @@ test('historical evidence is explicitly WALK_FORWARD_OOS and can never masquerad
   assert.ok(records.every((record) => record.evidenceClass === 'HISTORICAL_CROSS_SECTIONAL_REGIME_WALK_FORWARD_RESEARCH'));
   assert.ok(records.every((record) => record.liveArchiveEligible === false && record.liveCalibrationEligible === false));
   assert.equal(JSON.stringify(records).includes('LIVE_SHADOW_OOS'), false);
+  assert.equal(JSON.stringify(records).includes('"latentFactorScore"'), false);
 });
 
 test('raw historical records are omitted by default and audit samples are explicit and bounded', () => {
@@ -163,6 +242,15 @@ test('raw historical records are omitted by default and audit samples are explic
   assert.deepEqual(status.auditSampleRecords, []);
   assert.equal(Object.prototype.hasOwnProperty.call(status, 'researchRecords'), false);
   assert.equal(status.methodology.rawHistoricalRecordExportDefault, 'DISABLED');
+});
+
+test('historical market factor audit lineage remains compact and raw-candle free', () => {
+  const status = build([instrument(0), instrument(1)]);
+  const text = JSON.stringify(status.auditSampleRecords);
+  assert.equal(text.includes('"candles"'), false);
+  assert.equal(text.includes('currentFundamentals'), false);
+  assert.equal(text.includes('currentNews'), false);
+  assert.ok(status.auditSampleRecords.some((record) => record.historicalMarketFactorSnapshot));
 });
 
 test('research output never creates final actions, broker authority or live-archive mutation instructions', () => {
