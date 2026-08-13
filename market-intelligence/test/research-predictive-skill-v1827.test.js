@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   V1827_DATASET_INTEGRITY_CONTRACT,
+  assertV1827DatasetIntegrityReady,
   runV1827HistoricalPredictiveSkillResearchJob,
 } from '../scripts/run-cross-sectional-regime-walk-forward-research-v1827.js';
 
@@ -92,6 +93,7 @@ test('v1827 blocks predictive evaluation when historical regime coverage is inco
   assert.equal(result.datasetIntegrity.forecastMayInfluenceFinalAction, false);
   assert.equal(result.datasetIntegrity.brokerExecutionEligible, false);
   assert.equal(result.datasetIntegrity.decisionImpact, 'NONE');
+  assert.throws(() => assertV1827DatasetIntegrityReady(result.datasetIntegrity), /dataset integrity blocked/);
 });
 
 test('v1827 permits predictive evaluation only when every generated forecast has valid historical regime lineage', async () => {
@@ -105,4 +107,5 @@ test('v1827 permits predictive evaluation only when every generated forecast has
   assert.equal(result.datasetIntegrity.regimeCoveragePct, 100);
   assert.equal(result.predictiveSkillSummary.datasetIntegrityReady, true);
   assert.equal(result.predictiveSkillSummary.predictiveSkillReadyGroupCount, 1);
+  assert.equal(assertV1827DatasetIntegrityReady(result.datasetIntegrity), true);
 });
