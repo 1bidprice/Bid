@@ -5,8 +5,9 @@ import { buildForecastMarketRegimeSnapshot, validateForecastMarketRegimeSnapshot
 import { evaluateOosSampleIndependence } from './forecast-oos-sample-independence.js';
 import { evaluateOosOutcomeWindowIndependence } from './forecast-oos-outcome-window-independence.js';
 import { evaluateOosInstrumentConcentration } from './forecast-oos-instrument-concentration.js';
+import { buildHistoricalMarketFactorSnapshot, HISTORICAL_MARKET_FACTOR_VERSION } from './forecast-historical-market-factor.js';
 
-export const FORECAST_CROSS_SECTIONAL_REGIME_WALK_FORWARD_VERSION = '2026-08-13.1';
+export const FORECAST_CROSS_SECTIONAL_REGIME_WALK_FORWARD_VERSION = '2026-08-13.2';
 export const FORECAST_CROSS_SECTIONAL_REGIME_WALK_FORWARD_CONTRACT = 'CROSS_SECTIONAL_HISTORICAL_REGIME_WALK_FORWARD_RESEARCH_V1';
 export const FORECAST_CROSS_SECTIONAL_REGIME_WALK_FORWARD_EVIDENCE_CLASS = 'HISTORICAL_CROSS_SECTIONAL_REGIME_WALK_FORWARD_RESEARCH';
 
@@ -73,16 +74,33 @@ function buildHistoricalResearchRecord(instrument, walkForwardRecord, options = 
   const tradingDays = positiveInteger(walkForwardRecord?.tradingDays);
   if (!tradingDays) return { record: null, blocker: 'HISTORICAL_WALK_FORWARD_TRADING_DAYS_INVALID' };
 
+  const assetClass = instrument.assetClass || walkForwardRecord.assetClass || 'UNKNOWN';
+  const historicalMarketFactorSnapshot = buildHistoricalMarketFactorSnapshot({
+    instrumentId: identity.instrumentId,
+    companyId: identity.companyId,
+    symbol: identity.symbol,
+    assetClass,
+    horizon: walkForwardRecord.horizon,
+    forecastAt: times.forecastAt,
+    series: instrument.series || {},
+    benchmarkSeries: instrument.benchmarkSeries || {},
+    benchmarkSymbol: instrument.benchmarkSeries?.providerSymbol || instrument.benchmarkSeries?.symbol || options.benchmarkSymbol || null,
+  });
+
   const provisional = {
     forecastId: `historical-regime-wf:${identity.instrumentId}:${walkForwardRecord.horizon}:${times.forecastAt}`,
     evidenceClass: FORECAST_CROSS_SECTIONAL_REGIME_WALK_FORWARD_EVIDENCE_CLASS,
     validationMode: 'WALK_FORWARD_OOS',
     status: 'MATURED',
     historicalPatternPolicyVersion: walkForwardRecord.historicalPatternPolicyVersion || null,
+    historicalMarketFactorPolicyVersion: HISTORICAL_MARKET_FACTOR_VERSION,
+    historicalMarketFactorStatus: historicalMarketFactorSnapshot.status,
+    historicalMarketFactorScore: finite(historicalMarketFactorSnapshot.historicalMarketFactorScore),
+    historicalMarketFactorSnapshot,
     instrumentId: identity.instrumentId,
     companyId: identity.companyId,
     symbol: identity.symbol,
-    assetClass: instrument.assetClass || walkForwardRecord.assetClass || 'UNKNOWN',
+    assetClass,
     horizon: walkForwardRecord.horizon,
     tradingDays,
     forecastAt: times.forecastAt,
@@ -137,12 +155,52 @@ function buildHistoricalResearchRecord(instrument, walkForwardRecord, options = 
   };
 }
 
+function compactHistoricalMarketFactorSnapshot(snapshot = {}) {
+  if (!snapshot || typeof snapshot !== 'object') return null;
+  return {
+    contract: snapshot.contract || null,
+    policyVersion: snapshot.policyVersion || null,
+    status: snapshot.status || null,
+    instrumentId: snapshot.instrumentId || null,
+    assetClass: snapshot.assetClass || 'UNKNOWN',
+    horizon: snapshot.horizon || null,
+    forecastAt: snapshot.forecastAt || null,
+    historicalMarketFactorScore: snapshot.historicalMarketFactorScore ?? null,
+    companyObservationCount: snapshot.companyObservationCount ?? 0,
+    benchmarkObservationCount: snapshot.benchmarkObservationCount ?? 0,
+    companyHistoryAsOf: snapshot.companyHistoryAsOf || null,
+    benchmarkHistoryAsOf: snapshot.benchmarkHistoryAsOf || null,
+    domainContributions: Array.isArray(snapshot.domainContributions)
+      ? snapshot.domainContributions.map((item) => ({ ...item }))
+      : [],
+    blockers: Array.isArray(snapshot.blockers) ? [...snapshot.blockers] : [],
+    usesOnlyMarketHistoryAvailableAtForecastTime: snapshot.usesOnlyMarketHistoryAvailableAtForecastTime === true,
+    fundamentalsBackfilled: snapshot.fundamentalsBackfilled === true,
+    valuationBackfilled: snapshot.valuationBackfilled === true,
+    qualityBackfilled: snapshot.qualityBackfilled === true,
+    growthBackfilled: snapshot.growthBackfilled === true,
+    catalystsBackfilled: snapshot.catalystsBackfilled === true,
+    newsBackfilled: snapshot.newsBackfilled === true,
+    liquidityUsedAsReturnFactor: snapshot.liquidityUsedAsReturnFactor === true,
+    historicalResearchOnly: snapshot.historicalResearchOnly === true,
+    decisionIntegrationEnabled: snapshot.decisionIntegrationEnabled === true,
+    forecastMayInfluenceFinalAction: snapshot.forecastMayInfluenceFinalAction === true,
+    brokerExecutionEligible: snapshot.brokerExecutionEligible === true,
+    decisionImpact: snapshot.decisionImpact || null,
+  };
+}
+
 function compactAuditRecord(record = {}) {
   return {
     forecastId: record.forecastId || null,
     evidenceClass: record.evidenceClass || null,
     validationMode: record.validationMode || null,
     status: record.status || null,
+    historicalPatternPolicyVersion: record.historicalPatternPolicyVersion || null,
+    historicalMarketFactorPolicyVersion: record.historicalMarketFactorPolicyVersion || null,
+    historicalMarketFactorStatus: record.historicalMarketFactorStatus || null,
+    historicalMarketFactorScore: record.historicalMarketFactorScore ?? null,
+    historicalMarketFactorSnapshot: compactHistoricalMarketFactorSnapshot(record.historicalMarketFactorSnapshot),
     instrumentId: record.instrumentId || null,
     assetClass: record.assetClass || 'UNKNOWN',
     horizon: record.horizon || null,
@@ -248,7 +306,7 @@ export function buildCrossSectionalRegimeWalkForwardResearch(input = {}) {
     const normalized = normalizeHistoricalSeries(instrument.series || { candles: [] });
     if (normalized.length < Math.max(260, Number(options.minimumInstrumentObservations || 260))) {
       diagnostics.push({ code: 'HISTORICAL_WALK_FORWARD_SERIES_TOO_SHORT', instrumentId: identity.instrumentId, observationCount: normalized.length });
-      instrumentSummaries.push({ instrumentId: identity.instrumentId, observationCount: normalized.length, generatedRecordCount: 0 });
+      instrumentSummaries.push({ instrumentId: identity.instrumentId, observationCount: normalized.length, generatedRecordCount: 0, historicalMarketFactorReadyRecordCount: 0, historicalMarketFactorBlockedRecordCount: 0 });
       continue;
     }
     const walkForward = runHistoricalPatternWalkForward({
@@ -269,6 +327,8 @@ export function buildCrossSectionalRegimeWalkForwardResearch(input = {}) {
       generatedAt: input.generatedAt,
     });
     let generatedRecordCount = 0;
+    let historicalMarketFactorReadyRecordCount = 0;
+    let historicalMarketFactorBlockedRecordCount = 0;
     for (const horizon of Object.values(walkForward.horizons || {})) {
       for (const walkForwardRecord of horizon.records || []) {
         const built = buildHistoricalResearchRecord(instrument, walkForwardRecord, options);
@@ -279,6 +339,8 @@ export function buildCrossSectionalRegimeWalkForwardResearch(input = {}) {
         if (!built.record) continue;
         allRecords.push(built.record);
         generatedRecordCount += 1;
+        if (built.record.historicalMarketFactorStatus === 'HISTORICAL_MARKET_FACTOR_READY') historicalMarketFactorReadyRecordCount += 1;
+        else historicalMarketFactorBlockedRecordCount += 1;
       }
     }
     instrumentSummaries.push({
@@ -286,11 +348,14 @@ export function buildCrossSectionalRegimeWalkForwardResearch(input = {}) {
       assetClass: instrument.assetClass || 'UNKNOWN',
       observationCount: normalized.length,
       generatedRecordCount,
+      historicalMarketFactorReadyRecordCount,
+      historicalMarketFactorBlockedRecordCount,
       walkForwardStatus: walkForward.status,
     });
   }
 
   const validRegimeRecords = allRecords.filter((record) => record.regimeStatus === 'REGIME_READY' && record.regimeKey);
+  const historicalMarketFactorReadyRecordCount = allRecords.filter((record) => record.historicalMarketFactorStatus === 'HISTORICAL_MARKET_FACTOR_READY' && finite(record.historicalMarketFactorScore) !== null).length;
   const groupsMap = new Map();
   for (const record of validRegimeRecords) {
     const key = groupKey(record);
@@ -321,6 +386,8 @@ export function buildCrossSectionalRegimeWalkForwardResearch(input = {}) {
     generatedRecordCount: allRecords.length,
     validRegimeRecordCount: validRegimeRecords.length,
     regimeUnavailableRecordCount: allRecords.length - validRegimeRecords.length,
+    historicalMarketFactorReadyRecordCount,
+    historicalMarketFactorBlockedRecordCount: allRecords.length - historicalMarketFactorReadyRecordCount,
     groupCount: groups.length,
     readyGroupCount,
     instrumentSummaries,
@@ -331,6 +398,10 @@ export function buildCrossSectionalRegimeWalkForwardResearch(input = {}) {
       validationMode: 'WALK_FORWARD_OOS',
       instrumentForecastBoundary: 'EACH_INSTRUMENT_FORECAST_USES_ONLY_ITS_OWN_HISTORY_AVAILABLE_AT_FORECAST_AT',
       regimeBoundary: 'BENCHMARK_REGIME_RECONSTRUCTED_USING_ONLY_BENCHMARK_DATA_AT_OR_BEFORE_FORECAST_AT',
+      historicalMarketFactorBoundary: 'MOMENTUM_AND_RISK_RECONSTRUCTED_ONLY_FROM_COMPANY_AND_BENCHMARK_CANDLES_AT_OR_BEFORE_FORECAST_AT',
+      historicalMarketFactorPolicyVersion: HISTORICAL_MARKET_FACTOR_VERSION,
+      historicalMarketFactorAllowedDomains: ['MOMENTUM', 'RISK'],
+      historicalMarketFactorFundamentalBackfillAllowed: false,
       crossSectionalPooling: 'POOL_ONLY_AFTER_PER_INSTRUMENT_FORECAST_GENERATION',
       historicalClassificationBackfillAllowed: false,
       liveArchiveWriteAllowed: false,
