@@ -8,6 +8,10 @@ import {
   FORECAST_CROSS_SECTIONAL_REGIME_WALK_FORWARD_RUNTIME_VERSION,
   FORECAST_HISTORICAL_UNIVERSE_COVERAGE_CONTRACT,
 } from './forecast-cross-sectional-regime-walk-forward-runtime.js';
+import {
+  HISTORICAL_MARKET_STACK_RESEARCH_CONTRACT,
+  HISTORICAL_MARKET_STACK_RESEARCH_VERSION,
+} from './forecast-historical-market-stacked-ensemble-research.js';
 
 export const FORECAST_CROSS_SECTIONAL_REGIME_WALK_FORWARD_OBSERVABILITY_CONTRACT = 'HISTORICAL_REGIME_WALK_FORWARD_RUNTIME_OBSERVABILITY_V1';
 
@@ -27,6 +31,18 @@ function authoritySafe(value = {}) {
   return value?.liveArchiveEligible === false &&
     value?.liveCalibrationEligible === false &&
     value?.factorWeightGovernanceEligible === false &&
+    value?.automaticModelPromotionEnabled === false &&
+    value?.probabilityCalibrationEnabled === false &&
+    value?.decisionIntegrationEnabled === false &&
+    value?.forecastMayInfluenceFinalAction === false &&
+    value?.finalActionEligible === false &&
+    value?.brokerExecutionEligible === false &&
+    value?.decisionImpact === 'NONE';
+}
+
+function historicalMarketStackAuthoritySafe(value = {}) {
+  return value?.taxonomyPromotionEligible === false &&
+    value?.historicalResearchOnly === true &&
     value?.automaticModelPromotionEnabled === false &&
     value?.probabilityCalibrationEnabled === false &&
     value?.decisionIntegrationEnabled === false &&
@@ -94,6 +110,82 @@ function verifyCoverage(status) {
   assert(!JSON.stringify(coverage).includes('"candles"'), 'raw candle arrays leaked into universe coverage');
 }
 
+function verifyHistoricalMarketStackResearch(research) {
+  const stack = research?.historicalMarketStackResearch;
+  assert(stack && typeof stack === 'object', 'historical market stack research missing');
+  assert(stack.format === 'investor-control-historical-market-stacked-ensemble-research', 'historical market stack format invalid');
+  assert(stack.version === 1, 'historical market stack version invalid');
+  assert(stack.policyVersion === HISTORICAL_MARKET_STACK_RESEARCH_VERSION, 'historical market stack policy version invalid');
+  assert(stack.contract === HISTORICAL_MARKET_STACK_RESEARCH_CONTRACT, 'historical market stack contract invalid');
+  assert(historicalMarketStackAuthoritySafe(stack), 'historical market stack has forbidden authority');
+  assert(stack.rawPredictionsIncluded === false, 'historical market stack raw predictions forbidden');
+  assert(stack.rawHistoricalRecordsIncluded === false, 'historical market stack raw records forbidden');
+  assert(stack.rawHistoricalCandlesIncluded === false, 'historical market stack raw candles forbidden');
+  assert(stack?.methodology?.model === 'PREQUENTIAL_L2_LOGISTIC_STACK', 'historical market stack model invalid');
+  assert(Array.isArray(stack?.methodology?.features) && stack.methodology.features.length === 2 && stack.methodology.features.includes('PATTERN_LOGIT') && stack.methodology.features.includes('HISTORICAL_MARKET_FACTOR_SCORE'), 'historical market stack features invalid');
+  assert(typeof stack?.methodology?.trainingRule === 'string' && stack.methodology.trainingRule.includes('STRICTLY_BEFORE_TARGET_FORECAST_TIME'), 'historical market stack anti-leak rule invalid');
+  assert(stack?.methodology?.taxonomyHistoricalBackfillAllowed === false, 'historical market stack taxonomy backfill forbidden');
+  assert(stack?.methodology?.rawPredictionExportAllowed === false, 'historical market stack raw prediction export forbidden');
+  assert(nonNegativeInteger(stack.sourceRecordCount) === nonNegativeInteger(research.validRegimeRecordCount), 'historical market stack source count mismatch');
+  for (const key of ['eligibleRecordCount', 'rejectedRecordCount', 'predictionCount', 'skippedInsufficientTrainingCount', 'modelFitCount', 'groupCount', 'predictiveReadyGroupCount', 'predictiveNotReadyGroupCount']) {
+    assert(nonNegativeInteger(stack[key]) !== null, `historical market stack ${key} invalid`);
+  }
+  assert(stack.eligibleRecordCount + stack.rejectedRecordCount === stack.sourceRecordCount, 'historical market stack eligibility counts mismatch');
+  assert(stack.predictionCount <= stack.eligibleRecordCount, 'historical market stack prediction count exceeds eligible evidence');
+  assert(Array.isArray(stack.groups) && stack.groups.length === stack.groupCount, 'historical market stack group count mismatch');
+  assert(stack.predictiveReadyGroupCount + stack.predictiveNotReadyGroupCount === stack.groupCount, 'historical market stack readiness counts mismatch');
+  assert(stack.predictiveReadyGroupCount === stack.groups.filter((group) => group?.status === 'HISTORICAL_MARKET_STACK_PREDICTIVE_READY').length, 'historical market stack ready status count mismatch');
+
+  const serialized = JSON.stringify(stack);
+  assert(!serialized.includes('"predictions"'), 'historical market stack raw prediction collection leaked');
+  assert(!serialized.includes('"candles"'), 'historical market stack raw candles leaked');
+  assert(!serialized.includes('LIVE_SHADOW_OOS'), 'historical market stack live-shadow lineage forbidden');
+
+  for (const [index, group] of stack.groups.entries()) {
+    assert(historicalMarketStackAuthoritySafe(group), `historical market stack group ${index} has forbidden authority`);
+    assert(group?.taxonomyHistoricalBackfillAllowed === false, `historical market stack group ${index} taxonomy backfill forbidden`);
+    if (group.status !== 'HISTORICAL_MARKET_STACK_PREDICTIVE_READY') continue;
+
+    const thresholds = group.thresholds || {};
+    const sample = group.sampleIndependence || {};
+    const windows = group.outcomeWindowIndependence || {};
+    const instruments = group.instrumentConcentration || {};
+    const stability = group.chronologicalStability || {};
+    const metrics = group.ensembleMetrics || {};
+
+    assert(finiteNumber(thresholds.minimumEvaluationSample) >= 200, `historical market stack group ${index} evaluation sample threshold too weak`);
+    assert(finiteNumber(thresholds.minimumClassCount) >= 40, `historical market stack group ${index} class threshold too weak`);
+    assert(finiteNumber(thresholds.minimumSkillPct) >= 5, `historical market stack group ${index} skill threshold too weak`);
+    assert(finiteNumber(thresholds.maximumEce) <= 0.08, `historical market stack group ${index} ECE threshold too weak`);
+    assert(finiteNumber(thresholds.minimumBrierImprovementPct) >= 3, `historical market stack group ${index} Brier threshold too weak`);
+    assert(finiteNumber(thresholds.minimumLogLossImprovementPct) >= 0, `historical market stack group ${index} log-loss threshold too weak`);
+    assert(finiteNumber(thresholds.minimumEceImprovement) >= -0.01, `historical market stack group ${index} ECE regression threshold too weak`);
+    assert(finiteNumber(thresholds.minimumDistinctForecastDates) >= 40, `historical market stack group ${index} date threshold too weak`);
+    assert(finiteNumber(thresholds.minimumDistinctInstruments) >= 10, `historical market stack group ${index} instrument threshold too weak`);
+    assert(finiteNumber(thresholds.maximumSingleForecastDateSharePct) <= 10, `historical market stack group ${index} date concentration threshold too weak`);
+    assert(finiteNumber(thresholds.minimumEffectiveNonOverlappingWindows) >= 12, `historical market stack group ${index} outcome-window threshold too weak`);
+    assert(finiteNumber(thresholds.maximumSingleInstrumentSharePct) <= 25, `historical market stack group ${index} single-instrument threshold too weak`);
+    assert(finiteNumber(thresholds.minimumEffectiveInstrumentCount) >= 6, `historical market stack group ${index} effective-instrument threshold too weak`);
+    assert(finiteNumber(thresholds.chronologicalBlockCount) >= 3, `historical market stack group ${index} chronological block threshold too weak`);
+    assert(finiteNumber(thresholds.minimumChronologicalBlockSample) >= 20, `historical market stack group ${index} chronological block sample too weak`);
+
+    assert(nonNegativeInteger(group.sampleSize) !== null && group.sampleSize >= thresholds.minimumEvaluationSample, `historical market stack group ${index} sample below threshold`);
+    assert(nonNegativeInteger(group.positiveCount) !== null && group.positiveCount >= thresholds.minimumClassCount, `historical market stack group ${index} positive class below threshold`);
+    assert(nonNegativeInteger(group.negativeCount) !== null && group.negativeCount >= thresholds.minimumClassCount, `historical market stack group ${index} negative class below threshold`);
+    assert(finiteNumber(metrics.skillVsBaseRatePct) >= 5, `historical market stack group ${index} skill not ready`);
+    assert(finiteNumber(metrics.expectedCalibrationError) <= 0.08, `historical market stack group ${index} ECE not ready`);
+    assert(finiteNumber(group.brierImprovementVsRawPatternPct) >= 3, `historical market stack group ${index} Brier improvement not ready`);
+    assert(finiteNumber(group.logLossImprovementVsRawPatternPct) >= 0, `historical market stack group ${index} log-loss regression`);
+    assert(finiteNumber(group.eceImprovementVsRawPattern) >= -0.01, `historical market stack group ${index} ECE regression`);
+    assert(sample.status === 'INDEPENDENCE_READY', `historical market stack group ${index} sample independence not ready`);
+    assert(windows.status === 'WINDOW_INDEPENDENCE_READY', `historical market stack group ${index} outcome-window independence not ready`);
+    assert(instruments.status === 'INSTRUMENT_DIVERSIFICATION_READY', `historical market stack group ${index} instrument diversification not ready`);
+    assert(stability.status === 'CHRONOLOGICAL_STABILITY_READY', `historical market stack group ${index} chronological stability not ready`);
+    assert(Array.isArray(stability.blocks) && stability.blocks.length >= 3 && stability.blocks.every((block) => block?.ready === true), `historical market stack group ${index} chronological block not ready`);
+    assert(Array.isArray(group.blockers) && group.blockers.length === 0, `historical market stack group ${index} ready status contains blockers`);
+  }
+}
+
 function verifyResearch(status) {
   const research = status.research;
   assert(research && typeof research === 'object', 'enabled runtime research payload missing');
@@ -108,12 +200,14 @@ function verifyResearch(status) {
   assert(research?.methodology?.liveArchiveWriteAllowed === false, 'live archive write must remain forbidden');
   assert(research?.methodology?.liveCalibrationUseAllowed === false, 'live calibration use must remain forbidden');
   assert(research?.methodology?.rawHistoricalRecordExportDefault === 'DISABLED', 'raw historical export default must remain disabled');
+  assert(research?.methodology?.historicalMarketStackBoundary === 'PREQUENTIAL_WITHIN_SAME_PATTERN_FACTOR_ASSET_HORIZON_REGIME_LINEAGE_TRAIN_ONLY_ON_OUTCOMES_REALIZED_STRICTLY_BEFORE_TARGET_FORECAST_TIME', 'historical market stack boundary invalid');
   assert(Array.isArray(research.auditSampleRecords) && research.auditSampleRecords.length === 0, 'production runtime must not export historical audit samples');
   assert(!Object.prototype.hasOwnProperty.call(research, 'researchRecords'), 'raw historical research records leaked into runtime report');
   assert(nonNegativeInteger(research.generatedRecordCount) === nonNegativeInteger(status.generatedRecordCount), 'generated record count mismatch');
   assert(nonNegativeInteger(research.validRegimeRecordCount) === nonNegativeInteger(status.validRegimeRecordCount), 'valid regime record count mismatch');
   assert(nonNegativeInteger(research.groupCount) === nonNegativeInteger(status.groupCount), 'group count mismatch');
   assert(nonNegativeInteger(research.readyGroupCount) === nonNegativeInteger(status.readyGroupCount), 'ready group count mismatch');
+  verifyHistoricalMarketStackResearch(research);
 
   for (const [index, group] of (research.groups || []).entries()) {
     assert(group?.historicalResearchOnly === true, `group ${index} not marked historical research only`);
@@ -180,7 +274,7 @@ export function verifyCrossSectionalRegimeWalkForwardProductionSafety(report = {
     assert(health[key] === value, `telemetry mismatch for ${key}`);
   }
   const healthText = JSON.stringify(health);
-  assert(!healthText.includes('auditSampleRecords') && !healthText.includes('instrumentSummaries') && !healthText.includes('calibration'), 'raw historical research payload leaked into operational health');
+  assert(!healthText.includes('auditSampleRecords') && !healthText.includes('instrumentSummaries') && !healthText.includes('calibration') && !healthText.includes('historicalMarketStackResearch') && !healthText.includes('ensembleMetrics'), 'raw historical research payload leaked into operational health');
 
   return {
     status: 'VERIFIED',
