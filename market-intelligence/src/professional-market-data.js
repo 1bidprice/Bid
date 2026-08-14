@@ -190,10 +190,80 @@ async function fetchCompanyHistorySeries(company, options, diagnostics) {
   return fallback.series || null;
 }
 
+function benchmarkMinimumObservationCount(options = {}) {
+  const configured = Number(options.benchmarkMinimumObservationCount);
+  if (Number.isFinite(configured) && configured > 0) return Math.max(1, Math.floor(configured));
+  const range = resolveYahooHistoryRange(options);
+  if (range === '5y') return 1_000;
+  if (range === '10y') return 2_000;
+  if (range === 'max') return 1_000;
+  return 1;
+}
+
+function benchmarkSeriesMeetsDepth(series, minimumObservationCount) {
+  return series?.usable === true
+    && Array.isArray(series.candles)
+    && series.candles.length >= minimumObservationCount;
+}
+
+function benchmarkRetryable(diagnostics = []) {
+  return diagnostics.some((item) => {
+    if (item?.code === 'YAHOO_MARKET_HISTORY_TOO_SHALLOW' || item?.code === 'YAHOO_MARKET_RATE_LIMITED') return true;
+    if (item?.code !== 'YAHOO_MARKET_REQUEST_FAILED') return false;
+    const status = Number(item?.status);
+    return !Number.isFinite(status) || status === 408 || status === 425 || status === 429 || status >= 500;
+  });
+}
+
+function benchmarkMaximumAttempts(options = {}) {
+  const configured = Number(options.benchmarkFetchMaxAttempts);
+  if (Number.isFinite(configured)) return Math.max(1, Math.min(3, Math.floor(configured)));
+  return benchmarkMinimumObservationCount(options) > 1 ? 2 : 1;
+}
+
+async function waitForBenchmarkRetry(options, attempt) {
+  const configured = Number(options.benchmarkRetryDelayMs);
+  const delayMs = Number.isFinite(configured) ? Math.max(0, Math.min(5_000, configured)) : 500;
+  if (delayMs <= 0) return;
+  await new Promise((resolve) => setTimeout(resolve, delayMs * Math.max(1, attempt)));
+}
+
 async function fetchBenchmarkSeries(company, options, diagnostics) {
   const candidates = benchmarkYahooSymbols(company);
-  const cacheKey = `YAHOO:${candidates.join('|')}:${resolveYahooHistoryRange(options)}`;
-  if (options.benchmarkCache?.has(cacheKey)) return options.benchmarkCache.get(cacheKey);
+  const range = resolveYahooHistoryRange(options);
+  const minimumObservationCount = benchmarkMinimumObservationCount(options);
+  const cacheKey = `YAHOO:${candidates.join('|')}:${range}`;
+  const retryStateKey = `${cacheKey}:DEPTH:${minimumObservationCount}:STATE`;
+  const cached = options.benchmarkCache?.get(cacheKey) || null;
+  if (benchmarkSeriesMeetsDepth(cached, minimumObservationCount)) {
+    diagnostics.push({
+      code: 'MARKET_BENCHMARK_CACHE_HIT',
+      companyId: company.companyId,
+      providerSymbol: cached.providerSymbol || cached.symbol || null,
+      observationCount: cached.candles.length,
+      minimumObservationCount,
+    });
+    return cached;
+  }
+  if (cached && options.benchmarkCache?.delete) {
+    options.benchmarkCache.delete(cacheKey);
+    diagnostics.push({
+      code: 'MARKET_BENCHMARK_CACHE_REJECTED_DEPTH',
+      companyId: company.companyId,
+      observationCount: Array.isArray(cached.candles) ? cached.candles.length : 0,
+      minimumObservationCount,
+    });
+  }
+  const priorState = options.benchmarkCache?.get(retryStateKey) || null;
+  if (priorState?.status === 'EXHAUSTED') {
+    diagnostics.push({
+      code: 'MARKET_BENCHMARK_RETRY_EXHAUSTED_CACHED',
+      companyId: company.companyId,
+      attempts: priorState.attempts,
+      minimumObservationCount,
+    });
+    return null;
+  }
 
   if (company.country === 'US' && String(options.token || '').trim()) {
     const finnhub = await fetchFinnhubCandlesForSymbol('SPY', {
@@ -201,25 +271,78 @@ async function fetchBenchmarkSeries(company, options, diagnostics) {
       currency: 'USD',
     });
     diagnostics.push(...(finnhub.diagnostics || []).map((item) => ({ ...item, benchmark: true })));
-    if (finnhub.series?.usable) {
+    if (benchmarkSeriesMeetsDepth(finnhub.series, minimumObservationCount)) {
       const series = { ...finnhub.series, sourceQuality: 'PRIMARY_LICENSED', providerSymbol: 'SPY' };
       options.benchmarkCache?.set(cacheKey, series);
+      options.benchmarkCache?.set(retryStateKey, { status: 'READY', attempts: 1 });
       return series;
+    }
+    if (finnhub.series?.usable) {
+      diagnostics.push({
+        code: 'MARKET_BENCHMARK_HISTORY_TOO_SHALLOW',
+        companyId: company.companyId,
+        provider: 'Finnhub',
+        providerSymbol: 'SPY',
+        observationCount: Array.isArray(finnhub.series.candles) ? finnhub.series.candles.length : 0,
+        minimumObservationCount,
+      });
     }
   }
 
-  const yahoo = await fetchYahooChartSeries(candidates[0], {
-    ...options,
-    symbol: isAthensListing(company) ? 'ATHEX_BENCHMARK' : 'SPY',
-    alternateSymbols: candidates.slice(1),
-    currency: company.currency || 'USD',
-    range: resolveYahooHistoryRange(options),
-    interval: '1d',
-    excludeIncompleteSession: true,
+  const maximumAttempts = benchmarkMaximumAttempts(options);
+  let attempts = 0;
+  for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
+    attempts = attempt;
+    const yahoo = await fetchYahooChartSeries(candidates[0], {
+      ...options,
+      symbol: isAthensListing(company) ? 'ATHEX_BENCHMARK' : 'SPY',
+      alternateSymbols: candidates.slice(1),
+      currency: company.currency || 'USD',
+      range,
+      interval: '1d',
+      excludeIncompleteSession: true,
+      minimumObservationCount,
+    });
+    diagnostics.push(...(yahoo.diagnostics || []).map((item) => ({ ...item, benchmark: true, benchmarkAttempt: attempt })));
+    if (benchmarkSeriesMeetsDepth(yahoo.series, minimumObservationCount)) {
+      options.benchmarkCache?.set(cacheKey, yahoo.series);
+      options.benchmarkCache?.set(retryStateKey, { status: 'READY', attempts: attempt });
+      if (attempt > 1) {
+        diagnostics.push({
+          code: 'MARKET_BENCHMARK_RECOVERED_AFTER_RETRY',
+          companyId: company.companyId,
+          attempts: attempt,
+          providerSymbol: yahoo.series.providerSymbol || yahoo.series.symbol || null,
+          observationCount: yahoo.series.candles.length,
+          minimumObservationCount,
+        });
+      }
+      return yahoo.series;
+    }
+    const retryable = benchmarkRetryable(yahoo.diagnostics || []);
+    if (attempt < maximumAttempts && retryable) {
+      diagnostics.push({
+        code: 'MARKET_BENCHMARK_RETRYING',
+        companyId: company.companyId,
+        attempt,
+        maximumAttempts,
+        minimumObservationCount,
+      });
+      await waitForBenchmarkRetry(options, attempt);
+      continue;
+    }
+    break;
+  }
+
+  options.benchmarkCache?.set(retryStateKey, { status: 'EXHAUSTED', attempts });
+  diagnostics.push({
+    code: 'MARKET_BENCHMARK_RETRY_EXHAUSTED',
+    companyId: company.companyId,
+    attempts,
+    maximumAttempts,
+    minimumObservationCount,
   });
-  diagnostics.push(...(yahoo.diagnostics || []).map((item) => ({ ...item, benchmark: true })));
-  if (yahoo.series) options.benchmarkCache?.set(cacheKey, yahoo.series);
-  return yahoo.series || null;
+  return null;
 }
 
 export async function fetchProfessionalHistoricalMetrics(company, options = {}) {
