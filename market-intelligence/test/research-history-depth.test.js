@@ -17,7 +17,7 @@ const COMPANY = {
 };
 
 function chartPayload(symbol, startPrice) {
-  const count = 260;
+  const count = 1_100;
   const timestamp = [];
   const close = [];
   const open = [];
@@ -25,7 +25,7 @@ function chartPayload(symbol, startPrice) {
   const low = [];
   const volume = [];
   const adjclose = [];
-  const base = Math.floor(new Date('2025-08-14T14:00:00.000Z').getTime() / 1000);
+  const base = Math.floor(new Date('2023-08-10T14:00:00.000Z').getTime() / 1000);
   let price = startPrice;
   for (let index = 0; index < count; index += 1) {
     price *= 1.0005;
