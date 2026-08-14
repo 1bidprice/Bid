@@ -337,9 +337,9 @@ export function buildHistoricalMarketDomainPrequentialStackPredictions(records =
   return buildPrequential(records, options, 'DOMAIN_SEPARATED');
 }
 
-export function buildHistoricalMarketPriorShrunkPrequentialStackPredictions(records = [], options = {}) {
-  const scalar = buildPrequential(records, options, 'SCALAR');
-  const predictions = scalar.predictions.map((prediction) => supportShrunkPrediction(prediction, scalar.minimumTrainingSample, options));
+export function buildHistoricalMarketPriorShrunkPrequentialStackFromScalar(scalar = {}, options = {}) {
+  const predictions = (Array.isArray(scalar?.predictions) ? scalar.predictions : [])
+    .map((prediction) => supportShrunkPrediction(prediction, scalar.minimumTrainingSample, options));
   return {
     ...scalar,
     contract: HISTORICAL_MARKET_PRIOR_SHRUNK_PREQUENTIAL_STACK_CONTRACT,
@@ -360,4 +360,8 @@ export function buildHistoricalMarketPriorShrunkPrequentialStackPredictions(reco
     antiLeakRule: scalar.antiLeakRule,
     priorShrinkageRule: 'PREDICTION_CONVEXLY_SHRUNK_TOWARD_BETA_SMOOTHED_BASE_RATE_COMPUTED_ONLY_FROM_TRAINING_OUTCOMES_REALIZED_STRICTLY_BEFORE_TARGET_FORECAST_TIME',
   };
+}
+
+export function buildHistoricalMarketPriorShrunkPrequentialStackPredictions(records = [], options = {}) {
+  return buildHistoricalMarketPriorShrunkPrequentialStackFromScalar(buildPrequential(records, options, 'SCALAR'), options);
 }
