@@ -4,6 +4,7 @@ import {
   HISTORICAL_MARKET_PREQUENTIAL_STACK_CONTRACT,
   HISTORICAL_MARKET_PRIOR_SHRUNK_PREQUENTIAL_STACK_CONTRACT,
   buildHistoricalMarketFactorPrequentialStackPredictions,
+  buildHistoricalMarketPriorShrunkPrequentialStackFromScalar,
   buildHistoricalMarketPriorShrunkPrequentialStackPredictions,
 } from '../src/forecast-historical-market-prequential-stack.js';
 
@@ -177,6 +178,23 @@ test('support-shrunk scalar candidate moves only toward a training-only base rat
     if (Math.abs(candidate.ensembleResearchProbabilityPositive - original.ensembleResearchProbabilityPositive) > 1e-6) movedPredictionCount += 1;
   }
   assert.ok(movedPredictionCount > 0);
+});
+
+test('reusing the already-fitted scalar prequential result preserves prior-shrunk output exactly', () => {
+  const input = records(150).map((record, index) => ({
+    ...record,
+    rawProbabilityPositive: index % 3 === 0 ? 0.62 : 0.46,
+    historicalMarketFactorScore: index % 2 ? 0.7 : -0.4,
+  }));
+  const options = {
+    ensembleMinimumTrainingSample: 30,
+    ensembleMinimumTrainingClassCount: 10,
+    priorShrinkageSupportFloor: 60,
+  };
+  const scalar = buildHistoricalMarketFactorPrequentialStackPredictions(input, options);
+  const reused = buildHistoricalMarketPriorShrunkPrequentialStackFromScalar(scalar, options);
+  const wrapper = buildHistoricalMarketPriorShrunkPrequentialStackPredictions(input, options);
+  assert.deepEqual(reused, wrapper);
 });
 
 test('historical prequential predictions remain compact research-only and authority-free', () => {
