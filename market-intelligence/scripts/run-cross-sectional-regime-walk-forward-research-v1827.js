@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { runV1826HistoricalResearchJob } from './run-cross-sectional-regime-walk-forward-research-v1826.js';
 import { buildHistoricalPredictiveSkillSummary } from '../src/forecast-historical-predictive-skill.js';
 import { verifyHistoricalMarketDomainStackCandidate } from '../src/forecast-historical-market-domain-stack-candidate-safety.js';
+import { verifyHistoricalMarketPriorShrunkStackCandidate } from '../src/forecast-historical-market-prior-shrunk-stack-candidate-safety.js';
 
 export const V1827_PREDICTIVE_SKILL_ARTIFACT_CONTRACT = 'HISTORICAL_PREDICTIVE_SKILL_ARTIFACT_V1';
 export const V1827_DATASET_INTEGRITY_CONTRACT = 'HISTORICAL_PREDICTIVE_DATASET_INTEGRITY_V1';
@@ -90,9 +91,15 @@ export async function runV1827HistoricalPredictiveSkillResearchJob(input = {}) {
     buildHistoricalPredictiveSkillSummary(groups),
     datasetIntegrity,
   );
-  const domainSeparatedCandidate = research?.historicalMarketStackResearch?.domainSeparatedCandidate || null;
+  const sourceRecordCount = count(research?.validRegimeRecordCount);
+  const marketStackResearch = research?.historicalMarketStackResearch || null;
+  const domainSeparatedCandidate = marketStackResearch?.domainSeparatedCandidate || null;
+  const priorShrunkCandidate = marketStackResearch?.priorShrunkCandidate || null;
   const domainCandidateSafety = verifyHistoricalMarketDomainStackCandidate(domainSeparatedCandidate, {
-    sourceRecordCount: count(research?.validRegimeRecordCount),
+    sourceRecordCount,
+  });
+  const priorShrunkCandidateSafety = verifyHistoricalMarketPriorShrunkStackCandidate(priorShrunkCandidate, {
+    sourceRecordCount,
   });
 
   return {
@@ -102,6 +109,7 @@ export async function runV1827HistoricalPredictiveSkillResearchJob(input = {}) {
     datasetIntegrity,
     predictiveSkillSummary,
     domainCandidateSafety,
+    priorShrunkCandidateSafety,
     automaticModelPromotionEnabled: false,
     probabilityCalibrationEnabled: false,
     decisionIntegrationEnabled: false,
@@ -133,6 +141,12 @@ async function main() {
       console.log(`Historical domain stack OOS predictions: ${domain.predictionCount}`);
       console.log(`Historical domain stack predictive-ready groups: ${domain.predictiveReadyGroupCount}/${domain.groupCount}`);
       console.log(`Historical domain stack safety: ${result.domainCandidateSafety.status}`);
+    }
+    const priorShrunk = marketStack.priorShrunkCandidate || null;
+    if (priorShrunk) {
+      console.log(`Historical prior-shrunk stack OOS predictions: ${priorShrunk.predictionCount}`);
+      console.log(`Historical prior-shrunk stack predictive-ready groups: ${priorShrunk.predictiveReadyGroupCount}/${priorShrunk.groupCount}`);
+      console.log(`Historical prior-shrunk stack safety: ${result.priorShrunkCandidateSafety.status}`);
     }
   }
   if (result.predictiveSkillSummary.blockerCounts.length) {
