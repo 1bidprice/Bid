@@ -1,8 +1,9 @@
 import { forecastDateKey } from './forecast-oos-sample-independence.js';
 
-export const HISTORICAL_MARKET_PREQUENTIAL_STACK_VERSION = '2026-08-14.1';
+export const HISTORICAL_MARKET_PREQUENTIAL_STACK_VERSION = '2026-08-14.2';
 export const HISTORICAL_MARKET_PREQUENTIAL_STACK_CONTRACT = 'PREQUENTIAL_HISTORICAL_PATTERN_MARKET_FACTOR_STACK_V1';
 export const HISTORICAL_MARKET_DOMAIN_PREQUENTIAL_STACK_CONTRACT = 'PREQUENTIAL_HISTORICAL_PATTERN_MARKET_DOMAIN_STACK_V1';
+export const HISTORICAL_MARKET_PRIOR_SHRUNK_PREQUENTIAL_STACK_CONTRACT = 'PREQUENTIAL_HISTORICAL_PATTERN_MARKET_FACTOR_PRIOR_SHRUNK_STACK_V1';
 
 function strictNumber(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
@@ -305,10 +306,58 @@ function buildPrequential(records = [], options = {}, featureMode = 'SCALAR') {
   };
 }
 
+function supportShrunkPrediction(prediction, minimumTrainingSample, options = {}) {
+  const positiveCount = Math.max(0, Number(prediction?.ensembleTrainingPositiveCount || 0));
+  const negativeCount = Math.max(0, Number(prediction?.ensembleTrainingNegativeCount || 0));
+  const trainingSampleSize = positiveCount + negativeCount;
+  const betaAlpha = Math.max(1, Number(options.priorShrinkageBetaAlpha ?? 1));
+  const betaBeta = Math.max(1, Number(options.priorShrinkageBetaBeta ?? 1));
+  const supportFloor = Math.max(minimumTrainingSample, Number(options.priorShrinkageSupportFloor ?? minimumTrainingSample));
+  const trainingBaseRate = (positiveCount + betaAlpha) / (trainingSampleSize + betaAlpha + betaBeta);
+  const reliabilityWeight = trainingSampleSize / (trainingSampleSize + supportFloor);
+  const scalarProbability = Number(prediction.ensembleResearchProbabilityPositive);
+  const shrunkProbability = trainingBaseRate + reliabilityWeight * (scalarProbability - trainingBaseRate);
+  return {
+    ...prediction,
+    ensembleResearchProbabilityPositive: round(clamp(shrunkProbability, 1e-4, 1 - 1e-4), 8),
+    ensembleFeatureMode: 'PRIOR_SHRUNK_SCALAR',
+    ensembleTrainingBaseRatePositive: round(trainingBaseRate, 8),
+    ensembleSupportReliabilityWeight: round(reliabilityWeight, 8),
+    ensemblePriorShrinkageBetaAlpha: betaAlpha,
+    ensemblePriorShrinkageBetaBeta: betaBeta,
+    ensemblePriorShrinkageSupportFloor: supportFloor,
+  };
+}
+
 export function buildHistoricalMarketFactorPrequentialStackPredictions(records = [], options = {}) {
   return buildPrequential(records, options, 'SCALAR');
 }
 
 export function buildHistoricalMarketDomainPrequentialStackPredictions(records = [], options = {}) {
   return buildPrequential(records, options, 'DOMAIN_SEPARATED');
+}
+
+export function buildHistoricalMarketPriorShrunkPrequentialStackPredictions(records = [], options = {}) {
+  const scalar = buildPrequential(records, options, 'SCALAR');
+  const predictions = scalar.predictions.map((prediction) => supportShrunkPrediction(prediction, scalar.minimumTrainingSample, options));
+  return {
+    ...scalar,
+    contract: HISTORICAL_MARKET_PRIOR_SHRUNK_PREQUENTIAL_STACK_CONTRACT,
+    featureMode: 'PRIOR_SHRUNK_SCALAR',
+    featureOrder: ['PATTERN_LOGIT', 'HISTORICAL_MARKET_FACTOR_SCORE', 'TRAINING_ONLY_BASE_RATE_SHRINKAGE'],
+    predictions,
+    predictionCount: predictions.length,
+    latestModel: scalar.latestModel ? {
+      ...scalar.latestModel,
+      contract: HISTORICAL_MARKET_PRIOR_SHRUNK_PREQUENTIAL_STACK_CONTRACT,
+      featureMode: 'PRIOR_SHRUNK_SCALAR',
+      priorShrinkage: {
+        betaAlpha: Math.max(1, Number(options.priorShrinkageBetaAlpha ?? 1)),
+        betaBeta: Math.max(1, Number(options.priorShrinkageBetaBeta ?? 1)),
+        supportFloor: Math.max(scalar.minimumTrainingSample, Number(options.priorShrinkageSupportFloor ?? scalar.minimumTrainingSample)),
+      },
+    } : null,
+    antiLeakRule: scalar.antiLeakRule,
+    priorShrinkageRule: 'PREDICTION_CONVEXLY_SHRUNK_TOWARD_BETA_SMOOTHED_BASE_RATE_COMPUTED_ONLY_FROM_TRAINING_OUTCOMES_REALIZED_STRICTLY_BEFORE_TARGET_FORECAST_TIME',
+  };
 }
