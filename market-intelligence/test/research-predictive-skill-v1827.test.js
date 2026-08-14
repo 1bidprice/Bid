@@ -5,7 +5,10 @@ import {
   assertV1827DatasetIntegrityReady,
   runV1827HistoricalPredictiveSkillResearchJob,
 } from '../scripts/run-cross-sectional-regime-walk-forward-research-v1827.js';
-import { buildHistoricalMarketDomainStackResearch } from '../src/forecast-historical-market-stacked-ensemble-research.js';
+import {
+  buildHistoricalMarketDomainStackResearch,
+  buildHistoricalMarketPriorShrunkStackResearch,
+} from '../src/forecast-historical-market-stacked-ensemble-research.js';
 
 const group = (skill) => ({
   assetClass: 'EQUITY',
@@ -20,8 +23,7 @@ const group = (skill) => ({
   },
 });
 
-function domainCandidate(sourceRecordCount) {
-  const candidate = buildHistoricalMarketDomainStackResearch([]);
+function emptyCandidate(candidate, sourceRecordCount) {
   return {
     ...candidate,
     sourceRecordCount,
@@ -37,6 +39,14 @@ function domainCandidate(sourceRecordCount) {
   };
 }
 
+function domainCandidate(sourceRecordCount) {
+  return emptyCandidate(buildHistoricalMarketDomainStackResearch([]), sourceRecordCount);
+}
+
+function priorShrunkCandidate(sourceRecordCount) {
+  return emptyCandidate(buildHistoricalMarketPriorShrunkStackResearch([]), sourceRecordCount);
+}
+
 const base = (skill, options = {}) => {
   const generatedRecordCount = options.generatedRecordCount ?? 265;
   const validRegimeRecordCount = options.validRegimeRecordCount ?? generatedRecordCount;
@@ -50,6 +60,7 @@ const base = (skill, options = {}) => {
         groups: [group(skill)],
         historicalMarketStackResearch: {
           domainSeparatedCandidate: domainCandidate(validRegimeRecordCount),
+          priorShrunkCandidate: priorShrunkCandidate(validRegimeRecordCount),
         },
       },
     },
@@ -73,6 +84,7 @@ test('v1827 separates evaluation readiness from predictive skill', async () => {
   assert.equal(result.datasetIntegrity.regimeCoveragePct, 100);
   assert.equal(result.predictiveSkillSummary.datasetIntegrityReady, true);
   assert.equal(result.domainCandidateSafety.status, 'VERIFIED');
+  assert.equal(result.priorShrunkCandidateSafety.status, 'VERIFIED');
   assert.equal(result.readinessSummary.readyGroupCount, 1);
   assert.equal(result.predictiveSkillSummary.evaluationReadyGroupCount, 1);
   assert.equal(result.predictiveSkillSummary.predictiveSkillReadyGroupCount, 0);
@@ -85,6 +97,7 @@ test('v1827 remains authority-free even when predictive skill passes', async () 
   const result = await runV1827HistoricalPredictiveSkillResearchJob({ runV1826: async () => base(6.5) });
   assert.equal(result.datasetIntegrity.ready, true);
   assert.equal(result.domainCandidateSafety.status, 'VERIFIED');
+  assert.equal(result.priorShrunkCandidateSafety.status, 'VERIFIED');
   assert.equal(result.predictiveSkillSummary.predictiveSkillReadyGroupCount, 1);
   assert.equal(result.predictiveSkillSummary.automaticModelPromotionEnabled, false);
   assert.equal(result.predictiveSkillSummary.forecastMayInfluenceFinalAction, false);
@@ -108,6 +121,7 @@ test('v1827 blocks predictive evaluation when historical regime coverage is inco
   assert.equal(result.datasetIntegrity.validRegimeRecordCount, 338);
   assert.equal(result.datasetIntegrity.regimeUnavailableRecordCount, 2263);
   assert.equal(result.domainCandidateSafety.status, 'VERIFIED');
+  assert.equal(result.priorShrunkCandidateSafety.status, 'VERIFIED');
   assert.ok(result.datasetIntegrity.regimeCoveragePct < 100);
   assert.ok(result.datasetIntegrity.blockers.includes('HISTORICAL_REGIME_COVERAGE_INCOMPLETE'));
   assert.equal(result.predictiveSkillSummary.status, 'PREDICTIVE_SKILL_EVALUATION_BLOCKED_BY_DATASET_INTEGRITY');
@@ -135,6 +149,7 @@ test('v1827 permits predictive evaluation only when every generated forecast has
   assert.equal(result.datasetIntegrity.regimeUnavailableRecordCount, 0);
   assert.equal(result.datasetIntegrity.regimeCoveragePct, 100);
   assert.equal(result.domainCandidateSafety.status, 'VERIFIED');
+  assert.equal(result.priorShrunkCandidateSafety.status, 'VERIFIED');
   assert.equal(result.predictiveSkillSummary.datasetIntegrityReady, true);
   assert.equal(result.predictiveSkillSummary.predictiveSkillReadyGroupCount, 1);
   assert.equal(assertV1827DatasetIntegrityReady(result.datasetIntegrity), true);
