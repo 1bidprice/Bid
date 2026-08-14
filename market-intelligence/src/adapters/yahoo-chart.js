@@ -122,6 +122,14 @@ async function fetchOne(host, providerSymbol, options) {
     excludeIncompleteSession: options.excludeIncompleteSession,
   });
   if (!series.usable) throw new Error(`Yahoo chart returned no usable data for ${providerSymbol}`);
+  const minimumObservationCount = Math.max(1, Math.floor(Number(options.minimumObservationCount || 1)));
+  if (series.candles.length < minimumObservationCount) {
+    const error = new Error(`Yahoo chart history too shallow for ${providerSymbol}: ${series.candles.length}/${minimumObservationCount}`);
+    error.code = 'YAHOO_HISTORY_TOO_SHALLOW';
+    error.observationCount = series.candles.length;
+    error.minimumObservationCount = minimumObservationCount;
+    throw error;
+  }
   return series;
 }
 
@@ -154,11 +162,20 @@ export async function fetchYahooChartSeries(symbolInput, options = {}) {
           ],
         };
       } catch (error) {
+        const shallow = error?.code === 'YAHOO_HISTORY_TOO_SHALLOW';
         diagnostics.push({
-          code: error?.status === 429 ? 'YAHOO_MARKET_RATE_LIMITED' : 'YAHOO_MARKET_REQUEST_FAILED',
+          code: shallow
+            ? 'YAHOO_MARKET_HISTORY_TOO_SHALLOW'
+            : error?.status === 429
+              ? 'YAHOO_MARKET_RATE_LIMITED'
+              : 'YAHOO_MARKET_REQUEST_FAILED',
           providerSymbol,
           host,
           status: error?.status || null,
+          ...(shallow ? {
+            observationCount: error.observationCount,
+            minimumObservationCount: error.minimumObservationCount,
+          } : {}),
           message: error instanceof Error ? error.message : String(error),
         });
       }
