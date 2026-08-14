@@ -84,6 +84,10 @@ test('adaptive shrinkage uses fixed powers-of-two support grid and warmup defaul
   assert.equal(result.predictions[0].ensemblePriorShrinkageSupportFloor, 20);
   assert.equal(result.adaptiveSelectionObjective, 'BRIER_SCORE');
   assert.equal(result.adaptiveTieBreak, 'PREFER_STRONGER_SHRINKAGE');
+  assert.equal(
+    result.adaptiveSupportFloorSelectionCounts.reduce((sum, item) => sum + item.predictionCount, 0),
+    result.predictionCount,
+  );
 });
 
 test('adaptive shrinkage selects support only from prior realised OOS outcomes in the same lineage', () => {
@@ -134,6 +138,34 @@ test('earlier forecast with outcome known after target is excluded from adaptive
   const selected = result.predictions.at(-1);
   assert.equal(selected.ensembleAdaptiveSelectionSampleSize, 40);
   assert.ok(Date.parse(selected.ensembleAdaptiveSelectionLatestOutcomeAt) < Date.parse(selected.forecastAt));
+});
+
+test('duplicate forecast ids cannot overwrite adaptive selections for other prediction objects', () => {
+  const predictions = Array.from({ length: 41 }, (_, index) => scalarPrediction(index, {
+    forecastId: 'duplicate-id',
+    positiveOutcome: index % 2,
+    probability: 0.9,
+  }));
+  const result = buildHistoricalMarketAdaptivePriorShrunkPrequentialStackFromScalar(scalarStack(predictions));
+
+  assert.equal(result.predictions[0].ensembleAdaptiveSelectionStatus, 'ADAPTIVE_PRIOR_SHRINKAGE_WARMUP_DEFAULT');
+  assert.equal(result.predictions[0].ensemblePriorShrinkageSupportFloor, 20);
+  assert.equal(result.predictions.at(-1).ensembleAdaptiveSelectionStatus, 'ADAPTIVE_PRIOR_SHRINKAGE_SELECTION_READY');
+  assert.equal(result.predictions.at(-1).ensemblePriorShrinkageSupportFloor, 160);
+});
+
+test('adaptive support-floor usage counts are bounded to the registered grid and sum to all predictions', () => {
+  const predictions = Array.from({ length: 55 }, (_, index) => scalarPrediction(index, {
+    positiveOutcome: index % 2,
+    probability: index % 3 === 0 ? 0.9 : 0.7,
+  }));
+  const result = buildHistoricalMarketAdaptivePriorShrunkPrequentialStackFromScalar(scalarStack(predictions));
+  const grid = new Set(result.adaptiveSupportFloorGrid);
+  assert.ok(result.adaptiveSupportFloorSelectionCounts.every((item) => grid.has(item.supportFloor)));
+  assert.equal(
+    result.adaptiveSupportFloorSelectionCounts.reduce((sum, item) => sum + item.predictionCount, 0),
+    result.predictionCount,
+  );
 });
 
 test('adaptive shrinkage stays research-only and exports no authority', () => {
