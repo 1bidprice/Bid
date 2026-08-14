@@ -8,11 +8,16 @@ import {
   buildHistoricalMarketPriorShrunkPrequentialStackFromScalar,
   buildHistoricalMarketPriorShrunkPrequentialStackPredictions,
 } from './forecast-historical-market-prequential-stack.js';
+import {
+  buildHistoricalMarketAdaptivePriorShrunkPrequentialStackFromScalar,
+  buildHistoricalMarketAdaptivePriorShrunkPrequentialStackPredictions,
+} from './forecast-historical-market-adaptive-prior-shrinkage.js';
 
-export const HISTORICAL_MARKET_STACK_RESEARCH_VERSION = '2026-08-14.3';
+export const HISTORICAL_MARKET_STACK_RESEARCH_VERSION = '2026-08-14.4';
 export const HISTORICAL_MARKET_STACK_RESEARCH_CONTRACT = 'HISTORICAL_MARKET_STACK_PREDICTIVE_RESEARCH_V1';
 export const HISTORICAL_MARKET_DOMAIN_STACK_RESEARCH_CONTRACT = 'HISTORICAL_MARKET_DOMAIN_STACK_PREDICTIVE_RESEARCH_V1';
 export const HISTORICAL_MARKET_PRIOR_SHRUNK_STACK_RESEARCH_CONTRACT = 'HISTORICAL_MARKET_PRIOR_SHRUNK_STACK_PREDICTIVE_RESEARCH_V1';
+export const HISTORICAL_MARKET_ADAPTIVE_PRIOR_SHRUNK_STACK_RESEARCH_CONTRACT = 'HISTORICAL_MARKET_ADAPTIVE_PRIOR_SHRUNK_STACK_PREDICTIVE_RESEARCH_V1';
 
 function strictNumber(value) { return typeof value === 'number' && Number.isFinite(value) ? value : null; }
 function round(value, digits = 6) { return Number.isFinite(value) ? Number(value.toFixed(digits)) : null; }
@@ -69,10 +74,29 @@ function buildStackResearch(records, options, prequential, config) {
   for (const prediction of prequential.predictions) { const key = lineageKey(prediction); const items = groupsMap.get(key) || []; items.push(prediction); groupsMap.set(key, items); }
   const groups = [...groupsMap.values()].map((predictions) => ({ ...evaluateGroup(predictions, options), modelVariant: config.modelVariant })).sort((left, right) => [left.historicalPatternPolicyVersion, left.historicalMarketFactorPolicyVersion, left.assetClass, left.horizon, left.regimeKey].join('|').localeCompare([right.historicalPatternPolicyVersion, right.historicalMarketFactorPolicyVersion, right.assetClass, right.horizon, right.regimeKey].join('|')));
   const predictiveReadyGroupCount = groups.filter((group) => group.status === 'HISTORICAL_MARKET_STACK_PREDICTIVE_READY').length; const blockerCounts = new Map(); for (const group of groups) for (const blocker of group.blockers || []) blockerCounts.set(blocker, (blockerCounts.get(blocker) || 0) + 1);
-  return { format: config.format, version: 1, policyVersion: HISTORICAL_MARKET_STACK_RESEARCH_VERSION, contract: config.contract, status: predictiveReadyGroupCount ? config.readyStatus : config.notReadyStatus, modelVariant: config.modelVariant, sourceRecordCount: input.length, eligibleRecordCount: prequential.eligibleRecordCount, rejectedRecordCount: prequential.rejectedRecordCount, predictionCount: prequential.predictionCount, skippedInsufficientTrainingCount: prequential.skippedInsufficientTrainingCount, modelFitCount: prequential.modelFitCount, groupCount: groups.length, predictiveReadyGroupCount, predictiveNotReadyGroupCount: groups.length - predictiveReadyGroupCount, groups, blockerCounts: [...blockerCounts.entries()].map(([code, groupCount]) => ({ code, groupCount })).sort((left, right) => right.groupCount - left.groupCount || left.code.localeCompare(right.code)), methodology: { model: config.model || 'PREQUENTIAL_L2_LOGISTIC_STACK', features: [...config.features], historicalMarketFactorDomains: ['MOMENTUM', 'RISK'], representation: config.representation, trainingRule: prequential.antiLeakRule, priorShrinkageRule: prequential.priorShrinkageRule || null, comparisonRule: 'ENSEMBLE_AND_RAW_PATTERN_EVALUATED_ON_IDENTICAL_TARGET_PREDICTION_SAMPLE', chronologyRule: 'THREE_CONTIGUOUS_FORECAST_DATE_BLOCKS_EACH_REQUIRE_NON_NEGATIVE_BASE_RATE_SKILL_AND_NON_REGRESSION_VS_RAW_PATTERN', taxonomyHistoricalBackfillAllowed: false, rawPredictionExportAllowed: false }, rawPredictionsIncluded: false, rawHistoricalRecordsIncluded: false, rawHistoricalCandlesIncluded: false, taxonomyPromotionEligible: false, historicalResearchOnly: true, automaticModelPromotionEnabled: false, probabilityCalibrationEnabled: false, decisionIntegrationEnabled: false, forecastMayInfluenceFinalAction: false, finalActionEligible: false, brokerExecutionEligible: false, decisionImpact: 'NONE' };
+  const adaptive = prequential.featureMode === 'ADAPTIVE_PRIOR_SHRUNK_SCALAR' ? {
+    adaptiveSupportFloorGrid: [...(prequential.adaptiveSupportFloorGrid || [])],
+    adaptiveSupportFloorSelectionCounts: [...(prequential.adaptiveSupportFloorSelectionCounts || [])],
+    adaptiveSelectionMinimumSample: prequential.adaptiveSelectionMinimumSample,
+    adaptiveSelectionMinimumClassCount: prequential.adaptiveSelectionMinimumClassCount,
+    adaptiveSelectionReadyPredictionCount: prequential.adaptiveSelectionReadyPredictionCount,
+    adaptiveSelectionWarmupPredictionCount: prequential.adaptiveSelectionWarmupPredictionCount,
+  } : {};
+  const adaptiveMethodology = prequential.featureMode === 'ADAPTIVE_PRIOR_SHRUNK_SCALAR' ? {
+    adaptiveSupportFloorGrid: [...(prequential.adaptiveSupportFloorGrid || [])],
+    adaptiveSelectionMinimumSample: prequential.adaptiveSelectionMinimumSample,
+    adaptiveSelectionMinimumClassCount: prequential.adaptiveSelectionMinimumClassCount,
+    adaptiveSelectionRule: prequential.adaptiveSelectionRule,
+    adaptiveSelectionObjective: prequential.adaptiveSelectionObjective,
+    adaptiveTieBreak: prequential.adaptiveTieBreak,
+  } : {};
+  return { format: config.format, version: 1, policyVersion: HISTORICAL_MARKET_STACK_RESEARCH_VERSION, contract: config.contract, status: predictiveReadyGroupCount ? config.readyStatus : config.notReadyStatus, modelVariant: config.modelVariant, sourceRecordCount: input.length, eligibleRecordCount: prequential.eligibleRecordCount, rejectedRecordCount: prequential.rejectedRecordCount, predictionCount: prequential.predictionCount, skippedInsufficientTrainingCount: prequential.skippedInsufficientTrainingCount, modelFitCount: prequential.modelFitCount, ...adaptive, groupCount: groups.length, predictiveReadyGroupCount, predictiveNotReadyGroupCount: groups.length - predictiveReadyGroupCount, groups, blockerCounts: [...blockerCounts.entries()].map(([code, groupCount]) => ({ code, groupCount })).sort((left, right) => right.groupCount - left.groupCount || left.code.localeCompare(right.code)), methodology: { model: config.model || 'PREQUENTIAL_L2_LOGISTIC_STACK', features: [...config.features], historicalMarketFactorDomains: ['MOMENTUM', 'RISK'], representation: config.representation, trainingRule: prequential.antiLeakRule, priorShrinkageRule: prequential.priorShrinkageRule || null, ...adaptiveMethodology, comparisonRule: 'ENSEMBLE_AND_RAW_PATTERN_EVALUATED_ON_IDENTICAL_TARGET_PREDICTION_SAMPLE', chronologyRule: 'THREE_CONTIGUOUS_FORECAST_DATE_BLOCKS_EACH_REQUIRE_NON_NEGATIVE_BASE_RATE_SKILL_AND_NON_REGRESSION_VS_RAW_PATTERN', taxonomyHistoricalBackfillAllowed: false, rawPredictionExportAllowed: false }, rawPredictionsIncluded: false, rawHistoricalRecordsIncluded: false, rawHistoricalCandlesIncluded: false, taxonomyPromotionEligible: false, historicalResearchOnly: true, automaticModelPromotionEnabled: false, probabilityCalibrationEnabled: false, decisionIntegrationEnabled: false, forecastMayInfluenceFinalAction: false, finalActionEligible: false, brokerExecutionEligible: false, decisionImpact: 'NONE' };
 }
 function priorShrunkStackConfig() {
   return { format: 'investor-control-historical-market-prior-shrunk-stacked-ensemble-research', contract: HISTORICAL_MARKET_PRIOR_SHRUNK_STACK_RESEARCH_CONTRACT, modelVariant: 'PRIOR_SHRUNK_SCALAR_MARKET_FACTOR', model: 'PREQUENTIAL_L2_LOGISTIC_STACK_WITH_TRAINING_SUPPORT_BASE_RATE_SHRINKAGE', features: ['PATTERN_LOGIT', 'HISTORICAL_MARKET_FACTOR_SCORE', 'TRAINING_ONLY_BASE_RATE_SHRINKAGE'], representation: 'SCALAR_MARKET_FACTOR_CONVEXLY_SHRUNK_TOWARD_BETA_SMOOTHED_TRAINING_BASE_RATE_USING_TRAINING_SUPPORT_ONLY', readyStatus: 'HISTORICAL_MARKET_PRIOR_SHRUNK_STACK_PREDICTIVE_READY_GROUPS_EXIST', notReadyStatus: 'HISTORICAL_MARKET_PRIOR_SHRUNK_STACK_PREDICTIVE_NOT_READY' };
+}
+function adaptivePriorShrunkStackConfig() {
+  return { format: 'investor-control-historical-market-adaptive-prior-shrunk-stacked-ensemble-research', contract: HISTORICAL_MARKET_ADAPTIVE_PRIOR_SHRUNK_STACK_RESEARCH_CONTRACT, modelVariant: 'ADAPTIVE_PRIOR_SHRUNK_SCALAR_MARKET_FACTOR', model: 'PREQUENTIAL_L2_LOGISTIC_STACK_WITH_ADAPTIVE_TRAINING_ONLY_PRIOR_SHRINKAGE', features: ['PATTERN_LOGIT', 'HISTORICAL_MARKET_FACTOR_SCORE', 'TRAINING_ONLY_BASE_RATE_SHRINKAGE', 'PREQUENTIAL_BRIER_SELECTED_SUPPORT_FLOOR'], representation: 'SCALAR_MARKET_FACTOR_SHRUNK_TOWARD_BETA_1_1_TRAINING_BASE_RATE_WITH_SUPPORT_FLOOR_SELECTED_FROM_PRIOR_REALIZED_OOS_BRIER_ONLY', readyStatus: 'HISTORICAL_MARKET_ADAPTIVE_PRIOR_SHRUNK_STACK_PREDICTIVE_READY_GROUPS_EXIST', notReadyStatus: 'HISTORICAL_MARKET_ADAPTIVE_PRIOR_SHRUNK_STACK_PREDICTIVE_NOT_READY' };
 }
 export function buildHistoricalMarketStackResearch(records = [], options = {}) {
   const input = Array.isArray(records) ? records : [];
@@ -82,6 +106,7 @@ export function buildHistoricalMarketStackResearch(records = [], options = {}) {
     ...scalar,
     domainSeparatedCandidate: buildHistoricalMarketDomainStackResearch(input, options),
     priorShrunkCandidate: buildStackResearch(input, options, buildHistoricalMarketPriorShrunkPrequentialStackFromScalar(scalarPrequential, options), priorShrunkStackConfig()),
+    adaptivePriorShrunkCandidate: buildStackResearch(input, options, buildHistoricalMarketAdaptivePriorShrunkPrequentialStackFromScalar(scalarPrequential), adaptivePriorShrunkStackConfig()),
   };
 }
 export function buildHistoricalMarketDomainStackResearch(records = [], options = {}) {
@@ -89,4 +114,7 @@ export function buildHistoricalMarketDomainStackResearch(records = [], options =
 }
 export function buildHistoricalMarketPriorShrunkStackResearch(records = [], options = {}) {
   const input = Array.isArray(records) ? records : []; return buildStackResearch(input, options, buildHistoricalMarketPriorShrunkPrequentialStackPredictions(input, options), priorShrunkStackConfig());
+}
+export function buildHistoricalMarketAdaptivePriorShrunkStackResearch(records = [], options = {}) {
+  const input = Array.isArray(records) ? records : []; return buildStackResearch(input, options, buildHistoricalMarketAdaptivePriorShrunkPrequentialStackPredictions(input, options), adaptivePriorShrunkStackConfig());
 }
