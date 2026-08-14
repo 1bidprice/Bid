@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   HISTORICAL_MARKET_PREQUENTIAL_STACK_CONTRACT,
+  HISTORICAL_MARKET_PRIOR_SHRUNK_PREQUENTIAL_STACK_CONTRACT,
   buildHistoricalMarketFactorPrequentialStackPredictions,
+  buildHistoricalMarketPriorShrunkPrequentialStackPredictions,
 } from '../src/forecast-historical-market-prequential-stack.js';
 
 const DAY_MS = 86_400_000;
@@ -137,6 +139,44 @@ test('strong historical market factor can move probability away from an uninform
   assert.ok(positiveMean > 0.65);
   assert.ok(negativeMean < 0.35);
   assert.ok(positiveMean > negativeMean);
+});
+
+test('support-shrunk scalar candidate moves only toward a training-only base rate and preserves prequential chronology', () => {
+  const input = records(140).map((record, index) => ({
+    ...record,
+    rawProbabilityPositive: 0.8,
+    historicalMarketFactorScore: index % 2 ? 0.6 : -0.6,
+  }));
+  const options = {
+    ensembleMinimumTrainingSample: 30,
+    ensembleMinimumTrainingClassCount: 10,
+  };
+  const scalar = buildHistoricalMarketFactorPrequentialStackPredictions(input, options);
+  const shrunk = buildHistoricalMarketPriorShrunkPrequentialStackPredictions(input, options);
+
+  assert.equal(shrunk.contract, HISTORICAL_MARKET_PRIOR_SHRUNK_PREQUENTIAL_STACK_CONTRACT);
+  assert.equal(shrunk.predictionCount, scalar.predictionCount);
+  assert.equal(shrunk.skippedInsufficientTrainingCount, scalar.skippedInsufficientTrainingCount);
+  assert.equal(shrunk.priorShrinkageRule.includes('STRICTLY_BEFORE_TARGET_FORECAST_TIME'), true);
+
+  const scalarById = new Map(scalar.predictions.map((prediction) => [prediction.forecastId, prediction]));
+  let movedPredictionCount = 0;
+  for (const candidate of shrunk.predictions) {
+    const original = scalarById.get(candidate.forecastId);
+    assert.ok(original);
+    const n = candidate.ensembleTrainingPositiveCount + candidate.ensembleTrainingNegativeCount;
+    const baseRate = (candidate.ensembleTrainingPositiveCount + 1) / (n + 2);
+    const weight = n / (n + options.ensembleMinimumTrainingSample);
+    const expected = baseRate + weight * (original.ensembleResearchProbabilityPositive - baseRate);
+    assert.ok(Math.abs(candidate.ensembleTrainingBaseRatePositive - baseRate) < 1e-7);
+    assert.ok(Math.abs(candidate.ensembleSupportReliabilityWeight - weight) < 1e-7);
+    assert.ok(Math.abs(candidate.ensembleResearchProbabilityPositive - expected) < 1e-7);
+    assert.ok(candidate.ensembleResearchProbabilityPositive >= Math.min(baseRate, original.ensembleResearchProbabilityPositive) - 1e-8);
+    assert.ok(candidate.ensembleResearchProbabilityPositive <= Math.max(baseRate, original.ensembleResearchProbabilityPositive) + 1e-8);
+    assert.ok(Date.parse(candidate.ensembleTrainingLatestOutcomeAt) < Date.parse(candidate.forecastAt));
+    if (Math.abs(candidate.ensembleResearchProbabilityPositive - original.ensembleResearchProbabilityPositive) > 1e-6) movedPredictionCount += 1;
+  }
+  assert.ok(movedPredictionCount > 0);
 });
 
 test('historical prequential predictions remain compact research-only and authority-free', () => {
