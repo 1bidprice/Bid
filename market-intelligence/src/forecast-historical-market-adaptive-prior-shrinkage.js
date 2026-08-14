@@ -4,7 +4,7 @@ import {
 } from './forecast-historical-market-prequential-stack.js';
 import { forecastDateKey } from './forecast-oos-sample-independence.js';
 
-export const HISTORICAL_MARKET_ADAPTIVE_PRIOR_SHRINKAGE_VERSION = '2026-08-14.1';
+export const HISTORICAL_MARKET_ADAPTIVE_PRIOR_SHRINKAGE_VERSION = '2026-08-14.2';
 export const HISTORICAL_MARKET_ADAPTIVE_PRIOR_SHRINKAGE_CONTRACT = 'PREQUENTIAL_HISTORICAL_PATTERN_MARKET_FACTOR_ADAPTIVE_PRIOR_SHRINKAGE_V1';
 
 const BETA_ALPHA = 1;
@@ -197,12 +197,13 @@ export function buildHistoricalMarketAdaptivePriorShrunkPrequentialStackFromScal
     for (const date of orderedDates) {
       const targets = dateGroups.get(date) || [];
       const selection = selectionForTarget(lineage, targets, grid, minimumSelectionSample, minimumSelectionClassCount);
-      for (const target of targets) selections.set(target.forecastId, selection);
+      for (const target of targets) selections.set(target, selection);
     }
   }
 
+  const supportFloorSelectionCounts = new Map();
   const predictions = inputPredictions.map((prediction) => {
-    const selection = selections.get(prediction.forecastId) || {
+    const selection = selections.get(prediction) || {
       status: 'ADAPTIVE_PRIOR_SHRINKAGE_WARMUP_DEFAULT',
       supportFloor: grid[0],
       selectionSampleSize: 0,
@@ -211,7 +212,12 @@ export function buildHistoricalMarketAdaptivePriorShrunkPrequentialStackFromScal
       selectionLatestOutcomeAt: null,
       selectedBrierScore: null,
     };
-    return selectedPrediction(prediction, selection, grid);
+    const selected = selectedPrediction(prediction, selection, grid);
+    supportFloorSelectionCounts.set(
+      selected.ensemblePriorShrinkageSupportFloor,
+      (supportFloorSelectionCounts.get(selected.ensemblePriorShrinkageSupportFloor) || 0) + 1,
+    );
+    return selected;
   });
   const selectionReadyPredictionCount = predictions.filter((prediction) => prediction.ensembleAdaptiveSelectionStatus === 'ADAPTIVE_PRIOR_SHRINKAGE_SELECTION_READY').length;
 
@@ -224,6 +230,9 @@ export function buildHistoricalMarketAdaptivePriorShrunkPrequentialStackFromScal
     predictions,
     predictionCount: predictions.length,
     adaptiveSupportFloorGrid: [...grid],
+    adaptiveSupportFloorSelectionCounts: [...supportFloorSelectionCounts.entries()]
+      .map(([supportFloor, predictionCount]) => ({ supportFloor, predictionCount }))
+      .sort((left, right) => left.supportFloor - right.supportFloor),
     adaptiveSelectionMinimumSample: minimumSelectionSample,
     adaptiveSelectionMinimumClassCount: minimumSelectionClassCount,
     adaptiveSelectionReadyPredictionCount: selectionReadyPredictionCount,
