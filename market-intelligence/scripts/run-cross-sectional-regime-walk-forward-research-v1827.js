@@ -5,6 +5,7 @@ import { runV1826HistoricalResearchJob } from './run-cross-sectional-regime-walk
 import { buildHistoricalPredictiveSkillSummary } from '../src/forecast-historical-predictive-skill.js';
 import { verifyHistoricalMarketDomainStackCandidate } from '../src/forecast-historical-market-domain-stack-candidate-safety.js';
 import { verifyHistoricalMarketPriorShrunkStackCandidate } from '../src/forecast-historical-market-prior-shrunk-stack-candidate-safety.js';
+import { verifyHistoricalMarketAdaptivePriorShrunkStackCandidate } from '../src/forecast-historical-market-adaptive-prior-shrunk-stack-candidate-safety.js';
 
 export const V1827_PREDICTIVE_SKILL_ARTIFACT_CONTRACT = 'HISTORICAL_PREDICTIVE_SKILL_ARTIFACT_V1';
 export const V1827_DATASET_INTEGRITY_CONTRACT = 'HISTORICAL_PREDICTIVE_DATASET_INTEGRITY_V1';
@@ -65,6 +66,42 @@ function blockPredictiveSummary(summary, datasetIntegrity) {
   };
 }
 
+function buildAdaptiveCandidateSummary(candidate = {}, safety = {}) {
+  return {
+    safetyStatus: safety.status || 'UNVERIFIED',
+    safetyContract: safety.contract || null,
+    modelVariant: candidate.modelVariant || null,
+    status: candidate.status || null,
+    sourceRecordCount: count(candidate.sourceRecordCount),
+    predictionCount: count(candidate.predictionCount),
+    groupCount: count(candidate.groupCount),
+    predictiveReadyGroupCount: count(candidate.predictiveReadyGroupCount),
+    predictiveNotReadyGroupCount: count(candidate.predictiveNotReadyGroupCount),
+    adaptiveSupportFloorGrid: Array.isArray(safety.adaptiveSupportFloorGrid)
+      ? [...safety.adaptiveSupportFloorGrid]
+      : [],
+    adaptiveSupportFloorSelectionCounts: Array.isArray(safety.adaptiveSupportFloorSelectionCounts)
+      ? safety.adaptiveSupportFloorSelectionCounts.map((item) => ({
+        supportFloor: count(item.supportFloor),
+        predictionCount: count(item.predictionCount),
+      }))
+      : [],
+    adaptiveSelectionReadyPredictionCount: count(safety.adaptiveSelectionReadyPredictionCount),
+    adaptiveSelectionWarmupPredictionCount: count(safety.adaptiveSelectionWarmupPredictionCount),
+    rawPredictionsIncluded: false,
+    rawHistoricalRecordsIncluded: false,
+    rawHistoricalCandlesIncluded: false,
+    historicalResearchOnly: true,
+    automaticModelPromotionEnabled: false,
+    probabilityCalibrationEnabled: false,
+    decisionIntegrationEnabled: false,
+    forecastMayInfluenceFinalAction: false,
+    finalActionEligible: false,
+    brokerExecutionEligible: false,
+    decisionImpact: 'NONE',
+  };
+}
+
 export function assertV1827DatasetIntegrityReady(datasetIntegrity = {}) {
   if (datasetIntegrity?.contract !== V1827_DATASET_INTEGRITY_CONTRACT || datasetIntegrity?.ready !== true) {
     const blockers = Array.isArray(datasetIntegrity?.blockers) && datasetIntegrity.blockers.length
@@ -95,12 +132,20 @@ export async function runV1827HistoricalPredictiveSkillResearchJob(input = {}) {
   const marketStackResearch = research?.historicalMarketStackResearch || null;
   const domainSeparatedCandidate = marketStackResearch?.domainSeparatedCandidate || null;
   const priorShrunkCandidate = marketStackResearch?.priorShrunkCandidate || null;
+  const adaptivePriorShrunkCandidate = marketStackResearch?.adaptivePriorShrunkCandidate || null;
   const domainCandidateSafety = verifyHistoricalMarketDomainStackCandidate(domainSeparatedCandidate, {
     sourceRecordCount,
   });
   const priorShrunkCandidateSafety = verifyHistoricalMarketPriorShrunkStackCandidate(priorShrunkCandidate, {
     sourceRecordCount,
   });
+  const adaptivePriorShrunkCandidateSafety = verifyHistoricalMarketAdaptivePriorShrunkStackCandidate(adaptivePriorShrunkCandidate, {
+    sourceRecordCount,
+  });
+  const adaptivePriorShrunkCandidateSummary = buildAdaptiveCandidateSummary(
+    adaptivePriorShrunkCandidate,
+    adaptivePriorShrunkCandidateSafety,
+  );
 
   return {
     ...artifact,
@@ -110,6 +155,8 @@ export async function runV1827HistoricalPredictiveSkillResearchJob(input = {}) {
     predictiveSkillSummary,
     domainCandidateSafety,
     priorShrunkCandidateSafety,
+    adaptivePriorShrunkCandidateSafety,
+    adaptivePriorShrunkCandidateSummary,
     automaticModelPromotionEnabled: false,
     probabilityCalibrationEnabled: false,
     decisionIntegrationEnabled: false,
@@ -147,6 +194,17 @@ async function main() {
       console.log(`Historical prior-shrunk stack OOS predictions: ${priorShrunk.predictionCount}`);
       console.log(`Historical prior-shrunk stack predictive-ready groups: ${priorShrunk.predictiveReadyGroupCount}/${priorShrunk.groupCount}`);
       console.log(`Historical prior-shrunk stack safety: ${result.priorShrunkCandidateSafety.status}`);
+    }
+    const adaptive = result.adaptivePriorShrunkCandidateSummary;
+    if (adaptive) {
+      const supportCounts = adaptive.adaptiveSupportFloorSelectionCounts
+        .map((item) => `${item.supportFloor}=${item.predictionCount}`)
+        .join(', ');
+      console.log(`Historical adaptive prior-shrunk stack OOS predictions: ${adaptive.predictionCount}`);
+      console.log(`Historical adaptive prior-shrunk stack predictive-ready groups: ${adaptive.predictiveReadyGroupCount}/${adaptive.groupCount}`);
+      console.log(`Historical adaptive prior-shrunk stack safety: ${adaptive.safetyStatus}`);
+      console.log(`Historical adaptive support-floor selections: ${supportCounts || 'none'}`);
+      console.log(`Historical adaptive selection ready/warmup: ${adaptive.adaptiveSelectionReadyPredictionCount}/${adaptive.adaptiveSelectionWarmupPredictionCount}`);
     }
   }
   if (result.predictiveSkillSummary.blockerCounts.length) {
