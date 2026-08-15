@@ -8,9 +8,15 @@ on:
       - '.github/workflows/run-v1827-historical-predictive-skill-research.yml'
       - 'market-intelligence/scripts/run-cross-sectional-regime-walk-forward-research-v1827.js'
       - 'market-intelligence/src/forecast-historical-predictive-skill.js'
+      - 'market-intelligence/src/forecast-historical-market-stacked-ensemble-research.js'
+      - 'market-intelligence/src/forecast-historical-market-adaptive-prior-shrinkage.js'
+      - 'market-intelligence/src/forecast-historical-market-adaptive-prior-shrunk-stack-candidate-safety.js'
       - 'market-intelligence/src/professional-market-data.js'
       - 'market-intelligence/src/adapters/yahoo-chart.js'
       - 'market-intelligence/test/forecast-historical-predictive-skill.test.js'
+      - 'market-intelligence/test/forecast-historical-market-stacked-ensemble-research.test.js'
+      - 'market-intelligence/test/forecast-historical-market-adaptive-prior-shrinkage.test.js'
+      - 'market-intelligence/test/forecast-historical-market-adaptive-prior-shrunk-stack-candidate-safety.test.js'
       - 'market-intelligence/test/professional-market-data-benchmark-stability.test.js'
       - 'market-intelligence/test/research-history-depth.test.js'
       - 'market-intelligence/test/research-predictive-skill-v1827.test.js'
@@ -66,6 +72,8 @@ jobs:
           const fail = (message) => { throw new Error(message); };
           const summary = artifact?.predictiveSkillSummary;
           const groups = Array.isArray(summary?.groups) ? summary.groups : [];
+          const adaptiveSafety = artifact?.adaptivePriorShrunkCandidateSafety;
+          const adaptive = artifact?.adaptivePriorShrunkCandidateSummary;
           if (artifact?.historyDepth?.lookbackDays !== 1825) fail('five-year lookback changed');
           if (artifact?.historyDepth?.expectedYahooRange !== '5y') fail('Yahoo range changed');
           if (artifact?.readinessSummary?.thresholds?.minimumDistinctForecastDates !== 30) fail('30-date floor changed');
@@ -85,6 +93,23 @@ jobs:
           if (summary?.decisionIntegrationEnabled !== false) fail('summary decision integration detected');
           if (summary?.forecastMayInfluenceFinalAction !== false) fail('summary final-action influence detected');
           if (summary?.brokerExecutionEligible !== false) fail('summary broker authority detected');
+          if (adaptiveSafety?.status !== 'VERIFIED') fail('adaptive candidate safety firewall not verified');
+          if (!adaptive || adaptive.safetyStatus !== 'VERIFIED') fail('adaptive candidate summary not verified');
+          if (adaptive.modelVariant !== 'ADAPTIVE_PRIOR_SHRUNK_SCALAR_MARKET_FACTOR') fail('adaptive model variant changed');
+          if (!Array.isArray(adaptive.adaptiveSupportFloorGrid) || adaptive.adaptiveSupportFloorGrid.length !== 4) fail('adaptive support grid missing');
+          if (!Array.isArray(adaptive.adaptiveSupportFloorSelectionCounts)) fail('adaptive support counts missing');
+          const adaptiveSelectionCount = adaptive.adaptiveSupportFloorSelectionCounts.reduce((sum, item) => sum + Number(item?.predictionCount || 0), 0);
+          if (adaptiveSelectionCount !== adaptive.predictionCount) fail('adaptive support counts do not cover predictions');
+          if ((adaptive.adaptiveSelectionReadyPredictionCount + adaptive.adaptiveSelectionWarmupPredictionCount) !== adaptive.predictionCount) fail('adaptive ready/warmup counts do not cover predictions');
+          if (adaptive.rawPredictionsIncluded !== false || adaptive.rawHistoricalRecordsIncluded !== false || adaptive.rawHistoricalCandlesIncluded !== false) fail('adaptive raw research data leaked');
+          if (adaptive.historicalResearchOnly !== true) fail('adaptive candidate escaped research-only mode');
+          if (adaptive.automaticModelPromotionEnabled !== false) fail('adaptive automatic promotion detected');
+          if (adaptive.probabilityCalibrationEnabled !== false) fail('adaptive probability calibration authority detected');
+          if (adaptive.decisionIntegrationEnabled !== false) fail('adaptive decision integration detected');
+          if (adaptive.forecastMayInfluenceFinalAction !== false) fail('adaptive final-action influence detected');
+          if (adaptive.finalActionEligible !== false) fail('adaptive final action eligibility detected');
+          if (adaptive.brokerExecutionEligible !== false) fail('adaptive broker authority detected');
+          if (adaptive.decisionImpact !== 'NONE') fail('adaptive decision impact must remain NONE');
           if (artifact?.executionState !== 'ENABLED_RESEARCH_ONLY') fail('base research state changed');
           if (artifact?.publication?.artifactOnly !== true) fail('artifact-only contract broken');
           if (artifact?.publication?.liveFeedWriteAllowed !== false) fail('live feed write authority detected');
@@ -104,6 +129,15 @@ jobs:
             thresholds: groups[0]?.thresholds,
             historicalRecords: artifact.telemetry?.forecastHistoricalWalkForwardGeneratedRecordCount,
             distinctForecastDates: artifact.readinessSummary?.observedMaxima?.distinctForecastDates,
+            adaptive: {
+              safetyStatus: adaptive.safetyStatus,
+              predictionCount: adaptive.predictionCount,
+              predictiveReadyGroupCount: adaptive.predictiveReadyGroupCount,
+              supportFloorGrid: adaptive.adaptiveSupportFloorGrid,
+              supportFloorSelectionCounts: adaptive.adaptiveSupportFloorSelectionCounts,
+              selectionReadyPredictionCount: adaptive.adaptiveSelectionReadyPredictionCount,
+              selectionWarmupPredictionCount: adaptive.adaptiveSelectionWarmupPredictionCount,
+            },
           }, null, 2));
           NODE
 
