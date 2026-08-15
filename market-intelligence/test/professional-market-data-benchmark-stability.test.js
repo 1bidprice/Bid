@@ -171,3 +171,51 @@ test('five-year Athens benchmark exhausts bounded retries once per run and stays
   assert.equal(benchmarkRequestCount, 4);
   assert.ok(second.diagnostics.some((item) => item.code === 'MARKET_BENCHMARK_RETRY_EXHAUSTED_CACHED'));
 });
+
+test('Athens benchmark keeps configured alias first but recovers through canonical GD.AT fallback', async () => {
+  const companyPayload = chartPayload({ symbol: 'CREDIA.AT', count: 1_100, start: 0.7, growth: 0.0008 });
+  const deepBenchmark = chartPayload({ symbol: 'GD.AT', count: 1_100, start: 1_800 });
+  const configuredOnlyBadAlias = {
+    ...ATHENS,
+    companyId: 'company:benchmark-configured-bad-alias',
+    marketData: {
+      ...ATHENS.marketData,
+      benchmarkYahooSymbols: ['^ATG'],
+    },
+  };
+  let configuredAliasRequestCount = 0;
+  let canonicalFallbackRequestCount = 0;
+
+  const fetchImpl = async (url) => {
+    const value = String(url);
+    if (value.includes('CREDIA.AT')) {
+      return { ok: true, status: 200, json: async () => companyPayload };
+    }
+    if (value.includes('%5EATG')) {
+      configuredAliasRequestCount += 1;
+      return { ok: false, status: 503, json: async () => ({}) };
+    }
+    if (value.includes('GD.AT')) {
+      canonicalFallbackRequestCount += 1;
+      return { ok: true, status: 200, json: async () => deepBenchmark };
+    }
+    throw new Error(`Unexpected URL ${url}`);
+  };
+
+  const result = await fetchProfessionalHistoricalMetrics(configuredOnlyBadAlias, {
+    fetchImpl,
+    generatedAt: '2026-08-14T15:00:00.000Z',
+    lookbackDays: 1_825,
+    benchmarkCache: new Map(),
+    benchmarkRetryDelayMs: 0,
+    marketSnapshot: marketSnapshotFrom(companyPayload),
+  });
+
+  assert.equal(configuredAliasRequestCount, 2);
+  assert.equal(canonicalFallbackRequestCount, 1);
+  assert.equal(result.benchmarkSeries?.usable, true);
+  assert.equal(result.benchmarkSeries?.providerSymbol, 'GD.AT');
+  assert.equal(result.benchmarkSeries?.candles?.length, 1_100);
+  assert.ok(result.diagnostics.some((item) => item.code === 'YAHOO_MARKET_REQUEST_FAILED' && item.providerSymbol === '^ATG'));
+  assert.ok(result.diagnostics.some((item) => item.code === 'SECONDARY_MARKET_DATA_USED' && item.providerSymbol === 'GD.AT'));
+});
