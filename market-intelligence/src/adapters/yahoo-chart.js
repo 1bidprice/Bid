@@ -1,4 +1,5 @@
 const YAHOO_HOSTS = ['query1.finance.yahoo.com', 'query2.finance.yahoo.com'];
+const ATHEX_BENCHMARK_PROVIDER_SYMBOLS = ['GD.AT', 'ATG.AT', '^ATG'];
 
 function finite(value) {
   const number = Number(value);
@@ -136,8 +137,11 @@ async function fetchOne(host, providerSymbol, options) {
 export async function fetchYahooChartSeries(symbolInput, options = {}) {
   const fetchImpl = options.fetchImpl || globalThis.fetch;
   if (typeof fetchImpl !== 'function') throw new Error('Yahoo chart adapter requires fetch');
+  const canonicalFallbacks = options.symbol === 'ATHEX_BENCHMARK'
+    ? ATHEX_BENCHMARK_PROVIDER_SYMBOLS
+    : [];
   const providerSymbols = [...new Set(
-    [symbolInput, ...(options.alternateSymbols || [])]
+    [symbolInput, ...(options.alternateSymbols || []), ...canonicalFallbacks]
       .map((value) => String(value || '').trim())
       .filter(Boolean),
   )];
