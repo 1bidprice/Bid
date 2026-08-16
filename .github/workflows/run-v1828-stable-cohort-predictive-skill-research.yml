@@ -32,7 +32,7 @@ permissions:
 
 concurrency:
   group: investor-control-v1828-stable-cohort-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   research:
@@ -86,17 +86,22 @@ jobs:
           if (artifact?.stableCohortProofContract !== 'HISTORICAL_RESEARCH_STABLE_COHORT_PROOF_V1') fail('v1828 proof contract changed');
           if (validation?.contract !== 'HISTORICAL_RESEARCH_STABLE_VALIDATION_UNIVERSE_V1') fail('stable validation universe contract changed');
           if (validation?.configuredInstrumentCount !== 16) fail('stable validation universe count changed');
-          if (validation?.uniqueCompanyCount !== 16 || validation?.uniqueListingCount !== 16 || validation?.canonicalIdentityReadyCount !== 16) fail('stable validation universe identity is not unique');
-          if (validation?.sectorCount < 9) fail('stable validation universe sector breadth too small');
+          if (validation?.uniqueCompanyCount !== 16 || validation?.uniqueListingCount !== 16 || validation?.canonicalIdentityReadyCount !== 16 || validation?.usEquityCount !== 16) fail('stable validation universe identity/domain is not unique');
+          if (validation?.sectorCount < 10) fail('stable validation universe sector breadth too small');
+          if (validation?.marketDomain !== 'US_EQUITY' || validation?.benchmarkFamily !== 'SPY') fail('stable validation market domain changed');
           if (validation?.minimumLoadedInstrumentCount !== 12) fail('stable cohort minimum loaded breadth changed');
           if (validation?.currentNewsDependentSelection !== false || validation?.outcomeAwareSelectionAllowed !== false || validation?.eventDiscoveryAdditionsAllowed !== false) fail('stable validation selection is no longer frozen');
+          if (validation?.crossMarketValidationIncluded !== false || validation?.athensDomainValidated !== false || validation?.athensDomainStatus !== 'SEPARATE_DOMAIN_PROOF_REQUIRED') fail('Athens domain limitation was hidden');
           if (validation?.statisticalReadinessThresholdsChanged !== false) fail('statistical thresholds changed by validation universe');
 
           if (cohort?.status !== 'STABLE_RESEARCH_COHORT_INTEGRITY_READY' || cohort?.ready !== true) fail(`stable cohort integrity blocked: ${(cohort?.blockers || []).join(',')}`);
           if (cohort?.seedCompanyCount !== 16 || cohort?.analysedCompanyCount !== 16) fail('runtime stable cohort count changed');
           if (cohort?.eventDiscoveredCompanyCount !== 0 || cohort?.broadScreenCompanyCount !== 0) fail('transient discovery changed stable cohort');
-          if (cohort?.loadedHistoricalSeriesCount < 12 || cohort?.loadedBenchmarkSeriesCount < 12 || cohort?.eligibleInstrumentCount < 12 || cohort?.selectedInstrumentCount < 12) fail('validated historical breadth below twelve instruments');
+          if (cohort?.loadedHistoricalSeriesCount !== 16 || cohort?.loadedBenchmarkSeriesCount !== 16 || cohort?.eligibleInstrumentCount !== 16 || cohort?.selectedInstrumentCount !== 16) fail('stable validation cohort is incomplete');
+          if (cohort?.eligibleWithBenchmarkCount !== 16 || cohort?.eligibleWithoutBenchmarkCount !== 0) fail('stable validation benchmark lineage is incomplete');
+          if (cohort?.marketDomain !== 'US_EQUITY' || cohort?.benchmarkFamily !== 'SPY') fail('runtime validation domain changed');
           if (cohort?.currentNewsDependentSelection !== false || cohort?.outcomeAwareSelectionAllowed !== false) fail('cohort selection became transient or outcome-aware');
+          if (cohort?.athensDomainValidated !== false || cohort?.athensDomainStatus !== 'SEPARATE_DOMAIN_PROOF_REQUIRED') fail('runtime Athens limitation was hidden');
           if (cohort?.survivorshipBiasControlled !== false || cohort?.survivorshipBiasStatus !== 'REQUIRES_POINT_IN_TIME_UNIVERSE_BEFORE_PRODUCTION_PROMOTION') fail('survivorship-bias limitation was hidden');
 
           if (artifact?.historyDepth?.lookbackDays !== 1825 || artifact?.historyDepth?.expectedYahooRange !== '5y') fail('five-year history depth changed');
@@ -122,6 +127,7 @@ jobs:
           console.log('PASS v1828 stable-cohort predictive-skill safety contract');
           console.log(JSON.stringify({
             sourceCommit: artifact.sourceCommit,
+            marketDomain: validation.marketDomain,
             configuredInstruments: validation.configuredInstrumentCount,
             sectorCount: validation.sectorCount,
             loadedHistories: cohort.loadedHistoricalSeriesCount,
@@ -134,6 +140,7 @@ jobs:
             predictiveSkillReadyGroups: summary.predictiveSkillReadyGroupCount,
             adaptivePredictiveReadyGroups: adaptive.predictiveReadyGroupCount,
             adaptiveGroupCount: adaptive.groupCount,
+            athensDomainStatus: cohort.athensDomainStatus,
             survivorshipBiasStatus: cohort.survivorshipBiasStatus,
           }, null, 2));
           NODE
