@@ -30,6 +30,8 @@ function artifactWithBreadth(count = 16, overrides = {}) {
       loadedBenchmarkSeriesCount: count,
       eligibleInstrumentCount: count,
       selectedInstrumentCount: count,
+      eligibleWithBenchmarkCount: count,
+      eligibleWithoutBenchmarkCount: 0,
       ...(overrides.universeCoverage || {}),
     },
     telemetry: {
@@ -53,7 +55,7 @@ function artifactWithBreadth(count = 16, overrides = {}) {
   };
 }
 
-test('stable validation universe is predeclared, diverse and canonically unique', () => {
+test('stable validation universe is predeclared, diverse, US-domain and canonically unique', () => {
   const universe = buildHistoricalResearchValidationUniverse();
   const summary = summarizeHistoricalResearchValidationUniverse(universe);
 
@@ -62,11 +64,17 @@ test('stable validation universe is predeclared, diverse and canonically unique'
   assert.equal(summary.uniqueCompanyCount, 16);
   assert.equal(summary.uniqueListingCount, 16);
   assert.equal(summary.canonicalIdentityReadyCount, 16);
-  assert.ok(summary.sectorCount >= 9);
+  assert.equal(summary.usEquityCount, 16);
+  assert.ok(summary.sectorCount >= 10);
+  assert.equal(summary.marketDomain, 'US_EQUITY');
+  assert.equal(summary.benchmarkFamily, 'SPY');
   assert.equal(summary.minimumLoadedInstrumentCount, HISTORICAL_RESEARCH_VALIDATION_UNIVERSE_MINIMUM_LOADED_INSTRUMENTS);
   assert.equal(summary.currentNewsDependentSelection, false);
   assert.equal(summary.outcomeAwareSelectionAllowed, false);
   assert.equal(summary.eventDiscoveryAdditionsAllowed, false);
+  assert.equal(summary.crossMarketValidationIncluded, false);
+  assert.equal(summary.athensDomainValidated, false);
+  assert.equal(summary.athensDomainStatus, 'SEPARATE_DOMAIN_PROOF_REQUIRED');
   assert.equal(summary.normalProductionDefaultChanged, false);
   assert.equal(summary.statisticalReadinessThresholdsChanged, false);
   assert.equal(summary.historicalResearchOnly, true);
@@ -74,7 +82,7 @@ test('stable validation universe is predeclared, diverse and canonically unique'
   assert.equal(summary.decisionImpact, 'NONE');
 });
 
-test('v1828 injects the stable universe and disables transient additions', async () => {
+test('v1828 injects the stable US universe and disables transient additions and evidence collection', async () => {
   let received = null;
   const result = await runV1828StableCohortPredictiveSkillResearchJob({
     runV1827: async (options) => {
@@ -87,12 +95,22 @@ test('v1828 injects the stable universe and disables transient additions', async
   assert.equal(received.autonomousOptions.universe.length, 16);
   assert.equal(received.autonomousOptions.minimumScore, 101);
   assert.equal(received.autonomousOptions.enableBroadOpportunityScan, false);
+  assert.equal(received.autonomousOptions.enableAthensDiscovery, false);
+  assert.equal(received.autonomousOptions.collectTrustedNews, false);
+  assert.equal(received.autonomousOptions.documentLimit, 0);
   assert.equal(result.validationUniverse.configuredInstrumentCount, 16);
   assert.equal(result.stableCohortIntegrity.contract, V1828_STABLE_COHORT_INTEGRITY_CONTRACT);
   assert.equal(result.stableCohortIntegrity.status, 'STABLE_RESEARCH_COHORT_INTEGRITY_READY');
   assert.equal(result.stableCohortIntegrity.ready, true);
   assert.equal(result.stableCohortIntegrity.eventDiscoveredCompanyCount, 0);
   assert.equal(result.stableCohortIntegrity.broadScreenCompanyCount, 0);
+  assert.equal(result.stableCohortIntegrity.loadedHistoricalSeriesCount, 16);
+  assert.equal(result.stableCohortIntegrity.loadedBenchmarkSeriesCount, 16);
+  assert.equal(result.stableCohortIntegrity.eligibleWithBenchmarkCount, 16);
+  assert.equal(result.stableCohortIntegrity.eligibleWithoutBenchmarkCount, 0);
+  assert.equal(result.stableCohortIntegrity.marketDomain, 'US_EQUITY');
+  assert.equal(result.stableCohortIntegrity.benchmarkFamily, 'SPY');
+  assert.equal(result.stableCohortIntegrity.athensDomainValidated, false);
   assert.equal(result.stableCohortIntegrity.survivorshipBiasControlled, false);
   assert.equal(result.stableCohortIntegrity.automaticModelPromotionEnabled, false);
   assert.equal(result.stableCohortIntegrity.decisionIntegrationEnabled, false);
@@ -130,6 +148,8 @@ test('v1828 fails cohort integrity when validated market breadth falls below twe
         loadedBenchmarkSeriesCount: 11,
         eligibleInstrumentCount: 11,
         selectedInstrumentCount: 11,
+        eligibleWithBenchmarkCount: 11,
+        eligibleWithoutBenchmarkCount: 5,
       },
     }),
     universeSummary,
@@ -140,5 +160,25 @@ test('v1828 fails cohort integrity when validated market breadth falls below twe
   assert.ok(integrity.blockers.includes('STABLE_VALIDATION_BENCHMARK_BREADTH_TOO_SMALL'));
   assert.ok(integrity.blockers.includes('STABLE_VALIDATION_ELIGIBLE_BREADTH_TOO_SMALL'));
   assert.ok(integrity.blockers.includes('STABLE_VALIDATION_SELECTED_BREADTH_TOO_SMALL'));
+  assert.ok(integrity.blockers.includes('STABLE_VALIDATION_BENCHMARK_LINEAGE_INCOMPLETE'));
+  assert.throws(() => assertV1828StableCohortIntegrityReady(integrity), /stable research cohort blocked/);
+});
+
+test('v1828 requires complete benchmark lineage even when breadth remains above the minimum floor', () => {
+  const universeSummary = summarizeHistoricalResearchValidationUniverse(buildHistoricalResearchValidationUniverse());
+  const integrity = buildV1828StableCohortIntegrity(
+    artifactWithBreadth(16, {
+      universeCoverage: {
+        loadedBenchmarkSeriesCount: 15,
+        eligibleWithBenchmarkCount: 15,
+        eligibleWithoutBenchmarkCount: 1,
+      },
+    }),
+    universeSummary,
+  );
+
+  assert.equal(integrity.ready, false);
+  assert.ok(integrity.blockers.includes('STABLE_VALIDATION_BENCHMARK_COHORT_INCOMPLETE'));
+  assert.ok(integrity.blockers.includes('STABLE_VALIDATION_BENCHMARK_LINEAGE_INCOMPLETE'));
   assert.throws(() => assertV1828StableCohortIntegrityReady(integrity), /stable research cohort blocked/);
 });
