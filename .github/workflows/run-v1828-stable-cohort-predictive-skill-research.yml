@@ -1,0 +1,148 @@
+name: Investor Control v1828 Stable Cohort Research
+
+on:
+  push:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - '.github/workflows/run-v1828-stable-cohort-predictive-skill-research.yml'
+      - 'market-intelligence/scripts/run-cross-sectional-regime-walk-forward-research.js'
+      - 'market-intelligence/scripts/run-cross-sectional-regime-walk-forward-research-v1826.js'
+      - 'market-intelligence/scripts/run-cross-sectional-regime-walk-forward-research-v1827.js'
+      - 'market-intelligence/scripts/run-cross-sectional-regime-walk-forward-research-v1828.js'
+      - 'market-intelligence/src/historical-research-validation-universe.js'
+      - 'market-intelligence/src/forecast-cross-sectional-regime-walk-forward-runtime.js'
+      - 'market-intelligence/src/forecast-historical-predictive-skill.js'
+      - 'market-intelligence/src/forecast-historical-market-stacked-ensemble-research.js'
+      - 'market-intelligence/src/forecast-historical-market-adaptive-prior-shrinkage.js'
+      - 'market-intelligence/src/forecast-historical-market-adaptive-prior-shrunk-stack-candidate-safety.js'
+      - 'market-intelligence/src/professional-market-data.js'
+      - 'market-intelligence/src/adapters/yahoo-chart.js'
+      - 'market-intelligence/test/research-stable-cohort-v1828.test.js'
+      - 'market-intelligence/test/research-predictive-skill-v1827.test.js'
+      - 'market-intelligence/test/forecast-historical-predictive-skill.test.js'
+      - 'market-intelligence/test/forecast-historical-market-stacked-ensemble-research.test.js'
+      - 'market-intelligence/test/forecast-historical-market-adaptive-prior-shrinkage.test.js'
+      - 'market-intelligence/test/forecast-historical-market-adaptive-prior-shrunk-stack-candidate-safety.test.js'
+      - 'market-intelligence/test/professional-market-data-benchmark-stability.test.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-v1828-stable-cohort-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: market-intelligence
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install PDF extraction runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y poppler-utils
+
+      - name: Run full deterministic safety gate
+        run: npm test
+
+      - name: Run v1828 five-year stable-cohort predictive-skill research
+        env:
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+          TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
+          INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT: ${{ github.sha }}
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          mkdir -p out
+          node scripts/run-cross-sectional-regime-walk-forward-research-v1828.js out/v1828-stable-cohort-predictive-skill-research.json
+
+      - name: Verify v1828 stable-cohort and predictive-skill safety contracts
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const artifact = JSON.parse(fs.readFileSync('out/v1828-stable-cohort-predictive-skill-research.json', 'utf8'));
+          const fail = (message) => { throw new Error(message); };
+          const validation = artifact?.validationUniverse;
+          const cohort = artifact?.stableCohortIntegrity;
+          const dataset = artifact?.datasetIntegrity;
+          const summary = artifact?.predictiveSkillSummary;
+          const groups = Array.isArray(summary?.groups) ? summary.groups : [];
+          const adaptiveSafety = artifact?.adaptivePriorShrunkCandidateSafety;
+          const adaptive = artifact?.adaptivePriorShrunkCandidateSummary;
+
+          if (artifact?.stableCohortProofContract !== 'HISTORICAL_RESEARCH_STABLE_COHORT_PROOF_V1') fail('v1828 proof contract changed');
+          if (validation?.contract !== 'HISTORICAL_RESEARCH_STABLE_VALIDATION_UNIVERSE_V1') fail('stable validation universe contract changed');
+          if (validation?.configuredInstrumentCount !== 16) fail('stable validation universe count changed');
+          if (validation?.uniqueCompanyCount !== 16 || validation?.uniqueListingCount !== 16 || validation?.canonicalIdentityReadyCount !== 16) fail('stable validation universe identity is not unique');
+          if (validation?.sectorCount < 9) fail('stable validation universe sector breadth too small');
+          if (validation?.minimumLoadedInstrumentCount !== 12) fail('stable cohort minimum loaded breadth changed');
+          if (validation?.currentNewsDependentSelection !== false || validation?.outcomeAwareSelectionAllowed !== false || validation?.eventDiscoveryAdditionsAllowed !== false) fail('stable validation selection is no longer frozen');
+          if (validation?.statisticalReadinessThresholdsChanged !== false) fail('statistical thresholds changed by validation universe');
+
+          if (cohort?.status !== 'STABLE_RESEARCH_COHORT_INTEGRITY_READY' || cohort?.ready !== true) fail(`stable cohort integrity blocked: ${(cohort?.blockers || []).join(',')}`);
+          if (cohort?.seedCompanyCount !== 16 || cohort?.analysedCompanyCount !== 16) fail('runtime stable cohort count changed');
+          if (cohort?.eventDiscoveredCompanyCount !== 0 || cohort?.broadScreenCompanyCount !== 0) fail('transient discovery changed stable cohort');
+          if (cohort?.loadedHistoricalSeriesCount < 12 || cohort?.loadedBenchmarkSeriesCount < 12 || cohort?.eligibleInstrumentCount < 12 || cohort?.selectedInstrumentCount < 12) fail('validated historical breadth below twelve instruments');
+          if (cohort?.currentNewsDependentSelection !== false || cohort?.outcomeAwareSelectionAllowed !== false) fail('cohort selection became transient or outcome-aware');
+          if (cohort?.survivorshipBiasControlled !== false || cohort?.survivorshipBiasStatus !== 'REQUIRES_POINT_IN_TIME_UNIVERSE_BEFORE_PRODUCTION_PROMOTION') fail('survivorship-bias limitation was hidden');
+
+          if (artifact?.historyDepth?.lookbackDays !== 1825 || artifact?.historyDepth?.expectedYahooRange !== '5y') fail('five-year history depth changed');
+          if (artifact?.readinessSummary?.thresholds?.minimumDistinctForecastDates !== 30) fail('30-date independence floor changed');
+          if (artifact?.readinessSummary?.thresholds?.minimumDistinctInstruments !== 8) fail('8-instrument independence floor changed');
+          if (dataset?.status !== 'HISTORICAL_PREDICTIVE_DATASET_INTEGRITY_READY' || dataset?.ready !== true) fail('predictive dataset integrity not ready');
+          if (dataset?.validRegimeRecordCount !== dataset?.generatedRecordCount || dataset?.regimeCoveragePct !== 100) fail('historical regime coverage incomplete');
+          if (!summary || summary?.historicalResearchOnly !== true) fail('predictive skill escaped research-only mode');
+          if (!groups.length) fail('predictive skill groups missing');
+          for (const group of groups) {
+            if (group?.thresholds?.minimumSample !== 200) fail('minimum predictive sample changed');
+            if (group?.thresholds?.minimumSkillPct !== 5) fail('minimum predictive skill changed');
+            if (group?.thresholds?.maximumEce !== 0.08) fail('maximum ECE changed');
+            if (group?.automaticModelPromotionEnabled !== false || group?.forecastMayInfluenceFinalAction !== false || group?.brokerExecutionEligible !== false) fail('predictive group gained authority');
+          }
+          if (adaptiveSafety?.status !== 'VERIFIED') fail('adaptive candidate firewall not verified');
+          if (!adaptive || adaptive?.safetyStatus !== 'VERIFIED') fail('adaptive candidate summary not verified');
+          if (adaptive?.automaticModelPromotionEnabled !== false || adaptive?.probabilityCalibrationEnabled !== false || adaptive?.decisionIntegrationEnabled !== false || adaptive?.forecastMayInfluenceFinalAction !== false || adaptive?.finalActionEligible !== false || adaptive?.brokerExecutionEligible !== false || adaptive?.decisionImpact !== 'NONE') fail('adaptive candidate gained authority');
+          if (artifact?.executionState !== 'ENABLED_RESEARCH_ONLY') fail('research execution state changed');
+          if (artifact?.publication?.artifactOnly !== true || artifact?.publication?.liveFeedWriteAllowed !== false || artifact?.publication?.gitPushAllowed !== false) fail('artifact-only publication boundary broken');
+          if (artifact?.automaticModelPromotionEnabled !== false || artifact?.decisionIntegrationEnabled !== false || artifact?.forecastMayInfluenceFinalAction !== false || artifact?.brokerExecutionEligible !== false || artifact?.decisionImpact !== 'NONE') fail('artifact gained decision authority');
+
+          console.log('PASS v1828 stable-cohort predictive-skill safety contract');
+          console.log(JSON.stringify({
+            sourceCommit: artifact.sourceCommit,
+            configuredInstruments: validation.configuredInstrumentCount,
+            sectorCount: validation.sectorCount,
+            loadedHistories: cohort.loadedHistoricalSeriesCount,
+            loadedBenchmarks: cohort.loadedBenchmarkSeriesCount,
+            eligibleInstruments: cohort.eligibleInstrumentCount,
+            selectedInstruments: cohort.selectedInstrumentCount,
+            historicalRecords: dataset.generatedRecordCount,
+            regimeCoveragePct: dataset.regimeCoveragePct,
+            evaluationReadyGroups: summary.evaluationReadyGroupCount,
+            predictiveSkillReadyGroups: summary.predictiveSkillReadyGroupCount,
+            adaptivePredictiveReadyGroups: adaptive.predictiveReadyGroupCount,
+            adaptiveGroupCount: adaptive.groupCount,
+            survivorshipBiasStatus: cohort.survivorshipBiasStatus,
+          }, null, 2));
+          NODE
+
+      - name: Upload v1828 research artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1828-stable-cohort-${{ github.run_id }}
+          path: market-intelligence/out/v1828-stable-cohort-predictive-skill-research.json
+          if-no-files-found: warn
+          retention-days: 30
