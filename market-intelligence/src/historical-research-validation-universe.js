@@ -1,5 +1,5 @@
 export const HISTORICAL_RESEARCH_VALIDATION_UNIVERSE_CONTRACT = 'HISTORICAL_RESEARCH_STABLE_VALIDATION_UNIVERSE_V1';
-export const HISTORICAL_RESEARCH_VALIDATION_UNIVERSE_VERSION = '2026-08-16.1';
+export const HISTORICAL_RESEARCH_VALIDATION_UNIVERSE_VERSION = '2026-08-16.2';
 export const HISTORICAL_RESEARCH_VALIDATION_UNIVERSE_MINIMUM_LOADED_INSTRUMENTS = 12;
 
 function equity({ companyId, legalName, displayName, exchange, symbol, mic, country, currency, sector, industry }) {
@@ -20,11 +20,12 @@ function equity({ companyId, legalName, displayName, exchange, symbol, mic, coun
   });
 }
 
-// Research-only validation cohort. Membership is intentionally versioned and
-// independent of current news/event discovery so identical source commits can
-// be evaluated against a stable cross-sectional universe over time.
+// Research-only US validation cohort. Membership is intentionally versioned
+// and independent of current news/event discovery and observed forecast skill.
+// Athens is intentionally excluded from this proof because it uses a different
+// benchmark/data domain and requires its own fail-closed validation proof.
 const VALIDATION_UNIVERSE = Object.freeze([
-  equity({ companyId: 'company:allwyn-ag', legalName: 'Allwyn AG', displayName: 'Allwyn', exchange: 'Euronext Athens', symbol: 'ALWN', mic: 'XATH', country: 'CH', currency: 'EUR', sector: 'Consumer Discretionary', industry: 'Lottery and gaming entertainment' }),
+  equity({ companyId: 'company:realty-income', legalName: 'Realty Income Corporation', displayName: 'Realty Income', exchange: 'New York Stock Exchange', symbol: 'O', mic: 'XNYS', country: 'US', currency: 'USD', sector: 'Real Estate', industry: 'Retail REITs' }),
   equity({ companyId: 'company:virgin-galactic-holdings', legalName: 'Virgin Galactic Holdings, Inc.', displayName: 'Virgin Galactic', exchange: 'New York Stock Exchange', symbol: 'SPCE', mic: 'XNYS', country: 'US', currency: 'USD', sector: 'Industrials', industry: 'Commercial spaceflight' }),
   equity({ companyId: 'company:apple', legalName: 'Apple Inc.', displayName: 'Apple', exchange: 'Nasdaq', symbol: 'AAPL', mic: 'XNAS', country: 'US', currency: 'USD', sector: 'Information Technology', industry: 'Technology hardware' }),
   equity({ companyId: 'company:microsoft', legalName: 'Microsoft Corporation', displayName: 'Microsoft', exchange: 'Nasdaq', symbol: 'MSFT', mic: 'XNAS', country: 'US', currency: 'USD', sector: 'Information Technology', industry: 'Software' }),
@@ -67,6 +68,7 @@ export function summarizeHistoricalResearchValidationUniverse(universe = VALIDAT
     && typeof company?.primaryListing?.mic === 'string'
     && company.primaryListing.mic.length > 0
   )).length;
+  const usEquityCount = companies.filter((company) => company?.country === 'US' && ['XNYS', 'XNAS'].includes(company?.primaryListing?.mic)).length;
 
   return {
     contract: HISTORICAL_RESEARCH_VALIDATION_UNIVERSE_CONTRACT,
@@ -75,12 +77,18 @@ export function summarizeHistoricalResearchValidationUniverse(universe = VALIDAT
     uniqueCompanyCount: uniqueCompanyIds.size,
     uniqueListingCount: uniqueListings.size,
     canonicalIdentityReadyCount,
+    usEquityCount,
     sectorCount: sectors.size,
     minimumLoadedInstrumentCount: HISTORICAL_RESEARCH_VALIDATION_UNIVERSE_MINIMUM_LOADED_INSTRUMENTS,
-    selectionBasis: 'PREDECLARED_SECTOR_DIVERSE_LONG_HISTORY_EQUITY_VALIDATION_COHORT',
+    marketDomain: 'US_EQUITY',
+    benchmarkFamily: 'SPY',
+    selectionBasis: 'PREDECLARED_SECTOR_DIVERSE_LONG_HISTORY_US_EQUITY_VALIDATION_COHORT',
     currentNewsDependentSelection: false,
     outcomeAwareSelectionAllowed: false,
     eventDiscoveryAdditionsAllowed: false,
+    crossMarketValidationIncluded: false,
+    athensDomainValidated: false,
+    athensDomainStatus: 'SEPARATE_DOMAIN_PROOF_REQUIRED',
     normalProductionDefaultChanged: false,
     selectionThresholdsChanged: false,
     statisticalReadinessThresholdsChanged: false,
