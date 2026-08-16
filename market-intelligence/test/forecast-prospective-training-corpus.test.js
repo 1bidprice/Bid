@@ -11,12 +11,16 @@ import {
 function series(symbol, count, phase = 0, benchmark = false) {
   const start = Date.parse('2023-01-03T21:00:00.000Z') / 1000;
   const candles = [];
-  let previous = benchmark ? 100 : 75 + phase * 4;
+  let previous = benchmark ? 100 : 100 + phase * 3;
   for (let index = 0; index < count; index += 1) {
-    const trend = benchmark
-      ? 100 + index * 0.075 + Math.sin(index / 31) * 0.12
-      : 75 + phase * 4 + index * 0.035 + Math.sin(index / 13 + phase) * 4.4 + Math.sin(index / 4.7 + phase * 0.7) * 1.8;
-    const close = Number(Math.max(5, trend).toFixed(6));
+    const closeLevel = benchmark
+      ? 100 + index * 0.04 + 0.45 * Math.sin((2 * Math.PI * index) / 160)
+      : 100
+        + phase * 3
+        + index * 0.015
+        + 8 * Math.sin((2 * Math.PI * index) / 80 + phase * 0.7)
+        + 2 * Math.sin((2 * Math.PI * index) / 23 + phase * 0.37);
+    const close = Number(Math.max(5, closeLevel).toFixed(6));
     const open = Number(((previous + close) / 2).toFixed(6));
     const high = Number((Math.max(open, close) * 1.008).toFixed(6));
     const low = Number((Math.min(open, close) * 0.992).toFixed(6));
@@ -26,7 +30,7 @@ function series(symbol, count, phase = 0, benchmark = false) {
       high,
       low,
       close,
-      volume: 1_000_000 + ((index * 7919 + phase * 1000) % 350_000),
+      volume: 1_000_000 + ((index * 7919 + phase * 31_337) % 350_000),
     });
     previous = close;
   }
@@ -34,14 +38,14 @@ function series(symbol, count, phase = 0, benchmark = false) {
 }
 
 function fixtureInstruments() {
-  const benchmarkSeries = series('SPY', 560, 0, true);
+  const benchmarkSeries = series('SPY', 1000, 0, true);
   return [
     {
       instrumentId: 'company:fixture-alpha',
       companyId: 'company:fixture-alpha',
       symbol: 'AAA',
       assetClass: 'EQUITY',
-      series: series('AAA', 560, 1),
+      series: series('AAA', 1000, 1),
       benchmarkSeries,
     },
     {
@@ -49,7 +53,23 @@ function fixtureInstruments() {
       companyId: 'company:fixture-beta',
       symbol: 'BBB',
       assetClass: 'EQUITY',
-      series: series('BBB', 560, 4),
+      series: series('BBB', 1000, 2),
+      benchmarkSeries,
+    },
+    {
+      instrumentId: 'company:fixture-gamma',
+      companyId: 'company:fixture-gamma',
+      symbol: 'CCC',
+      assetClass: 'EQUITY',
+      series: series('CCC', 1000, 3),
+      benchmarkSeries,
+    },
+    {
+      instrumentId: 'company:fixture-delta',
+      companyId: 'company:fixture-delta',
+      symbol: 'DDD',
+      assetClass: 'EQUITY',
+      series: series('DDD', 1000, 4),
       benchmarkSeries,
     },
   ];
@@ -58,11 +78,11 @@ function fixtureInstruments() {
 function scientificOptions() {
   return {
     horizons: { week1: 5, month1: 21 },
-    warmupObservations: 260,
-    evaluationStep: 5,
+    warmupObservations: 320,
+    evaluationStep: 7,
     minimumForecastsForMetrics: 20,
-    minAnalogCount: 5,
-    maxAnalogs: 40,
+    minAnalogCount: 8,
+    maxAnalogs: 30,
     minEffectiveSample: 4,
     sameInstrumentTrendRegimeOnly: true,
     minimumHistory: 200,
@@ -90,7 +110,7 @@ test('prospective frozen training corpus reproduces the frozen cross-sectional s
 
   assert.equal(corpus.contract, PROSPECTIVE_TRAINING_CORPUS_CONTRACT);
   assert.equal(corpus.referenceSourceCommit, PROSPECTIVE_TRAINING_CORPUS_REFERENCE_SOURCE_COMMIT);
-  assert.equal(corpus.instrumentCount, 2);
+  assert.equal(corpus.instrumentCount, 4);
   assert.equal(corpus.generatedRecordCount, frozenReference.generatedRecordCount);
   assert.equal(corpus.validRegimeRecordCount, frozenReference.validRegimeRecordCount);
   assert.equal(corpus.regimeCoveragePct, Number(((frozenReference.validRegimeRecordCount / frozenReference.generatedRecordCount) * 100).toFixed(4)));
