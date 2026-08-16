@@ -1,0 +1,112 @@
+name: Investor Control v1831 Frozen Prospective Equivalence
+
+on:
+  push:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - '.github/workflows/run-v1831-prospective-bridge-equivalence.yml'
+      - 'market-intelligence/scripts/run-prospective-bridge-equivalence-v1831.js'
+      - 'market-intelligence/src/forecast-prospective-frozen-stack-bridge.js'
+      - 'market-intelligence/src/forecast-prospective-training-corpus.js'
+      - 'market-intelligence/src/forecast-prospective-holdout-protocol.js'
+      - 'market-intelligence/src/forecast-cross-sectional-regime-walk-forward.js'
+      - 'market-intelligence/src/forecast-historical-market-stacked-ensemble-research.js'
+      - 'market-intelligence/src/forecast-historical-market-prequential-stack.js'
+      - 'market-intelligence/src/forecast-historical-market-adaptive-prior-shrinkage.js'
+      - 'market-intelligence/src/forecast-historical-market-factor.js'
+      - 'market-intelligence/src/forecast-market-regime.js'
+      - 'market-intelligence/src/historical-pattern-engine.js'
+      - 'market-intelligence/src/walk-forward-validator.js'
+      - 'market-intelligence/test/forecast-prospective-frozen-stack-bridge.test.js'
+      - 'market-intelligence/test/forecast-prospective-training-corpus.test.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-v1831-equivalence-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  equivalence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: market-intelligence
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run full deterministic safety gate
+        run: npm test
+
+      - name: Build v1831 frozen prospective equivalence proof
+        env:
+          INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT: ${{ github.sha }}
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          mkdir -p out
+          node scripts/run-prospective-bridge-equivalence-v1831.js out/v1831-prospective-equivalence-proof.json
+
+      - name: Verify v1831 exact equivalence and authority boundaries
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const proof = JSON.parse(fs.readFileSync('out/v1831-prospective-equivalence-proof.json', 'utf8'));
+          const fail = (message) => { throw new Error(message); };
+
+          if (proof?.contract !== 'PROSPECTIVE_FROZEN_STACK_EQUIVALENCE_PROOF_V1') fail('v1831 proof contract changed');
+          if (proof?.status !== 'PROSPECTIVE_FROZEN_STACK_EQUIVALENCE_VERIFIED' || proof?.verified !== true) fail(`v1831 equivalence blocked: ${(proof?.blockers || []).join(',')}`);
+          if (proof?.sourceCommit !== process.env.GITHUB_SHA) fail('v1831 source commit mismatch');
+          if (proof?.frozenModelSourceCommit !== '0e13074f1e8d89c5f52f3825c07203f0e62f20a8') fail('v1829 frozen model source changed');
+          if (proof?.trainingCorpusReferenceCommit !== '0e13074f1e8d89c5f52f3825c07203f0e62f20a8') fail('training corpus frozen reference changed');
+          if (proof?.bridgeContract !== 'PROSPECTIVE_FROZEN_V1829_STACK_BRIDGE_V1') fail('bridge contract changed');
+          if (proof?.trainingCorpusContract !== 'PROSPECTIVE_FROZEN_HISTORICAL_TRAINING_CORPUS_V1') fail('training corpus contract changed');
+          if (proof?.holdoutProtocolContract !== 'PROSPECTIVE_UNSEEN_HOLDOUT_PROTOCOL_V1') fail('holdout protocol contract changed');
+          if (!/^[a-f0-9]{64}$/.test(proof?.holdoutProtocolFingerprint || '')) fail('holdout protocol fingerprint invalid');
+
+          if (proof?.corpusEquivalence?.deepEqual !== true) fail('rebuilt training corpus stack is not deep-equal to frozen reference');
+          if (Number(proof?.corpusEquivalence?.frozenStackPredictionCount || 0) <= 0) fail('equivalence fixture produced no real stacked predictions');
+          if (Number(proof?.corpusEquivalence?.validRegimeRecordCount || 0) <= 0) fail('equivalence fixture produced no valid regime records');
+          if (proof?.bridgeEquivalence?.allFourVariantsExact !== true) fail('four frozen variants are not exact');
+          if (proof?.bridgeEquivalence?.targetOutcomeUsed !== false) fail('prospective bridge used target outcome');
+          if (!proof?.bridgeEquivalence?.targetForecastId || !proof?.bridgeEquivalence?.targetForecastAt) fail('bridge reference target missing');
+          if (!Array.isArray(proof?.bridgeEquivalence?.variants) || proof.bridgeEquivalence.variants.length !== 4) fail('bridge variant matrix incomplete');
+          for (const variant of proof.bridgeEquivalence.variants) {
+            if (variant?.bridgeStatus !== 'FORECAST_AVAILABLE' || variant?.exactProbabilityMatch !== true) fail(`frozen variant mismatch: ${variant?.modelVariant}`);
+            if (typeof variant?.bridgeProbabilityPositive !== 'number' || variant.bridgeProbabilityPositive !== variant.referenceProbabilityPositive) fail(`probability mismatch: ${variant?.modelVariant}`);
+          }
+
+          if (proof?.rawSyntheticTrainingRecordsIncluded !== false || proof?.rawSyntheticCandlesIncluded !== false) fail('raw equivalence fixtures exported');
+          if (proof?.holdoutStarted !== false || proof?.firstLiveCaptureCreated !== false || proof?.historicalBackfillAllowed !== false) fail('holdout started during equivalence proof');
+          if (proof?.prospectiveResearchOnly !== true || proof?.automaticModelPromotionEnabled !== false || proof?.probabilityCalibrationEnabled !== false || proof?.decisionIntegrationEnabled !== false || proof?.forecastMayInfluenceFinalAction !== false || proof?.finalActionEligible !== false || proof?.brokerExecutionEligible !== false || proof?.decisionImpact !== 'NONE') fail('equivalence proof gained authority');
+
+          console.log('PASS v1831 frozen prospective equivalence');
+          console.log(JSON.stringify({
+            sourceCommit: proof.sourceCommit,
+            frozenModelSourceCommit: proof.frozenModelSourceCommit,
+            corpusDeepEqual: proof.corpusEquivalence.deepEqual,
+            generatedRecords: proof.corpusEquivalence.generatedRecordCount,
+            validRegimeRecords: proof.corpusEquivalence.validRegimeRecordCount,
+            frozenStackPredictions: proof.corpusEquivalence.frozenStackPredictionCount,
+            bridgeTarget: proof.bridgeEquivalence.targetForecastId,
+            bridgeAllFourExact: proof.bridgeEquivalence.allFourVariantsExact,
+            holdoutStarted: proof.holdoutStarted,
+          }, null, 2));
+          NODE
+
+      - name: Upload v1831 equivalence proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1831-equivalence-${{ github.run_id }}
+          path: market-intelligence/out/v1831-prospective-equivalence-proof.json
+          if-no-files-found: error
+          retention-days: 90
