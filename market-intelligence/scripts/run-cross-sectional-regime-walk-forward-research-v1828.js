@@ -1,7 +1,10 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { runV1827HistoricalPredictiveSkillResearchJob } from './run-cross-sectional-regime-walk-forward-research-v1827.js';
+import {
+  assertV1827DatasetIntegrityReady,
+  runV1827HistoricalPredictiveSkillResearchJob,
+} from './run-cross-sectional-regime-walk-forward-research-v1827.js';
 import {
   HISTORICAL_RESEARCH_VALIDATION_UNIVERSE_CONTRACT,
   HISTORICAL_RESEARCH_VALIDATION_UNIVERSE_MINIMUM_LOADED_INSTRUMENTS,
@@ -34,6 +37,8 @@ export function buildV1828StableCohortIntegrity(artifact = {}, validationUnivers
   const loadedBenchmarkSeriesCount = count(coverage.loadedBenchmarkSeriesCount);
   const eligibleInstrumentCount = count(coverage.eligibleInstrumentCount);
   const selectedInstrumentCount = count(coverage.selectedInstrumentCount);
+  const eligibleWithBenchmarkCount = count(coverage.eligibleWithBenchmarkCount);
+  const eligibleWithoutBenchmarkCount = count(coverage.eligibleWithoutBenchmarkCount);
   const blockers = [];
 
   if (validationUniverse.contract !== HISTORICAL_RESEARCH_VALIDATION_UNIVERSE_CONTRACT) {
@@ -46,6 +51,11 @@ export function buildV1828StableCohortIntegrity(artifact = {}, validationUnivers
       || count(validationUniverse.uniqueListingCount) !== configuredInstrumentCount
       || count(validationUniverse.canonicalIdentityReadyCount) !== configuredInstrumentCount) {
     blockers.push('STABLE_VALIDATION_UNIVERSE_IDENTITY_NOT_UNIQUE');
+  }
+  if (validationUniverse.marketDomain !== 'US_EQUITY'
+      || validationUniverse.benchmarkFamily !== 'SPY'
+      || count(validationUniverse.usEquityCount) !== configuredInstrumentCount) {
+    blockers.push('STABLE_VALIDATION_UNIVERSE_DOMAIN_NOT_HOMOGENEOUS');
   }
   if (validationUniverse.currentNewsDependentSelection !== false
       || validationUniverse.outcomeAwareSelectionAllowed !== false
@@ -61,6 +71,13 @@ export function buildV1828StableCohortIntegrity(artifact = {}, validationUnivers
   if (loadedBenchmarkSeriesCount < minimumLoadedInstrumentCount) blockers.push('STABLE_VALIDATION_BENCHMARK_BREADTH_TOO_SMALL');
   if (eligibleInstrumentCount < minimumLoadedInstrumentCount) blockers.push('STABLE_VALIDATION_ELIGIBLE_BREADTH_TOO_SMALL');
   if (selectedInstrumentCount < minimumLoadedInstrumentCount) blockers.push('STABLE_VALIDATION_SELECTED_BREADTH_TOO_SMALL');
+  if (loadedHistoricalSeriesCount !== configuredInstrumentCount) blockers.push('STABLE_VALIDATION_HISTORY_COHORT_INCOMPLETE');
+  if (loadedBenchmarkSeriesCount !== configuredInstrumentCount) blockers.push('STABLE_VALIDATION_BENCHMARK_COHORT_INCOMPLETE');
+  if (eligibleInstrumentCount !== configuredInstrumentCount) blockers.push('STABLE_VALIDATION_ELIGIBLE_COHORT_INCOMPLETE');
+  if (selectedInstrumentCount !== configuredInstrumentCount) blockers.push('STABLE_VALIDATION_SELECTED_COHORT_INCOMPLETE');
+  if (eligibleWithBenchmarkCount !== configuredInstrumentCount || eligibleWithoutBenchmarkCount !== 0) {
+    blockers.push('STABLE_VALIDATION_BENCHMARK_LINEAGE_INCOMPLETE');
+  }
 
   const ready = blockers.length === 0;
   return {
@@ -77,11 +94,18 @@ export function buildV1828StableCohortIntegrity(artifact = {}, validationUnivers
     loadedBenchmarkSeriesCount,
     eligibleInstrumentCount,
     selectedInstrumentCount,
+    eligibleWithBenchmarkCount,
+    eligibleWithoutBenchmarkCount,
     blockers,
+    marketDomain: 'US_EQUITY',
+    benchmarkFamily: 'SPY',
     currentNewsDependentSelection: false,
     outcomeAwareSelectionAllowed: false,
     eventDiscoveryAdditionsAllowed: false,
     broadOpportunityAdditionsAllowed: false,
+    crossMarketValidationIncluded: false,
+    athensDomainValidated: false,
+    athensDomainStatus: 'SEPARATE_DOMAIN_PROOF_REQUIRED',
     survivorshipBiasControlled: false,
     survivorshipBiasStatus: 'REQUIRES_POINT_IN_TIME_UNIVERSE_BEFORE_PRODUCTION_PROMOTION',
     rawCompanyRecordsIncluded: false,
@@ -117,6 +141,9 @@ export async function runV1828StableCohortPredictiveSkillResearchJob(input = {})
       universe: validationUniverse,
       minimumScore: 101,
       enableBroadOpportunityScan: false,
+      enableAthensDiscovery: false,
+      collectTrustedNews: false,
+      documentLimit: 0,
     },
   });
   const stableCohortIntegrity = buildV1828StableCohortIntegrity(artifact, validationUniverseSummary);
@@ -152,6 +179,7 @@ async function main() {
   console.log(`Predictive-skill-ready groups: ${result.predictiveSkillSummary?.predictiveSkillReadyGroupCount || 0}`);
   console.log(`Adaptive predictive-ready groups: ${result.adaptivePriorShrunkCandidateSummary?.predictiveReadyGroupCount || 0}/${result.adaptivePriorShrunkCandidateSummary?.groupCount || 0}`);
   assertV1828StableCohortIntegrityReady(result.stableCohortIntegrity);
+  assertV1827DatasetIntegrityReady(result.datasetIntegrity);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : '';
