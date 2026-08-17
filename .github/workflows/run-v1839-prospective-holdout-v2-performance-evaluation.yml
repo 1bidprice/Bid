@@ -1,0 +1,190 @@
+name: Investor Control v1839 V2 Post-Gate Performance Evaluation
+
+on:
+  push:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - '.github/workflows/run-v1839-prospective-holdout-v2-performance-evaluation.yml'
+      - 'market-intelligence/scripts/run-prospective-holdout-v2-performance-evaluation-v1839.js'
+      - 'market-intelligence/scripts/run-prospective-holdout-v2-structural-gate-v1838.js'
+      - 'market-intelligence/scripts/run-prospective-holdout-v2-outcome-maturation-v1837.js'
+      - 'market-intelligence/src/forecast-prospective-holdout-protocol-v2.js'
+      - 'market-intelligence/src/forecast-calibration.js'
+      - 'market-intelligence/test/research-prospective-v2-performance-evaluation-v1839.test.js'
+  workflow_dispatch:
+  schedule:
+    - cron: '15 0 * * 2-6'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: investor-control-v1839-v2-performance-evaluation
+  cancel-in-progress: false
+
+jobs:
+  evaluation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: market-intelligence
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run full deterministic safety gate
+        run: npm test
+
+      - name: Restore verified v2 captures and latest v1837 maturation artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p out/v2-captures out/v1837
+          FOUND_CAPTURES=0
+
+          download_capture_runs() {
+            local workflow="$1"
+            while read -r RUN_ID; do
+              [ -z "$RUN_ID" ] && continue
+              ARTIFACT_NAME="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts" --jq '.artifacts[] | select(.expired == false) | .name' | head -n 1)"
+              [ -z "$ARTIFACT_NAME" ] && continue
+              mkdir -p "out/v2-captures/${RUN_ID}"
+              if gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" -n "$ARTIFACT_NAME" -D "out/v2-captures/${RUN_ID}"; then FOUND_CAPTURES=$((FOUND_CAPTURES + 1)); fi
+            done < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}/runs?status=success&per_page=100" --jq '.workflow_runs[].id')
+          }
+
+          download_capture_runs 'run-v1835-prospective-holdout-v2-first-capture.yml'
+          download_capture_runs 'run-v1836-prospective-holdout-v2-session-capture.yml'
+          if [ "$FOUND_CAPTURES" -lt 1 ]; then
+            echo 'No retained successful v2 capture artifacts found.' >&2
+            exit 1
+          fi
+
+          MATURATION_RUN_ID="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/run-v1837-prospective-holdout-v2-outcome-maturation.yml/runs?status=success&per_page=100" --jq '.workflow_runs[0].id // empty')"
+          if [ -z "$MATURATION_RUN_ID" ]; then
+            echo 'No successful v1837 maturation artifact exists.' >&2
+            exit 1
+          fi
+          MATURATION_ARTIFACT_NAME="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${MATURATION_RUN_ID}/artifacts" --jq '.artifacts[] | select(.expired == false) | .name' | head -n 1)"
+          if [ -z "$MATURATION_ARTIFACT_NAME" ]; then
+            echo "v1837 run ${MATURATION_RUN_ID} has no retained artifact." >&2
+            exit 1
+          fi
+          gh run download "$MATURATION_RUN_ID" --repo "$GITHUB_REPOSITORY" -n "$MATURATION_ARTIFACT_NAME" -D out/v1837
+          MATURATION_FILE="$(find out/v1837 -type f -name 'v1837-v2-outcome-maturation.json' | head -n 1)"
+          if [ -z "$MATURATION_FILE" ]; then
+            echo 'Downloaded v1837 artifact does not contain expected maturation file.' >&2
+            exit 1
+          fi
+
+          echo "PROSPECTIVE_V2_CAPTURE_ARTIFACT_DIRECTORY=out/v2-captures" >> "$GITHUB_ENV"
+          echo "PROSPECTIVE_V2_MATURATION_ARTIFACT_PATH=${MATURATION_FILE}" >> "$GITHUB_ENV"
+          echo "Restored v2 capture artifacts: ${FOUND_CAPTURES}"
+          echo "Restored v1837 maturation from run: ${MATURATION_RUN_ID}"
+
+      - name: Recompute v1838 gate from exact v1839 inputs
+        env:
+          INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          node scripts/run-prospective-holdout-v2-structural-gate-v1838.js out/v1838-recomputed-for-v1839.json
+
+      - name: Build v1839 post-gate evaluation
+        env:
+          INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT: ${{ github.sha }}
+          PROSPECTIVE_V2_STRUCTURAL_GATE_ARTIFACT_PATH: out/v1838-recomputed-for-v1839.json
+        run: |
+          node scripts/run-prospective-holdout-v2-performance-evaluation-v1839.js out/v1839-performance-evaluation.json
+
+      - name: Build cryptographic input provenance manifest
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          import path from 'node:path';
+          import { loadV2CapturesFromDirectory } from './scripts/run-prospective-holdout-v2-outcome-maturation-v1837.js';
+          const stable = (value) => Array.isArray(value) ? value.map(stable) : (!value || typeof value !== 'object') ? value : Object.fromEntries(Object.keys(value).sort().map((key) => [key, stable(value[key])]));
+          const sha256 = (value) => crypto.createHash('sha256').update(JSON.stringify(stable(value))).digest('hex');
+          const captures = await loadV2CapturesFromDirectory(path.resolve(process.env.PROSPECTIVE_V2_CAPTURE_ARTIFACT_DIRECTORY));
+          const maturation = JSON.parse(fs.readFileSync(process.env.PROSPECTIVE_V2_MATURATION_ARTIFACT_PATH, 'utf8'));
+          const structural = JSON.parse(fs.readFileSync('out/v1838-recomputed-for-v1839.json', 'utf8'));
+          const evaluation = JSON.parse(fs.readFileSync('out/v1839-performance-evaluation.json', 'utf8'));
+          const core = {
+            format: 'investor-control-v1839-evaluation-input-provenance',
+            version: 1,
+            sourceCommit: process.env.GITHUB_SHA,
+            holdoutId: evaluation.holdoutId,
+            captureCount: captures.length,
+            captureContentHashes: captures.map((capture) => capture.contentHash).sort(),
+            captureSetFingerprint: sha256(captures.map((capture) => capture.contentHash).sort()),
+            maturationArtifactContentHash: maturation.contentHash || null,
+            recomputedStructuralGateContentHash: structural.contentHash,
+            performanceEvaluationContentHash: evaluation.contentHash,
+          };
+          const manifest = { ...core, contentHashAlgorithm: 'SHA256_CANONICAL_JSON', contentHash: sha256(core) };
+          fs.writeFileSync('out/v1839-input-provenance.json', `${JSON.stringify(manifest, null, 2)}\n`);
+          NODE
+
+      - name: Verify v1839 gate, thresholds, multiplicity and authority boundaries
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { assertV1838StructuralGateSafe } from './scripts/run-prospective-holdout-v2-structural-gate-v1838.js';
+          import { assertV1839PerformanceEvaluationSafe } from './scripts/run-prospective-holdout-v2-performance-evaluation-v1839.js';
+          const gate = JSON.parse(fs.readFileSync('out/v1838-recomputed-for-v1839.json', 'utf8'));
+          const artifact = JSON.parse(fs.readFileSync('out/v1839-performance-evaluation.json', 'utf8'));
+          const provenance = JSON.parse(fs.readFileSync('out/v1839-input-provenance.json', 'utf8'));
+          const fail = (message) => { throw new Error(message); };
+          assertV1838StructuralGateSafe(gate);
+          assertV1839PerformanceEvaluationSafe(artifact);
+          if (artifact?.sourceCommit !== process.env.GITHUB_SHA || provenance?.sourceCommit !== process.env.GITHUB_SHA) fail('v1839 proof is not exact-head');
+          if (artifact?.holdoutId !== 'investor-control-us-equity-unseen-holdout-2026q3-v2' || artifact?.protocolContract !== 'PROSPECTIVE_UNSEEN_HOLDOUT_PROTOCOL_V2') fail('v1839 v2 lineage changed');
+          if (artifact?.structuralGateContentHash !== gate?.contentHash || provenance?.recomputedStructuralGateContentHash !== gate?.contentHash || provenance?.performanceEvaluationContentHash !== artifact?.contentHash) fail('v1839 provenance/gate hash mismatch');
+          if (!provenance?.maturationArtifactContentHash || !provenance?.captureSetFingerprint || provenance?.captureCount < 1) fail('v1839 input provenance incomplete');
+          if (gate?.performanceGateEligible !== true) {
+            if (artifact?.status !== 'PERFORMANCE_EVALUATION_LOCKED' || artifact?.structuralGateEligible !== false || artifact?.evaluationGateOpened !== false || artifact?.performanceMetricsIncluded !== false || artifact?.performancePeeked !== false || artifact?.evaluationCount !== 0 || artifact?.evaluations?.length !== 0) fail('v1839 opened metrics before structural eligibility');
+          } else {
+            if (artifact?.structuralGateEligible !== true || artifact?.evaluationGateOpened !== true || artifact?.performanceMetricsIncluded !== true || artifact?.performancePeeked !== true) fail('v1839 post-gate state inconsistent');
+            const expectedEvaluations = gate.structurallyReadyGroupCount * 4;
+            if (artifact?.evaluationCount !== expectedEvaluations || artifact?.evaluations?.length !== expectedEvaluations) fail('v1839 did not evaluate all four frozen variants symmetrically');
+            for (const item of artifact.evaluations) {
+              const t = item?.performanceThresholds || {};
+              if (t.minimumEvaluationSamplePerGroup !== 200 || t.minimumClassCountPerGroup !== 40 || t.minimumSkillPctVsBaseRate !== 5 || t.maximumExpectedCalibrationError !== 0.08 || t.minimumBrierImprovementPctVsRawPattern !== 3 || t.minimumLogLossImprovementPctVsRawPattern !== 0 || t.minimumEceImprovementVsRawPattern !== -0.01 || t.chronologicalBlockCount !== 3 || t.minimumChronologicalBlockSample !== 20 || t.chronologicalBlockSkillFloorPct !== 0) fail('v1839 performance threshold changed');
+            }
+          }
+          if (artifact?.sameHoldoutVariantSelectionAllowed !== false || artifact?.postHocWinnerSelectionAllowed !== false || artifact?.confirmatoryHoldoutRequiredBeforeAnyVariantSelection !== true) fail('v1839 multiplicity boundary changed');
+          if (artifact?.automaticModelPromotionEnabled !== false || artifact?.probabilityCalibrationEnabled !== false || artifact?.decisionIntegrationEnabled !== false || artifact?.forecastMayInfluenceFinalAction !== false || artifact?.finalActionEligible !== false || artifact?.brokerExecutionEligible !== false || artifact?.decisionImpact !== 'NONE') fail('v1839 gained authority');
+          console.log('PASS v1839 post-gate performance evaluation contract');
+          console.log(JSON.stringify({
+            sourceCommit: artifact.sourceCommit,
+            captureCount: provenance.captureCount,
+            maturationArtifactContentHash: provenance.maturationArtifactContentHash,
+            structuralGateContentHash: gate.contentHash,
+            structuralGateEligible: gate.performanceGateEligible,
+            performanceMetricsIncluded: artifact.performanceMetricsIncluded,
+            evaluationCount: artifact.evaluationCount,
+            predictiveStandardSignalCount: artifact.predictiveStandardSignalCount,
+            confirmatoryHoldoutRequired: artifact.confirmatoryHoldoutRequiredBeforeAnyVariantSelection,
+            evaluationContentHash: artifact.contentHash,
+          }, null, 2));
+          NODE
+
+      - name: Upload v1839 evaluation proof bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1839-performance-evaluation-${{ github.run_id }}
+          path: |
+            market-intelligence/out/v1838-recomputed-for-v1839.json
+            market-intelligence/out/v1839-performance-evaluation.json
+            market-intelligence/out/v1839-input-provenance.json
+          if-no-files-found: warn
+          retention-days: 90
