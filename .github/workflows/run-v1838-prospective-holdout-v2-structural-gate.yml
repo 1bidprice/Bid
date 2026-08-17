@@ -1,0 +1,142 @@
+name: Investor Control v1838 V2 Structural Evaluation Gate
+
+on:
+  push:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - '.github/workflows/run-v1838-prospective-holdout-v2-structural-gate.yml'
+      - 'market-intelligence/scripts/run-prospective-holdout-v2-structural-gate-v1838.js'
+      - 'market-intelligence/scripts/run-prospective-holdout-v2-outcome-maturation-v1837.js'
+      - 'market-intelligence/src/forecast-prospective-holdout-protocol-v2.js'
+      - 'market-intelligence/test/research-prospective-v2-structural-gate-v1838.test.js'
+  workflow_dispatch:
+  schedule:
+    - cron: '45 23 * * 1-5'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: investor-control-v1838-v2-structural-gate
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: market-intelligence
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run full deterministic safety gate
+        run: npm test
+
+      - name: Restore verified v2 captures and latest v1837 maturation artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p out/v2-captures out/v1837
+          FOUND_CAPTURES=0
+
+          download_capture_runs() {
+            local workflow="$1"
+            while read -r RUN_ID; do
+              [ -z "$RUN_ID" ] && continue
+              ARTIFACT_NAME="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts" --jq '.artifacts[] | select(.expired == false) | .name' | head -n 1)"
+              [ -z "$ARTIFACT_NAME" ] && continue
+              mkdir -p "out/v2-captures/${RUN_ID}"
+              if gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" -n "$ARTIFACT_NAME" -D "out/v2-captures/${RUN_ID}"; then
+                FOUND_CAPTURES=$((FOUND_CAPTURES + 1))
+              fi
+            done < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}/runs?status=success&per_page=100" --jq '.workflow_runs[].id')
+          }
+
+          download_capture_runs 'run-v1835-prospective-holdout-v2-first-capture.yml'
+          download_capture_runs 'run-v1836-prospective-holdout-v2-session-capture.yml'
+          if [ "$FOUND_CAPTURES" -lt 1 ]; then
+            echo 'No retained successful v2 capture artifacts found.' >&2
+            exit 1
+          fi
+
+          MATURATION_RUN_ID="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/run-v1837-prospective-holdout-v2-outcome-maturation.yml/runs?status=success&per_page=100" --jq '.workflow_runs[0].id // empty')"
+          if [ -z "$MATURATION_RUN_ID" ]; then
+            echo 'No successful v1837 maturation artifact exists.' >&2
+            exit 1
+          fi
+          MATURATION_ARTIFACT_NAME="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${MATURATION_RUN_ID}/artifacts" --jq '.artifacts[] | select(.expired == false) | .name' | head -n 1)"
+          if [ -z "$MATURATION_ARTIFACT_NAME" ]; then
+            echo "v1837 run ${MATURATION_RUN_ID} has no retained artifact." >&2
+            exit 1
+          fi
+          gh run download "$MATURATION_RUN_ID" --repo "$GITHUB_REPOSITORY" -n "$MATURATION_ARTIFACT_NAME" -D out/v1837
+          MATURATION_FILE="$(find out/v1837 -type f -name 'v1837-v2-outcome-maturation.json' | head -n 1)"
+          if [ -z "$MATURATION_FILE" ]; then
+            echo 'Downloaded v1837 artifact does not contain the expected maturation file.' >&2
+            exit 1
+          fi
+
+          echo "PROSPECTIVE_V2_CAPTURE_ARTIFACT_DIRECTORY=out/v2-captures" >> "$GITHUB_ENV"
+          echo "PROSPECTIVE_V2_MATURATION_ARTIFACT_PATH=${MATURATION_FILE}" >> "$GITHUB_ENV"
+          echo "Restored v2 capture artifacts: ${FOUND_CAPTURES}"
+          echo "Restored v1837 maturation from run: ${MATURATION_RUN_ID}"
+
+      - name: Build v1838 structural no-peek gate
+        env:
+          INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          mkdir -p out
+          node scripts/run-prospective-holdout-v2-structural-gate-v1838.js out/v1838-structural-gate.json
+
+      - name: Verify v1838 structural-only eligibility contract
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { assertV1838StructuralGateSafe } from './scripts/run-prospective-holdout-v2-structural-gate-v1838.js';
+          const artifact = JSON.parse(fs.readFileSync('out/v1838-structural-gate.json', 'utf8'));
+          const fail = (message) => { throw new Error(message); };
+          assertV1838StructuralGateSafe(artifact);
+          if (artifact?.sourceCommit !== process.env.GITHUB_SHA) fail('v1838 artifact is not exact-head');
+          if (artifact?.holdoutId !== 'investor-control-us-equity-unseen-holdout-2026q3-v2' || artifact?.protocolContract !== 'PROSPECTIVE_UNSEEN_HOLDOUT_PROTOCOL_V2') fail('v1838 v2 lineage changed');
+          if (artifact?.sourceCaptureVerificationFailureCount !== 0) fail('v1838 saw an unverified source capture');
+          if (artifact?.structuralInputsOnly !== true || artifact?.usesMaturationStatusAndTimingOnly !== true) fail('v1838 used nonstructural inputs');
+          if (artifact?.probabilitiesIncluded !== false || artifact?.rawPatternBaselinesIncluded !== false || artifact?.outcomeSignsIncluded !== false || artifact?.outcomeReturnsIncluded !== false || artifact?.classCountsIncluded !== false || artifact?.performanceMetricsIncluded !== false || artifact?.performancePeeked !== false || artifact?.evaluationGateOpened !== false) fail('v1838 exposed performance information before the gate');
+          for (const group of artifact?.groups || []) {
+            const t = group?.thresholds || {};
+            if (t.minimumEvaluationSamplePerGroup !== 200 || t.minimumDistinctForecastDates !== 40 || t.minimumDistinctInstruments !== 10 || t.maximumSingleForecastDateSharePct !== 10 || t.minimumEffectiveNonOverlappingWindows !== 12 || t.maximumSingleInstrumentSharePct !== 25 || t.minimumEffectiveInstrumentCount !== 6 || t.chronologicalBlockCount !== 3 || t.minimumChronologicalBlockSample !== 20) fail('v1838 structural threshold changed');
+          }
+          if (artifact?.performanceGateEligible === true && artifact?.structurallyReadyGroupCount < 1) fail('v1838 opened without a ready group');
+          if (artifact?.performanceGateEligible === false && artifact?.nextAllowedAction !== 'CONTINUE_PROSPECTIVE_CAPTURE_AND_OUTCOME_MATURATION_WITHOUT_PERFORMANCE_EVALUATION') fail('v1838 not-ready action changed');
+          if (artifact?.automaticModelPromotionEnabled !== false || artifact?.probabilityCalibrationEnabled !== false || artifact?.decisionIntegrationEnabled !== false || artifact?.forecastMayInfluenceFinalAction !== false || artifact?.finalActionEligible !== false || artifact?.brokerExecutionEligible !== false || artifact?.decisionImpact !== 'NONE') fail('v1838 gained authority');
+          console.log('PASS v1838 structural no-peek evaluation gate');
+          console.log(JSON.stringify({
+            sourceCommit: artifact.sourceCommit,
+            captureCount: artifact.captureCount,
+            maturedCommonVariantTargets: artifact.maturedCommonVariantTargetCount,
+            structuralGroups: artifact.structuralGroupCount,
+            readyGroups: artifact.structurallyReadyGroupCount,
+            performanceGateEligible: artifact.performanceGateEligible,
+            performancePeeked: artifact.performancePeeked,
+            blockers: artifact.blockers,
+            contentHash: artifact.contentHash,
+          }, null, 2));
+          NODE
+
+      - name: Upload v1838 structural gate artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1838-structural-gate-${{ github.run_id }}
+          path: market-intelligence/out/v1838-structural-gate.json
+          if-no-files-found: warn
+          retention-days: 90
