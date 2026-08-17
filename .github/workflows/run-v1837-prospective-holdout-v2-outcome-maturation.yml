@@ -1,0 +1,118 @@
+name: Investor Control v1837 V2 Prospective Outcome Maturation
+
+on:
+  push:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - '.github/workflows/run-v1837-prospective-holdout-v2-outcome-maturation.yml'
+      - 'market-intelligence/scripts/run-prospective-holdout-v2-outcome-maturation-v1837.js'
+      - 'market-intelligence/src/forecast-prospective-holdout-protocol-v2.js'
+      - 'market-intelligence/src/historical-research-validation-universe.js'
+      - 'market-intelligence/src/professional-market-data.js'
+      - 'market-intelligence/src/adapters/yahoo-chart.js'
+      - 'market-intelligence/test/research-prospective-v2-outcome-maturation-v1837.test.js'
+  workflow_dispatch:
+  schedule:
+    - cron: '15 23 * * 1-5'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: investor-control-v1837-v2-outcome-maturation
+  cancel-in-progress: false
+
+jobs:
+  maturation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: market-intelligence
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install PDF extraction runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y poppler-utils
+
+      - name: Run full deterministic safety gate
+        run: npm test
+
+      - name: Restore verified v2 capture artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p out/v2-captures
+          FOUND=0
+          download_runs() {
+            local workflow="$1"
+            while read -r RUN_ID; do
+              [ -z "$RUN_ID" ] && continue
+              ARTIFACT_NAME="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts" --jq '.artifacts[] | select(.expired == false) | .name' | head -n 1)"
+              [ -z "$ARTIFACT_NAME" ] && continue
+              mkdir -p "out/v2-captures/${RUN_ID}"
+              if gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" -n "$ARTIFACT_NAME" -D "out/v2-captures/${RUN_ID}"; then FOUND=$((FOUND + 1)); fi
+            done < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}/runs?status=success&per_page=100" --jq '.workflow_runs[].id')
+          }
+          # Cross-branch retrieval is deliberate so the cryptographic v2 lineage survives
+          # eventual integration from this research branch to the default branch.
+          download_runs 'run-v1835-prospective-holdout-v2-first-capture.yml'
+          download_runs 'run-v1836-prospective-holdout-v2-session-capture.yml'
+          if [ "$FOUND" -lt 1 ]; then
+            echo 'No retained successful v2 capture artifacts found.' >&2
+            exit 1
+          fi
+          echo "PROSPECTIVE_V2_CAPTURE_ARTIFACT_DIRECTORY=out/v2-captures" >> "$GITHUB_ENV"
+          echo "Downloaded v2 capture-proof artifacts: ${FOUND}"
+
+      - name: Build v1837 v2 outcome maturation artifact
+        env:
+          INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT: ${{ github.sha }}
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          mkdir -p out
+          node scripts/run-prospective-holdout-v2-outcome-maturation-v1837.js out/v1837-v2-outcome-maturation.json
+
+      - name: Verify v1837 no-peek maturation boundary
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { assertV1837V2MaturationReady } from './scripts/run-prospective-holdout-v2-outcome-maturation-v1837.js';
+          const artifact = JSON.parse(fs.readFileSync('out/v1837-v2-outcome-maturation.json', 'utf8'));
+          const fail = (message) => { throw new Error(message); };
+          assertV1837V2MaturationReady(artifact);
+          if (artifact?.sourceCommit !== process.env.GITHUB_SHA) fail('v1837 artifact is not exact-head');
+          if (artifact?.holdoutId !== 'investor-control-us-equity-unseen-holdout-2026q3-v2' || artifact?.protocolContract !== 'PROSPECTIVE_UNSEEN_HOLDOUT_PROTOCOL_V2') fail('v2 lineage changed');
+          if (artifact?.captureCount < 1 || artifact?.sourceCaptureVerificationFailureCount !== 0) fail('verified v2 capture set invalid');
+          if (artifact?.outcomeTupleCount !== artifact.captureCount * 32 || artifact?.maturedOutcomeCount + artifact?.pendingOutcomeCount !== artifact?.outcomeTupleCount) fail('v2 outcome matrix incomplete');
+          for (const outcome of artifact?.outcomes || []) {
+            if (outcome?.sourceCaptureVerified !== true) fail('v2 outcome source capture not verified');
+            if (Object.hasOwn(outcome, 'probabilityPositive') || Object.hasOwn(outcome, 'rawPatternProbabilityPositive') || Object.hasOwn(outcome, 'regimeKey') || Object.hasOwn(outcome, 'modelVariant')) fail('forecast/model data leaked into separate outcome store');
+            if (outcome?.status === 'PENDING_HORIZON_MATURATION' && (outcome?.outcomeKnownAt !== null || outcome?.positiveOutcome !== null || outcome?.realizedReturnPct !== null || outcome?.benchmarkReturnPct !== null || outcome?.benchmarkRelativeReturnPct !== null)) fail('pending v2 outcome disclosed partial result');
+          }
+          if (artifact?.outcomeStorageMode !== 'SEPARATE_FROM_IMMUTABLE_V2_FORECAST_CAPTURES' || artifact?.modelProbabilitiesIncluded !== false || artifact?.rawPatternBaselinesIncluded !== false || artifact?.regimeKeysIncluded !== false) fail('v2 capture/outcome separation changed');
+          if (artifact?.performanceMetricsIncluded !== false || artifact?.performancePeeked !== false || artifact?.evaluationGateOpened !== false) fail('v2 performance gate opened prematurely');
+          if (artifact?.automaticModelPromotionEnabled !== false || artifact?.probabilityCalibrationEnabled !== false || artifact?.decisionIntegrationEnabled !== false || artifact?.forecastMayInfluenceFinalAction !== false || artifact?.finalActionEligible !== false || artifact?.brokerExecutionEligible !== false || artifact?.decisionImpact !== 'NONE') fail('v1837 gained authority');
+          console.log('PASS v1837 v2 outcome maturation');
+          console.log(JSON.stringify({ sourceCommit: artifact.sourceCommit, captures: artifact.captureCount, matured: artifact.maturedOutcomeCount, pending: artifact.pendingOutcomeCount, performancePeeked: artifact.performancePeeked, contentHash: artifact.contentHash }, null, 2));
+          NODE
+
+      - name: Upload v1837 v2 outcome maturation artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1837-v2-outcome-maturation-${{ github.run_id }}
+          path: market-intelligence/out/v1837-v2-outcome-maturation.json
+          if-no-files-found: warn
+          retention-days: 90
