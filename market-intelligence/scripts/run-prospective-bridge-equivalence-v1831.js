@@ -5,6 +5,12 @@ import { isDeepStrictEqual } from 'node:util';
 import { buildCrossSectionalRegimeWalkForwardResearch } from '../src/forecast-cross-sectional-regime-walk-forward.js';
 import { buildHistoricalMarketStackResearch } from '../src/forecast-historical-market-stacked-ensemble-research.js';
 import {
+  buildHistoricalMarketDomainPrequentialStackPredictions,
+  buildHistoricalMarketFactorPrequentialStackPredictions,
+  buildHistoricalMarketPriorShrunkPrequentialStackPredictions,
+} from '../src/forecast-historical-market-prequential-stack.js';
+import { buildHistoricalMarketAdaptivePriorShrunkPrequentialStackPredictions } from '../src/forecast-historical-market-adaptive-prior-shrinkage.js';
+import {
   buildProspectiveFrozenStackPredictions,
   PROSPECTIVE_FROZEN_STACK_BRIDGE_CONTRACT,
   PROSPECTIVE_FROZEN_STACK_MODEL_SOURCE_COMMIT,
@@ -97,12 +103,21 @@ function stripOutcome(record = {}) {
   return target;
 }
 
-function candidateMap(stack = {}) {
+function referenceKey(record = {}) {
+  return [
+    record.instrumentId || record.companyId || 'NO_INSTRUMENT',
+    record.forecastAt || 'NO_FORECAST_TIME',
+    record.horizon || 'NO_HORIZON',
+    record.regimeKey || 'NO_REGIME',
+  ].join('|');
+}
+
+function frozenPrequentialCandidates(records = [], options = {}) {
   return new Map([
-    ['SCALAR_MARKET_FACTOR', stack],
-    ['DOMAIN_SEPARATED_MARKET_FACTOR', stack.domainSeparatedCandidate],
-    ['PRIOR_SHRUNK_SCALAR_MARKET_FACTOR', stack.priorShrunkCandidate],
-    ['ADAPTIVE_PRIOR_SHRUNK_SCALAR_MARKET_FACTOR', stack.adaptivePriorShrunkCandidate],
+    ['SCALAR_MARKET_FACTOR', buildHistoricalMarketFactorPrequentialStackPredictions(records, options)],
+    ['DOMAIN_SEPARATED_MARKET_FACTOR', buildHistoricalMarketDomainPrequentialStackPredictions(records, options)],
+    ['PRIOR_SHRUNK_SCALAR_MARKET_FACTOR', buildHistoricalMarketPriorShrunkPrequentialStackPredictions(records, options)],
+    ['ADAPTIVE_PRIOR_SHRUNK_SCALAR_MARKET_FACTOR', buildHistoricalMarketAdaptivePriorShrunkPrequentialStackPredictions(records, options)],
   ]);
 }
 
@@ -110,20 +125,27 @@ function predictionProbability(prediction = {}) {
   return prediction.ensembleResearchProbabilityPositive ?? null;
 }
 
-function findCommonReferenceTarget(stack = {}, records = []) {
-  const candidates = candidateMap(stack);
-  const scalarPredictions = Array.isArray(stack.predictions) ? stack.predictions : [];
+export function findCommonFrozenReferenceTarget(candidates = new Map(), records = []) {
+  const scalarPredictions = Array.isArray(candidates.get('SCALAR_MARKET_FACTOR')?.predictions)
+    ? candidates.get('SCALAR_MARKET_FACTOR').predictions
+    : [];
+  const recordByKey = new Map((Array.isArray(records) ? records : []).map((record) => [referenceKey(record), record]));
+
   for (let index = scalarPredictions.length - 1; index >= 0; index -= 1) {
     const scalar = scalarPredictions[index];
-    const forecastId = scalar?.forecastId;
-    if (!forecastId) continue;
+    const key = referenceKey(scalar);
+    const record = recordByKey.get(key) || null;
+    if (!record) continue;
     const allPresent = [...candidates.values()].every((candidate) => (
       Array.isArray(candidate?.predictions)
-      && candidate.predictions.some((prediction) => prediction.forecastId === forecastId)
+      && candidate.predictions.some((prediction) => referenceKey(prediction) === key)
     ));
     if (!allPresent) continue;
-    const record = records.find((item) => item.forecastId === forecastId);
-    if (record) return { forecastId, record };
+    return {
+      key,
+      forecastId: record.forecastId || scalar.forecastId || null,
+      record,
+    };
   }
   return null;
 }
@@ -136,7 +158,7 @@ export function assertV1831ProspectiveEquivalenceProofReady(proof = {}) {
   if (proof?.trainingCorpusReferenceCommit !== PROSPECTIVE_TRAINING_CORPUS_REFERENCE_SOURCE_COMMIT) blockers.push('V1831_CORPUS_REFERENCE_CHANGED');
   if (proof?.corpusEquivalence?.deepEqual !== true) blockers.push('V1831_CORPUS_NOT_EXACT');
   if (proof?.bridgeEquivalence?.allFourVariantsExact !== true) blockers.push('V1831_BRIDGE_NOT_EXACT');
-  if (proof?.bridgeEquivalence?.targetOutcomeUsed !== false) blockers.push('V1831_TARGET_OUTCOME_USED');
+  if (proof?.bridgeEquivalence?.bridgeConstructed === true && proof?.bridgeEquivalence?.targetOutcomeUsed !== false) blockers.push('V1831_TARGET_OUTCOME_USED');
   if (proof?.holdoutStarted !== false) blockers.push('V1831_HOLDOUT_STARTED_DURING_EQUIVALENCE_PROOF');
   if (proof?.automaticModelPromotionEnabled !== false
       || proof?.decisionIntegrationEnabled !== false
@@ -155,17 +177,21 @@ export function buildV1831ProspectiveEquivalenceProof(input = {}) {
   const corpus = buildProspectiveFrozenTrainingCorpus({ instruments, options, generatedAt });
   const rebuiltStack = buildHistoricalMarketStackResearch(corpus.records, options);
   const corpusDeepEqual = isDeepStrictEqual(rebuiltStack, frozenReference.historicalMarketStackResearch);
-  const targetReference = findCommonReferenceTarget(frozenReference.historicalMarketStackResearch, corpus.records);
+
+  // The research artifact intentionally strips raw predictions. For equivalence, rebuild the
+  // frozen prequential prediction streams directly from the already-proven equivalent corpus.
+  // Match target identity with immutable lineage fields rather than depending on an artifact ID.
+  const referenceCandidates = frozenPrequentialCandidates(corpus.records, options);
+  const targetReference = findCommonFrozenReferenceTarget(referenceCandidates, corpus.records);
 
   let bridge = null;
   const variantComparisons = [];
   if (targetReference) {
     const target = stripOutcome(targetReference.record);
     bridge = buildProspectiveFrozenStackPredictions(corpus.records, target);
-    const candidates = candidateMap(frozenReference.historicalMarketStackResearch);
     for (const bridgePrediction of bridge.predictions || []) {
-      const referenceCandidate = candidates.get(bridgePrediction.modelVariant);
-      const referencePrediction = referenceCandidate?.predictions?.find((prediction) => prediction.forecastId === targetReference.forecastId) || null;
+      const referenceCandidate = referenceCandidates.get(bridgePrediction.modelVariant);
+      const referencePrediction = referenceCandidate?.predictions?.find((prediction) => referenceKey(prediction) === targetReference.key) || null;
       const referenceProbability = predictionProbability(referencePrediction);
       variantComparisons.push({
         modelVariant: bridgePrediction.modelVariant,
@@ -186,7 +212,7 @@ export function buildV1831ProspectiveEquivalenceProof(input = {}) {
   if (frozenReference.historicalMarketStackResearch?.predictionCount <= 0) blockers.push('EQUIVALENCE_FIXTURE_HAS_NO_STACK_PREDICTIONS');
   if (!targetReference) blockers.push('NO_COMMON_FROZEN_VARIANT_REFERENCE_TARGET');
   if (!allFourVariantsExact) blockers.push('FROZEN_BRIDGE_VARIANT_EQUIVALENCE_FAILED');
-  if (bridge?.targetOutcomeUsed !== false) blockers.push('FROZEN_BRIDGE_USED_TARGET_OUTCOME');
+  if (bridge && bridge.targetOutcomeUsed !== false) blockers.push('FROZEN_BRIDGE_USED_TARGET_OUTCOME');
   if (protocol.contract !== PROSPECTIVE_HOLDOUT_PROTOCOL_CONTRACT) blockers.push('HOLDOUT_PROTOCOL_CONTRACT_CHANGED');
   if (protocol.modelFreeze?.sourceCommit !== PROSPECTIVE_FROZEN_STACK_MODEL_SOURCE_COMMIT) blockers.push('HOLDOUT_MODEL_FREEZE_CHANGED');
 
@@ -213,6 +239,9 @@ export function buildV1831ProspectiveEquivalenceProof(input = {}) {
       frozenStackPredictionCount: frozenReference.historicalMarketStackResearch?.predictionCount || 0,
     },
     bridgeEquivalence: {
+      referenceSource: 'FROZEN_PREQUENTIAL_IMPLEMENTATION_REBUILT_FROM_DEEP_EQUAL_TRAINING_CORPUS',
+      referenceIdentityRule: 'INSTRUMENT_FORECAST_AT_HORIZON_REGIME',
+      bridgeConstructed: bridge !== null,
       targetForecastId: targetReference?.forecastId || null,
       targetForecastAt: targetReference?.record?.forecastAt || null,
       targetHorizon: targetReference?.record?.horizon || null,
