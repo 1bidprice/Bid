@@ -1,0 +1,379 @@
+name: Investor Control Prospective V2 Runtime
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/investor-control-prospective-v2-runtime.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '30 22 * * 1-5'
+    - cron: '30 1 * * 2-6'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: investor-control-prospective-v2-runtime
+  cancel-in-progress: false
+
+env:
+  RUNTIME_BRANCH: investor-control-prospective-holdout-v2-runtime
+  HOLDOUT_ID: investor-control-us-equity-unseen-holdout-2026q3-v2
+
+jobs:
+  prospective-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: market-intelligence
+
+    steps:
+      - name: Checkout frozen prospective runtime source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RUNTIME_BRANCH }}
+          fetch-depth: 1
+
+      - name: Resolve exact runtime source commit
+        run: |
+          set -euo pipefail
+          RUNTIME_SOURCE_COMMIT="$(git rev-parse HEAD)"
+          echo "RUNTIME_SOURCE_COMMIT=${RUNTIME_SOURCE_COMMIT}" >> "$GITHUB_ENV"
+          echo "Frozen runtime branch: ${RUNTIME_BRANCH}"
+          echo "Exact runtime source: ${RUNTIME_SOURCE_COMMIT}"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install PDF extraction runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y poppler-utils
+
+      - name: Run full deterministic safety gate
+        run: npm test
+
+      - name: Restore cumulative runtime state or bootstrap v2
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          rm -rf state out/runtime-restore out/bootstrap
+          mkdir -p state/captures state/manifests state/latest out/runtime-restore out/bootstrap
+
+          PREVIOUS_RUNTIME_RUN_ID="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/investor-control-prospective-v2-runtime.yml/runs?status=success&per_page=100" --jq '.workflow_runs[0].id // empty' 2>/dev/null || true)"
+
+          if [ -n "$PREVIOUS_RUNTIME_RUN_ID" ]; then
+            STATE_ARTIFACT_NAME="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${PREVIOUS_RUNTIME_RUN_ID}/artifacts" --jq '.artifacts[] | select(.expired == false and (.name | startswith("investor-control-prospective-v2-runtime-state-"))) | .name' | head -n 1)"
+            if [ -z "$STATE_ARTIFACT_NAME" ]; then
+              echo "Previous successful runtime run ${PREVIOUS_RUNTIME_RUN_ID} has no retained cumulative state artifact; refusing silent bootstrap." >&2
+              exit 1
+            fi
+            gh run download "$PREVIOUS_RUNTIME_RUN_ID" --repo "$GITHUB_REPOSITORY" -n "$STATE_ARTIFACT_NAME" -D out/runtime-restore
+            RESTORED_MANIFEST="$(find out/runtime-restore -type f -name 'state-manifest.json' | head -n 1)"
+            if [ -z "$RESTORED_MANIFEST" ]; then
+              echo "Previous runtime artifact ${STATE_ARTIFACT_NAME} does not contain state-manifest.json." >&2
+              exit 1
+            fi
+            RESTORED_ROOT="$(dirname "$RESTORED_MANIFEST")"
+            rm -rf state
+            mkdir -p state
+            cp -a "${RESTORED_ROOT}/." state/
+            echo "STATE_BOOTSTRAPPED_FROM_V1835=false" >> "$GITHUB_ENV"
+            echo "PREVIOUS_RUNTIME_RUN_ID=${PREVIOUS_RUNTIME_RUN_ID}" >> "$GITHUB_ENV"
+            echo "Restored cumulative state from runtime run ${PREVIOUS_RUNTIME_RUN_ID}."
+          else
+            BOOTSTRAP_RUN_ID="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/run-v1835-prospective-holdout-v2-first-capture.yml/runs?status=success&per_page=100" --jq '.workflow_runs[0].id // empty')"
+            if [ -z "$BOOTSTRAP_RUN_ID" ]; then
+              echo 'No successful v1835 v2 first-capture proof exists for initial runtime bootstrap.' >&2
+              exit 1
+            fi
+            BOOTSTRAP_ARTIFACT_NAME="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${BOOTSTRAP_RUN_ID}/artifacts" --jq '.artifacts[] | select(.expired == false and (.name | startswith("investor-control-v1835-v2-first-capture-"))) | .name' | head -n 1)"
+            if [ -z "$BOOTSTRAP_ARTIFACT_NAME" ]; then
+              echo "v1835 bootstrap run ${BOOTSTRAP_RUN_ID} has no retained proof artifact." >&2
+              exit 1
+            fi
+            gh run download "$BOOTSTRAP_RUN_ID" --repo "$GITHUB_REPOSITORY" -n "$BOOTSTRAP_ARTIFACT_NAME" -D out/bootstrap
+            BOOTSTRAP_FILE="$(find out/bootstrap -type f -name 'v1835-v2-first-capture.json' | head -n 1)"
+            if [ -z "$BOOTSTRAP_FILE" ]; then
+              echo 'Downloaded v1835 artifact does not contain v1835-v2-first-capture.json.' >&2
+              exit 1
+            fi
+            mkdir -p state/captures state/manifests state/latest
+            cp "$BOOTSTRAP_FILE" state/chain-head-proof.json
+            cp "$BOOTSTRAP_FILE" state/captures/v1835-v2-first-capture.json
+            echo "STATE_BOOTSTRAPPED_FROM_V1835=true" >> "$GITHUB_ENV"
+            echo "PREVIOUS_RUNTIME_RUN_ID=" >> "$GITHUB_ENV"
+            echo "Bootstrapped cumulative state from v1835 run ${BOOTSTRAP_RUN_ID}."
+          fi
+
+      - name: Verify restored state before any new market-data work
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import crypto from 'node:crypto';
+          import { extractV2ChainHead } from './scripts/run-prospective-holdout-v2-session-capture-v1836.js';
+          import { loadV2CapturesFromDirectory } from './scripts/run-prospective-holdout-v2-outcome-maturation-v1837.js';
+          import { verifyProspectiveHoldoutCaptureV2 } from './src/forecast-prospective-holdout-protocol-v2.js';
+          import { verifyV1840Ledger } from './scripts/run-prospective-holdout-v2-immutable-outcome-ledger-v1840.js';
+
+          const stable = (value) => Array.isArray(value) ? value.map(stable) : (!value || typeof value !== 'object') ? value : Object.fromEntries(Object.keys(value).sort().map((key) => [key, stable(value[key])]));
+          const sha256 = (value) => crypto.createHash('sha256').update(JSON.stringify(stable(value))).digest('hex');
+          const fail = (message) => { throw new Error(message); };
+          const root = path.resolve('state');
+          const chainProof = JSON.parse(fs.readFileSync(path.join(root, 'chain-head-proof.json'), 'utf8'));
+          const chain = extractV2ChainHead(chainProof);
+          if (!chain.hash || !chain.sessionDate || chain.sequence < 1 || chain.holdoutId !== process.env.HOLDOUT_ID) fail('Restored v2 chain head is invalid.');
+
+          const captures = await loadV2CapturesFromDirectory(path.join(root, 'captures'));
+          if (!captures.length) fail('Restored state contains no actual v2 captures.');
+          for (const capture of captures) {
+            const verification = verifyProspectiveHoldoutCaptureV2(capture);
+            if (!verification.verified) fail(`Restored capture rejected: ${(verification.blockers || []).join(',')}`);
+          }
+          const captureHashes = captures.map((capture) => capture.contentHash).sort();
+          const captureSetFingerprint = sha256(captureHashes);
+          if (!captureHashes.includes(chain.hash)) {
+            // A no-op v1836 chain proof points to the most recent actual capture hash.
+            fail('Restored chain head hash is not present in the cumulative capture set.');
+          }
+
+          const manifestPath = path.join(root, 'state-manifest.json');
+          let previousManifestHash = '';
+          if (fs.existsSync(manifestPath)) {
+            const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+            const { contentHash: _hash, contentHashAlgorithm: _algorithm, ...core } = manifest;
+            if (manifest.contentHashAlgorithm !== 'SHA256_CANONICAL_JSON' || manifest.contentHash !== sha256(core)) fail('Previous runtime state manifest hash is invalid.');
+            if (manifest.contract !== 'INVESTOR_CONTROL_PROSPECTIVE_V2_RUNTIME_STATE_MANIFEST_V1') fail('Previous runtime manifest contract changed.');
+            if (manifest.holdoutId !== process.env.HOLDOUT_ID) fail('Previous runtime manifest belongs to another holdout.');
+            if (manifest.captureCount !== captures.length || manifest.captureSetFingerprint !== captureSetFingerprint) fail('Previous runtime capture-set fingerprint mismatch.');
+            if (manifest.chainHeadCaptureHash !== chain.hash || manifest.chainHeadSessionDate !== chain.sessionDate || manifest.captureSequence !== chain.sequence) fail('Previous runtime chain-head manifest mismatch.');
+            if (manifest.runtimeBranch !== process.env.RUNTIME_BRANCH || manifest.runtimeSourceCommit !== process.env.RUNTIME_SOURCE_COMMIT) fail('Frozen runtime source changed from the prior cumulative state.');
+            const ledgerPath = path.join(root, 'immutable-outcome-ledger.json');
+            if (!fs.existsSync(ledgerPath)) fail('Previous runtime manifest exists but immutable outcome ledger is missing.');
+            const ledger = JSON.parse(fs.readFileSync(ledgerPath, 'utf8'));
+            const ledgerVerification = verifyV1840Ledger(ledger);
+            if (!ledgerVerification.verified) fail(`Previous immutable outcome ledger rejected: ${ledgerVerification.blockers.join(',')}`);
+            if (manifest.immutableOutcomeLedgerContentHash !== ledger.contentHash) fail('Previous runtime manifest ledger hash mismatch.');
+            previousManifestHash = manifest.contentHash;
+          } else {
+            if (process.env.STATE_BOOTSTRAPPED_FROM_V1835 !== 'true') fail('State manifest is missing from a non-bootstrap restore.');
+            if (captures.length !== 1 || chain.sequence !== 1) fail('Initial bootstrap is not the single verified v1835 capture.');
+            if (fs.existsSync(path.join(root, 'immutable-outcome-ledger.json'))) fail('Initial bootstrap unexpectedly contains an unmanifested ledger.');
+          }
+
+          fs.appendFileSync(process.env.GITHUB_ENV, `PREVIOUS_STATE_MANIFEST_HASH=${previousManifestHash}\n`);
+          fs.appendFileSync(process.env.GITHUB_ENV, `RESTORED_CAPTURE_COUNT=${captures.length}\n`);
+          fs.appendFileSync(process.env.GITHUB_ENV, `RESTORED_CAPTURE_SET_FINGERPRINT=${captureSetFingerprint}\n`);
+          console.log(JSON.stringify({
+            holdoutId: chain.holdoutId,
+            captureSequence: chain.sequence,
+            chainHeadSessionDate: chain.sessionDate,
+            chainHeadCaptureHash: chain.hash,
+            captureCount: captures.length,
+            captureSetFingerprint,
+            previousStateManifestHash: previousManifestHash || null,
+          }, null, 2));
+          NODE
+
+      - name: Capture next completed US session or record verified no-op
+        env:
+          PREVIOUS_V2_CAPTURE_PROOF_PATH: state/chain-head-proof.json
+          INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT: ${{ env.RUNTIME_SOURCE_COMMIT }}
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          mkdir -p out
+          node scripts/run-prospective-holdout-v2-session-capture-v1836.js out/v1836-runtime-session.json
+
+      - name: Advance cumulative capture state without duplicates
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import { verifyProspectiveHoldoutCaptureV2 } from './src/forecast-prospective-holdout-protocol-v2.js';
+          const proof = JSON.parse(fs.readFileSync('out/v1836-runtime-session.json', 'utf8'));
+          const fail = (message) => { throw new Error(message); };
+          if (proof?.contract !== 'PROSPECTIVE_UNSEEN_HOLDOUT_V2_CHAINED_SESSION_CAPTURE_V1' || proof?.holdoutId !== process.env.HOLDOUT_ID) fail('v1836 runtime proof lineage changed.');
+          if (proof?.sourceCommit !== process.env.RUNTIME_SOURCE_COMMIT) fail('v1836 runtime proof is not exact frozen-source.');
+          fs.copyFileSync('out/v1836-runtime-session.json', 'state/chain-head-proof.json');
+          fs.copyFileSync('out/v1836-runtime-session.json', 'state/latest/v1836-session-run.json');
+          if (proof.captureCreated === true) {
+            const verification = verifyProspectiveHoldoutCaptureV2(proof.capture);
+            if (!verification.verified) fail(`New v1836 capture rejected: ${(verification.blockers || []).join(',')}`);
+            const session = proof.chainHeadSessionDate;
+            const name = `v1836-capture-${session}-${proof.capture.contentHash.slice(0, 12)}.json`;
+            const destination = path.join('state', 'captures', name);
+            if (fs.existsSync(destination)) fail(`Duplicate cumulative capture filename already exists: ${name}`);
+            fs.copyFileSync('out/v1836-runtime-session.json', destination);
+          } else if (proof.status !== 'NO_NEW_COMPLETED_SESSION') {
+            fail(`Unexpected v1836 runtime status: ${proof.status}`);
+          }
+          console.log(JSON.stringify({ status: proof.status, captureCreated: proof.captureCreated, captureSequence: proof.captureSequence, chainHeadSessionDate: proof.chainHeadSessionDate, chainHeadCaptureHash: proof.chainHeadCaptureHash }, null, 2));
+          NODE
+
+      - name: Recompute current maturation candidates from cumulative captures
+        env:
+          PROSPECTIVE_V2_CAPTURE_ARTIFACT_DIRECTORY: state/captures
+          INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT: ${{ env.RUNTIME_SOURCE_COMMIT }}
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          node scripts/run-prospective-holdout-v2-outcome-maturation-v1837.js out/v1837-runtime-maturation-candidate.json
+          cp out/v1837-runtime-maturation-candidate.json state/latest/v1837-provider-maturation-candidate.json
+
+      - name: Advance immutable outcome ledger
+        env:
+          PROSPECTIVE_V2_MATURATION_ARTIFACT_PATH: out/v1837-runtime-maturation-candidate.json
+          INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT: ${{ env.RUNTIME_SOURCE_COMMIT }}
+        run: |
+          set -euo pipefail
+          if [ -f state/immutable-outcome-ledger.json ]; then
+            PREVIOUS_V1840_LEDGER_PATH=state/immutable-outcome-ledger.json \
+              node scripts/run-prospective-holdout-v2-immutable-outcome-ledger-v1840.js out/v1840-runtime-ledger.json out/v1840-runtime-maturation-view.json
+          else
+            node scripts/run-prospective-holdout-v2-immutable-outcome-ledger-v1840.js out/v1840-runtime-ledger.json out/v1840-runtime-maturation-view.json
+          fi
+          cp out/v1840-runtime-ledger.json state/immutable-outcome-ledger.json
+          cp out/v1840-runtime-maturation-view.json state/latest/v1840-immutable-maturation-view.json
+
+      - name: Compute structural no-peek gate from immutable outcomes
+        env:
+          PROSPECTIVE_V2_CAPTURE_ARTIFACT_DIRECTORY: state/captures
+          PROSPECTIVE_V2_MATURATION_ARTIFACT_PATH: out/v1840-runtime-maturation-view.json
+          INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT: ${{ env.RUNTIME_SOURCE_COMMIT }}
+        run: |
+          node scripts/run-prospective-holdout-v2-structural-gate-v1838.js out/v1838-runtime-structural-gate.json
+          cp out/v1838-runtime-structural-gate.json state/latest/v1838-structural-gate.json
+
+      - name: Run preregistered post-gate evaluator
+        env:
+          PROSPECTIVE_V2_CAPTURE_ARTIFACT_DIRECTORY: state/captures
+          PROSPECTIVE_V2_MATURATION_ARTIFACT_PATH: out/v1840-runtime-maturation-view.json
+          PROSPECTIVE_V2_STRUCTURAL_GATE_ARTIFACT_PATH: out/v1838-runtime-structural-gate.json
+          INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT: ${{ env.RUNTIME_SOURCE_COMMIT }}
+        run: |
+          node scripts/run-prospective-holdout-v2-performance-evaluation-v1839.js out/v1839-runtime-performance-evaluation.json
+          cp out/v1839-runtime-performance-evaluation.json state/latest/v1839-performance-evaluation.json
+
+      - name: Build and verify cumulative runtime state manifest
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import crypto from 'node:crypto';
+          import { extractV2ChainHead } from './scripts/run-prospective-holdout-v2-session-capture-v1836.js';
+          import { loadV2CapturesFromDirectory } from './scripts/run-prospective-holdout-v2-outcome-maturation-v1837.js';
+          import { verifyProspectiveHoldoutCaptureV2 } from './src/forecast-prospective-holdout-protocol-v2.js';
+          import { verifyV1840Ledger } from './scripts/run-prospective-holdout-v2-immutable-outcome-ledger-v1840.js';
+          import { assertV1838StructuralGateSafe } from './scripts/run-prospective-holdout-v2-structural-gate-v1838.js';
+          import { assertV1839PerformanceEvaluationSafe } from './scripts/run-prospective-holdout-v2-performance-evaluation-v1839.js';
+
+          const stable = (value) => Array.isArray(value) ? value.map(stable) : (!value || typeof value !== 'object') ? value : Object.fromEntries(Object.keys(value).sort().map((key) => [key, stable(value[key])]));
+          const sha256 = (value) => crypto.createHash('sha256').update(JSON.stringify(stable(value))).digest('hex');
+          const fail = (message) => { throw new Error(message); };
+
+          const chainProof = JSON.parse(fs.readFileSync('state/chain-head-proof.json', 'utf8'));
+          const chain = extractV2ChainHead(chainProof);
+          if (!chain.hash || !chain.sessionDate || chain.sequence < 1 || chain.holdoutId !== process.env.HOLDOUT_ID) fail('Final runtime chain head invalid.');
+
+          const captures = await loadV2CapturesFromDirectory(path.resolve('state/captures'));
+          for (const capture of captures) {
+            const verification = verifyProspectiveHoldoutCaptureV2(capture);
+            if (!verification.verified) fail(`Final cumulative capture rejected: ${(verification.blockers || []).join(',')}`);
+          }
+          const captureHashes = captures.map((capture) => capture.contentHash).sort();
+          const captureSetFingerprint = sha256(captureHashes);
+          if (captures.length !== chain.sequence) fail(`Capture sequence ${chain.sequence} does not equal actual cumulative capture count ${captures.length}.`);
+          if (!captureHashes.includes(chain.hash)) fail('Final chain head hash is not in cumulative capture set.');
+
+          const ledger = JSON.parse(fs.readFileSync('state/immutable-outcome-ledger.json', 'utf8'));
+          const ledgerVerification = verifyV1840Ledger(ledger);
+          if (!ledgerVerification.verified) fail(`Final immutable ledger rejected: ${ledgerVerification.blockers.join(',')}`);
+          if (ledger.entryCount !== captures.length * 32) fail('Immutable ledger does not contain exactly 32 outcome tuples per capture.');
+
+          const structuralGate = JSON.parse(fs.readFileSync('state/latest/v1838-structural-gate.json', 'utf8'));
+          assertV1838StructuralGateSafe(structuralGate);
+          const evaluation = JSON.parse(fs.readFileSync('state/latest/v1839-performance-evaluation.json', 'utf8'));
+          assertV1839PerformanceEvaluationSafe(evaluation);
+          if (evaluation.structuralGateContentHash !== structuralGate.contentHash) fail('Performance evaluation is not bound to the current structural gate.');
+          if (structuralGate.performanceGateEligible !== true && (evaluation.performanceMetricsIncluded !== false || evaluation.performancePeeked !== false || evaluation.evaluationCount !== 0)) fail('Performance metrics opened before structural eligibility.');
+          if (evaluation.sameHoldoutVariantSelectionAllowed !== false || evaluation.postHocWinnerSelectionAllowed !== false || evaluation.confirmatoryHoldoutRequiredBeforeAnyVariantSelection !== true) fail('Multiplicity boundary changed.');
+
+          const core = {
+            format: 'investor-control-prospective-v2-runtime-state-manifest',
+            version: 1,
+            contract: 'INVESTOR_CONTROL_PROSPECTIVE_V2_RUNTIME_STATE_MANIFEST_V1',
+            holdoutId: process.env.HOLDOUT_ID,
+            runtimeBranch: process.env.RUNTIME_BRANCH,
+            runtimeSourceCommit: process.env.RUNTIME_SOURCE_COMMIT,
+            schedulerSourceCommit: process.env.GITHUB_SHA,
+            workflowRunId: process.env.GITHUB_RUN_ID,
+            workflowRunAttempt: Number(process.env.GITHUB_RUN_ATTEMPT || 1),
+            generatedAt: new Date().toISOString(),
+            previousRuntimeRunId: process.env.PREVIOUS_RUNTIME_RUN_ID || null,
+            previousStateManifestContentHash: process.env.PREVIOUS_STATE_MANIFEST_HASH || null,
+            stateBootstrappedFromV1835: process.env.STATE_BOOTSTRAPPED_FROM_V1835 === 'true',
+            captureSequence: chain.sequence,
+            chainHeadSessionDate: chain.sessionDate,
+            chainHeadCaptureHash: chain.hash,
+            captureCount: captures.length,
+            captureContentHashes: captureHashes,
+            captureSetFingerprint,
+            immutableOutcomeLedgerContentHash: ledger.contentHash,
+            immutableOutcomeEntryCount: ledger.entryCount,
+            maturedOutcomeEntryCount: ledger.maturedEntryCount,
+            pendingOutcomeEntryCount: ledger.pendingEntryCount,
+            providerDriftDiagnosticCount: ledger.providerDriftDiagnosticCount,
+            structuralGateContentHash: structuralGate.contentHash,
+            structuralGateStatus: structuralGate.status,
+            structuralPerformanceGateEligible: structuralGate.performanceGateEligible,
+            performanceEvaluationContentHash: evaluation.contentHash,
+            performanceEvaluationStatus: evaluation.status,
+            performanceMetricsIncluded: evaluation.performanceMetricsIncluded,
+            performancePeeked: evaluation.performancePeeked,
+            predictiveStandardSignalCount: evaluation.predictiveStandardSignalCount,
+            sameHoldoutVariantSelectionAllowed: false,
+            automaticModelPromotionEnabled: false,
+            probabilityCalibrationEnabled: false,
+            decisionIntegrationEnabled: false,
+            forecastMayInfluenceFinalAction: false,
+            finalActionEligible: false,
+            brokerExecutionEligible: false,
+            decisionImpact: 'NONE',
+          };
+          const manifest = { ...core, contentHashAlgorithm: 'SHA256_CANONICAL_JSON', contentHash: sha256(core) };
+          fs.writeFileSync('state/state-manifest.json', `${JSON.stringify(manifest, null, 2)}\n`);
+          fs.mkdirSync('state/manifests', { recursive: true });
+          fs.writeFileSync(`state/manifests/manifest-run-${process.env.GITHUB_RUN_ID}-attempt-${process.env.GITHUB_RUN_ATTEMPT}.json`, `${JSON.stringify(manifest, null, 2)}\n`);
+
+          const { contentHash: _hash, contentHashAlgorithm: _algorithm, ...verifyCore } = manifest;
+          if (manifest.contentHash !== sha256(verifyCore)) fail('New state manifest hash verification failed.');
+          console.log(JSON.stringify({
+            runtimeSourceCommit: manifest.runtimeSourceCommit,
+            captureSequence: manifest.captureSequence,
+            chainHeadSessionDate: manifest.chainHeadSessionDate,
+            captureCount: manifest.captureCount,
+            maturedOutcomes: manifest.maturedOutcomeEntryCount,
+            pendingOutcomes: manifest.pendingOutcomeEntryCount,
+            providerDriftDiagnostics: manifest.providerDriftDiagnosticCount,
+            structuralGateEligible: manifest.structuralPerformanceGateEligible,
+            performanceEvaluationStatus: manifest.performanceEvaluationStatus,
+            performanceMetricsIncluded: manifest.performanceMetricsIncluded,
+            predictiveStandardSignalCount: manifest.predictiveStandardSignalCount,
+            stateManifestContentHash: manifest.contentHash,
+          }, null, 2));
+          NODE
+
+      - name: Upload cumulative prospective runtime state
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-prospective-v2-runtime-state-${{ github.run_id }}
+          path: market-intelligence/state
+          if-no-files-found: error
+          retention-days: 90
