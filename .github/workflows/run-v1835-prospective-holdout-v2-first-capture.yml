@@ -1,0 +1,108 @@
+name: Investor Control v1835 Prospective Holdout V2 First Capture
+
+on:
+  push:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - '.github/workflows/run-v1835-prospective-holdout-v2-first-capture.yml'
+      - 'market-intelligence/scripts/run-prospective-holdout-v2-first-capture-v1835.js'
+      - 'market-intelligence/src/forecast-prospective-holdout-protocol-v2.js'
+      - 'market-intelligence/src/forecast-prospective-target-builder.js'
+      - 'market-intelligence/src/forecast-prospective-training-corpus.js'
+      - 'market-intelligence/src/forecast-prospective-frozen-stack-bridge.js'
+      - 'market-intelligence/src/historical-research-validation-universe.js'
+      - 'market-intelligence/src/professional-market-data.js'
+      - 'market-intelligence/src/adapters/yahoo-chart.js'
+      - 'market-intelligence/test/forecast-prospective-holdout-protocol-v2.test.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-v1835-v2-first-capture-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: market-intelligence
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install PDF extraction runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y poppler-utils
+
+      - name: Run full deterministic safety gate
+        run: npm test
+
+      - name: Build evaluation-complete v2 first capture
+        env:
+          INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT: ${{ github.sha }}
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          mkdir -p out
+          node scripts/run-prospective-holdout-v2-first-capture-v1835.js out/v1835-v2-first-capture.json
+
+      - name: Verify v1835 v2 lineage and no-outcome boundary
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { verifyProspectiveHoldoutCaptureV2 } from './src/forecast-prospective-holdout-protocol-v2.js';
+          const proof = JSON.parse(fs.readFileSync('out/v1835-v2-first-capture.json', 'utf8'));
+          const fail = (message) => { throw new Error(message); };
+          if (proof?.contract !== 'PROSPECTIVE_UNSEEN_HOLDOUT_V2_FIRST_CAPTURE_PROOF_V1') fail('v1835 proof contract changed');
+          if (proof?.sourceCommit !== process.env.GITHUB_SHA) fail('v1835 proof is not exact-head');
+          if (proof?.protocolContract !== 'PROSPECTIVE_UNSEEN_HOLDOUT_PROTOCOL_V2') fail('v2 protocol contract changed');
+          if (proof?.holdoutId !== 'investor-control-us-equity-unseen-holdout-2026q3-v2') fail('v2 holdout id changed');
+          if (proof?.v1Retirement?.maturedOutcomeCountAtRetirement !== 0 || proof?.v1Retirement?.performancePeekedAtRetirement !== false || proof?.v1Retirement?.evaluationGateOpenedAtRetirement !== false) fail('v1 was not retired before outcome/performance exposure');
+          if (proof?.v1Retirement?.v1MayContributeToV2PerformanceEvaluation !== false) fail('v1 pilot may contaminate v2 evaluation');
+          if (proof?.marketDataSummary?.configuredInstrumentCount !== 16 || proof?.marketDataSummary?.fiveYearHistoryReadyCount !== 16 || proof?.marketDataSummary?.fiveYearBenchmarkReadyCount !== 16) fail('v2 market-data cohort incomplete');
+          if (proof?.marketDataSummary?.completedSessionDates?.length !== 1 || proof?.marketDataSummary?.benchmarkCompletedSessionDates?.length !== 1 || proof?.marketDataSummary?.completedSessionDates[0] !== proof?.marketDataSummary?.benchmarkCompletedSessionDates[0] || proof?.marketDataSummary?.sessionAlignedInstrumentCount !== 16) fail('v2 completed-session alignment failed');
+          if (proof?.marketDataSummary?.completedSessionOnly !== true || proof?.marketDataSummary?.currentIntradayQuoteUsed !== false) fail('v2 information boundary used current intraday quote');
+          if (proof?.trainingCorpusSummary?.instrumentCount !== 16 || proof?.trainingCorpusSummary?.regimeCoveragePct !== 100) fail('v2 frozen training corpus incomplete');
+          if (proof?.targetSummary?.targetCount !== 32 || proof?.targetSummary?.readyTargetCount !== 32) fail('v2 target matrix incomplete');
+          if (proof?.targetSummary?.rawPatternBaselineCapturedInEverySlot !== true || proof?.targetSummary?.regimeKeyCapturedInEverySlot !== true || proof?.targetSummary?.targetFeatureFingerprintCapturedInEverySlot !== true) fail('v2 evaluation lineage incomplete');
+          if (proof?.capture?.slots?.length !== 128) fail('v2 capture does not contain 128 slots');
+          if (proof?.availableForecastCount <= 0) fail('v2 all forecasts withheld');
+          const verification = verifyProspectiveHoldoutCaptureV2(proof.capture);
+          if (verification?.verified !== true || verification?.actualSlotCount !== 128 || verification?.targetFeatureFingerprintCount !== 32) fail(`v2 capture verification failed: ${(verification?.blockers || []).join(',')}`);
+          if (proof?.captureVerification?.verified !== true) fail('embedded v2 verification failed');
+          if (proof?.holdoutStarted !== true || proof?.firstLiveCaptureCreated !== true) fail('v2 holdout did not start');
+          if (proof?.historicalBackfillAllowed !== false || proof?.performanceMetricsIncluded !== false || proof?.performancePeeked !== false || proof?.outcomeFieldsIncluded !== false || proof?.evaluationGateOpened !== false) fail('v2 pre-outcome/performance boundary changed');
+          if (proof?.automaticModelPromotionEnabled !== false || proof?.probabilityCalibrationEnabled !== false || proof?.decisionIntegrationEnabled !== false || proof?.forecastMayInfluenceFinalAction !== false || proof?.finalActionEligible !== false || proof?.brokerExecutionEligible !== false || proof?.decisionImpact !== 'NONE') fail('v2 capture gained authority');
+          console.log('PASS v1835 evaluation-complete prospective holdout v2 first capture');
+          console.log(JSON.stringify({
+            sourceCommit: proof.sourceCommit,
+            completedSessionDate: proof.completedSessionDate,
+            trainingRecords: proof.trainingCorpusSummary.generatedRecordCount,
+            targetsReady: proof.targetSummary.readyTargetCount,
+            availableForecasts: proof.availableForecastCount,
+            withheldForecasts: proof.withheldForecastCount,
+            targetFeatureFingerprints: proof.captureVerification.targetFeatureFingerprintCount,
+            captureHash: proof.capture.contentHash,
+            v1MaturedOutcomesAtRetirement: proof.v1Retirement.maturedOutcomeCountAtRetirement,
+            v2HoldoutStarted: proof.holdoutStarted,
+          }, null, 2));
+          NODE
+
+      - name: Upload v1835 v2 first-capture proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1835-v2-first-capture-${{ github.run_id }}
+          path: market-intelligence/out/v1835-v2-first-capture.json
+          if-no-files-found: warn
+          retention-days: 90
