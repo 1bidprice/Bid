@@ -1,0 +1,110 @@
+name: Investor Control v1832 First Prospective Holdout Capture
+
+on:
+  push:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - '.github/workflows/run-v1832-first-prospective-holdout-capture.yml'
+      - 'market-intelligence/scripts/run-prospective-holdout-first-capture-v1832.js'
+      - 'market-intelligence/src/forecast-prospective-target-builder.js'
+      - 'market-intelligence/src/forecast-prospective-training-corpus.js'
+      - 'market-intelligence/src/forecast-prospective-frozen-stack-bridge.js'
+      - 'market-intelligence/src/forecast-prospective-holdout-protocol.js'
+      - 'market-intelligence/src/historical-research-validation-universe.js'
+      - 'market-intelligence/src/professional-market-data.js'
+      - 'market-intelligence/src/adapters/yahoo-chart.js'
+      - 'market-intelligence/test/forecast-prospective-target-builder.test.js'
+      - 'market-intelligence/test/forecast-prospective-training-corpus.test.js'
+      - 'market-intelligence/test/forecast-prospective-frozen-stack-bridge.test.js'
+      - 'market-intelligence/test/forecast-prospective-holdout-protocol.test.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-v1832-first-capture-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: market-intelligence
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install PDF extraction runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y poppler-utils
+
+      - name: Run full deterministic safety gate
+        run: npm test
+
+      - name: Build first real v1832 prospective capture
+        env:
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+          INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT: ${{ github.sha }}
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          mkdir -p out
+          node scripts/run-prospective-holdout-first-capture-v1832.js out/v1832-first-prospective-capture.json
+
+      - name: Verify v1832 first-capture contract and authority boundaries
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const proof = JSON.parse(fs.readFileSync('out/v1832-first-prospective-capture.json', 'utf8'));
+          const fail = (message) => { throw new Error(message); };
+          if (proof?.contract !== 'PROSPECTIVE_UNSEEN_HOLDOUT_FIRST_CAPTURE_PROOF_V1') fail('v1832 proof contract changed');
+          if (proof?.sourceCommit !== process.env.GITHUB_SHA) fail('v1832 proof is not exact-head');
+          if (proof?.protocolContract !== 'PROSPECTIVE_UNSEEN_HOLDOUT_PROTOCOL_V1') fail('holdout protocol changed');
+          if (proof?.targetBuilderContract !== 'PROSPECTIVE_FROZEN_TARGET_FEATURE_BUILDER_V1') fail('target builder contract changed');
+          if (proof?.marketDataSummary?.configuredInstrumentCount !== 16) fail('frozen universe count changed');
+          if (proof?.marketDataSummary?.fiveYearHistoryReadyCount !== 16) fail('five-year history cohort incomplete');
+          if (proof?.marketDataSummary?.fiveYearBenchmarkReadyCount !== 16) fail('SPY benchmark cohort incomplete');
+          if (proof?.marketDataSummary?.latestCompletedSessionDates?.length !== 1 || proof?.marketDataSummary?.benchmarkLatestCompletedSessionDates?.length !== 1) fail('latest completed session is not unique');
+          if (proof.marketDataSummary.latestCompletedSessionDates[0] !== proof.marketDataSummary.benchmarkLatestCompletedSessionDates[0]) fail('company and SPY completed sessions are not aligned');
+          if (proof?.trainingCorpusSummary?.instrumentCount !== 16 || proof?.trainingCorpusSummary?.regimeCoveragePct !== 100) fail('frozen training corpus not complete');
+          if (proof?.targetSummary?.targetCount !== 32 || proof?.targetSummary?.readyTargetCount !== 32 || proof?.targetSummary?.targetOutcomeUsed !== false) fail('prospective target feature matrix not ready');
+          if (proof?.operationalGate?.status !== 'FIRST_CAPTURE_READY' || proof?.operationalGate?.ready !== true) fail(`operational gate blocked: ${(proof?.operationalGate?.blockers || []).join(',')}`);
+          if (proof?.operationalGate?.actualSlotCount !== 128 || proof?.operationalGate?.availableForecastCount <= 0) fail('capture slot matrix invalid or all forecasts withheld');
+          if (proof?.captureVerification?.status !== 'PROSPECTIVE_CAPTURE_VERIFIED' || proof?.captureVerification?.verified !== true) fail('capture verification failed');
+          if (proof?.capture?.contentHashAlgorithm !== 'SHA256_CANONICAL_JSON' || !proof?.capture?.contentHash) fail('immutable capture hash missing');
+          if (proof?.capture?.slots?.length !== 128) fail('capture does not contain exactly 128 preregistered slots');
+          if (proof?.holdoutStarted !== true || proof?.firstLiveCaptureCreated !== true) fail('valid first capture did not start holdout');
+          if (proof?.historicalBackfillAllowed !== false || proof?.performanceMetricsIncluded !== false || proof?.outcomeFieldsIncluded !== false) fail('pre-outcome boundary changed');
+          if (proof?.automaticModelPromotionEnabled !== false || proof?.probabilityCalibrationEnabled !== false || proof?.decisionIntegrationEnabled !== false || proof?.forecastMayInfluenceFinalAction !== false || proof?.finalActionEligible !== false || proof?.brokerExecutionEligible !== false || proof?.decisionImpact !== 'NONE') fail('prospective capture gained authority');
+          console.log('PASS v1832 first prospective holdout capture');
+          console.log(JSON.stringify({
+            sourceCommit: proof.sourceCommit,
+            capturedAt: proof.capturedAt,
+            sourceDataAsOf: proof.sourceDataAsOf,
+            completedSession: proof.operationalGate.commonBenchmarkCompletedSessionDate,
+            trainingRecords: proof.trainingCorpusSummary.generatedRecordCount,
+            targetsReady: proof.targetSummary.readyTargetCount,
+            availableForecasts: proof.operationalGate.availableForecastCount,
+            withheldForecasts: proof.operationalGate.withheldForecastCount,
+            captureHash: proof.capture.contentHash,
+            holdoutStarted: proof.holdoutStarted,
+          }, null, 2));
+          NODE
+
+      - name: Upload v1832 prospective capture proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1832-first-capture-${{ github.run_id }}
+          path: market-intelligence/out/v1832-first-prospective-capture.json
+          if-no-files-found: warn
+          retention-days: 90
