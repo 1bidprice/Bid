@@ -1,0 +1,124 @@
+name: Investor Control v1836 V2 Chained Prospective Session Capture
+
+on:
+  push:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - '.github/workflows/run-v1836-prospective-holdout-v2-session-capture.yml'
+      - 'market-intelligence/scripts/run-prospective-holdout-v2-session-capture-v1836.js'
+      - 'market-intelligence/scripts/run-prospective-holdout-v2-first-capture-v1835.js'
+      - 'market-intelligence/src/forecast-prospective-holdout-protocol-v2.js'
+      - 'market-intelligence/src/forecast-prospective-target-builder.js'
+      - 'market-intelligence/src/forecast-prospective-training-corpus.js'
+      - 'market-intelligence/src/forecast-prospective-frozen-stack-bridge.js'
+      - 'market-intelligence/src/historical-research-validation-universe.js'
+      - 'market-intelligence/src/professional-market-data.js'
+      - 'market-intelligence/src/adapters/yahoo-chart.js'
+      - 'market-intelligence/test/research-prospective-v2-session-capture-v1836.test.js'
+  workflow_dispatch:
+  schedule:
+    - cron: '15 22 * * 1-5'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: investor-control-v1836-v2-session-capture
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: market-intelligence
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install PDF extraction runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y poppler-utils
+
+      - name: Run full deterministic safety gate
+        run: npm test
+
+      - name: Restore latest verified v2 chain head
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p out/previous
+          PREV_RUN_ID="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/run-v1836-prospective-holdout-v2-session-capture.yml/runs?status=success&per_page=100" --jq '.workflow_runs[0].id // empty')"
+          if [ -z "$PREV_RUN_ID" ]; then
+            PREV_RUN_ID="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/run-v1835-prospective-holdout-v2-first-capture.yml/runs?status=success&per_page=100" --jq '.workflow_runs[0].id // empty')"
+          fi
+          if [ -z "$PREV_RUN_ID" ]; then
+            echo 'No successful v2 prospective capture proof exists.' >&2
+            exit 1
+          fi
+          ARTIFACT_NAME="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${PREV_RUN_ID}/artifacts" --jq '.artifacts[] | select(.expired == false) | .name' | head -n 1)"
+          if [ -z "$ARTIFACT_NAME" ]; then
+            echo "v2 source run ${PREV_RUN_ID} has no retained artifact." >&2
+            exit 1
+          fi
+          gh run download "$PREV_RUN_ID" --repo "$GITHUB_REPOSITORY" -n "$ARTIFACT_NAME" -D out/previous
+          PREVIOUS_FILE="$(find out/previous -type f \( -name 'v1836-v2-session-capture.json' -o -name 'v1835-v2-first-capture.json' \) | head -n 1)"
+          if [ -z "$PREVIOUS_FILE" ]; then
+            echo 'Downloaded artifact does not contain a recognized v2 chain proof.' >&2
+            exit 1
+          fi
+          echo "PREVIOUS_V2_CAPTURE_PROOF_PATH=${PREVIOUS_FILE}" >> "$GITHUB_ENV"
+          echo "Restored v2 chain from run ${PREV_RUN_ID}: ${PREVIOUS_FILE}"
+
+      - name: Build v1836 chained v2 session capture
+        env:
+          INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT: ${{ github.sha }}
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          mkdir -p out
+          node scripts/run-prospective-holdout-v2-session-capture-v1836.js out/v1836-v2-session-capture.json
+
+      - name: Verify v1836 v2 chain and evaluation lineage
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { verifyProspectiveHoldoutCaptureV2 } from './src/forecast-prospective-holdout-protocol-v2.js';
+          const proof = JSON.parse(fs.readFileSync('out/v1836-v2-session-capture.json', 'utf8'));
+          const fail = (message) => { throw new Error(message); };
+          if (proof?.contract !== 'PROSPECTIVE_UNSEEN_HOLDOUT_V2_CHAINED_SESSION_CAPTURE_V1') fail('v1836 contract changed');
+          if (proof?.sourceCommit !== process.env.GITHUB_SHA) fail('v1836 proof is not exact-head');
+          if (proof?.holdoutId !== 'investor-control-us-equity-unseen-holdout-2026q3-v2' || proof?.protocolContract !== 'PROSPECTIVE_UNSEEN_HOLDOUT_PROTOCOL_V2') fail('v2 lineage changed');
+          if (proof?.operationalSummary?.fiveYearHistoryReadyCount !== 16 || proof?.operationalSummary?.fiveYearBenchmarkReadyCount !== 16 || proof?.operationalSummary?.sessionAlignedInstrumentCount !== 16 || proof?.operationalSummary?.targetReadyCount !== 32 || proof?.operationalSummary?.evaluationLineageComplete !== true) fail('v2 operational/evaluation lineage incomplete');
+          if (proof?.status === 'NEW_V2_SESSION_CAPTURE_VERIFIED') {
+            if (proof?.captureCreated !== true || proof?.capture?.previousCaptureHash !== proof?.previousChainHeadCaptureHash || proof?.captureSequence !== proof?.previousCaptureSequence + 1) fail('v2 chain link invalid');
+            const verification = verifyProspectiveHoldoutCaptureV2(proof.capture);
+            if (verification?.verified !== true || verification?.actualSlotCount !== 128 || verification?.targetFeatureFingerprintCount !== 32) fail(`new v2 capture rejected: ${(verification?.blockers || []).join(',')}`);
+          } else if (proof?.status === 'NO_NEW_COMPLETED_SESSION') {
+            if (proof?.captureCreated !== false || proof?.capture !== null) fail('duplicate session created v2 capture');
+            if (proof?.chainHeadCaptureHash !== proof?.previousChainHeadCaptureHash || proof?.captureSequence !== proof?.previousCaptureSequence) fail('v2 no-op changed chain');
+            if (proof?.operationalSummary?.duplicateCompletedSessionPrevented !== true) fail('v2 duplicate prevention not recorded');
+          } else fail(`unexpected v1836 status: ${proof?.status}`);
+          if (proof?.historicalBackfillAllowed !== false || proof?.performancePeeked !== false || proof?.outcomeFieldsIncluded !== false || proof?.evaluationGateOpened !== false) fail('v1836 preoutcome boundary changed');
+          if (proof?.automaticModelPromotionEnabled !== false || proof?.probabilityCalibrationEnabled !== false || proof?.decisionIntegrationEnabled !== false || proof?.forecastMayInfluenceFinalAction !== false || proof?.finalActionEligible !== false || proof?.brokerExecutionEligible !== false || proof?.decisionImpact !== 'NONE') fail('v1836 gained authority');
+          console.log('PASS v1836 v2 chained prospective session capture');
+          console.log(JSON.stringify({ status: proof.status, session: proof.candidateCompletedSessionDate, sequence: proof.captureSequence, created: proof.captureCreated, chainHead: proof.chainHeadCaptureHash }, null, 2));
+          NODE
+
+      - name: Upload v1836 v2 chained capture proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1836-v2-session-capture-${{ github.run_id }}
+          path: market-intelligence/out/v1836-v2-session-capture.json
+          if-no-files-found: warn
+          retention-days: 90

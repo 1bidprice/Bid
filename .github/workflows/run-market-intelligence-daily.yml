@@ -1,0 +1,108 @@
+name: Validate Investor Control Production Candidate
+
+on:
+  push:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - market-intelligence/**
+      - .github/workflows/run-market-intelligence-daily.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-production-candidate-validation
+  cancel-in-progress: true
+
+jobs:
+  validate-production-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+
+    steps:
+      - name: Checkout production intelligence source
+        uses: actions/checkout@v4
+        with:
+          ref: investor-control-v1-market-intelligence-foundation
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install controlled PDF extraction runtime
+        run: |
+          set -euo pipefail
+          if ! command -v pdftotext >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y poppler-utils
+          fi
+          pdftotext -v
+
+      - name: Run deterministic intelligence tests
+        working-directory: market-intelligence
+        run: npm test
+
+      - name: Build exact production candidate
+        working-directory: market-intelligence
+        env:
+          SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          node src/run-autonomous-intelligence.js out/autonomous-intelligence.json
+          node src/build-mobile-feed.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json
+
+      - name: Verify strict production contracts
+        working-directory: market-intelligence
+        run: |
+          set -euo pipefail
+          node scripts/verify-production-output.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json
+
+      - name: Verify opportunity hunter safety
+        working-directory: market-intelligence
+        run: |
+          set -euo pipefail
+          node scripts/verify-opportunity-hunter-output.js out/autonomous-intelligence.json
+
+      - name: Summarize candidate funnel
+        working-directory: market-intelligence
+        run: |
+          node - <<'NODE'
+          const report = require('./out/autonomous-intelligence.json');
+          const broad = report.broadOpportunityScan || {};
+          const hunter = report.opportunityUniverse || {};
+          const ranking = hunter.ranking || {};
+          console.log(JSON.stringify({
+            generatedAt: report.generatedAt,
+            release: require('./config/runtime-release-manifest.json').releaseVersion,
+            broadEligibleUniverseCount: Number(broad.directoryEligibleCount || 0),
+            fundamentalPoolCount: Number(broad.fundamentalPoolCount || 0),
+            fundamentalSelectedCount: Number(broad.fundamentalSelectedCount || 0),
+            marketScreenInputCount: Number(broad.marketScreenInputCount || 0),
+            marketScreenScorableCount: Number(broad.marketScreenScorableCount || 0),
+            marketScreenEligibleCount: Number(broad.marketScreenEligibleCount || 0),
+            deepAnalysisCandidateCount: (broad.candidates || []).length,
+            specializedQuarantineCount: Number(broad.specializedQuarantineCount || 0),
+            opportunityScannedInstrumentCount: Number(hunter.uniqueInstrumentCount || 0),
+            opportunityScorableInstrumentCount: Number(hunter.scorableInstrumentCount || 0),
+            superOpportunityCount: Number(ranking.superOpportunityCount || 0),
+            highPriorityOpportunityCount: Number(ranking.highPriorityCount || 0),
+            deepVerificationQueueCount: (report.opportunityDeepVerificationQueue || []).length,
+            finalActionCount: Number(report.finalActionCount || 0),
+          }, null, 2));
+          NODE
+
+      - name: Upload verified production candidate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1.7-production-candidate-${{ github.run_id }}
+          path: |
+            market-intelligence/out/autonomous-intelligence.json
+            market-intelligence/out/mobile-intelligence-feed.json
+          if-no-files-found: warn
+          retention-days: 30

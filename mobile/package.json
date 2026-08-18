@@ -1,10 +1,14 @@
 {
   "name": "investor-control-mobile",
-  "version": "0.6.5",
+  "version": "1.7.2",
   "private": true,
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
-    "postinstall": "node scripts/apply-v065-native-ui-fix.js",
+    "postinstall": "node scripts/apply-v065-native-ui-fix.js && node scripts/apply-v070-opportunities.js && node scripts/apply-v071-live-sync.js && node scripts/apply-v080-autonomous-decisions.js && node scripts/apply-v081-position-performance.js && node scripts/apply-v081b-fix-source-newline.js && node scripts/apply-v090-discovery-clarity.js && node scripts/apply-v090b-background-intelligence.js && node scripts/apply-v091-reliability.js && node scripts/apply-v100-production-health.js && node scripts/apply-v101-integrity-recovery.js && node scripts/apply-v110-unified-intelligence.js && node scripts/apply-v111-alert-integrity.js && node scripts/apply-v120-play-store-release.js && node scripts/apply-v121-play-permission-minimization.js && node scripts/apply-v170-opportunity-purchase-ui.js && node scripts/apply-v170-release-identity.js && node scripts/apply-v171-portfolio-aware-decisions.js && node scripts/apply-v172-quote-transparency.js",
+    "test:lots": "node scripts/test-position-lots.cjs",
+    "test:hunter-ui": "node scripts/verify-v170-opportunity-purchase-ui.js",
+    "test:release-identity": "node scripts/verify-v171-portfolio-aware-decisions.js",
+    "test:quote-transparency": "node scripts/verify-v172-quote-transparency.js",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
@@ -17,6 +21,7 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~55.0.0",
     "expo-background-task": "~55.0.19",
+    "expo-build-properties": "~55.0.16",
     "expo-document-picker": "~55.0.14",
     "expo-file-system": "~55.0.23",
     "expo-notifications": "~55.0.25",
@@ -24,7 +29,7 @@
     "expo-sharing": "~55.0.21",
     "expo-task-manager": "~55.0.17",
     "react": "19.2.0",
-    "react-native": "0.83.0",
+    "react-native": "0.83.10",
     "react-native-safe-area-context": "~5.6.2"
   }
 }

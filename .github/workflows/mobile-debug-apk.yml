@@ -31,6 +31,9 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Verify v1.7 mobile release identity
+        run: npm run test:release-identity
+
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean --non-interactive
 

@@ -1,0 +1,151 @@
+name: Investor Control v1827 Predictive Skill Research
+
+on:
+  push:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - '.github/workflows/run-v1827-historical-predictive-skill-research.yml'
+      - 'market-intelligence/scripts/run-cross-sectional-regime-walk-forward-research-v1827.js'
+      - 'market-intelligence/src/forecast-historical-predictive-skill.js'
+      - 'market-intelligence/src/forecast-historical-market-stacked-ensemble-research.js'
+      - 'market-intelligence/src/forecast-historical-market-adaptive-prior-shrinkage.js'
+      - 'market-intelligence/src/forecast-historical-market-adaptive-prior-shrunk-stack-candidate-safety.js'
+      - 'market-intelligence/src/professional-market-data.js'
+      - 'market-intelligence/src/adapters/yahoo-chart.js'
+      - 'market-intelligence/test/forecast-historical-predictive-skill.test.js'
+      - 'market-intelligence/test/forecast-historical-market-stacked-ensemble-research.test.js'
+      - 'market-intelligence/test/forecast-historical-market-adaptive-prior-shrinkage.test.js'
+      - 'market-intelligence/test/forecast-historical-market-adaptive-prior-shrunk-stack-candidate-safety.test.js'
+      - 'market-intelligence/test/professional-market-data-benchmark-stability.test.js'
+      - 'market-intelligence/test/research-history-depth.test.js'
+      - 'market-intelligence/test/research-predictive-skill-v1827.test.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-v1827-predictive-skill-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: market-intelligence
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install PDF extraction runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y poppler-utils
+
+      - name: Run full deterministic safety gate
+        run: npm test
+
+      - name: Run v1827 five-year predictive-skill research
+        env:
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+          TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
+          INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT: ${{ github.sha }}
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          mkdir -p out
+          node scripts/run-cross-sectional-regime-walk-forward-research-v1827.js out/v1827-historical-predictive-skill-research.json
+
+      - name: Verify v1827 predictive-skill safety contract
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const artifact = JSON.parse(fs.readFileSync('out/v1827-historical-predictive-skill-research.json', 'utf8'));
+          const fail = (message) => { throw new Error(message); };
+          const summary = artifact?.predictiveSkillSummary;
+          const groups = Array.isArray(summary?.groups) ? summary.groups : [];
+          const adaptiveSafety = artifact?.adaptivePriorShrunkCandidateSafety;
+          const adaptive = artifact?.adaptivePriorShrunkCandidateSummary;
+          if (artifact?.historyDepth?.lookbackDays !== 1825) fail('five-year lookback changed');
+          if (artifact?.historyDepth?.expectedYahooRange !== '5y') fail('Yahoo range changed');
+          if (artifact?.readinessSummary?.thresholds?.minimumDistinctForecastDates !== 30) fail('30-date floor changed');
+          if (artifact?.evaluationReadinessMeaning !== 'SUFFICIENT_FOR_EVALUATION_NOT_PREDICTIVE_SKILL') fail('readiness semantics changed');
+          if (!summary || summary.historicalResearchOnly !== true) fail('predictive skill escaped research-only mode');
+          if (!groups.length) fail('predictive skill groups missing');
+          for (const group of groups) {
+            if (group?.thresholds?.minimumSample !== 200) fail('minimum predictive sample changed');
+            if (group?.thresholds?.minimumSkillPct !== 5) fail('minimum predictive skill changed');
+            if (group?.thresholds?.maximumEce !== 0.08) fail('maximum ECE changed');
+            if (group?.automaticModelPromotionEnabled !== false) fail('group automatic promotion detected');
+            if (group?.forecastMayInfluenceFinalAction !== false) fail('group final-action influence detected');
+            if (group?.brokerExecutionEligible !== false) fail('group broker authority detected');
+          }
+          if (summary?.rawHistoricalRecordsIncluded !== false || summary?.rawHistoricalCandlesIncluded !== false) fail('raw history leaked');
+          if (summary?.automaticModelPromotionEnabled !== false) fail('summary automatic promotion detected');
+          if (summary?.decisionIntegrationEnabled !== false) fail('summary decision integration detected');
+          if (summary?.forecastMayInfluenceFinalAction !== false) fail('summary final-action influence detected');
+          if (summary?.brokerExecutionEligible !== false) fail('summary broker authority detected');
+          if (adaptiveSafety?.status !== 'VERIFIED') fail('adaptive candidate safety firewall not verified');
+          if (!adaptive || adaptive.safetyStatus !== 'VERIFIED') fail('adaptive candidate summary not verified');
+          if (adaptive.modelVariant !== 'ADAPTIVE_PRIOR_SHRUNK_SCALAR_MARKET_FACTOR') fail('adaptive model variant changed');
+          if (!Array.isArray(adaptive.adaptiveSupportFloorGrid) || adaptive.adaptiveSupportFloorGrid.length !== 4) fail('adaptive support grid missing');
+          if (!Array.isArray(adaptive.adaptiveSupportFloorSelectionCounts)) fail('adaptive support counts missing');
+          const adaptiveSelectionCount = adaptive.adaptiveSupportFloorSelectionCounts.reduce((sum, item) => sum + Number(item?.predictionCount || 0), 0);
+          if (adaptiveSelectionCount !== adaptive.predictionCount) fail('adaptive support counts do not cover predictions');
+          if ((adaptive.adaptiveSelectionReadyPredictionCount + adaptive.adaptiveSelectionWarmupPredictionCount) !== adaptive.predictionCount) fail('adaptive ready/warmup counts do not cover predictions');
+          if (adaptive.rawPredictionsIncluded !== false || adaptive.rawHistoricalRecordsIncluded !== false || adaptive.rawHistoricalCandlesIncluded !== false) fail('adaptive raw research data leaked');
+          if (adaptive.historicalResearchOnly !== true) fail('adaptive candidate escaped research-only mode');
+          if (adaptive.automaticModelPromotionEnabled !== false) fail('adaptive automatic promotion detected');
+          if (adaptive.probabilityCalibrationEnabled !== false) fail('adaptive probability calibration authority detected');
+          if (adaptive.decisionIntegrationEnabled !== false) fail('adaptive decision integration detected');
+          if (adaptive.forecastMayInfluenceFinalAction !== false) fail('adaptive final-action influence detected');
+          if (adaptive.finalActionEligible !== false) fail('adaptive final action eligibility detected');
+          if (adaptive.brokerExecutionEligible !== false) fail('adaptive broker authority detected');
+          if (adaptive.decisionImpact !== 'NONE') fail('adaptive decision impact must remain NONE');
+          if (artifact?.executionState !== 'ENABLED_RESEARCH_ONLY') fail('base research state changed');
+          if (artifact?.publication?.artifactOnly !== true) fail('artifact-only contract broken');
+          if (artifact?.publication?.liveFeedWriteAllowed !== false) fail('live feed write authority detected');
+          if (artifact?.publication?.gitPushAllowed !== false) fail('git push authority detected');
+          if (artifact?.automaticModelPromotionEnabled !== false) fail('artifact automatic promotion detected');
+          if (artifact?.decisionIntegrationEnabled !== false) fail('artifact decision integration detected');
+          if (artifact?.forecastMayInfluenceFinalAction !== false) fail('artifact final-action influence detected');
+          if (artifact?.brokerExecutionEligible !== false) fail('artifact broker authority detected');
+          if (artifact?.decisionImpact !== 'NONE') fail('decision impact must remain NONE');
+          console.log('PASS v1827 predictive-skill safety contract');
+          console.log(JSON.stringify({
+            evaluationReadyGroupCount: summary.evaluationReadyGroupCount,
+            predictiveSkillReadyGroupCount: summary.predictiveSkillReadyGroupCount,
+            predictiveSkillNotReadyGroupCount: summary.predictiveSkillNotReadyGroupCount,
+            notEvaluableGroupCount: summary.notEvaluableGroupCount,
+            blockerCounts: summary.blockerCounts,
+            thresholds: groups[0]?.thresholds,
+            historicalRecords: artifact.telemetry?.forecastHistoricalWalkForwardGeneratedRecordCount,
+            distinctForecastDates: artifact.readinessSummary?.observedMaxima?.distinctForecastDates,
+            adaptive: {
+              safetyStatus: adaptive.safetyStatus,
+              predictionCount: adaptive.predictionCount,
+              predictiveReadyGroupCount: adaptive.predictiveReadyGroupCount,
+              supportFloorGrid: adaptive.adaptiveSupportFloorGrid,
+              supportFloorSelectionCounts: adaptive.adaptiveSupportFloorSelectionCounts,
+              selectionReadyPredictionCount: adaptive.adaptiveSelectionReadyPredictionCount,
+              selectionWarmupPredictionCount: adaptive.adaptiveSelectionWarmupPredictionCount,
+            },
+          }, null, 2));
+          NODE
+
+      - name: Upload v1827 research artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1827-predictive-skill-${{ github.run_id }}
+          path: market-intelligence/out/v1827-historical-predictive-skill-research.json
+          if-no-files-found: warn
+          retention-days: 30

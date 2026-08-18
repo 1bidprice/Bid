@@ -1,0 +1,120 @@
+import { evaluateForecastCalibration, evaluateForecastPromotionGate } from './forecast-calibration.js';
+import { evaluateOosSampleIndependence, splitChronologicalDateBlocks } from './forecast-oos-sample-independence.js';
+import { evaluateOosOutcomeWindowIndependence } from './forecast-oos-outcome-window-independence.js';
+import { evaluateOosInstrumentConcentration } from './forecast-oos-instrument-concentration.js';
+import {
+  buildHistoricalMarketFactorPrequentialStackPredictions,
+  buildHistoricalMarketDomainPrequentialStackPredictions,
+  buildHistoricalMarketPriorShrunkPrequentialStackFromScalar,
+  buildHistoricalMarketPriorShrunkPrequentialStackPredictions,
+} from './forecast-historical-market-prequential-stack.js';
+import {
+  buildHistoricalMarketAdaptivePriorShrunkPrequentialStackFromScalar,
+  buildHistoricalMarketAdaptivePriorShrunkPrequentialStackPredictions,
+} from './forecast-historical-market-adaptive-prior-shrinkage.js';
+
+export const HISTORICAL_MARKET_STACK_RESEARCH_VERSION = '2026-08-14.4';
+export const HISTORICAL_MARKET_STACK_RESEARCH_CONTRACT = 'HISTORICAL_MARKET_STACK_PREDICTIVE_RESEARCH_V1';
+export const HISTORICAL_MARKET_DOMAIN_STACK_RESEARCH_CONTRACT = 'HISTORICAL_MARKET_DOMAIN_STACK_PREDICTIVE_RESEARCH_V1';
+export const HISTORICAL_MARKET_PRIOR_SHRUNK_STACK_RESEARCH_CONTRACT = 'HISTORICAL_MARKET_PRIOR_SHRUNK_STACK_PREDICTIVE_RESEARCH_V1';
+export const HISTORICAL_MARKET_ADAPTIVE_PRIOR_SHRUNK_STACK_RESEARCH_CONTRACT = 'HISTORICAL_MARKET_ADAPTIVE_PRIOR_SHRUNK_STACK_PREDICTIVE_RESEARCH_V1';
+
+function strictNumber(value) { return typeof value === 'number' && Number.isFinite(value) ? value : null; }
+function round(value, digits = 6) { return Number.isFinite(value) ? Number(value.toFixed(digits)) : null; }
+function probabilityRecord(prediction, probability) {
+  return { forecastId: prediction.forecastId || null, validationMode: 'WALK_FORWARD_OOS', status: 'MATURED', rawProbabilityPositive: probability, positiveOutcome: prediction.positiveOutcome, instrumentId: prediction.instrumentId || null, companyId: prediction.companyId || null, assetClass: prediction.assetClass || 'UNKNOWN', horizon: prediction.horizon || null, tradingDays: prediction.tradingDays || null, forecastAt: prediction.forecastAt || null, forecastSampleDate: prediction.forecastSampleDate || null, outcomeKnownAt: prediction.outcomeKnownAt || null, referencePrice: { timestamp: prediction.referencePrice?.timestamp || prediction.forecastAt || null }, realisedOutcome: { timestamp: prediction.realisedOutcome?.timestamp || prediction.outcomeKnownAt || null } };
+}
+function metricRecords(predictions, field) { return predictions.map((prediction) => probabilityRecord(prediction, prediction[field])); }
+function improvementPct(baselineValue, candidateValue) { const baseline = strictNumber(baselineValue); const candidate = strictNumber(candidateValue); if (baseline === null || candidate === null || baseline <= 0) return null; return ((baseline - candidate) / baseline) * 100; }
+function absoluteImprovement(baselineValue, candidateValue) { const baseline = strictNumber(baselineValue); const candidate = strictNumber(candidateValue); return baseline === null || candidate === null ? null : baseline - candidate; }
+function lineageKey(prediction = {}) { return [prediction.historicalPatternPolicyVersion || 'NO_PATTERN_VERSION', prediction.historicalMarketFactorPolicyVersion || 'NO_MARKET_FACTOR_VERSION', prediction.assetClass || 'UNKNOWN', prediction.horizon || 'UNKNOWN', prediction.regimeKey || 'NO_REGIME'].join('|'); }
+function evaluationMetrics(predictions, options = {}) {
+  const minimumMetricsSample = Math.max(20, Number(options.minimumMetricsSample ?? 20));
+  const binCount = Math.max(4, Number(options.calibrationBinCount ?? 8));
+  const baseline = evaluateForecastCalibration(metricRecords(predictions, 'baselinePatternProbabilityPositive'), { minimumTotal: minimumMetricsSample, binCount });
+  const ensemble = evaluateForecastCalibration(metricRecords(predictions, 'ensembleResearchProbabilityPositive'), { minimumTotal: minimumMetricsSample, binCount });
+  return { baseline, ensemble, brierImprovementPct: round(improvementPct(baseline.brierScore, ensemble.brierScore), 4), logLossImprovementPct: round(improvementPct(baseline.logLoss, ensemble.logLoss), 4), eceImprovement: round(absoluteImprovement(baseline.expectedCalibrationError, ensemble.expectedCalibrationError), 6) };
+}
+function chronologicalStability(predictions, options = {}) {
+  const blockCount = Math.max(3, Number(options.chronologicalBlockCount ?? 3));
+  const minimumBlockSample = Math.max(20, Number(options.minimumChronologicalBlockSample ?? 20));
+  const blocks = splitChronologicalDateBlocks(predictions, blockCount).map((block, index) => {
+    const metrics = evaluationMetrics(block, { ...options, minimumMetricsSample: minimumBlockSample });
+    const skill = strictNumber(metrics.ensemble.skillVsBaseRatePct); const brierImprovement = strictNumber(metrics.brierImprovementPct); const logLossImprovement = strictNumber(metrics.logLossImprovementPct);
+    const ready = block.length >= minimumBlockSample && metrics.ensemble.status === 'OOS_METRICS_READY' && skill !== null && skill >= 0 && brierImprovement !== null && brierImprovement >= 0 && logLossImprovement !== null && logLossImprovement >= 0;
+    return { block: index + 1, sampleSize: block.length, firstForecastAt: block[0]?.forecastAt || null, lastForecastAt: block.at(-1)?.forecastAt || null, ensembleSkillVsBaseRatePct: metrics.ensemble.skillVsBaseRatePct, brierImprovementVsRawPatternPct: metrics.brierImprovementPct, logLossImprovementVsRawPatternPct: metrics.logLossImprovementPct, ensembleEce: metrics.ensemble.expectedCalibrationError, ready };
+  });
+  return { status: blocks.length === blockCount && blocks.every((block) => block.ready) ? 'CHRONOLOGICAL_STABILITY_READY' : 'CHRONOLOGICAL_STABILITY_NOT_READY', blockCount, minimumBlockSample, blocks };
+}
+function evaluateGroup(predictions, options = {}) {
+  const minimumEvaluationSample = Math.max(200, Number(options.minimumEvaluationSample ?? 200));
+  const minimumClassCount = Math.max(40, Number(options.minimumClassCount ?? 40));
+  const minimumSkillPct = Math.max(5, Number(options.minimumSkillPct ?? 5));
+  const maximumEce = Math.min(0.08, Number(options.maximumEce ?? 0.08));
+  const minimumBrierImprovementPct = Math.max(3, Number(options.minimumBrierImprovementPct ?? 3));
+  const minimumLogLossImprovementPct = Math.max(0, Number(options.minimumLogLossImprovementPct ?? 0));
+  const minimumEceImprovement = Math.max(-0.01, Number(options.minimumEceImprovement ?? -0.01));
+  const metrics = evaluationMetrics(predictions, options);
+  const promotionEvidence = evaluateForecastPromotionGate(metrics.ensemble, { minimumSample: minimumEvaluationSample, minimumSkillPct, maximumEce });
+  const sampleIndependence = evaluateOosSampleIndependence(predictions, { minimumDistinctForecastDates: Math.max(40, Number(options.minimumDistinctForecastDates ?? 40)), minimumDistinctInstruments: Math.max(10, Number(options.minimumDistinctInstruments ?? 10)), maximumSingleForecastDateSharePct: Math.min(10, Number(options.maximumSingleForecastDateSharePct ?? 10)) });
+  const outcomeWindowIndependence = evaluateOosOutcomeWindowIndependence(metricRecords(predictions, 'ensembleResearchProbabilityPositive'), { minimumEffectiveNonOverlappingWindows: Math.max(12, Number(options.minimumEffectiveNonOverlappingWindows ?? 12)) });
+  const instrumentConcentration = evaluateOosInstrumentConcentration(predictions, { maximumSingleInstrumentSharePct: Math.min(25, Number(options.maximumSingleInstrumentSharePct ?? 25)), minimumEffectiveInstrumentCount: Math.max(6, Number(options.minimumEffectiveInstrumentCount ?? 6)) });
+  const stability = chronologicalStability(predictions, options); const positiveCount = predictions.filter((item) => item.positiveOutcome === 1).length; const negativeCount = predictions.length - positiveCount; const blockers = [];
+  if (predictions.length < minimumEvaluationSample) blockers.push('HISTORICAL_MARKET_STACK_PREDICTION_SAMPLE_TOO_SMALL');
+  if (positiveCount < minimumClassCount || negativeCount < minimumClassCount) blockers.push('HISTORICAL_MARKET_STACK_CLASS_SAMPLE_TOO_SMALL');
+  for (const blocker of promotionEvidence.blockers || []) { if (blocker === 'OOS_SAMPLE_TOO_SMALL_FOR_PROMOTION') blockers.push('HISTORICAL_MARKET_STACK_PREDICTION_SAMPLE_TOO_SMALL'); else if (blocker === 'INSUFFICIENT_PROBABILISTIC_SKILL') blockers.push('HISTORICAL_MARKET_STACK_PROBABILISTIC_SKILL_TOO_SMALL'); else if (blocker === 'CALIBRATION_ERROR_TOO_HIGH') blockers.push('HISTORICAL_MARKET_STACK_ECE_TOO_HIGH'); else blockers.push(`HISTORICAL_MARKET_STACK_${blocker}`); }
+  if (strictNumber(metrics.brierImprovementPct) === null || metrics.brierImprovementPct < minimumBrierImprovementPct) blockers.push('HISTORICAL_MARKET_STACK_BRIER_IMPROVEMENT_TOO_SMALL');
+  if (strictNumber(metrics.logLossImprovementPct) === null || metrics.logLossImprovementPct < minimumLogLossImprovementPct) blockers.push('HISTORICAL_MARKET_STACK_LOGLOSS_REGRESSION');
+  if (strictNumber(metrics.eceImprovement) === null || metrics.eceImprovement < minimumEceImprovement) blockers.push('HISTORICAL_MARKET_STACK_ECE_REGRESSION');
+  blockers.push(...sampleIndependence.blockers, ...outcomeWindowIndependence.blockers, ...instrumentConcentration.blockers); if (stability.status !== 'CHRONOLOGICAL_STABILITY_READY') blockers.push('HISTORICAL_MARKET_STACK_CHRONOLOGICAL_STABILITY_NOT_READY'); const uniqueBlockers = [...new Set(blockers)];
+  return { historicalPatternPolicyVersion: predictions[0]?.historicalPatternPolicyVersion || null, historicalMarketFactorPolicyVersion: predictions[0]?.historicalMarketFactorPolicyVersion || null, assetClass: predictions[0]?.assetClass || 'UNKNOWN', horizon: predictions[0]?.horizon || null, regimeKey: predictions[0]?.regimeKey || null, status: uniqueBlockers.length ? 'HISTORICAL_MARKET_STACK_PREDICTIVE_NOT_READY' : 'HISTORICAL_MARKET_STACK_PREDICTIVE_READY', sampleSize: predictions.length, positiveCount, negativeCount, baselinePatternMetrics: { brierScore: metrics.baseline.brierScore, logLoss: metrics.baseline.logLoss, expectedCalibrationError: metrics.baseline.expectedCalibrationError, skillVsBaseRatePct: metrics.baseline.skillVsBaseRatePct, baseRate: metrics.baseline.baseRate }, ensembleMetrics: { brierScore: metrics.ensemble.brierScore, logLoss: metrics.ensemble.logLoss, expectedCalibrationError: metrics.ensemble.expectedCalibrationError, skillVsBaseRatePct: metrics.ensemble.skillVsBaseRatePct, baseRate: metrics.ensemble.baseRate }, brierImprovementVsRawPatternPct: metrics.brierImprovementPct, logLossImprovementVsRawPatternPct: metrics.logLossImprovementPct, eceImprovementVsRawPattern: metrics.eceImprovement, sampleIndependence, outcomeWindowIndependence, instrumentConcentration, chronologicalStability: stability, thresholds: { minimumEvaluationSample, minimumClassCount, minimumSkillPct, maximumEce, minimumBrierImprovementPct, minimumLogLossImprovementPct, minimumEceImprovement, minimumDistinctForecastDates: sampleIndependence.thresholds.minimumDistinctForecastDates, minimumDistinctInstruments: sampleIndependence.thresholds.minimumDistinctInstruments, maximumSingleForecastDateSharePct: sampleIndependence.thresholds.maximumSingleForecastDateSharePct, minimumEffectiveNonOverlappingWindows: outcomeWindowIndependence.thresholds.minimumEffectiveNonOverlappingWindows, maximumSingleInstrumentSharePct: instrumentConcentration.thresholds.maximumSingleInstrumentSharePct, minimumEffectiveInstrumentCount: instrumentConcentration.thresholds.minimumEffectiveInstrumentCount, chronologicalBlockCount: stability.blockCount, minimumChronologicalBlockSample: stability.minimumBlockSample }, blockers: uniqueBlockers, taxonomyHistoricalBackfillAllowed: false, taxonomyPromotionEligible: false, historicalResearchOnly: true, automaticModelPromotionEnabled: false, probabilityCalibrationEnabled: false, decisionIntegrationEnabled: false, forecastMayInfluenceFinalAction: false, finalActionEligible: false, brokerExecutionEligible: false, decisionImpact: 'NONE' };
+}
+function buildStackResearch(records, options, prequential, config) {
+  const input = Array.isArray(records) ? records : []; const groupsMap = new Map();
+  for (const prediction of prequential.predictions) { const key = lineageKey(prediction); const items = groupsMap.get(key) || []; items.push(prediction); groupsMap.set(key, items); }
+  const groups = [...groupsMap.values()].map((predictions) => ({ ...evaluateGroup(predictions, options), modelVariant: config.modelVariant })).sort((left, right) => [left.historicalPatternPolicyVersion, left.historicalMarketFactorPolicyVersion, left.assetClass, left.horizon, left.regimeKey].join('|').localeCompare([right.historicalPatternPolicyVersion, right.historicalMarketFactorPolicyVersion, right.assetClass, right.horizon, right.regimeKey].join('|')));
+  const predictiveReadyGroupCount = groups.filter((group) => group.status === 'HISTORICAL_MARKET_STACK_PREDICTIVE_READY').length; const blockerCounts = new Map(); for (const group of groups) for (const blocker of group.blockers || []) blockerCounts.set(blocker, (blockerCounts.get(blocker) || 0) + 1);
+  const adaptive = prequential.featureMode === 'ADAPTIVE_PRIOR_SHRUNK_SCALAR' ? {
+    adaptiveSupportFloorGrid: [...(prequential.adaptiveSupportFloorGrid || [])],
+    adaptiveSupportFloorSelectionCounts: [...(prequential.adaptiveSupportFloorSelectionCounts || [])],
+    adaptiveSelectionMinimumSample: prequential.adaptiveSelectionMinimumSample,
+    adaptiveSelectionMinimumClassCount: prequential.adaptiveSelectionMinimumClassCount,
+    adaptiveSelectionReadyPredictionCount: prequential.adaptiveSelectionReadyPredictionCount,
+    adaptiveSelectionWarmupPredictionCount: prequential.adaptiveSelectionWarmupPredictionCount,
+  } : {};
+  const adaptiveMethodology = prequential.featureMode === 'ADAPTIVE_PRIOR_SHRUNK_SCALAR' ? {
+    adaptiveSupportFloorGrid: [...(prequential.adaptiveSupportFloorGrid || [])],
+    adaptiveSelectionMinimumSample: prequential.adaptiveSelectionMinimumSample,
+    adaptiveSelectionMinimumClassCount: prequential.adaptiveSelectionMinimumClassCount,
+    adaptiveSelectionRule: prequential.adaptiveSelectionRule,
+    adaptiveSelectionObjective: prequential.adaptiveSelectionObjective,
+    adaptiveTieBreak: prequential.adaptiveTieBreak,
+  } : {};
+  return { format: config.format, version: 1, policyVersion: HISTORICAL_MARKET_STACK_RESEARCH_VERSION, contract: config.contract, status: predictiveReadyGroupCount ? config.readyStatus : config.notReadyStatus, modelVariant: config.modelVariant, sourceRecordCount: input.length, eligibleRecordCount: prequential.eligibleRecordCount, rejectedRecordCount: prequential.rejectedRecordCount, predictionCount: prequential.predictionCount, skippedInsufficientTrainingCount: prequential.skippedInsufficientTrainingCount, modelFitCount: prequential.modelFitCount, ...adaptive, groupCount: groups.length, predictiveReadyGroupCount, predictiveNotReadyGroupCount: groups.length - predictiveReadyGroupCount, groups, blockerCounts: [...blockerCounts.entries()].map(([code, groupCount]) => ({ code, groupCount })).sort((left, right) => right.groupCount - left.groupCount || left.code.localeCompare(right.code)), methodology: { model: config.model || 'PREQUENTIAL_L2_LOGISTIC_STACK', features: [...config.features], historicalMarketFactorDomains: ['MOMENTUM', 'RISK'], representation: config.representation, trainingRule: prequential.antiLeakRule, priorShrinkageRule: prequential.priorShrinkageRule || null, ...adaptiveMethodology, comparisonRule: 'ENSEMBLE_AND_RAW_PATTERN_EVALUATED_ON_IDENTICAL_TARGET_PREDICTION_SAMPLE', chronologyRule: 'THREE_CONTIGUOUS_FORECAST_DATE_BLOCKS_EACH_REQUIRE_NON_NEGATIVE_BASE_RATE_SKILL_AND_NON_REGRESSION_VS_RAW_PATTERN', taxonomyHistoricalBackfillAllowed: false, rawPredictionExportAllowed: false }, rawPredictionsIncluded: false, rawHistoricalRecordsIncluded: false, rawHistoricalCandlesIncluded: false, taxonomyPromotionEligible: false, historicalResearchOnly: true, automaticModelPromotionEnabled: false, probabilityCalibrationEnabled: false, decisionIntegrationEnabled: false, forecastMayInfluenceFinalAction: false, finalActionEligible: false, brokerExecutionEligible: false, decisionImpact: 'NONE' };
+}
+function priorShrunkStackConfig() {
+  return { format: 'investor-control-historical-market-prior-shrunk-stacked-ensemble-research', contract: HISTORICAL_MARKET_PRIOR_SHRUNK_STACK_RESEARCH_CONTRACT, modelVariant: 'PRIOR_SHRUNK_SCALAR_MARKET_FACTOR', model: 'PREQUENTIAL_L2_LOGISTIC_STACK_WITH_TRAINING_SUPPORT_BASE_RATE_SHRINKAGE', features: ['PATTERN_LOGIT', 'HISTORICAL_MARKET_FACTOR_SCORE', 'TRAINING_ONLY_BASE_RATE_SHRINKAGE'], representation: 'SCALAR_MARKET_FACTOR_CONVEXLY_SHRUNK_TOWARD_BETA_SMOOTHED_TRAINING_BASE_RATE_USING_TRAINING_SUPPORT_ONLY', readyStatus: 'HISTORICAL_MARKET_PRIOR_SHRUNK_STACK_PREDICTIVE_READY_GROUPS_EXIST', notReadyStatus: 'HISTORICAL_MARKET_PRIOR_SHRUNK_STACK_PREDICTIVE_NOT_READY' };
+}
+function adaptivePriorShrunkStackConfig() {
+  return { format: 'investor-control-historical-market-adaptive-prior-shrunk-stacked-ensemble-research', contract: HISTORICAL_MARKET_ADAPTIVE_PRIOR_SHRUNK_STACK_RESEARCH_CONTRACT, modelVariant: 'ADAPTIVE_PRIOR_SHRUNK_SCALAR_MARKET_FACTOR', model: 'PREQUENTIAL_L2_LOGISTIC_STACK_WITH_ADAPTIVE_TRAINING_ONLY_PRIOR_SHRINKAGE', features: ['PATTERN_LOGIT', 'HISTORICAL_MARKET_FACTOR_SCORE', 'TRAINING_ONLY_BASE_RATE_SHRINKAGE', 'PREQUENTIAL_BRIER_SELECTED_SUPPORT_FLOOR'], representation: 'SCALAR_MARKET_FACTOR_SHRUNK_TOWARD_BETA_1_1_TRAINING_BASE_RATE_WITH_SUPPORT_FLOOR_SELECTED_FROM_PRIOR_REALIZED_OOS_BRIER_ONLY', readyStatus: 'HISTORICAL_MARKET_ADAPTIVE_PRIOR_SHRUNK_STACK_PREDICTIVE_READY_GROUPS_EXIST', notReadyStatus: 'HISTORICAL_MARKET_ADAPTIVE_PRIOR_SHRUNK_STACK_PREDICTIVE_NOT_READY' };
+}
+export function buildHistoricalMarketStackResearch(records = [], options = {}) {
+  const input = Array.isArray(records) ? records : [];
+  const scalarPrequential = buildHistoricalMarketFactorPrequentialStackPredictions(input, options);
+  const scalar = buildStackResearch(input, options, scalarPrequential, { format: 'investor-control-historical-market-stacked-ensemble-research', contract: HISTORICAL_MARKET_STACK_RESEARCH_CONTRACT, modelVariant: 'SCALAR_MARKET_FACTOR', features: ['PATTERN_LOGIT', 'HISTORICAL_MARKET_FACTOR_SCORE'], representation: 'CANONICAL_MOMENTUM_RISK_WEIGHTED_SCALAR', readyStatus: 'HISTORICAL_MARKET_STACK_PREDICTIVE_READY_GROUPS_EXIST', notReadyStatus: 'HISTORICAL_MARKET_STACK_PREDICTIVE_NOT_READY' });
+  return {
+    ...scalar,
+    domainSeparatedCandidate: buildHistoricalMarketDomainStackResearch(input, options),
+    priorShrunkCandidate: buildStackResearch(input, options, buildHistoricalMarketPriorShrunkPrequentialStackFromScalar(scalarPrequential, options), priorShrunkStackConfig()),
+    adaptivePriorShrunkCandidate: buildStackResearch(input, options, buildHistoricalMarketAdaptivePriorShrunkPrequentialStackFromScalar(scalarPrequential), adaptivePriorShrunkStackConfig()),
+  };
+}
+export function buildHistoricalMarketDomainStackResearch(records = [], options = {}) {
+  const input = Array.isArray(records) ? records : []; return buildStackResearch(input, options, buildHistoricalMarketDomainPrequentialStackPredictions(input, options), { format: 'investor-control-historical-market-domain-stacked-ensemble-research', contract: HISTORICAL_MARKET_DOMAIN_STACK_RESEARCH_CONTRACT, modelVariant: 'DOMAIN_SEPARATED_MARKET_FACTOR', features: ['PATTERN_LOGIT', 'HISTORICAL_MOMENTUM_SCORE', 'HISTORICAL_RISK_SCORE'], representation: 'MOMENTUM_AND_RISK_PRESERVED_AS_SEPARATE_PREQUENTIAL_FEATURES', readyStatus: 'HISTORICAL_MARKET_DOMAIN_STACK_PREDICTIVE_READY_GROUPS_EXIST', notReadyStatus: 'HISTORICAL_MARKET_DOMAIN_STACK_PREDICTIVE_NOT_READY' });
+}
+export function buildHistoricalMarketPriorShrunkStackResearch(records = [], options = {}) {
+  const input = Array.isArray(records) ? records : []; return buildStackResearch(input, options, buildHistoricalMarketPriorShrunkPrequentialStackPredictions(input, options), priorShrunkStackConfig());
+}
+export function buildHistoricalMarketAdaptivePriorShrunkStackResearch(records = [], options = {}) {
+  const input = Array.isArray(records) ? records : []; return buildStackResearch(input, options, buildHistoricalMarketAdaptivePriorShrunkPrequentialStackPredictions(input, options), adaptivePriorShrunkStackConfig());
+}

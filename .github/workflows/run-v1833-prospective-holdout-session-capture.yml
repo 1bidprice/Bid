@@ -1,0 +1,137 @@
+name: Investor Control v1833 Chained Prospective Session Capture
+
+on:
+  push:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - '.github/workflows/run-v1833-prospective-holdout-session-capture.yml'
+      - 'market-intelligence/scripts/run-prospective-holdout-session-capture-v1833.js'
+      - 'market-intelligence/scripts/run-prospective-holdout-first-capture-v1832.js'
+      - 'market-intelligence/src/forecast-prospective-target-builder.js'
+      - 'market-intelligence/src/forecast-prospective-training-corpus.js'
+      - 'market-intelligence/src/forecast-prospective-frozen-stack-bridge.js'
+      - 'market-intelligence/src/forecast-prospective-holdout-protocol.js'
+      - 'market-intelligence/src/historical-research-validation-universe.js'
+      - 'market-intelligence/src/professional-market-data.js'
+      - 'market-intelligence/src/adapters/yahoo-chart.js'
+      - 'market-intelligence/test/research-prospective-session-capture-v1833.test.js'
+  workflow_dispatch:
+  schedule:
+    - cron: '15 22 * * 1-5'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: investor-control-v1833-session-capture
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: market-intelligence
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install PDF extraction runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y poppler-utils
+
+      - name: Run full deterministic safety gate
+        run: npm test
+
+      - name: Restore latest verified prospective chain head
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p out/previous
+          PREV_RUN_ID="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/run-v1833-prospective-holdout-session-capture.yml/runs?branch=${GITHUB_REF_NAME}&status=success&per_page=10" --jq '.workflow_runs[0].id // empty')"
+          if [ -z "$PREV_RUN_ID" ]; then
+            PREV_RUN_ID="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/run-v1832-first-prospective-holdout-capture.yml/runs?branch=${GITHUB_REF_NAME}&status=success&per_page=10" --jq '.workflow_runs[0].id // empty')"
+          fi
+          if [ -z "$PREV_RUN_ID" ]; then
+            echo 'No verified prior prospective capture run exists.' >&2
+            exit 1
+          fi
+          ARTIFACT_NAME="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${PREV_RUN_ID}/artifacts" --jq '.artifacts[0].name // empty')"
+          if [ -z "$ARTIFACT_NAME" ]; then
+            echo "Prior run ${PREV_RUN_ID} has no capture artifact." >&2
+            exit 1
+          fi
+          gh run download "$PREV_RUN_ID" --repo "$GITHUB_REPOSITORY" -n "$ARTIFACT_NAME" -D out/previous
+          PREVIOUS_FILE="$(find out/previous -type f \( -name 'v1833-session-capture.json' -o -name 'v1832-first-prospective-capture.json' \) | head -n 1)"
+          if [ -z "$PREVIOUS_FILE" ]; then
+            echo 'Downloaded prior artifact does not contain a recognized prospective capture proof.' >&2
+            exit 1
+          fi
+          echo "PREVIOUS_PROSPECTIVE_CAPTURE_PROOF_PATH=${PREVIOUS_FILE}" >> "$GITHUB_ENV"
+          echo "Prior chain source run: ${PREV_RUN_ID}"
+          echo "Prior proof: ${PREVIOUS_FILE}"
+
+      - name: Build v1833 chained session capture
+        env:
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+          INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT: ${{ github.sha }}
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          mkdir -p out
+          node scripts/run-prospective-holdout-session-capture-v1833.js out/v1833-session-capture.json
+
+      - name: Verify v1833 chain and pre-outcome boundaries
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const proof = JSON.parse(fs.readFileSync('out/v1833-session-capture.json', 'utf8'));
+          const fail = (message) => { throw new Error(message); };
+          if (proof?.contract !== 'PROSPECTIVE_UNSEEN_HOLDOUT_CHAINED_SESSION_CAPTURE_V1') fail('v1833 contract changed');
+          if (proof?.sourceCommit !== process.env.GITHUB_SHA) fail('v1833 proof is not exact-head');
+          if (!proof?.chainHeadCaptureHash || !proof?.chainHeadSessionDate || Number(proof?.captureSequence) < 1) fail('v1833 chain head missing');
+          if (proof?.status === 'NEW_SESSION_CAPTURE_VERIFIED') {
+            if (proof?.captureCreated !== true || proof?.captureVerification?.verified !== true) fail('new-session capture not verified');
+            if (proof?.capture?.previousCaptureHash !== proof?.previousChainHeadCaptureHash) fail('previous capture hash link broken');
+            if (proof?.capture?.contentHash !== proof?.chainHeadCaptureHash) fail('chain head does not equal new capture hash');
+            if (proof?.captureSequence !== proof?.previousCaptureSequence + 1) fail('capture sequence did not increment exactly once');
+            if (proof?.capture?.slots?.length !== 128) fail('new capture slot matrix is not 128');
+          } else if (proof?.status === 'NO_NEW_COMPLETED_SESSION') {
+            if (proof?.captureCreated !== false || proof?.capture !== null) fail('duplicate session created a capture');
+            if (proof?.chainHeadCaptureHash !== proof?.previousChainHeadCaptureHash) fail('no-op changed chain head');
+            if (proof?.captureSequence !== proof?.previousCaptureSequence) fail('no-op changed capture sequence');
+            if (proof?.operationalSummary?.duplicateCompletedSessionPrevented !== true) fail('duplicate session prevention not recorded');
+          } else {
+            fail(`unexpected v1833 status: ${proof?.status}`);
+          }
+          if (proof?.historicalBackfillAllowed !== false || proof?.performancePeeked !== false || proof?.outcomeFieldsIncluded !== false) fail('pre-outcome boundary changed');
+          if (proof?.automaticModelPromotionEnabled !== false || proof?.probabilityCalibrationEnabled !== false || proof?.decisionIntegrationEnabled !== false || proof?.forecastMayInfluenceFinalAction !== false || proof?.finalActionEligible !== false || proof?.brokerExecutionEligible !== false || proof?.decisionImpact !== 'NONE') fail('v1833 gained authority');
+          console.log('PASS v1833 chained prospective session capture');
+          console.log(JSON.stringify({
+            sourceCommit: proof.sourceCommit,
+            status: proof.status,
+            candidateCompletedSessionDate: proof.candidateCompletedSessionDate,
+            chainHeadSessionDate: proof.chainHeadSessionDate,
+            captureSequence: proof.captureSequence,
+            captureCreated: proof.captureCreated,
+            chainHeadCaptureHash: proof.chainHeadCaptureHash,
+          }, null, 2));
+          NODE
+
+      - name: Upload v1833 chained capture proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1833-session-capture-${{ github.run_id }}
+          path: market-intelligence/out/v1833-session-capture.json
+          if-no-files-found: warn
+          retention-days: 90

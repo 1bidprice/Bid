@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://investorcontrol.local/schemas/review-decision.schema.json",
+  "title": "ReviewDecision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reviewId", "version", "dossierId", "reviewer", "decision", "reviewedAt", "notes"],
+  "properties": {
+    "reviewId": { "type": "string", "minLength": 12 },
+    "version": { "type": "integer", "minimum": 1 },
+    "dossierId": { "type": "string", "minLength": 12 },
+    "reviewer": { "type": "string", "minLength": 3 },
+    "decision": { "type": "string", "enum": ["APPROVE", "REJECT", "DEFER"] },
+    "reviewedAt": { "type": "string", "format": "date-time" },
+    "notes": { "type": ["string", "null"] }
+  }
+}

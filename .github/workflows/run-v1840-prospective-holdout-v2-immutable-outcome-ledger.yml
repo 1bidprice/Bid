@@ -1,0 +1,107 @@
+name: Investor Control v1840 V2 Immutable Outcome Ledger
+
+on:
+  push:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - '.github/workflows/run-v1840-prospective-holdout-v2-immutable-outcome-ledger.yml'
+      - 'market-intelligence/scripts/run-prospective-holdout-v2-immutable-outcome-ledger-v1840.js'
+      - 'market-intelligence/test/research-prospective-v2-immutable-outcome-ledger-v1840.test.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: investor-control-v1840-v2-immutable-outcome-ledger-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ledger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: market-intelligence
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run full deterministic safety gate
+        run: npm test
+
+      - name: Restore latest successful v1837 maturation artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p out/v1837
+          RUN_ID="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/run-v1837-prospective-holdout-v2-outcome-maturation.yml/runs?status=success&per_page=100" --jq '.workflow_runs[0].id // empty')"
+          if [ -z "$RUN_ID" ]; then
+            echo 'No successful v1837 maturation artifact exists.' >&2
+            exit 1
+          fi
+          ARTIFACT_NAME="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts" --jq '.artifacts[] | select(.expired == false) | .name' | head -n 1)"
+          [ -n "$ARTIFACT_NAME" ] || { echo 'v1837 artifact missing' >&2; exit 1; }
+          gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" -n "$ARTIFACT_NAME" -D out/v1837
+          FILE="$(find out/v1837 -type f -name 'v1837-v2-outcome-maturation.json' | head -n 1)"
+          [ -n "$FILE" ] || { echo 'v1837 JSON missing' >&2; exit 1; }
+          echo "PROSPECTIVE_V2_MATURATION_ARTIFACT_PATH=${FILE}" >> "$GITHUB_ENV"
+          echo "Restored v1837 run ${RUN_ID}: ${FILE}"
+
+      - name: Build v1840 immutable outcome ledger bootstrap
+        env:
+          INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          mkdir -p out
+          node scripts/run-prospective-holdout-v2-immutable-outcome-ledger-v1840.js out/v1840-immutable-outcome-ledger.json out/v1840-maturation-view.json
+
+      - name: Verify v1840 immutability and no-peek boundary
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { verifyV1840Ledger } from './scripts/run-prospective-holdout-v2-immutable-outcome-ledger-v1840.js';
+          const ledger = JSON.parse(fs.readFileSync('out/v1840-immutable-outcome-ledger.json', 'utf8'));
+          const view = JSON.parse(fs.readFileSync('out/v1840-maturation-view.json', 'utf8'));
+          const fail = (m) => { throw new Error(m); };
+          const verification = verifyV1840Ledger(ledger);
+          if (!verification.verified) fail(`v1840 ledger rejected: ${verification.blockers.join(',')}`);
+          if (ledger?.sourceCommit !== process.env.GITHUB_SHA) fail('v1840 ledger is not exact-head');
+          if (ledger?.holdoutId !== 'investor-control-us-equity-unseen-holdout-2026q3-v2' || ledger?.protocolContract !== 'PROSPECTIVE_UNSEEN_HOLDOUT_PROTOCOL_V2') fail('v1840 v2 lineage changed');
+          if (ledger?.entryCount !== 32 || ledger?.maturedEntryCount !== 0 || ledger?.pendingEntryCount !== 32) fail('v1840 bootstrap expected 32 pending / 0 matured entries');
+          if (ledger?.providerDriftDiagnosticCount !== 0) fail('v1840 bootstrap unexpectedly detected provider drift');
+          if (ledger?.previousLedgerContentHash !== null) fail('v1840 bootstrap unexpectedly has previous ledger');
+          if (!ledger?.sourceMaturationArtifactContentHash) fail('v1840 source maturation hash missing');
+          if (ledger?.performanceMetricsIncluded !== false || ledger?.performancePeeked !== false || ledger?.evaluationGateOpened !== false) fail('v1840 opened performance');
+          if (ledger?.automaticModelPromotionEnabled !== false || ledger?.probabilityCalibrationEnabled !== false || ledger?.decisionIntegrationEnabled !== false || ledger?.forecastMayInfluenceFinalAction !== false || ledger?.finalActionEligible !== false || ledger?.brokerExecutionEligible !== false || ledger?.decisionImpact !== 'NONE') fail('v1840 gained authority');
+          if (view?.sourceImmutableLedgerContract !== ledger.contract || view?.sourceImmutableLedgerContentHash !== ledger.contentHash) fail('v1840 compatibility view not bound to ledger');
+          if (view?.outcomeTupleCount !== ledger.entryCount || view?.maturedOutcomeCount !== ledger.maturedEntryCount || view?.pendingOutcomeCount !== ledger.pendingEntryCount) fail('v1840 compatibility view counts mismatch');
+          console.log('PASS v1840 immutable outcome ledger bootstrap');
+          console.log(JSON.stringify({
+            sourceCommit: ledger.sourceCommit,
+            entries: ledger.entryCount,
+            matured: ledger.maturedEntryCount,
+            pending: ledger.pendingEntryCount,
+            providerDriftDiagnostics: ledger.providerDriftDiagnosticCount,
+            sourceMaturationArtifactContentHash: ledger.sourceMaturationArtifactContentHash,
+            ledgerContentHash: ledger.contentHash,
+          }, null, 2));
+          NODE
+
+      - name: Upload v1840 immutable ledger proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1840-immutable-outcome-ledger-${{ github.run_id }}
+          path: |
+            market-intelligence/out/v1840-immutable-outcome-ledger.json
+            market-intelligence/out/v1840-maturation-view.json
+          if-no-files-found: warn
+          retention-days: 90

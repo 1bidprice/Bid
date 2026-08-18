@@ -1,0 +1,96 @@
+name: Investor Control v1830 Prospective Holdout Preregistration
+
+on:
+  push:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - '.github/workflows/run-v1830-prospective-holdout-preregistration.yml'
+      - 'market-intelligence/src/forecast-prospective-holdout-protocol.js'
+      - 'market-intelligence/src/historical-research-validation-universe.js'
+      - 'market-intelligence/scripts/run-prospective-holdout-preregistration-v1830.js'
+      - 'market-intelligence/test/forecast-prospective-holdout-protocol.test.js'
+      - 'market-intelligence/test/research-prospective-holdout-v1830.test.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-v1830-preregistration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preregister:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: market-intelligence
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run full deterministic safety gate
+        run: npm test
+
+      - name: Build v1830 prospective holdout preregistration proof
+        env:
+          INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          mkdir -p out
+          node scripts/run-prospective-holdout-preregistration-v1830.js out/v1830-prospective-holdout-preregistration.json
+
+      - name: Verify v1830 preregistration contract
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const proof = JSON.parse(fs.readFileSync('out/v1830-prospective-holdout-preregistration.json', 'utf8'));
+          const protocol = proof?.protocol;
+          const fail = (message) => { throw new Error(message); };
+
+          if (proof?.contract !== 'PROSPECTIVE_UNSEEN_HOLDOUT_PREREGISTRATION_PROOF_V1' || proof?.verified !== true || proof?.status !== 'PROSPECTIVE_HOLDOUT_PREREGISTRATION_VERIFIED') fail('v1830 preregistration not verified');
+          if (proof?.sourceCommit !== process.env.GITHUB_SHA) fail('v1830 preregistration source commit mismatch');
+          if (proof?.modelFreezeSourceCommit !== '0e13074f1e8d89c5f52f3825c07203f0e62f20a8') fail('v1829 model freeze changed');
+          if (!/^[a-f0-9]{64}$/.test(proof?.protocolFingerprint || '')) fail('protocol fingerprint invalid');
+          if (proof?.holdoutStarted !== false || proof?.firstCaptureCreated !== false || proof?.historicalBackfillAllowed !== false) fail('holdout started or backfill enabled during preregistration');
+          if (proof?.expectedSlotCountPerCapture !== 128) fail('expected slot matrix changed');
+
+          if (protocol?.contract !== 'PROSPECTIVE_UNSEEN_HOLDOUT_PROTOCOL_V1') fail('protocol contract changed');
+          if (protocol?.status !== 'PREREGISTERED_NOT_YET_STARTED') fail('protocol status changed');
+          if (protocol?.modelFreeze?.sourceProofVerdict !== 'NO_EXISTING_STACK_VARIANT_MEETS_PREDECLARED_PREDICTIVE_STANDARD') fail('source falsification verdict changed');
+          if (protocol?.modelFreeze?.modelVariants?.length !== 4) fail('model variant freeze changed');
+          if (protocol?.modelFreeze?.specificationChangeAllowedInsideHoldout !== false || protocol?.modelFreeze?.variantRemovalAllowedInsideHoldout !== false || protocol?.modelFreeze?.postHocWinnerSelectionAllowed !== false) fail('model freeze anti-selection guard changed');
+          if (protocol?.universeFreeze?.instrumentCount !== 16 || protocol?.universeFreeze?.marketDomain !== 'US_EQUITY' || protocol?.universeFreeze?.benchmarkFamily !== 'SPY') fail('validation universe freeze changed');
+          if (protocol?.universeFreeze?.currentNewsDependentSelection !== false || protocol?.universeFreeze?.eventDiscoveryAdditionsAllowed !== false || protocol?.universeFreeze?.broadOpportunityAdditionsAllowed !== false) fail('transient universe selection enabled');
+          if (protocol?.captureProtocol?.expectedSlotCountPerCapture !== 128 || protocol?.captureProtocol?.outcomeFieldsAllowedAtCapture !== false || protocol?.captureProtocol?.performanceMetricsAllowedAtCapture !== false || protocol?.captureProtocol?.replacementOfExistingCaptureAllowed !== false) fail('capture immutability boundary changed');
+          if (protocol?.evaluationProtocol?.minimumEvaluationSamplePerGroup !== 200 || protocol?.evaluationProtocol?.minimumClassCountPerGroup !== 40 || protocol?.evaluationProtocol?.minimumSkillPctVsBaseRate !== 5 || protocol?.evaluationProtocol?.maximumExpectedCalibrationError !== 0.08 || protocol?.evaluationProtocol?.minimumBrierImprovementPctVsRawPattern !== 3) fail('scientific promotion floors changed');
+          if (protocol?.evaluationProtocol?.minimumDistinctForecastDates !== 40 || protocol?.evaluationProtocol?.minimumDistinctInstruments !== 10 || protocol?.evaluationProtocol?.maximumSingleInstrumentSharePct !== 25 || protocol?.evaluationProtocol?.minimumEffectiveInstrumentCount !== 6 || protocol?.evaluationProtocol?.chronologicalBlockCount !== 3) fail('independence/stability floors changed');
+          if (protocol?.evaluationProtocol?.performancePeekingBeforeGateAllowed !== false || protocol?.evaluationProtocol?.earlyStoppingForPositivePerformanceAllowed !== false || protocol?.evaluationProtocol?.thresholdWeakeningAllowed !== false) fail('anti-p-hacking guard changed');
+          if (protocol?.universeFreeze?.pointInTimeUniverseBiasControlled !== false) fail('survivorship-bias limitation incorrectly marked solved');
+          if (protocol?.prospectiveResearchOnly !== true || protocol?.automaticModelPromotionEnabled !== false || protocol?.decisionIntegrationEnabled !== false || protocol?.forecastMayInfluenceFinalAction !== false || protocol?.finalActionEligible !== false || protocol?.brokerExecutionEligible !== false || protocol?.decisionImpact !== 'NONE') fail('prospective research gained authority');
+          if (proof?.automaticModelPromotionEnabled !== false || proof?.decisionIntegrationEnabled !== false || proof?.forecastMayInfluenceFinalAction !== false || proof?.brokerExecutionEligible !== false || proof?.decisionImpact !== 'NONE') fail('preregistration proof gained authority');
+
+          console.log('PASS v1830 prospective holdout preregistration');
+          console.log(JSON.stringify({
+            sourceCommit: proof.sourceCommit,
+            modelFreezeSourceCommit: proof.modelFreezeSourceCommit,
+            holdoutId: proof.holdoutId,
+            protocolFingerprint: proof.protocolFingerprint,
+            expectedSlotCountPerCapture: proof.expectedSlotCountPerCapture,
+            holdoutStarted: proof.holdoutStarted,
+          }, null, 2));
+          NODE
+
+      - name: Upload v1830 preregistration proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1830-preregistration-${{ github.run_id }}
+          path: market-intelligence/out/v1830-prospective-holdout-preregistration.json
+          if-no-files-found: error
+          retention-days: 90

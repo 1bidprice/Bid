@@ -1,0 +1,74 @@
+name: Investor Control v1827 Athens Benchmark Diagnostic
+
+on:
+  push:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - '.github/workflows/diagnose-v1827-athens-benchmark.yml'
+      - 'market-intelligence/scripts/diagnose-v1827-athens-benchmark.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-v1827-athens-benchmark-diagnostic-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: market-intelligence
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run full deterministic safety gate
+        run: npm test
+
+      - name: Run compact Athens benchmark diagnostic
+        run: |
+          mkdir -p out
+          node scripts/diagnose-v1827-athens-benchmark.js out/v1827-athens-benchmark-diagnostic.json
+
+      - name: Verify diagnostic is non-invasive and raw-free
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const artifact = JSON.parse(fs.readFileSync('out/v1827-athens-benchmark-diagnostic.json', 'utf8'));
+          const fail = (message) => { throw new Error(message); };
+          if (artifact?.requestedRange !== '5y') fail('diagnostic did not use 5y range');
+          if (artifact?.requestedInterval !== '1d') fail('diagnostic did not use daily interval');
+          if (artifact?.regimeMinimumHistory !== 200) fail('regime minimum-history reference changed');
+          if (artifact?.rawCandlesIncluded !== false) fail('raw candles leaked');
+          if (artifact?.sourceUrlsIncluded !== false) fail('source URLs leaked');
+          if (artifact?.productionDefaultsChanged !== false) fail('production defaults changed');
+          if (artifact?.statisticalThresholdsChanged !== false) fail('statistical thresholds changed');
+          if (artifact?.decisionIntegrationEnabled !== false) fail('decision integration detected');
+          if (artifact?.brokerExecutionEligible !== false) fail('broker authority detected');
+          if (artifact?.decisionImpact !== 'NONE') fail('decision impact must remain NONE');
+          const rows = [artifact.combined, ...(artifact.explicit || []), artifact.control].filter(Boolean);
+          for (const row of rows) {
+            if (Object.prototype.hasOwnProperty.call(row, 'candles')) fail('raw candle array serialized');
+            if (Object.prototype.hasOwnProperty.call(row, 'sourceUrl')) fail('source URL serialized');
+          }
+          console.log('PASS Athens benchmark diagnostic safety contract');
+          NODE
+
+      - name: Upload compact diagnostic artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1827-athens-benchmark-diagnostic-${{ github.run_id }}
+          path: market-intelligence/out/v1827-athens-benchmark-diagnostic.json
+          if-no-files-found: warn
+          retention-days: 30

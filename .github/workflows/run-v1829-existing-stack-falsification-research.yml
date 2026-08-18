@@ -1,0 +1,131 @@
+name: Investor Control v1829 Existing Stack Falsification
+
+on:
+  push:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - '.github/workflows/run-v1829-existing-stack-falsification-research.yml'
+      - 'market-intelligence/scripts/run-cross-sectional-regime-walk-forward-research-v1827.js'
+      - 'market-intelligence/scripts/run-cross-sectional-regime-walk-forward-research-v1828.js'
+      - 'market-intelligence/scripts/run-cross-sectional-regime-walk-forward-research-v1829.js'
+      - 'market-intelligence/src/historical-research-validation-universe.js'
+      - 'market-intelligence/src/forecast-historical-market-existing-stack-falsification.js'
+      - 'market-intelligence/src/forecast-historical-market-stacked-ensemble-research.js'
+      - 'market-intelligence/src/forecast-historical-market-prequential-stack.js'
+      - 'market-intelligence/src/forecast-historical-market-adaptive-prior-shrinkage.js'
+      - 'market-intelligence/src/forecast-historical-market-adaptive-prior-shrunk-stack-candidate-safety.js'
+      - 'market-intelligence/src/forecast-cross-sectional-regime-walk-forward.js'
+      - 'market-intelligence/src/forecast-cross-sectional-regime-walk-forward-runtime.js'
+      - 'market-intelligence/src/professional-market-data.js'
+      - 'market-intelligence/src/adapters/yahoo-chart.js'
+      - 'market-intelligence/test/forecast-historical-market-existing-stack-falsification.test.js'
+      - 'market-intelligence/test/research-existing-stack-falsification-v1829.test.js'
+      - 'market-intelligence/test/research-stable-cohort-v1828.test.js'
+      - 'market-intelligence/test/research-predictive-skill-v1827.test.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-v1829-falsification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: market-intelligence
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install PDF extraction runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y poppler-utils
+
+      - name: Run full deterministic safety gate
+        run: npm test
+
+      - name: Run v1829 five-year existing-stack falsification research
+        env:
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+          TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
+          INVESTOR_CONTROL_RESEARCH_SOURCE_COMMIT: ${{ github.sha }}
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          mkdir -p out
+          node scripts/run-cross-sectional-regime-walk-forward-research-v1829.js out/v1829-existing-stack-falsification-research.json
+
+      - name: Verify v1829 falsification integrity and authority boundaries
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const artifact = JSON.parse(fs.readFileSync('out/v1829-existing-stack-falsification-research.json', 'utf8'));
+          const fail = (message) => { throw new Error(message); };
+          const cohort = artifact?.stableCohortIntegrity;
+          const dataset = artifact?.datasetIntegrity;
+          const falsification = artifact?.existingStackFalsification;
+          const variants = Array.isArray(falsification?.variantSummaries) ? falsification.variantSummaries : [];
+
+          if (artifact?.existingStackFalsificationProofContract !== 'HISTORICAL_MARKET_EXISTING_STACK_FALSIFICATION_PROOF_V1') fail('v1829 proof contract changed');
+          if (artifact?.sourceCommit !== process.env.GITHUB_SHA) fail('artifact source commit does not match exact workflow head');
+          if (cohort?.status !== 'STABLE_RESEARCH_COHORT_INTEGRITY_READY' || cohort?.ready !== true) fail('stable cohort integrity not ready');
+          if (cohort?.loadedHistoricalSeriesCount !== 16 || cohort?.loadedBenchmarkSeriesCount !== 16 || cohort?.eligibleWithBenchmarkCount !== 16 || cohort?.eligibleWithoutBenchmarkCount !== 0) fail('stable US cohort incomplete');
+          if (cohort?.marketDomain !== 'US_EQUITY' || cohort?.benchmarkFamily !== 'SPY') fail('stable validation domain changed');
+          if (dataset?.status !== 'HISTORICAL_PREDICTIVE_DATASET_INTEGRITY_READY' || dataset?.ready !== true || dataset?.regimeCoveragePct !== 100 || dataset?.validRegimeRecordCount !== dataset?.generatedRecordCount) fail('predictive dataset integrity not ready');
+
+          if (falsification?.contract !== 'HISTORICAL_MARKET_EXISTING_STACK_FALSIFICATION_V1') fail('falsification contract changed');
+          if (falsification?.lineageVerified !== true || (falsification?.blockers || []).length !== 0) fail(`falsification lineage blocked: ${(falsification?.blockers || []).join(',')}`);
+          if (falsification?.variantCount !== 4 || variants.length !== 4) fail('expected four predeclared model variants');
+          const expectedVariants = ['SCALAR_MARKET_FACTOR', 'DOMAIN_SEPARATED_MARKET_FACTOR', 'PRIOR_SHRUNK_SCALAR_MARKET_FACTOR', 'ADAPTIVE_PRIOR_SHRUNK_SCALAR_MARKET_FACTOR'];
+          for (const name of expectedVariants) if (!variants.some((variant) => variant.modelVariant === name)) fail(`missing predeclared variant ${name}`);
+          if (!['NO_EXISTING_STACK_VARIANT_MEETS_PREDECLARED_PREDICTIVE_STANDARD', 'EXISTING_STACK_SIGNAL_REQUIRES_NEW_UNSEEN_HOLDOUT'].includes(falsification?.status)) fail(`unexpected falsification verdict ${falsification?.status}`);
+          if (falsification?.diagnosticOnly !== true || falsification?.winnerSelectionAllowed !== false || falsification?.sameDatasetModelSelectionAllowed !== false || falsification?.sameDatasetPromotionAllowed !== false) fail('same-dataset model selection guard broken');
+          if (!String(falsification?.postHocSelectionGuard || '').includes('NO_MODEL_VARIANT_MAY_BE_SELECTED_OR_PROMOTED')) fail('post-hoc selection guard changed');
+          if (!String(falsification?.nextValidationRule || '').includes('NEW_UNSEEN')) fail('new unseen holdout rule changed');
+          for (const variant of variants) {
+            if (variant?.winnerSelectionAllowed !== false || variant?.sameDatasetPromotionAllowed !== false || variant?.automaticModelPromotionEnabled !== false || variant?.decisionImpact !== 'NONE') fail(`variant authority changed: ${variant?.modelVariant}`);
+          }
+          if (falsification?.rawPredictionsIncluded !== false || falsification?.rawHistoricalRecordsIncluded !== false || falsification?.rawHistoricalCandlesIncluded !== false) fail('raw historical material exported');
+          if (falsification?.automaticModelPromotionEnabled !== false || falsification?.probabilityCalibrationEnabled !== false || falsification?.decisionIntegrationEnabled !== false || falsification?.forecastMayInfluenceFinalAction !== false || falsification?.finalActionEligible !== false || falsification?.brokerExecutionEligible !== false || falsification?.decisionImpact !== 'NONE') fail('falsification gained authority');
+          if (artifact?.automaticModelPromotionEnabled !== false || artifact?.decisionIntegrationEnabled !== false || artifact?.forecastMayInfluenceFinalAction !== false || artifact?.brokerExecutionEligible !== false || artifact?.decisionImpact !== 'NONE') fail('artifact gained authority');
+
+          console.log('PASS v1829 existing-stack falsification integrity');
+          console.log(JSON.stringify({
+            sourceCommit: artifact.sourceCommit,
+            records: dataset.generatedRecordCount,
+            regimeCoveragePct: dataset.regimeCoveragePct,
+            verdict: falsification.status,
+            strictSignalVariantCount: falsification.strictSignalVariantCount,
+            variants: variants.map((variant) => ({
+              modelVariant: variant.modelVariant,
+              evaluableGroupCount: variant.evaluableGroupCount,
+              positiveSkillGroupCount: variant.positiveSkillGroupCount,
+              promotionSkillGroupCount: variant.promotionSkillGroupCount,
+              chronologicalNonRegressingGroupCount: variant.chronologicalNonRegressingGroupCount,
+              strictSignalGroupCount: variant.strictSignalGroupCount,
+              sampleWeightedSkillVsBaseRatePct: variant.sampleWeightedSkillVsBaseRatePct,
+              sampleWeightedBrierImprovementVsRawPatternPct: variant.sampleWeightedBrierImprovementVsRawPatternPct,
+            })),
+          }, null, 2));
+          NODE
+
+      - name: Upload v1829 research artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1829-falsification-${{ github.run_id }}
+          path: market-intelligence/out/v1829-existing-stack-falsification-research.json
+          if-no-files-found: warn
+          retention-days: 30

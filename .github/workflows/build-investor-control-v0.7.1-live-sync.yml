@@ -1,0 +1,178 @@
+name: Signed Investor Control v1.1.0 Unified Intelligence APK
+
+on:
+  push:
+    branches:
+      - investor-control-v1.1-unified-intelligence
+    paths:
+      - mobile/**
+      - .github/workflows/build-investor-control-v0.7.1-live-sync.yml
+  pull_request:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - mobile/**
+      - .github/workflows/build-investor-control-v0.7.1-live-sync.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-v110-unified-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-signed-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout v1.1.0 source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies without lifecycle scripts
+        working-directory: mobile
+        run: npm install --legacy-peer-deps --no-audit --no-fund --ignore-scripts
+
+      - name: Apply complete native patch chain
+        working-directory: mobile
+        run: |
+          node scripts/apply-v065-native-ui-fix.js
+          node scripts/apply-v070-opportunities.js
+          node scripts/apply-v071-live-sync.js
+          node scripts/apply-v080-autonomous-decisions.js
+          node scripts/apply-v081-position-performance.js
+          node scripts/apply-v081b-fix-source-newline.js
+          node scripts/apply-v090-discovery-clarity.js
+          node scripts/apply-v090b-background-intelligence.js
+          node scripts/apply-v091-reliability.js
+          node scripts/apply-v100-production-health.js
+          node scripts/apply-v101-integrity-recovery.js
+          node scripts/apply-v110-unified-intelligence.js
+          node scripts/apply-v111-alert-integrity.js
+
+      - name: Verify purchase-lot calculations
+        working-directory: mobile
+        run: npm run test:lots
+
+      - name: Verify v1.1.0 unified intelligence invariants
+        working-directory: mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q "const VERSION = '1.1.0';" PortfolioApp.js
+          grep -q "const VERSION = '1.1.0';" DecisionOverlay.js
+          grep -q "readCanonicalFeedQuotes" src/market-data.js
+          grep -q "quoteRegistry" src/intelligence-feed-store.js
+          grep -q "buildMobileQuoteContract" src/market-data.js
+          grep -q "Βαθμός προτεραιότητας διερεύνησης" src/OpportunitiesView.js
+          grep -q "marketDataStatus" src/OpportunitiesView.js
+          grep -q "quoteContract.publicMessage" PortfolioApp.js
+          grep -q "Παύση δεδομένων" PortfolioApp.js
+          grep -q "quote.dayChangeVerified === true" src/alert-engine.js
+          if grep -q 'Euronext error:.*officialError.message' src/market-data.js; then
+            echo 'Raw provider error leak remains' >&2
+            exit 1
+          fi
+          node - <<'NODE'
+          const fs = require('fs');
+          const app = require('./app.json');
+          const pkg = require('./package.json');
+          const portfolio = fs.readFileSync('./PortfolioApp.js', 'utf8');
+          const market = fs.readFileSync('./src/market-data.js', 'utf8');
+          const store = fs.readFileSync('./src/intelligence-feed-store.js', 'utf8');
+          const alerts = fs.readFileSync('./src/alert-engine.js', 'utf8');
+          if (app.expo.version !== '1.1.0') throw new Error('wrong Expo version');
+          if (app.expo.android.package !== 'gr.investorcontrol.app') throw new Error('wrong package');
+          if (app.expo.android.versionCode !== 22) throw new Error('wrong versionCode');
+          if (pkg.version !== '1.1.0') throw new Error('wrong package version');
+          if (!pkg.scripts.postinstall.includes('apply-v111-alert-integrity.js')) throw new Error('alert integrity patch missing from postinstall');
+          if (!portfolio.includes("quotePrice(item.average, item.currency, 4)")) throw new Error('four-decimal average all-in missing');
+          if (!market.includes("'CREDIA.GR'")) throw new Error('CrediaBank official quote routing missing');
+          if (!market.includes('safeProviderDiagnostic')) throw new Error('safe diagnostics missing');
+          if (!store.includes('quoteRegistry')) throw new Error('canonical quote registry missing');
+          if (!alerts.includes('quoteContract.valuationEligible')) throw new Error('canonical alert valuation gate missing');
+          console.log('PASS v1.1 canonical quotes, source governance, alert gates, honest health and local-ledger invariants');
+          NODE
+
+      - name: Verify Android JavaScript bundle
+        working-directory: mobile
+        run: npx expo export --platform android --output-dir dist-v1.1.0
+
+      - name: Expo Doctor diagnostic
+        working-directory: mobile
+        run: npx expo-doctor@latest
+
+      - name: Generate Android project
+        working-directory: mobile
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Build release APK
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -o pipefail
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee ../gradle-v1.1.0.log
+
+      - name: Upload Gradle failure diagnostic
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1.1.0-gradle-diagnostic
+          path: mobile/gradle-v1.1.0.log
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Sign and verify update APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          UNSIGNED='mobile/android/app/build/outputs/apk/release/app-release.apk'
+          KEYSTORE='mobile/android/app/debug.keystore'
+          OUTPUT='mobile/Investor-Control-v1.1.0.apk'
+          ALIGNED='mobile/Investor-Control-v1.1.0-aligned.apk'
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          ZIPALIGN="$BUILD_TOOLS/zipalign"
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+
+          test -s "$UNSIGNED"
+          test -s "$KEYSTORE"
+          unzip -l "$UNSIGNED" | grep -q 'assets/index.android.bundle'
+          "$ZIPALIGN" -p -f 4 "$UNSIGNED" "$ALIGNED"
+          "$APKSIGNER" sign \
+            --ks "$KEYSTORE" \
+            --ks-key-alias androiddebugkey \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --out "$OUTPUT" \
+            "$ALIGNED"
+          "$APKSIGNER" verify --verbose --print-certs "$OUTPUT" | tee mobile/Investor-Control-v1.1.0-signature.txt
+          grep -qi 'fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c' mobile/Investor-Control-v1.1.0-signature.txt
+          unzip -l "$OUTPUT" | grep -q 'assets/index.android.bundle'
+          sha256sum "$OUTPUT" | tee mobile/Investor-Control-v1.1.0.sha256
+
+      - name: Upload signed v1.1.0 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1.1.0-unified-intelligence-signed-apk
+          path: |
+            mobile/Investor-Control-v1.1.0.apk
+            mobile/Investor-Control-v1.1.0.sha256
+            mobile/Investor-Control-v1.1.0-signature.txt
+          if-no-files-found: error
+          retention-days: 90
