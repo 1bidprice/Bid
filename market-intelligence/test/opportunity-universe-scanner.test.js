@@ -91,7 +91,6 @@ test('universe scanner merges provider instruments and ranks only provider-verif
   assert.equal(result.byAssetClass.BOND, 1);
   assert.ok(result.ranking.items.every((item) => item.finalActionEligible === false));
   assert.ok(result.ranking.items.every((item) => ['DEEP_VERIFY_NOW', 'DEEP_VERIFY', 'WATCH'].includes(item.discoveryAction)));
-  assert.ok(result.ranking.items.every((item) => item.source?.rawSeedScoresIgnored !== false || true));
 });
 
 test('instrument without verified opportunity factors is fail-closed instead of receiving an invented score', async () => {
