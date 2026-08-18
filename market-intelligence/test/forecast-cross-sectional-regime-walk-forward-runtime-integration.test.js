@@ -6,6 +6,26 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
+const integrityPatches = [
+  'apply-v1841b-research-integrity.js',
+  'apply-v1841a-final-action-integrity.js',
+  'apply-v1841c-opportunity-factor-integrity.js',
+  'apply-v1841d-opportunity-scanner-integrity.js',
+  'apply-v1841e-mobile-integrity.js',
+  'apply-v1841f-hold-reference-integrity.js',
+];
+
+function assertRuntimeOrder(patches) {
+  const v1823 = patches.indexOf('apply-v1823-cross-sectional-regime-walk-forward-runtime.js');
+  assert.ok(v1823 >= 0);
+  let previous = v1823;
+  for (const patch of integrityPatches) {
+    const index = patches.indexOf(patch);
+    assert.ok(index > previous, `${patch} must remain after the frozen v1823 research runtime`);
+    previous = index;
+  }
+  assert.equal(new Set(patches).size, patches.length, 'runtime patch manifest must not contain duplicates');
+}
 
 test('v1823 runtime is present, default-off, cache-only and production-firewalled', () => {
   const manifest = JSON.parse(read('config/runtime-release-manifest.json'));
@@ -13,10 +33,8 @@ test('v1823 runtime is present, default-off, cache-only and production-firewalle
   const verifier = read('scripts/verify-production-output.js');
 
   assert.equal(manifest.releaseVersion, '1.8.0');
-  assert.equal(manifest.testPatches.at(-1), 'apply-v1823-cross-sectional-regime-walk-forward-runtime.js');
-  assert.equal(manifest.buildPatches.at(-1), 'apply-v1823-cross-sectional-regime-walk-forward-runtime.js');
-  assert.equal(new Set(manifest.testPatches).size, 72);
-  assert.equal(new Set(manifest.buildPatches).size, 71);
+  assertRuntimeOrder(manifest.testPatches);
+  assertRuntimeOrder(manifest.buildPatches);
 
   assert.match(runner, /buildCrossSectionalRegimeWalkForwardRuntimeStatus/);
   assert.match(runner, /enabled:\s*options\.crossSectionalHistoricalRegimeWalkForwardEnabled\s*===\s*true/);
