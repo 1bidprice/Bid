@@ -102,20 +102,21 @@ test('production firewall rejects stacked research authority, weakened evidence 
   assert.throws(() => verifyForecastStackedEnsembleProductionSafety(mismatch), /telemetry mismatch/);
 });
 
-test('v1821 runtime remains present after v1822 and still invokes its independent production firewall', () => {
+test('v1821 runtime remains present after v1822/v1823 and later integrity patches while its independent production firewall stays active', () => {
   const manifest = JSON.parse(read('config/runtime-release-manifest.json'));
   const runner = read('src/run-autonomous-intelligence.js');
   const verifier = read('scripts/verify-production-output.js');
 
   assert.equal(manifest.releaseVersion, '1.8.0');
-  assert.ok(manifest.testPatches.includes('apply-v1820-yahoo-history-freshness-recovery.js'));
-  assert.ok(manifest.buildPatches.includes('apply-v1820-yahoo-history-freshness-recovery.js'));
-  assert.ok(manifest.testPatches.includes('apply-v1821-stacked-ensemble-research.js'));
-  assert.ok(manifest.buildPatches.includes('apply-v1821-stacked-ensemble-research.js'));
-  assert.equal(manifest.testPatches.at(-1), 'apply-v1822-regime-stacked-ensemble-research.js');
-  assert.equal(manifest.buildPatches.at(-1), 'apply-v1822-regime-stacked-ensemble-research.js');
-  assert.equal(new Set(manifest.testPatches).size, 71);
-  assert.equal(new Set(manifest.buildPatches).size, 70);
+  for (const patches of [manifest.testPatches, manifest.buildPatches]) {
+    const i1820 = patches.indexOf('apply-v1820-yahoo-history-freshness-recovery.js');
+    const i1821 = patches.indexOf('apply-v1821-stacked-ensemble-research.js');
+    const i1822 = patches.indexOf('apply-v1822-regime-stacked-ensemble-research.js');
+    const i1823 = patches.indexOf('apply-v1823-cross-sectional-regime-walk-forward-runtime.js');
+    const integrity = patches.indexOf('apply-v1841b-research-integrity.js');
+    assert.ok(i1820 >= 0 && i1821 > i1820 && i1822 > i1821 && i1823 > i1822 && integrity > i1823);
+    assert.equal(new Set(patches).size, patches.length);
+  }
 
   assert.match(runner, /buildForecastStackedEnsembleResearchStatus/);
   assert.match(runner, /forecastStackedEnsembleResearchStatus/);
