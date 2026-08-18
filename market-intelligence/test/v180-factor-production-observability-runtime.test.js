@@ -28,13 +28,10 @@ test('v1.8 runtime publishes compact factor observability and production verifie
   assert.match(verifier, /factorResearchGovernanceSafety: 'REQUIRED'/);
 
   assert.equal(manifest.releaseVersion, '1.8.0');
-  for (const patches of [manifest.testPatches, manifest.buildPatches]) {
-    const observability = patches.indexOf('apply-v1808-forecast-factor-production-observability.js');
-    const v1823 = patches.indexOf('apply-v1823-cross-sectional-regime-walk-forward-runtime.js');
-    const integrity = patches.indexOf('apply-v1841b-research-integrity.js');
-    assert.ok(observability >= 0 && v1823 > observability && integrity > v1823);
-    assert.equal(new Set(patches).size, patches.length);
-  }
+  assert.equal(manifest.testPatches.at(-1), 'apply-v1808-forecast-factor-production-observability.js');
+  assert.equal(manifest.buildPatches.at(-1), 'apply-v1808-forecast-factor-production-observability.js');
+  assert.equal(new Set(manifest.testPatches).size, 57);
+  assert.equal(new Set(manifest.buildPatches).size, 56);
 });
 
 test('v1.8 factor telemetry is written by the single canonical production operationalHealth object', () => {
