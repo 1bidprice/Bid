@@ -6,6 +6,17 @@ const root = path.resolve(__dirname, '..');
 function read(relativePath) { return fs.readFileSync(path.join(root, relativePath), 'utf8'); }
 function assert(condition, message) { if (!condition) throw new Error(message); }
 function canonical(value) { return String(value || '').trim().toUpperCase().replace(/\.(US|GR)$/, ''); }
+function versionAtLeast(actual, minimum) {
+  const a = String(actual || '').split('.').map((value) => Number(value));
+  const b = String(minimum || '').split('.').map((value) => Number(value));
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+    const av = Number.isFinite(a[index]) ? a[index] : 0;
+    const bv = Number.isFinite(b[index]) ? b[index] : 0;
+    if (av > bv) return true;
+    if (av < bv) return false;
+  }
+  return true;
+}
 function currency(referencePrice, item) {
   const explicit = String(referencePrice?.currency || item?.marketQuote?.currency || '').trim().toUpperCase();
   if (/^[A-Z]{3}$/.test(explicit)) return explicit;
@@ -42,6 +53,7 @@ assert(currency({ value: 1, currency: null }, { symbol: 'UNKNOWN', exchange: 'Un
 const finalCard = read('src/FinalDecisionCard.js');
 const opportunities = read('src/OpportunitiesView.js');
 const portfolio = read('PortfolioApp.js');
+const decision = read('DecisionOverlay.js');
 const app = JSON.parse(read('app.json'));
 const pkg = JSON.parse(read('package.json'));
 
@@ -55,8 +67,11 @@ assert(opportunities.includes('personalizedDecisionCounts(feed, portfolioPositio
 assert(opportunities.includes('inferredReferenceCurrency(referencePrice, item)'), 'safe currency inference missing');
 assert(opportunities.includes("style: 'currency',\n      currency,"), 'currency formatter syntax contract missing');
 assert(!opportunities.includes("currency: referencePrice.currency || 'EUR'"), 'false EUR fallback still present');
-assert(app.expo.version === '1.7.1', `app version mismatch: ${app.expo.version}`);
-assert(Number(app.expo.android.versionCode) === 29, `Android versionCode mismatch: ${app.expo.android.versionCode}`);
-assert(pkg.version === '1.7.1', `package version mismatch: ${pkg.version}`);
 
-console.log('PASS v1.7.1 portfolio-aware holder/non-holder decisions, personalized counters, safe currency inference, JSX parse, version 1.7.1 build 29.');
+assert(versionAtLeast(app.expo.version, '1.7.1'), `app version predates v1.7.1: ${app.expo.version}`);
+assert(Number(app.expo.android.versionCode) >= 29, `Android versionCode predates v1.7.1: ${app.expo.android.versionCode}`);
+assert(pkg.version === app.expo.version, `package/app version mismatch: ${pkg.version} vs ${app.expo.version}`);
+assert(portfolio.includes(`const VERSION = '${app.expo.version}';`), `PortfolioApp runtime version mismatch: ${app.expo.version}`);
+assert(decision.includes(`const VERSION = '${app.expo.version}';`), `DecisionOverlay runtime version mismatch: ${app.expo.version}`);
+
+console.log(`PASS v1.7.1+ portfolio-aware holder/non-holder decisions, personalized counters, safe currency inference, JSX parse and consistent release identity ${app.expo.version} build ${app.expo.android.versionCode}.`);
