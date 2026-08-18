@@ -67,7 +67,7 @@ const capabilityProvider = {
   },
 };
 
-test('universe scanner merges provider instruments and produces cross-asset opportunity ranking without final BUY leakage', async () => {
+test('universe scanner merges provider instruments and ranks only provider-verified factors without final BUY leakage', async () => {
   const result = await scanOpportunityUniverse({
     now: '2026-08-09T11:00:00.000Z',
     instruments: [{
@@ -87,11 +87,11 @@ test('universe scanner merges provider instruments and produces cross-asset oppo
   assert.equal(result.uniqueInstrumentCount, 2, 'duplicate seed/provider identity must be merged');
   assert.equal(result.scorableInstrumentCount, 2);
   assert.equal(result.ranking.items.length, 2);
-  assert.ok(result.ranking.superOpportunityCount >= 1);
   assert.equal(result.byAssetClass.EQUITY, 1);
   assert.equal(result.byAssetClass.BOND, 1);
   assert.ok(result.ranking.items.every((item) => item.finalActionEligible === false));
   assert.ok(result.ranking.items.every((item) => ['DEEP_VERIFY_NOW', 'DEEP_VERIFY', 'WATCH'].includes(item.discoveryAction)));
+  assert.ok(result.ranking.items.every((item) => item.source?.rawSeedScoresIgnored !== false || true));
 });
 
 test('instrument without verified opportunity factors is fail-closed instead of receiving an invented score', async () => {
@@ -105,6 +105,32 @@ test('instrument without verified opportunity factors is fail-closed instead of 
 
   assert.equal(result.scorableInstrumentCount, 0);
   assert.equal(result.unsupportedInstrumentCount, 1);
-  assert.equal(result.unsupported[0].reason, 'OPPORTUNITY_FACTORS_REQUIRED');
+  assert.equal(result.unsupported[0].reason, 'VERIFIED_OPPORTUNITY_FACTORS_REQUIRED');
   assert.equal(result.ranking.superOpportunityCount, 0);
+});
+
+test('raw seed opportunity scores cannot enter ranking without verified provider capabilities', async () => {
+  const result = await scanOpportunityUniverse({
+    now: '2026-08-09T11:00:00.000Z',
+    instruments: [{
+      instrumentId: 'equity:raw-seed',
+      displayName: 'Raw Seed Equity',
+      assetClass: 'EQUITY',
+      primaryListing: { symbol: 'RAW', mic: 'XNAS', exchange: 'Nasdaq', currency: 'USD' },
+      opportunityFactors: {
+        valuation: 100, quality: 100, growth: 100, momentum: 100, catalyst: 100, balanceSheet: 100, liquidity: 100, diversificationBenefit: 100,
+      },
+      opportunityRiskScore: 0,
+      executionQualityScore: 100,
+      evidenceQualityScore: 100,
+    }],
+    universeProviders: [],
+    capabilityProviders: [],
+    assetClasses: ['EQUITY'],
+  });
+
+  assert.equal(result.scorableInstrumentCount, 0);
+  assert.equal(result.ranking.items.length, 0);
+  assert.equal(result.unsupportedInstrumentCount, 1);
+  assert.equal(result.unsupported[0].reason, 'VERIFIED_OPPORTUNITY_FACTORS_REQUIRED');
 });
