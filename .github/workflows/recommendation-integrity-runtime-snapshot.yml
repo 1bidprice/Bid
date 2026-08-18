@@ -1,0 +1,45 @@
+name: Recommendation Integrity Runtime Snapshot
+
+on:
+  push:
+    branches:
+      - investor-control-recommendation-integrity-fix-v2
+    paths:
+      - market-intelligence/**
+      - .github/workflows/recommendation-integrity-runtime-snapshot.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply full runtime release and execute baseline tests
+        working-directory: market-intelligence
+        run: node scripts/run-current-release.js test
+      - name: Capture fully migrated recommendation sources
+        if: always()
+        run: |
+          mkdir -p runtime-snapshot
+          cp market-intelligence/src/final-action-policy.js runtime-snapshot/
+          cp market-intelligence/src/research-dossier.js runtime-snapshot/
+          cp market-intelligence/src/opportunity-engine.js runtime-snapshot/
+          cp market-intelligence/src/opportunity-universe-scanner.js runtime-snapshot/
+          cp market-intelligence/src/mobile-intelligence-feed.js runtime-snapshot/
+          cp market-intelligence/src/opportunity-purchase-reconciliation.js runtime-snapshot/
+          cp market-intelligence/config/runtime-release-manifest.json runtime-snapshot/
+      - name: Upload runtime snapshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recommendation-integrity-runtime-snapshot-${{ github.run_id }}
+          path: runtime-snapshot/
+          if-no-files-found: error
+          retention-days: 7
