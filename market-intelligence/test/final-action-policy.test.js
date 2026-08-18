@@ -10,6 +10,7 @@ function dossier(overrides = {}) {
     companyId: 'company:test',
     companyName: 'Test Company',
     listing: { symbol: 'TEST', exchange: 'NYSE', mic: 'XNYS' },
+    listingIntegrity: { activeTradingVerified: true, lifecycleStatus: 'ACTIVE', verifiedAt: NOW },
     generatedAt: '2026-07-27T13:30:00.000Z',
     status: 'REVIEW_READY',
     category: 'QUALITY_COMPOUNDER',
@@ -19,13 +20,18 @@ function dossier(overrides = {}) {
       currency: 'USD',
       timestamp: '2026-07-27T13:45:00.000Z',
       source: 'Test feed',
-      purpose: 'ANALYSIS_REFERENCE',
-      freshnessModel: 'VERIFIED_TIMESTAMP',
+      companyId: 'company:test',
+      appSymbol: 'TEST',
+      sourceApproved: true,
+      timestampVerified: true,
       analysisReferenceEligible: true,
       executionFreshnessEligible: true,
       decisionEligible: true,
     },
-    evidence: [{ evidenceId: 'a' }, { evidenceId: 'b' }],
+    evidence: [
+      { evidenceId: 'a', companyIds: ['company:test'] },
+      { evidenceId: 'b', companyIds: ['company:test'] },
+    ],
     reviewDate: '2026-08-27',
     readiness: { publishable: true, blockers: [] },
     metrics: {
@@ -46,7 +52,7 @@ function dossier(overrides = {}) {
   };
 }
 
-test('autonomous policy emits BUY_NOW only when all freshness, evidence, risk, trend and liquidity gates pass', () => {
+test('BUY_NOW requires complete entity, listing, evidence, quote, freshness, risk, trend and liquidity integrity', () => {
   const result = evaluateFinalAction(dossier(), { now: NOW });
   assert.equal(result.status, 'FINAL');
   assert.equal(result.marketAction, 'BUY_NOW');
@@ -54,6 +60,7 @@ test('autonomous policy emits BUY_NOW only when all freshness, evidence, risk, t
   assert.equal(result.holderAction, 'HOLD');
   assert.equal(result.urgency, 'IMMEDIATE');
   assert.ok(result.confidenceScore >= 80);
+  assert.equal(result.integrity.passed, true);
   assert.equal(result.freshness.executionFreshnessEligible, true);
   assert.equal(result.execution.automaticBrokerOrder, false);
 });
@@ -104,6 +111,51 @@ test('unverified historical source blocks a directional action', () => {
   assert.equal(result.status, 'BLOCKED');
   assert.equal(result.marketAction, 'WATCH');
   assert.ok(result.blockers.includes('MARKET_HISTORY_NOT_CROSSCHECKED'));
+});
+
+test('non-decision-grade price can never support an immediate buy', () => {
+  const input = dossier({ referencePrice: { ...dossier().referencePrice, decisionEligible: false, executionFreshnessEligible: false } });
+  const result = evaluateFinalAction(input, { now: NOW });
+  assert.equal(result.status, 'BLOCKED');
+  assert.equal(result.marketAction, 'WATCH');
+  assert.ok(result.blockers.includes('REFERENCE_PRICE_NOT_DECISION_ELIGIBLE'));
+  assert.ok(result.blockers.includes('REFERENCE_PRICE_NOT_EXECUTION_ELIGIBLE'));
+  assert.ok(result.dataQualityScore <= 79);
+  assert.ok(result.confidenceScore <= 79);
+});
+
+test('cross-company evidence contamination blocks the recommendation', () => {
+  const input = dossier({ evidence: [{ evidenceId: 'a', companyIds: ['company:other'] }, { evidenceId: 'b', companyIds: ['company:test'] }] });
+  const result = evaluateFinalAction(input, { now: NOW });
+  assert.equal(result.status, 'BLOCKED');
+  assert.equal(result.marketAction, 'WATCH');
+  assert.ok(result.blockers.includes('EVIDENCE_ENTITY_MISMATCH'));
+});
+
+test('evidence without entity provenance blocks the recommendation', () => {
+  const input = dossier({ evidence: [{ evidenceId: 'a' }, { evidenceId: 'b', companyIds: ['company:test'] }] });
+  const result = evaluateFinalAction(input, { now: NOW });
+  assert.equal(result.status, 'BLOCKED');
+  assert.ok(result.blockers.includes('EVIDENCE_ENTITY_UNVERIFIED'));
+});
+
+test('inactive or unverified listing can never produce BUY_NOW', () => {
+  const unverified = evaluateFinalAction(dossier({ listingIntegrity: { activeTradingVerified: false, lifecycleStatus: null } }), { now: NOW });
+  assert.equal(unverified.status, 'BLOCKED');
+  assert.equal(unverified.marketAction, 'WATCH');
+  assert.ok(unverified.blockers.includes('ACTIVE_LISTING_NOT_VERIFIED'));
+
+  const delisted = evaluateFinalAction(dossier({ listingIntegrity: { activeTradingVerified: true, lifecycleStatus: 'DELISTED' } }), { now: NOW });
+  assert.equal(delisted.status, 'BLOCKED');
+  assert.equal(delisted.marketAction, 'WATCH');
+  assert.ok(delisted.blockers.includes('LISTING_NOT_ACTIVE'));
+});
+
+test('reference-price symbol must identify the same listing', () => {
+  const result = evaluateFinalAction(dossier({ referencePrice: { ...dossier().referencePrice, appSymbol: 'WRONG' } }), { now: NOW });
+  assert.equal(result.status, 'BLOCKED');
+  assert.equal(result.marketAction, 'WATCH');
+  assert.ok(result.blockers.includes('LISTING_IDENTITY_MISMATCH'));
 });
 
 test('only a final non-WATCH action is automatically published', () => {

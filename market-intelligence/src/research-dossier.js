@@ -17,6 +17,7 @@ function compactEvidence(record) {
     independenceGroup: record.independenceGroup || null,
     isPrimarySource: record.isPrimarySource === true,
     documentStatus: record.document?.status || null,
+    companyIds: Array.isArray(record.companyIds) ? unique(record.companyIds) : [],
   };
 }
 
@@ -59,11 +60,26 @@ function normalizeClaims(claims = []) {
 
 function referencePrice(marketSnapshot, historicalMetrics) {
   if (marketSnapshot?.usable && !marketSnapshot.stale && marketSnapshot.currentPrice > 0 && marketSnapshot.quoteAt) {
+    const contract = marketSnapshot.quoteContract || {};
     return {
       value: marketSnapshot.currentPrice,
       currency: marketSnapshot.currency,
       timestamp: marketSnapshot.quoteAt,
       source: marketSnapshot.source,
+      sourceUrl: marketSnapshot.sourceUrl || null,
+      companyId: marketSnapshot.companyId || null,
+      companyName: marketSnapshot.companyName || null,
+      appSymbol: marketSnapshot.appSymbol || marketSnapshot.symbol || null,
+      providerSymbol: marketSnapshot.providerSymbol || null,
+      sourceRole: contract.sourceRole || marketSnapshot.sourceRole || null,
+      sourceApproved: contract.sourceApproved === true,
+      timestampVerified: contract.timestampVerified === true,
+      valuationEligible: contract.valuationEligible === true,
+      analysisReferenceEligible: contract.analysisReferenceEligible === true || contract.valuationEligible === true,
+      executionFreshnessEligible: contract.executionFreshnessEligible === true || contract.decisionEligible === true,
+      decisionEligible: contract.decisionEligible === true,
+      publicStatus: contract.publicStatus || null,
+      diagnosticCodes: Array.isArray(contract.diagnosticCodes) ? [...contract.diagnosticCodes] : [],
     };
   }
   if (historicalMetrics?.latestClose > 0 && historicalMetrics.latestTimestamp) {
@@ -72,9 +88,39 @@ function referencePrice(marketSnapshot, historicalMetrics) {
       currency: historicalMetrics.currency,
       timestamp: new Date(historicalMetrics.latestTimestamp * 1000).toISOString(),
       source: 'Historical market series',
+      sourceUrl: historicalMetrics.sourceUrl || null,
+      companyId: historicalMetrics.companyId || null,
+      companyName: historicalMetrics.companyName || null,
+      appSymbol: historicalMetrics.appSymbol || historicalMetrics.symbol || null,
+      providerSymbol: historicalMetrics.providerSymbol || null,
+      sourceRole: 'HISTORICAL_MARKET_SERIES',
+      sourceApproved: true,
+      timestampVerified: true,
+      valuationEligible: false,
+      analysisReferenceEligible: true,
+      executionFreshnessEligible: false,
+      decisionEligible: false,
+      publicStatus: 'HISTORICAL_REFERENCE_ONLY',
+      diagnosticCodes: ['HISTORICAL_REFERENCE_NOT_EXECUTION_ELIGIBLE'],
     };
   }
   return null;
+}
+
+function entityIntegrityBlockers(company, records, reference, proposedAction) {
+  const blockers = [];
+  const companyId = company?.companyId || null;
+  const directional = proposedAction && proposedAction !== 'WATCH';
+  if (!companyId) blockers.push('COMPANY_IDENTITY_REQUIRED');
+
+  for (const record of records) {
+    const ids = Array.isArray(record?.companyIds) ? record.companyIds.filter(Boolean) : [];
+    if (ids.length && companyId && !ids.includes(companyId)) blockers.push('EVIDENCE_ENTITY_MISMATCH');
+  }
+
+  if (reference?.companyId && companyId && reference.companyId !== companyId) blockers.push('REFERENCE_PRICE_ENTITY_MISMATCH');
+  if (directional && reference && reference.decisionEligible !== true) blockers.push('REFERENCE_PRICE_NOT_DECISION_ELIGIBLE');
+  return unique(blockers);
 }
 
 function synthesisBlockers(input) {
@@ -101,6 +147,7 @@ export function buildResearchDossier(input = {}) {
   const reference = referencePrice(input.marketSnapshot, input.historicalMarketMetrics);
   const risks = normalizeClaims(input.risks);
   const catalysts = normalizeClaims(input.catalysts);
+  const proposedInputAction = input.proposedAction || 'WATCH';
   const baseReadiness = evaluateSignalReadiness({
     evidence: records.find((record) => record?.document?.reviewed === true) || records[0] || null,
     fundamentals: input.fundamentals,
@@ -114,10 +161,11 @@ export function buildResearchDossier(input = {}) {
     ...baseReadiness.blockers,
     ...synthesisBlockers(input),
     ...(reference ? [] : ['REFERENCE_PRICE_REQUIRED']),
+    ...entityIntegrityBlockers(company, records, reference, proposedInputAction),
   ]);
   const publishable = blockers.length === 0;
   const category = input.category || 'INSUFFICIENT_EVIDENCE';
-  const proposedAction = publishable ? (input.proposedAction || 'WATCH') : 'WATCH';
+  const proposedAction = publishable ? proposedInputAction : 'WATCH';
   const generatedAt = new Date(input.generatedAt || Date.now()).toISOString();
   const identity = {
     companyId: company.companyId,
@@ -129,10 +177,15 @@ export function buildResearchDossier(input = {}) {
 
   return {
     dossierId: `dossier:${company.companyId || 'unknown'}:${contentHash(identity).slice(0, 20)}`,
-    version: 2,
+    version: 3,
     companyId: company.companyId || 'company:unknown',
     companyName: company.displayName || company.legalName || 'Unknown company',
     listing: company.primaryListing || { exchange: 'Unknown', symbol: 'UNKNOWN', mic: null },
+    listingIntegrity: {
+      activeTradingVerified: company.activeTradingVerified === true || company.primaryListing?.activeTradingVerified === true,
+      lifecycleStatus: company.listingStatus || company.primaryListing?.status || null,
+      verifiedAt: company.listingVerifiedAt || company.primaryListing?.verifiedAt || null,
+    },
     generatedAt,
     status: publishable ? 'REVIEW_READY' : 'DRAFT_RESEARCH',
     category,

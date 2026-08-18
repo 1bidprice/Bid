@@ -26,6 +26,8 @@ function dossier(overrides = {}) {
     companyId: 'company:test',
     companyName: 'Test Opportunity',
     symbol: 'TEST',
+    listing: { symbol: 'TEST', exchange: 'NYSE', mic: 'XNYS' },
+    listingIntegrity: { activeTradingVerified: true, lifecycleStatus: 'ACTIVE', verifiedAt: NOW },
     generatedAt: '2026-08-10T13:30:00.000Z',
     status: 'REVIEW_READY',
     category: 'FUNDAMENTAL_BASELINE',
@@ -35,13 +37,18 @@ function dossier(overrides = {}) {
       currency: 'USD',
       timestamp: '2026-08-10T13:45:00.000Z',
       source: 'Verified market feed',
-      purpose: 'ANALYSIS_REFERENCE',
-      freshnessModel: 'VERIFIED_TIMESTAMP',
+      companyId: 'company:test',
+      appSymbol: 'TEST',
+      sourceApproved: true,
+      timestampVerified: true,
       analysisReferenceEligible: true,
       executionFreshnessEligible: true,
       decisionEligible: true,
     },
-    evidence: [{ evidenceId: 'a' }, { evidenceId: 'b' }],
+    evidence: [
+      { evidenceId: 'a', companyIds: ['company:test'] },
+      { evidenceId: 'b', companyIds: ['company:test'] },
+    ],
     reviewDate: '2026-09-10',
     readiness: { publishable: true, blockers: [] },
     metrics: {
@@ -62,7 +69,7 @@ function dossier(overrides = {}) {
   return { ...base, ...overrides };
 }
 
-test('high-priority opportunity can become BUY_CONFIRMED only through the existing strict BUY_NOW policy', () => {
+test('high-priority opportunity can become BUY_CONFIRMED only through the strict integrity-aware BUY_NOW policy', () => {
   const result = reconcileOpportunityPurchaseDecisions(opportunity(), [dossier()], { now: NOW });
   assert.equal(result.candidateCount, 1);
   assert.equal(result.counts.BUY_CONFIRMED, 1);
@@ -71,11 +78,12 @@ test('high-priority opportunity can become BUY_CONFIRMED only through the existi
   assert.equal(decision.buyNowEligible, true);
   assert.equal(decision.strictAction.marketAction, 'BUY_NOW');
   assert.equal(decision.strictAction.nonHolderAction, 'BUY_NOW');
+  assert.equal(decision.strictAction.integrity.passed, true);
   assert.equal(decision.automaticBrokerOrder, false);
   assert.equal(decision.nextGate, 'USER_EXECUTION_ONLY');
 });
 
-test('opportunity remains WAIT when valuation/quality are interesting but strict trend entry gates are not confirmed', () => {
+test('opportunity remains WAIT when strict trend entry gates are not confirmed', () => {
   const weak = dossier({
     metrics: {
       ...dossier().metrics,
@@ -108,6 +116,25 @@ test('severe risk rejects the opportunity even when the hunter ranked it highly'
   assert.equal(decision.buyNowEligible, false);
   assert.equal(decision.strictAction.nonHolderAction, 'AVOID');
   assert.ok(decision.whyNotBuyNow.includes('CASH_RUNWAY_UNDER_ONE_YEAR'));
+});
+
+test('unverified or inactive listing blocks BUY_CONFIRMED even for a high-ranked opportunity', () => {
+  const blocked = dossier({ listingIntegrity: { activeTradingVerified: false, lifecycleStatus: null } });
+  const result = reconcileOpportunityPurchaseDecisions(opportunity('SUPER_OPPORTUNITY_CANDIDATE'), [blocked], { now: NOW });
+  const decision = result.decisions[0];
+  assert.equal(decision.status, 'BLOCKED');
+  assert.equal(decision.buyNowEligible, false);
+  assert.equal(decision.strictAction.marketAction, 'WATCH');
+  assert.ok(decision.whyNotBuyNow.includes('ACTIVE_LISTING_NOT_VERIFIED'));
+});
+
+test('cross-company evidence blocks BUY_CONFIRMED even when opportunity score is high', () => {
+  const contaminated = dossier({ evidence: [{ evidenceId: 'a', companyIds: ['company:other'] }, { evidenceId: 'b', companyIds: ['company:test'] }] });
+  const result = reconcileOpportunityPurchaseDecisions(opportunity('SUPER_OPPORTUNITY_CANDIDATE'), [contaminated], { now: NOW });
+  const decision = result.decisions[0];
+  assert.equal(decision.status, 'BLOCKED');
+  assert.equal(decision.buyNowEligible, false);
+  assert.ok(decision.whyNotBuyNow.includes('EVIDENCE_ENTITY_MISMATCH'));
 });
 
 test('lower opportunity tiers never enter the strict buy-nomination lane', () => {

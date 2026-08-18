@@ -4,7 +4,7 @@ import { collectInstrumentCapabilities } from './instrument-capability-collector
 import { evaluateInstrumentCapabilities } from './instrument-capability-evaluator.js';
 import { rankOpportunityUniverse } from './opportunity-engine.js';
 
-export const OPPORTUNITY_UNIVERSE_SCANNER_VERSION = '2026-08-09.1';
+export const OPPORTUNITY_UNIVERSE_SCANNER_VERSION = '2026-08-18.1';
 
 function stableInstrumentKey(instrument = {}) {
   if (instrument.instrumentId) return `ID:${instrument.instrumentId}`;
@@ -35,7 +35,13 @@ function mergeInstruments(items = []) {
 function factorCapability(capabilities) {
   const raw = capabilities?.capabilities?.OPPORTUNITY_FACTORS;
   if (!raw || typeof raw !== 'object' || raw.verified !== true) return null;
-  return raw.factors && typeof raw.factors === 'object' ? raw.factors : null;
+  const factors = raw.factors && typeof raw.factors === 'object' ? raw.factors : null;
+  if (!factors) return null;
+  const entries = Object.entries(factors);
+  if (!entries.length) return null;
+  // Every factor must carry its own explicit provenance/verification marker.
+  if (entries.some(([, factor]) => !factor || typeof factor !== 'object' || factor.verified !== true || !Number.isFinite(Number(factor.score)) || Number(factor.sourceCount) < 1)) return null;
+  return factors;
 }
 
 function scoreFromLiquidity(capabilities) {
@@ -121,39 +127,45 @@ export async function scanOpportunityUniverse(options = {}) {
       now: generatedAt,
     });
     const evaluation = evaluateInstrumentCapabilities(profile, capabilities);
-    const providerFactors = factorCapability(capabilities);
-    const declaredFactors = instrument.opportunityFactors && typeof instrument.opportunityFactors === 'object' ? instrument.opportunityFactors : null;
-    const factors = providerFactors || declaredFactors;
+    const factors = factorCapability(capabilities);
 
     if (!factors) {
       unsupported.push({
         instrumentId: profile.instrumentId,
         displayName: profile.displayName,
         assetClass: profile.assetClass,
-        reason: 'OPPORTUNITY_FACTORS_REQUIRED',
+        reason: 'VERIFIED_OPPORTUNITY_FACTORS_REQUIRED',
         routeBlockers: route.blockers,
         capabilityBlockers: evaluation.blockers || [],
       });
       continue;
     }
 
-    const equityRisk = Number(instrument.opportunityRiskScore);
-    const riskScore = Number.isFinite(equityRisk) ? equityRisk : evaluation.riskScore;
+    const riskScore = Number(evaluation.riskScore);
+    const executionQualityScore = scoreFromLiquidity(capabilities);
+    const evidenceQualityScore = evidenceQuality(capabilities, evaluation);
+    const contradictionCapability = capabilities?.capabilities?.CONTRADICTIONS;
+    const contradictionCount = contradictionCapability?.verified === true && Number.isFinite(Number(contradictionCapability.count))
+      ? Math.max(0, Number(contradictionCapability.count))
+      : 0;
+
     scoredCandidates.push({
       instrumentId: profile.instrumentId,
       displayName: profile.displayName,
       profile,
       factors,
-      riskScore: Number.isFinite(Number(riskScore)) ? Number(riskScore) : 100,
-      liquidityScore: scoreFromLiquidity(capabilities),
-      executionQualityScore: Number.isFinite(Number(instrument.executionQualityScore)) ? Number(instrument.executionQualityScore) : scoreFromLiquidity(capabilities),
-      evidenceQualityScore: Number.isFinite(Number(instrument.evidenceQualityScore)) ? Number(instrument.evidenceQualityScore) : evidenceQuality(capabilities, evaluation),
-      contradictionCount: Number(instrument.contradictionCount || 0),
-      severeRiskFlags: [...new Set([...(evaluation.riskFlags || []), ...(instrument.severeRiskFlags || [])].filter((flag) => /^SEVERE_|^EXTREME_|DISTRESS|SOLVENCY|DEFAULT/.test(String(flag))))],
+      riskScore: Number.isFinite(riskScore) ? riskScore : 100,
+      liquidityScore: executionQualityScore,
+      executionQualityScore,
+      evidenceQualityScore,
+      contradictionCount,
+      severeRiskFlags: [...new Set((evaluation.riskFlags || []).filter((flag) => /^SEVERE_|^EXTREME_|DISTRESS|SOLVENCY|DEFAULT/.test(String(flag))))],
       strategyContextVerified: evaluation.strategyContextReady === true,
       source: {
         universeProviderId: instrument.universeProviderId || 'SEED_UNIVERSE',
         capabilityProviderCount: capabilities.providerCount,
+        opportunityFactorsVerified: true,
+        rawSeedScoresIgnored: true,
       },
     });
   }
@@ -164,7 +176,7 @@ export async function scanOpportunityUniverse(options = {}) {
 
   return {
     format: 'investor-control-opportunity-universe-scan',
-    version: 1,
+    version: 2,
     policyVersion: OPPORTUNITY_UNIVERSE_SCANNER_VERSION,
     generatedAt,
     providerCount: universeProviders.length,
@@ -178,6 +190,6 @@ export async function scanOpportunityUniverse(options = {}) {
     ranking: ranked,
     unsupported,
     diagnostics,
-    invariant: 'DISCOVERY_CAN_PRIORITIZE_DEEP_RESEARCH_BUT_CANNOT_BYPASS_FINAL_ACTION_POLICY',
+    invariant: 'ONLY_PROVIDER_VERIFIED_FACTORS_MAY_ENTER_OPPORTUNITY_SCORING_AND_DISCOVERY_CAN_NEVER_BYPASS_FINAL_ACTION_POLICY',
   };
 }

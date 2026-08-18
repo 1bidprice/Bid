@@ -1,4 +1,4 @@
-export const FINAL_ACTION_POLICY_VERSION = '2026-07-27.1';
+export const FINAL_ACTION_POLICY_VERSION = '2026-08-18.2';
 
 export const FINAL_ACTIONS = Object.freeze({
   BUY_NOW: 'BUY_NOW',
@@ -43,6 +43,10 @@ function ageHours(now, timestamp) {
   return Math.max(0, (now.getTime() - time) / 3_600_000);
 }
 
+function normalizedSymbol(value) {
+  return String(value || '').trim().toUpperCase().replace(/\.(US|GR)$/i, '');
+}
+
 function actionLabel(action) {
   return {
     BUY_NOW: 'ΑΜΕΣΗ ΑΓΟΡΑ',
@@ -63,38 +67,87 @@ function urgencyLabel(urgency) {
   }[urgency] || urgency;
 }
 
-function dataQualityScore(dossier) {
+function decisionIntegrity(dossier) {
+  const blockers = [];
+  const companyId = dossier?.companyId || null;
+  const proposed = dossier?.proposedAction || 'WATCH';
+  const directional = proposed !== 'WATCH';
+  const reference = dossier?.referencePrice || null;
+  const listingSymbol = normalizedSymbol(dossier?.listing?.symbol);
+  const referenceSymbol = normalizedSymbol(reference?.appSymbol || reference?.symbol || reference?.providerSymbol);
+  const evidence = Array.isArray(dossier?.evidence) ? dossier.evidence : [];
+
+  if (!companyId || companyId === 'company:unknown') blockers.push('COMPANY_IDENTITY_REQUIRED');
+
+  if (directional) {
+    if (!evidence.length) blockers.push('DECISION_EVIDENCE_REQUIRED');
+    for (const record of evidence) {
+      const ids = Array.isArray(record?.companyIds) ? record.companyIds.filter(Boolean) : [];
+      if (!ids.length) blockers.push('EVIDENCE_ENTITY_UNVERIFIED');
+      else if (companyId && !ids.includes(companyId)) blockers.push('EVIDENCE_ENTITY_MISMATCH');
+    }
+
+    if (reference?.companyId && companyId && reference.companyId !== companyId) blockers.push('REFERENCE_PRICE_ENTITY_MISMATCH');
+    if (reference?.sourceApproved !== true) blockers.push('REFERENCE_PRICE_SOURCE_NOT_APPROVED');
+    if (reference?.timestampVerified !== true) blockers.push('REFERENCE_PRICE_TIMESTAMP_NOT_VERIFIED');
+    if (reference?.decisionEligible !== true) blockers.push('REFERENCE_PRICE_NOT_DECISION_ELIGIBLE');
+    if (reference?.executionFreshnessEligible !== true) blockers.push('REFERENCE_PRICE_NOT_EXECUTION_ELIGIBLE');
+    if (listingSymbol && referenceSymbol && listingSymbol !== referenceSymbol) blockers.push('LISTING_IDENTITY_MISMATCH');
+  }
+
+  if (proposed === 'CONSIDER_BUY') {
+    if (dossier?.listingIntegrity?.activeTradingVerified !== true) blockers.push('ACTIVE_LISTING_NOT_VERIFIED');
+    const lifecycle = String(dossier?.listingIntegrity?.lifecycleStatus || '').toUpperCase();
+    if (['DELISTED', 'INACTIVE', 'PRIVATE', 'ACQUIRED', 'CEASED_TRADING'].includes(lifecycle)) blockers.push('LISTING_NOT_ACTIVE');
+  }
+
+  return {
+    passed: blockers.length === 0,
+    blockers: unique(blockers),
+    companyId,
+    listingSymbol: listingSymbol || null,
+    referenceSymbol: referenceSymbol || null,
+    evidenceCount: evidence.length,
+  };
+}
+
+function dataQualityScore(dossier, integrity) {
   const crossCheck = dossier?.metrics?.crossCheck || {};
   const fundamentals = dossier?.metrics?.fundamentals || {};
   const market = dossier?.metrics?.market || {};
   const reference = dossier?.referencePrice || null;
   let score = 0;
-  if (dossier?.readiness?.publishable === true) score += 20;
-  if (crossCheck.recommendationReady === true) score += 25;
-  if (fundamentals.metricsReady === true) score += 20;
-  if (market.readiness?.marketMetricsReady === true) score += 20;
+  if (dossier?.readiness?.publishable === true) score += 15;
+  if (crossCheck.recommendationReady === true) score += 20;
+  if (fundamentals.metricsReady === true) score += 15;
+  if (market.readiness?.marketMetricsReady === true) score += 15;
   if (reference?.timestamp && finite(reference?.value) > 0) score += 10;
+  if (reference?.decisionEligible === true && reference?.sourceApproved === true && reference?.timestampVerified === true) score += 10;
   if ((dossier?.evidence || []).length >= 2) score += 5;
-  return clamp(score);
+  if (integrity?.passed === true) score += 10;
+  const raw = clamp(score);
+  return integrity?.passed === true ? raw : Math.min(raw, 79);
 }
 
-function confidenceScore(dossier, flags) {
+function confidenceScore(dossier, flags, integrity) {
   const crossCheck = dossier?.metrics?.crossCheck || {};
   const market = dossier?.metrics?.market || {};
   const risk = dossier?.metrics?.fundamentalRisk || {};
-  let score = 45;
+  let score = 35;
   if (crossCheck.recommendationReady === true) score += 20;
   if (market.readiness?.marketMetricsReady === true) score += 15;
   if (risk.metricsReady === true) score += 10;
   if (finite(market.relativeStrength?.excessReturnPct) !== null) score += 5;
   if (finite(market.liquidity?.score) >= 65) score += 5;
+  if (integrity?.passed === true) score += 10;
   score -= flags.severeFundamental.length * 8;
   score -= flags.severeMarket.length * 8;
-  return clamp(score);
+  const raw = clamp(score);
+  return integrity?.passed === true ? raw : Math.min(raw, 79);
 }
 
-function finalBlockers(dossier, now, options) {
-  const blockers = [];
+function finalBlockers(dossier, now, options, integrity) {
+  const blockers = [...(integrity?.blockers || [])];
   const market = dossier?.metrics?.market || null;
   const fundamentals = dossier?.metrics?.fundamentals || null;
   const crossCheck = dossier?.metrics?.crossCheck || null;
@@ -109,6 +162,7 @@ function finalBlockers(dossier, now, options) {
   if (crossCheck?.recommendationReady !== true) blockers.push('CROSS_CHECK_NOT_READY');
   if (fundamentals?.metricsReady !== true) blockers.push('FUNDAMENTALS_NOT_READY');
   if (market?.readiness?.marketMetricsReady !== true) blockers.push('MARKET_METRICS_NOT_READY');
+  if (market?.dataQuality?.crossCheckReady === false) blockers.push('MARKET_HISTORY_NOT_CROSSCHECKED');
   if (!dossier?.referencePrice?.timestamp || finite(dossier?.referencePrice?.value) === null) blockers.push('REFERENCE_PRICE_REQUIRED');
   if (referencePriceAgeHours === null || referencePriceAgeHours > Number(options.maxReferencePriceAgeHours ?? 6)) blockers.push('REFERENCE_PRICE_STALE');
   if (dossierAgeHours === null || dossierAgeHours > Number(options.maxDossierAgeHours ?? 24)) blockers.push('DOSSIER_STALE');
@@ -120,6 +174,7 @@ function finalBlockers(dossier, now, options) {
     referencePriceAgeHours,
     dossierAgeHours,
     latestMarketAgeHours,
+    executionFreshnessEligible: dossier?.referencePrice?.executionFreshnessEligible === true,
   };
 }
 
@@ -219,10 +274,11 @@ function determineActions(dossier, flags, confidence, now, options) {
 
 export function evaluateFinalAction(dossier, options = {}) {
   const now = new Date(options.now || Date.now());
-  const freshness = finalBlockers(dossier, now, options);
+  const integrity = decisionIntegrity(dossier);
+  const freshness = finalBlockers(dossier, now, options, integrity);
   const flags = riskFlags(dossier);
-  const quality = dataQualityScore(dossier);
-  const confidence = confidenceScore(dossier, flags);
+  const quality = dataQualityScore(dossier, integrity);
+  const confidence = confidenceScore(dossier, flags, integrity);
   const blocked = freshness.blockers.length > 0;
   const actions = blocked
     ? {
@@ -238,7 +294,7 @@ export function evaluateFinalAction(dossier, options = {}) {
 
   return {
     format: 'investor-control-final-action',
-    version: 1,
+    version: 2,
     policyVersion: FINAL_ACTION_POLICY_VERSION,
     generatedAt,
     validUntil: new Date(now.getTime() + validForHours * 3_600_000).toISOString(),
@@ -252,13 +308,16 @@ export function evaluateFinalAction(dossier, options = {}) {
     urgency: actions.urgency,
     urgencyLabel: urgencyLabel(actions.urgency),
     confidenceScore: confidence,
+    confidenceMeaning: 'POLICY_COMPLETENESS_HEURISTIC_NOT_PROBABILITY',
     dataQualityScore: quality,
     reasons: unique(actions.reasons),
     blockers: freshness.blockers,
+    integrity,
     freshness: {
       referencePriceAgeHours: freshness.referencePriceAgeHours,
       dossierAgeHours: freshness.dossierAgeHours,
       latestMarketAgeHours: freshness.latestMarketAgeHours,
+      executionFreshnessEligible: freshness.executionFreshnessEligible,
     },
     risk: {
       riskScore: finite(dossier?.metrics?.fundamentalRisk?.riskScore),
