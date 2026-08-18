@@ -1,6 +1,6 @@
 import { ASSET_CLASS } from './instrument-profile.js';
 
-export const OPPORTUNITY_ENGINE_VERSION = '2026-08-09.2';
+export const OPPORTUNITY_ENGINE_VERSION = '2026-08-18.1';
 
 const clamp = (value, min = 0, max = 100) => Math.max(min, Math.min(max, Number(value) || 0));
 const round = (value, digits = 2) => Number(Number(value || 0).toFixed(digits));
@@ -8,8 +8,6 @@ const unique = (values = []) => [...new Set(values.filter(Boolean))];
 
 const MODEL = Object.freeze({
   [ASSET_CLASS.EQUITY]: {
-    // A fundamental opportunity must be able to qualify without a discrete
-    // event catalyst or portfolio-fit score, but those dimensions improve rank.
     weights: { valuation: 0.22, quality: 0.20, growth: 0.14, momentum: 0.14, catalyst: 0.08, balanceSheet: 0.12, liquidity: 0.06, diversificationBenefit: 0.04 },
     minimumStrongPillars: 4,
     maxRiskForSuper: 60,
@@ -66,14 +64,18 @@ const MODEL = Object.freeze({
 function verifiedFactor(candidate, key) {
   const factor = candidate?.factors?.[key];
   if (factor === null || factor === undefined) return null;
-  if (typeof factor === 'number') return { score: clamp(factor), verified: true, sourceCount: 1, ageHours: null, peerSampleSize: null };
+  // A naked numeric score has no provenance and must never be promoted to
+  // verified evidence. Only an explicit verified factor object is accepted.
+  if (typeof factor === 'number') return null;
   if (factor.verified !== true) return null;
   const score = Number(factor.score);
   if (!Number.isFinite(score)) return null;
+  const sourceCount = Number(factor.sourceCount);
+  if (!Number.isFinite(sourceCount) || sourceCount < 1) return null;
   return {
     score: clamp(score),
     verified: true,
-    sourceCount: Math.max(1, Number(factor.sourceCount || 1)),
+    sourceCount: Math.max(1, sourceCount),
     ageHours: Number.isFinite(Number(factor.ageHours)) ? Math.max(0, Number(factor.ageHours)) : null,
     peerSampleSize: Number.isFinite(Number(factor.peerSampleSize)) && Number(factor.peerSampleSize) > 0 ? Number(factor.peerSampleSize) : null,
     peerKey: factor.peerKey || null,
@@ -172,6 +174,7 @@ export function scoreOpportunityCandidate(candidate = {}) {
 
   const blockers = [];
   if (weighted.coverageScore < 70) blockers.push('INSUFFICIENT_FACTOR_COVERAGE');
+  if (weighted.missing.length) blockers.push('UNVERIFIED_OR_MISSING_FACTORS');
   if (evidenceQuality < 60) blockers.push('LOW_EVIDENCE_QUALITY');
   if (executionQuality < 45) blockers.push('INSUFFICIENT_EXECUTION_QUALITY');
   if (riskScore > model.maxRiskForSuper) blockers.push('RISK_TOO_HIGH_FOR_SUPER_TIER');
@@ -209,7 +212,7 @@ export function scoreOpportunityCandidate(candidate = {}) {
 
   return {
     format: 'investor-control-opportunity-score',
-    version: 1,
+    version: 2,
     policyVersion: OPPORTUNITY_ENGINE_VERSION,
     instrumentId: candidate.instrumentId || candidate?.profile?.instrumentId || null,
     displayName: candidate.displayName || candidate?.profile?.displayName || null,
@@ -246,7 +249,7 @@ export function rankOpportunityUniverse(candidates = [], options = {}) {
   const ranked = scores.slice(0, limit).map((item, index) => ({ ...item, rank: index + 1 }));
   return {
     format: 'investor-control-opportunity-universe',
-    version: 1,
+    version: 2,
     policyVersion: OPPORTUNITY_ENGINE_VERSION,
     generatedAt: new Date(options.generatedAt || Date.now()).toISOString(),
     scannedCount: candidates.length,
