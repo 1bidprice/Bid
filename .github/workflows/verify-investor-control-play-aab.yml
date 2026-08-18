@@ -60,6 +60,7 @@ jobs:
         run: |
           set -euo pipefail
           npm run test:lots
+          npm run test:quote-transparency
           npx expo install --check
           npx expo-doctor@latest
           npx expo export --platform android --output-dir dist-play-aab
@@ -69,7 +70,7 @@ jobs:
           const pkg = require('./package.json');
           const portfolio = fs.readFileSync('./PortfolioApp.js', 'utf8');
           const decision = fs.readFileSync('./DecisionOverlay.js', 'utf8');
-          if (app.expo.version !== '1.7.1' || app.expo.android.versionCode !== 29) throw new Error('current release version mismatch');
+          if (app.expo.version !== '1.7.2' || app.expo.android.versionCode !== 30) throw new Error('current release version mismatch');
           if (app.expo.android.package !== 'gr.investorcontrol.app') throw new Error('legacy package mismatch');
           const plugin = app.expo.plugins.find((item) => Array.isArray(item) && item[0] === 'expo-build-properties');
           if (plugin?.[1]?.android?.targetSdkVersion !== 36 || plugin?.[1]?.android?.compileSdkVersion !== 36) throw new Error('API 36 config missing');
@@ -77,9 +78,11 @@ jobs:
           for (const permission of ['android.permission.SYSTEM_ALERT_WINDOW','com.google.android.c2dm.permission.RECEIVE']) {
             if (!app.expo.android.blockedPermissions.includes(permission)) throw new Error(`permission not blocked: ${permission}`);
           }
-          if (pkg.version !== '1.7.1') throw new Error('mobile package version mismatch');
-          if (!portfolio.includes("const VERSION = '1.7.1';")) throw new Error('PortfolioApp runtime version mismatch');
-          if (!decision.includes("const VERSION = '1.7.1';")) throw new Error('DecisionOverlay runtime version mismatch');
+          if (pkg.version !== '1.7.2') throw new Error('mobile package version mismatch');
+          if (!portfolio.includes("const VERSION = '1.7.2';")) throw new Error('PortfolioApp runtime version mismatch');
+          if (!decision.includes("const VERSION = '1.7.2';")) throw new Error('DecisionOverlay runtime version mismatch');
+          if (!portfolio.includes('function quoteHeadlineLabel(quote)')) throw new Error('dynamic quote headline missing');
+          if (!portfolio.includes('Ο ακριβής χρόνος αυτής της τιμής δεν είναι επαληθευμένος.')) throw new Error('quote timestamp disclosure missing');
           if (!portfolio.includes('Σημαντική ενημέρωση πριν τη χρήση')) throw new Error('mandatory risk notice missing');
           if (!portfolio.includes('https://1bidprice.github.io/Bid/privacy-policy.html')) throw new Error('privacy policy link missing');
           if (portfolio.includes('Επικόλλησε το προσωπικό token')) throw new Error('personal provider token UI must not ship');
@@ -100,24 +103,24 @@ jobs:
         run: |
           set -euo pipefail
           APK='mobile/android/app/build/outputs/apk/release/app-release.apk'
-          UPDATE='mobile/Investor-Control-v1.7.1-update.apk'
-          ALIGNED='mobile/Investor-Control-v1.7.1-aligned.apk'
+          UPDATE='mobile/Investor-Control-v1.7.2-update.apk'
+          ALIGNED='mobile/Investor-Control-v1.7.2-aligned.apk'
           KEYSTORE='mobile/android/app/debug.keystore'
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           test -s "$APK" && test -s "$KEYSTORE"
           "$BUILD_TOOLS/zipalign" -p -f 4 "$APK" "$ALIGNED"
           "$BUILD_TOOLS/apksigner" sign --ks "$KEYSTORE" --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --out "$UPDATE" "$ALIGNED"
-          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$UPDATE" | tee mobile/Investor-Control-v1.7.1-update-signature.txt
-          grep -qi 'fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c' mobile/Investor-Control-v1.7.1-update-signature.txt
-          "$BUILD_TOOLS/aapt2" dump badging "$UPDATE" | tee mobile/Investor-Control-v1.7.1-badging.txt
-          grep -q "package: name='gr.investorcontrol.app' versionCode='29' versionName='1.7.1'" mobile/Investor-Control-v1.7.1-badging.txt
-          grep -q "targetSdkVersion:'36'" mobile/Investor-Control-v1.7.1-badging.txt
-          "$BUILD_TOOLS/aapt2" dump permissions "$UPDATE" | tee mobile/Investor-Control-v1.7.1-permissions.txt
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$UPDATE" | tee mobile/Investor-Control-v1.7.2-update-signature.txt
+          grep -qi 'fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c' mobile/Investor-Control-v1.7.2-update-signature.txt
+          "$BUILD_TOOLS/aapt2" dump badging "$UPDATE" | tee mobile/Investor-Control-v1.7.2-badging.txt
+          grep -q "package: name='gr.investorcontrol.app' versionCode='30' versionName='1.7.2'" mobile/Investor-Control-v1.7.2-badging.txt
+          grep -q "targetSdkVersion:'36'" mobile/Investor-Control-v1.7.2-badging.txt
+          "$BUILD_TOOLS/aapt2" dump permissions "$UPDATE" | tee mobile/Investor-Control-v1.7.2-permissions.txt
           for forbidden in ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION CAMERA RECORD_AUDIO READ_CONTACTS WRITE_CONTACTS READ_PHONE_STATE CALL_PHONE READ_SMS SEND_SMS SYSTEM_ALERT_WINDOW; do
-            ! grep -q "android.permission.${forbidden}" mobile/Investor-Control-v1.7.1-permissions.txt || { echo "forbidden permission ${forbidden}" >&2; exit 1; }
+            ! grep -q "android.permission.${forbidden}" mobile/Investor-Control-v1.7.2-permissions.txt || { echo "forbidden permission ${forbidden}" >&2; exit 1; }
           done
-          ! grep -q 'com.google.android.c2dm.permission.RECEIVE' mobile/Investor-Control-v1.7.1-permissions.txt || { echo 'unused push receive permission present' >&2; exit 1; }
-          sha256sum "$UPDATE" | tee mobile/Investor-Control-v1.7.1-update.sha256
+          ! grep -q 'com.google.android.c2dm.permission.RECEIVE' mobile/Investor-Control-v1.7.2-permissions.txt || { echo 'unused push receive permission present' >&2; exit 1; }
+          sha256sum "$UPDATE" | tee mobile/Investor-Control-v1.7.2-update.sha256
 
       - name: Create isolated Play package
         working-directory: mobile
@@ -128,7 +131,7 @@ jobs:
           path = Path('android/app/build.gradle')
           text = path.read_text()
           text, app_count = re.subn(r'applicationId\s+["\']gr\.investorcontrol\.app["\']', 'applicationId "gr.investorcontrol.play"', text, count=1)
-          text, code_count = re.subn(r'versionCode\s+29\b', 'versionCode 1', text, count=1)
+          text, code_count = re.subn(r'versionCode\s+30\b', 'versionCode 1', text, count=1)
           if app_count != 1 or code_count != 1:
               raise SystemExit(f'Play variant patch failed: applicationId={app_count}, versionCode={code_count}')
           path.write_text(text)
@@ -179,19 +182,19 @@ jobs:
         run: |
           set -euo pipefail
           AAB_SOURCE='mobile/android/app/build/outputs/bundle/release/app-release.aab'
-          AAB='mobile/Investor-Control-v1.7.1-play-signed.aab'
+          AAB='mobile/Investor-Control-v1.7.2-play-signed.aab'
           test -s "$AAB_SOURCE"
           cp "$AAB_SOURCE" "$AAB"
-          jarsigner -verify -verbose -certs "$AAB" | tee mobile/Investor-Control-v1.7.1-play-signature.txt
-          grep -qi 'jar verified' mobile/Investor-Control-v1.7.1-play-signature.txt
+          jarsigner -verify -verbose -certs "$AAB" | tee mobile/Investor-Control-v1.7.2-play-signature.txt
+          grep -qi 'jar verified' mobile/Investor-Control-v1.7.2-play-signature.txt
           curl --fail --location --silent --show-error 'https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar' --output /tmp/bundletool.jar
           java -jar /tmp/bundletool.jar validate --bundle="$AAB"
           PLAY_PACKAGE="$(java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB" --module=base --xpath='/manifest/@package')"
           PLAY_VERSION_CODE="$(java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB" --module=base --xpath='/manifest/@android:versionCode')"
           test "$PLAY_PACKAGE" = 'gr.investorcontrol.play'
           test "$PLAY_VERSION_CODE" = '1'
-          printf 'package=%s\nversionCode=%s\nversionName=1.7.1\ntargetSdk=36\nsigned=true\n' "$PLAY_PACKAGE" "$PLAY_VERSION_CODE" | tee mobile/Investor-Control-v1.7.1-play-manifest.txt
-          sha256sum "$AAB" | tee mobile/Investor-Control-v1.7.1-play-signed.sha256
+          printf 'package=%s\nversionCode=%s\nversionName=1.7.2\ntargetSdk=36\nsigned=true\n' "$PLAY_PACKAGE" "$PLAY_VERSION_CODE" | tee mobile/Investor-Control-v1.7.2-play-manifest.txt
+          sha256sum "$AAB" | tee mobile/Investor-Control-v1.7.2-play-signed.sha256
 
       - name: Encrypt upload-key recovery package
         shell: bash
@@ -243,17 +246,17 @@ jobs:
       - name: Upload verified Play release candidate
         uses: actions/upload-artifact@v4
         with:
-          name: investor-control-v1.7.1-final-play-release-candidate
+          name: investor-control-v1.7.2-final-play-release-candidate
           path: |
-            mobile/Investor-Control-v1.7.1-update.apk
-            mobile/Investor-Control-v1.7.1-update.sha256
-            mobile/Investor-Control-v1.7.1-update-signature.txt
-            mobile/Investor-Control-v1.7.1-badging.txt
-            mobile/Investor-Control-v1.7.1-permissions.txt
-            mobile/Investor-Control-v1.7.1-play-signed.aab
-            mobile/Investor-Control-v1.7.1-play-signed.sha256
-            mobile/Investor-Control-v1.7.1-play-signature.txt
-            mobile/Investor-Control-v1.7.1-play-manifest.txt
+            mobile/Investor-Control-v1.7.2-update.apk
+            mobile/Investor-Control-v1.7.2-update.sha256
+            mobile/Investor-Control-v1.7.2-update-signature.txt
+            mobile/Investor-Control-v1.7.2-badging.txt
+            mobile/Investor-Control-v1.7.2-permissions.txt
+            mobile/Investor-Control-v1.7.2-play-signed.aab
+            mobile/Investor-Control-v1.7.2-play-signed.sha256
+            mobile/Investor-Control-v1.7.2-play-signature.txt
+            mobile/Investor-Control-v1.7.2-play-manifest.txt
             mobile/Investor-Control-play-upload-certificate.pem
             mobile/Investor-Control-play-upload-certificate.txt
             mobile/Investor-Control-play-upload-key.zip.enc
