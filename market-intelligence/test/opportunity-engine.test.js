@@ -45,6 +45,35 @@ test('multi-factor verified equity can become a SUPER_OPPORTUNITY_CANDIDATE with
   assert.equal(result.blockers.length, 0);
 });
 
+test('bare numeric factor scores are treated as unverified and cannot create a high-confidence opportunity', () => {
+  const result = scoreOpportunityCandidate({
+    instrumentId: 'eq:unverified',
+    displayName: 'Unverified Equity',
+    profile: equityProfile('eq:unverified'),
+    factors: {
+      valuation: 100,
+      quality: 100,
+      growth: 100,
+      momentum: 100,
+      catalyst: 100,
+      balanceSheet: 100,
+      liquidity: 100,
+      diversificationBenefit: 100,
+    },
+    evidenceQualityScore: 100,
+    executionQualityScore: 100,
+    riskScore: 0,
+  });
+
+  assert.notEqual(result.tier, 'SUPER_OPPORTUNITY_CANDIDATE');
+  assert.notEqual(result.tier, 'HIGH_PRIORITY_CANDIDATE');
+  assert.equal(result.factorCoverageScore, 0);
+  assert.equal(result.missingFactors.length, 8);
+  assert.ok(result.blockers.includes('UNVERIFIED_OR_MISSING_FACTORS'));
+  assert.ok(result.blockers.includes('INSUFFICIENT_FACTOR_COVERAGE'));
+  assert.equal(result.finalActionEligible, false);
+});
+
 test('cheap distressed equity is never called super merely because valuation is extreme', () => {
   const result = scoreOpportunityCandidate({
     instrumentId: 'eq:value-trap',
