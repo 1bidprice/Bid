@@ -1,4 +1,4 @@
-export const FINAL_ACTION_POLICY_VERSION = '2026-08-18.1';
+export const FINAL_ACTION_POLICY_VERSION = '2026-08-18.2';
 
 export const FINAL_ACTIONS = Object.freeze({
   BUY_NOW: 'BUY_NOW',
@@ -162,6 +162,7 @@ function finalBlockers(dossier, now, options, integrity) {
   if (crossCheck?.recommendationReady !== true) blockers.push('CROSS_CHECK_NOT_READY');
   if (fundamentals?.metricsReady !== true) blockers.push('FUNDAMENTALS_NOT_READY');
   if (market?.readiness?.marketMetricsReady !== true) blockers.push('MARKET_METRICS_NOT_READY');
+  if (market?.dataQuality?.crossCheckReady === false) blockers.push('MARKET_HISTORY_NOT_CROSSCHECKED');
   if (!dossier?.referencePrice?.timestamp || finite(dossier?.referencePrice?.value) === null) blockers.push('REFERENCE_PRICE_REQUIRED');
   if (referencePriceAgeHours === null || referencePriceAgeHours > Number(options.maxReferencePriceAgeHours ?? 6)) blockers.push('REFERENCE_PRICE_STALE');
   if (dossierAgeHours === null || dossierAgeHours > Number(options.maxDossierAgeHours ?? 24)) blockers.push('DOSSIER_STALE');
@@ -173,6 +174,7 @@ function finalBlockers(dossier, now, options, integrity) {
     referencePriceAgeHours,
     dossierAgeHours,
     latestMarketAgeHours,
+    executionFreshnessEligible: dossier?.referencePrice?.executionFreshnessEligible === true,
   };
 }
 
@@ -315,6 +317,7 @@ export function evaluateFinalAction(dossier, options = {}) {
       referencePriceAgeHours: freshness.referencePriceAgeHours,
       dossierAgeHours: freshness.dossierAgeHours,
       latestMarketAgeHours: freshness.latestMarketAgeHours,
+      executionFreshnessEligible: freshness.executionFreshnessEligible,
     },
     risk: {
       riskScore: finite(dossier?.metrics?.fundamentalRisk?.riskScore),
