@@ -16,6 +16,7 @@ const company = {
 const structuredEvidence = [
   {
     id: 'evidence:structured:fundamental',
+    companyIds: [company.companyId],
     sourceName: 'SEC structured financial data',
     sourceType: 'STRUCTURED_FUNDAMENTALS',
     sourceUrl: 'https://data.sec.gov/api/xbrl/companyfacts/CIK0000000001.json',
@@ -28,6 +29,7 @@ const structuredEvidence = [
   },
   {
     id: 'evidence:structured:market',
+    companyIds: [company.companyId],
     sourceName: 'Licensed market data',
     sourceType: 'VERIFIED_MARKET_DATA',
     sourceUrl: 'https://example.test/market',
@@ -41,6 +43,10 @@ const structuredEvidence = [
 ];
 
 const marketMetrics = {
+  companyId: company.companyId,
+  companyName: company.displayName,
+  appSymbol: 'EXBL',
+  providerSymbol: 'EXBL',
   latestClose: 20,
   latestTimestamp,
   currency: 'USD',
@@ -107,6 +113,8 @@ test('FUNDAMENTAL_BASELINE decision corroboration survives dossier serialization
   assert.equal(built.decisionBasis, 'FUNDAMENTAL_BASELINE');
   assert.equal(built.metrics.decisionCorroboration?.ready, true, JSON.stringify(built.metrics, null, 2));
   assert.equal(built.metrics.crossCheck?.recommendationReady, false);
+  assert.equal(built.integrityContractVersion, 1);
+  assert.ok(built.evidence.every((record) => record.companyIds.includes(company.companyId)));
 
   const action = evaluateFinalAction(built, { now: NOW });
   assert.equal(action.status, 'FINAL', JSON.stringify(action, null, 2));
@@ -114,6 +122,7 @@ test('FUNDAMENTAL_BASELINE decision corroboration survives dossier serialization
   assert.equal(action.holderAction, 'HOLD');
   assert.equal(action.nonHolderAction, 'WATCH');
   assert.ok(!action.blockers.includes('CROSS_CHECK_NOT_READY'));
+  assert.ok(!action.blockers.includes('REFERENCE_PRICE_NOT_EXECUTION_ELIGIBLE'));
 });
 
 test('same evidence remains blocked when explicitly treated as EVENT_DRIVEN without event corroboration', () => {

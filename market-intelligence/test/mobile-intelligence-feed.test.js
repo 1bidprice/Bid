@@ -32,6 +32,7 @@ function dossier(overrides = {}) {
       publishedAt: NOW,
       documentStatus: 'REVIEWED_TEXT',
       isPrimarySource: true,
+      companyIds: ['company:test'],
     }],
     readiness: {
       publishable: false,
@@ -55,12 +56,13 @@ test('draft directional research is rendered as WATCH with blockers and one next
   assert.equal(feed.research[0].categoryLabel, 'Σημαντικό επερχόμενο ρίσκο');
   assert.ok(feed.research[0].blockerLabels.includes('Λείπει επαρκές ιστορικό τιμής και όγκου'));
   assert.equal(feed.research[0].nextStep, 'Εύρεση και ανάγνωση ανεξάρτητης αξιόπιστης πηγής');
+  assert.deepEqual(feed.research[0].sources[0].companyIds, ['company:test']);
   assert.equal(feed.today.primaryItem.id, dossier().dossierId);
   assert.equal(feed.assistantContext[0].action, 'WATCH');
   assert.equal('sources' in feed.assistantContext[0], false);
 });
 
-test('review-ready and published dossiers retain their supported action and separate sections', () => {
+test('review-ready and published dossiers retain supported actions and separate sections', () => {
   const reviewReady = dossier({
     dossierId: 'dossier:company:ready:1',
     companyId: 'company:ready',
@@ -88,6 +90,40 @@ test('review-ready and published dossiers retain their supported action and sepa
   assert.equal(feed.reviewReady[0].nextStep, 'Τελικός έλεγχος και απόφαση δημοσίευσης');
   assert.equal(feed.published[0].action, 'HOLD');
   assert.equal(feed.published[0].statusLabel, 'Δημοσιευμένη ανάλυση');
+  assert.equal(feed.published[0].nextStep, 'Έλεγχος τεκμηρίωσης');
+});
+
+test('a final action tells the user to read the evidence and decide, not to check the dossier afterwards', () => {
+  const published = dossier({
+    status: 'PUBLISHED',
+    category: 'FUNDAMENTAL_QUALITY',
+    proposedAction: 'CONSIDER_BUY',
+    referencePrice: { value: 20, currency: 'EUR', timestamp: NOW, source: 'Market data' },
+    readiness: { publishable: true, blockers: [] },
+    finalAction: {
+      status: 'FINAL',
+      marketAction: 'BUY_NOW',
+      marketActionLabel: 'ΑΜΕΣΗ ΑΓΟΡΑ',
+      nonHolderAction: 'BUY_NOW',
+      nonHolderActionLabel: 'ΑΜΕΣΗ ΑΓΟΡΑ',
+      confidenceScore: 84,
+      dataQualityScore: 90,
+      generatedAt: NOW,
+      validUntil: '2026-07-27T14:00:00.000Z',
+    },
+  });
+  const feed = buildMobileIntelligenceFeed({ generatedAt: NOW, researchDossiers: [published], diagnostics: [] });
+  assert.equal(feed.published[0].nextStep, 'Ανάγνωση τεκμηρίωσης και δική σου τελική απόφαση');
+  assert.notEqual(feed.published[0].nextStep, 'Έλεγχος του πλήρους φακέλου');
+});
+
+test('entity mismatch blocker is shown plainly instead of presenting unsupported certainty', () => {
+  const blocked = dossier({
+    readiness: { publishable: false, blockers: ['EVIDENCE_ENTITY_MISMATCH'] },
+  });
+  const feed = buildMobileIntelligenceFeed({ generatedAt: NOW, researchDossiers: [blocked], diagnostics: [] });
+  assert.ok(feed.research[0].blockerLabels.includes('Εντοπίστηκε πηγή που ανήκει σε άλλη εταιρεία'));
+  assert.equal(feed.research[0].nextStep, 'Αφαίρεση των πηγών άλλης εταιρείας και νέα διασταύρωση');
 });
 
 test('empty report produces a valid no-op feed rather than invented opportunities', () => {
