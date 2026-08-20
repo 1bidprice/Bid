@@ -28,7 +28,7 @@ function dossier(decisionBasis = 'FUNDAMENTAL_BASELINE') {
       companyId,
       appSymbol: 'BASE',
       sourceApproved: true,
-      timestampVerified: false,
+      timestampVerified: true,
       purpose: 'HISTORICAL_REFERENCE',
       analysisReferenceEligible: true,
       executionFreshnessEligible: false,
