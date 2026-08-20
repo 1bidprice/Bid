@@ -1,0 +1,120 @@
+name: Investor Control v1.7.3 Universal Integrity
+
+on:
+  push:
+    branches:
+      - investor-control-recommendation-integrity-fix-v2
+    paths:
+      - market-intelligence/**
+      - mobile/**
+      - .github/workflows/verify-investor-control-v173-universal-integrity.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-v173-universal-integrity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Validate universal market-intelligence integrity
+        working-directory: market-intelligence
+        run: npm test
+
+      - name: Install and apply mobile migration chain
+        working-directory: mobile
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: Validate universal mobile integrity
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          npm run test:lots
+          npm run test:quote-transparency
+          npm run test:instrument-integrity
+          npx expo install --check
+          npx expo-doctor@latest
+          npx expo export --platform android --output-dir dist-v173-integrity
+          node - <<'NODE'
+          const fs = require('fs');
+          const app = require('./app.json');
+          const pkg = require('./package.json');
+          const market = fs.readFileSync('./src/market-data.js', 'utf8');
+          const portfolio = fs.readFileSync('./PortfolioApp.js', 'utf8');
+          const quoteContract = fs.readFileSync('./src/quote-contract.js', 'utf8');
+          if (app.expo.version !== '1.7.3' || app.expo.android.versionCode !== 31) throw new Error('v1.7.3 build 31 identity mismatch');
+          if (app.expo.android.package !== 'gr.investorcontrol.app') throw new Error('package continuity mismatch');
+          if (pkg.version !== '1.7.3') throw new Error('package version mismatch');
+          if (market.includes('EURONEXT_ATHENS_URLS')) throw new Error('ticker-specific Athens whitelist remains');
+          if (market.includes("symbol === 'SPCE.US'")) throw new Error('ticker-specific US route remains');
+          if (!market.includes("if (route.market === 'US')") || !market.includes("if (route.market === 'GR')")) throw new Error('market-based routing missing');
+          if (market.includes("quote?.nativeCurrency || (symbol.endsWith('.US') ? 'USD' : 'EUR')")) throw new Error('currency inference remains');
+          if (!quoteContract.includes('evaluateMobileQuoteIntegrity')) throw new Error('universal quote gate missing');
+          if (!portfolio.includes('positionCurrencyVerified')) throw new Error('position currency gate missing');
+          NODE
+
+      - name: Prebuild Android
+        working-directory: mobile
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Build release APK
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Sign and verify update APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK='mobile/android/app/build/outputs/apk/release/app-release.apk'
+          ALIGNED='mobile/Investor-Control-v1.7.3-build31-aligned.apk'
+          UPDATE='mobile/Investor-Control-v1.7.3-build31.apk'
+          KEYSTORE='mobile/android/app/debug.keystore'
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          test -s "$APK" && test -s "$KEYSTORE"
+          "$BUILD_TOOLS/zipalign" -p -f 4 "$APK" "$ALIGNED"
+          "$BUILD_TOOLS/apksigner" sign --ks "$KEYSTORE" --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --out "$UPDATE" "$ALIGNED"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$UPDATE" | tee mobile/Investor-Control-v1.7.3-build31-signature.txt
+          grep -qi 'fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c' mobile/Investor-Control-v1.7.3-build31-signature.txt
+          "$BUILD_TOOLS/aapt2" dump badging "$UPDATE" | tee mobile/Investor-Control-v1.7.3-build31-badging.txt
+          grep -q "package: name='gr.investorcontrol.app' versionCode='31' versionName='1.7.3'" mobile/Investor-Control-v1.7.3-build31-badging.txt
+          grep -q "targetSdkVersion:'36'" mobile/Investor-Control-v1.7.3-build31-badging.txt
+          "$BUILD_TOOLS/aapt2" dump permissions "$UPDATE" | tee mobile/Investor-Control-v1.7.3-build31-permissions.txt
+          for forbidden in ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION CAMERA RECORD_AUDIO READ_CONTACTS WRITE_CONTACTS READ_PHONE_STATE CALL_PHONE READ_SMS SEND_SMS SYSTEM_ALERT_WINDOW; do
+            ! grep -q "android.permission.${forbidden}" mobile/Investor-Control-v1.7.3-build31-permissions.txt || { echo "forbidden permission ${forbidden}" >&2; exit 1; }
+          done
+          ! grep -q 'com.google.android.c2dm.permission.RECEIVE' mobile/Investor-Control-v1.7.3-build31-permissions.txt || { echo 'unused push receive permission present' >&2; exit 1; }
+          sha256sum "$UPDATE" | tee mobile/Investor-Control-v1.7.3-build31.sha256
+
+      - name: Upload verified v1.7.3 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1.7.3-build31-universal-integrity
+          path: |
+            mobile/Investor-Control-v1.7.3-build31.apk
+            mobile/Investor-Control-v1.7.3-build31.sha256
+            mobile/Investor-Control-v1.7.3-build31-signature.txt
+            mobile/Investor-Control-v1.7.3-build31-badging.txt
+            mobile/Investor-Control-v1.7.3-build31-permissions.txt
+          if-no-files-found: error
+          retention-days: 90
