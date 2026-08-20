@@ -377,6 +377,7 @@ patchVersions();
 
 const market = read('src/market-data.js');
 const portfolio = read('PortfolioApp.js');
+const decision = read('DecisionOverlay.js');
 const quoteContract = read('src/quote-contract.js');
 const app = JSON.parse(read('app.json'));
 const pkg = JSON.parse(read('package.json'));
