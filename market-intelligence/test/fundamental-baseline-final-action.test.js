@@ -5,8 +5,14 @@ import { evaluateFinalAction } from '../src/final-action-policy.js';
 const NOW = '2026-08-08T12:00:00.000Z';
 
 function dossier(decisionBasis = 'FUNDAMENTAL_BASELINE') {
+  const companyId = 'company:test:baseline';
   return {
-    companyId: 'company:test:baseline',
+    companyId,
+    companyName: 'Baseline Test Company',
+    assetClass: 'EQUITY',
+    listing: { symbol: 'BASE', exchange: 'NYSE', mic: 'XNYS', currency: 'USD' },
+    integrityContractVersion: 1,
+    listingIntegrity: { activeTradingVerified: true, lifecycleStatus: 'ACTIVE', verifiedAt: NOW },
     status: 'REVIEW_READY',
     generatedAt: NOW,
     reviewDate: '2026-09-30',
@@ -16,14 +22,23 @@ function dossier(decisionBasis = 'FUNDAMENTAL_BASELINE') {
     referencePrice: {
       value: 20,
       currency: 'USD',
+      nativeCurrency: 'USD',
       timestamp: '2026-08-06T20:00:00.000Z',
+      source: 'Licensed historical market data',
+      companyId,
+      appSymbol: 'BASE',
+      sourceApproved: true,
+      timestampVerified: false,
       purpose: 'HISTORICAL_REFERENCE',
       analysisReferenceEligible: true,
       executionFreshnessEligible: false,
       decisionEligible: false,
       freshnessModel: 'HISTORICAL_CLOSE',
     },
-    evidence: [{ id: 'evidence:f' }, { id: 'evidence:m' }],
+    evidence: [
+      { evidenceId: 'evidence:f', companyIds: [companyId] },
+      { evidenceId: 'evidence:m', companyIds: [companyId] },
+    ],
     metrics: {
       crossCheck: { recommendationReady: false, contradictionCount: 0 },
       decisionCorroboration: { ready: decisionBasis === 'FUNDAMENTAL_BASELINE' },
