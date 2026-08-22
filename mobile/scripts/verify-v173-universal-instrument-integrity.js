@@ -168,10 +168,9 @@ assert.ok(integritySource.includes("MOBILE_INSTRUMENT_INTEGRITY_VERSION = '2026-
 assert.ok(integritySource.includes('CLOSED_MARKET_REFERENCE'));
 assert.ok(portfolio.includes('positionCurrencyVerified'));
 assert.ok(portfolio.includes('route.expectedCurrency === position.currency'));
-assert.ok(portfolio.includes("<View style={{ alignItems: 'flex-start', marginTop: 10 }}>"));
-assert.ok(portfolio.includes("{ maxWidth: '100%' }"));
+assert.ok(portfolio.includes("maxWidth: '48%', flexShrink: 1"));
 assert.equal(app.expo.version, '1.7.3');
 assert.equal(app.expo.android.versionCode, 31);
 assert.equal(pkg.version, '1.7.3');
 
-console.log('Investor Control v1.7.3 universal instrument integrity verification passed, including closed-market valuation and mobile card layout regression coverage.');
+console.log('Investor Control v1.7.3 universal instrument integrity verification passed, including closed-market valuation and mobile badge-width regression coverage.');
