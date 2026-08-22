@@ -17,6 +17,13 @@ function replaceRequired(content, from, to, label) {
   return content.replace(from, to);
 }
 
+function replaceRegexRequired(content, pattern, replacement, sentinel, label) {
+  if (sentinel && content.includes(sentinel)) return content;
+  if (!pattern.test(content)) throw new Error(`Investor Control v1.7.3b runtime patch failed: missing ${label}`);
+  pattern.lastIndex = 0;
+  return content.replace(pattern, replacement);
+}
+
 function patchMarketContext() {
   let source = read('src/market-data.js');
   source = replaceRequired(
@@ -31,17 +38,18 @@ function patchMarketContext() {
 function patchPositionCardLayout() {
   let source = read('PortfolioApp.js');
 
-  source = replaceRequired(
+  source = replaceRegexRequired(
     source,
-    `        <View style={styles.rowTop}>\n          <View style={styles.grow}>\n            <Text style={styles.cardTitle}>{item.company}</Text>\n            <Text style={styles.muted}>{item.symbol} · {item.quantity.toLocaleString('el-GR')} μετοχές</Text>\n          </View>\n          <QuoteBadge quote={item.quote} />\n        </View>`,
-    `        <View style={{ width: '100%' }}>\n          <Text style={styles.cardTitle} numberOfLines={2}>{item.company}</Text>\n          <Text style={styles.muted}>{item.symbol} · {item.quantity.toLocaleString('el-GR')} μετοχές</Text>\n          <View style={{ alignItems: 'flex-start', marginTop: 10 }}>\n            <QuoteBadge quote={item.quote} />\n          </View>\n        </View>`,
+    /<View style=\{styles\.rowTop\}>\s*<View style=\{styles\.grow\}>\s*<Text style=\{styles\.cardTitle\}>\{item\.company\}<\/Text>\s*<Text style=\{styles\.muted\}>\{item\.symbol\} · \{item\.quantity\.toLocaleString\('el-GR'\)\} μετοχές<\/Text>\s*<\/View>\s*<QuoteBadge quote=\{item\.quote\} \/>\s*<\/View>/,
+    `<View style={{ width: '100%' }}>\n          <Text style={styles.cardTitle} numberOfLines={2}>{item.company}</Text>\n          <Text style={styles.muted}>{item.symbol} · {item.quantity.toLocaleString('el-GR')} μετοχές</Text>\n          <View style={{ alignItems: 'flex-start', marginTop: 10 }}>\n            <QuoteBadge quote={item.quote} />\n          </View>\n        </View>`,
+    "<View style={{ alignItems: 'flex-start', marginTop: 10 }}>",
     'position title and quote badge layout',
   );
 
   source = replaceRequired(
     source,
     '<View style={[styles.badge, bad && styles.badgeBad]}>',
-    "<View style={[styles.badge, bad && styles.badgeBad, { maxWidth: '100%' }] }>",
+    "<View style={[styles.badge, bad && styles.badgeBad, { maxWidth: '100%' }]}>",
     'bounded quote badge',
   );
 
