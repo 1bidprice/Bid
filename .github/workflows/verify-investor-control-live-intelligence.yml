@@ -50,6 +50,8 @@ jobs:
             local url="$1"
             local output="$2"
             curl --fail --location --silent --show-error \
+              --retry 5 --retry-all-errors --retry-delay 2 \
+              --connect-timeout 20 --max-time 120 \
               -H 'Accept: text/html,application/xhtml+xml' \
               -H 'User-Agent: Investor-Control-Market-Intelligence/1.2' \
               "$url" -o "$output"
@@ -76,8 +78,32 @@ jobs:
           set -euo pipefail
           npm test
           mkdir -p out
-          node src/run-autonomous-intelligence.js out/autonomous-intelligence.json
-          node src/build-mobile-feed.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json
+          live_ready=0
+          for attempt in 1 2 3; do
+            echo "Live Athens intelligence attempt ${attempt}/3"
+            node src/run-autonomous-intelligence.js out/autonomous-intelligence.json
+            node src/build-mobile-feed.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json
+            if node - <<'NODE'
+          const report = require('./out/autonomous-intelligence.json');
+          const discovery = report.discovery || {};
+          const issuerCount = Number(discovery.athensActiveIssuerCount || 0);
+          const announcementCount = Number(discovery.athensAnnouncementEventCount || 0);
+          const transient522 = (discovery.diagnostics || []).some((item) => item?.code === 'ATHENS_DISCOVERY_FAILED' && item?.errorClass === 'HTTP 522');
+          console.log(JSON.stringify({ issuerCount, announcementCount, transient522 }));
+          process.exit(issuerCount > 0 && announcementCount > 0 ? 0 : 1);
+          NODE
+            then
+              live_ready=1
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              sleep $((attempt * 4))
+            fi
+          done
+          if [ "$live_ready" -ne 1 ]; then
+            echo 'Athens live discovery remained unavailable after 3 bounded attempts.' >&2
+            exit 1
+          fi
 
       - name: Audit generated Athens parser against captured directory
         working-directory: market-intelligence

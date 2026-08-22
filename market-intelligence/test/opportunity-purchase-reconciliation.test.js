@@ -21,11 +21,16 @@ function opportunity(tier = 'HIGH_PRIORITY_CANDIDATE') {
 }
 
 function dossier(overrides = {}) {
+  const companyId = 'company:test';
   const base = {
     dossierId: 'dossier:test:1',
-    companyId: 'company:test',
+    companyId,
     companyName: 'Test Opportunity',
     symbol: 'TEST',
+    assetClass: 'EQUITY',
+    listing: { symbol: 'TEST', exchange: 'NYSE', mic: 'XNYS', currency: 'USD' },
+    integrityContractVersion: 1,
+    listingIntegrity: { activeTradingVerified: true, lifecycleStatus: 'ACTIVE', verifiedAt: NOW },
     generatedAt: '2026-08-10T13:30:00.000Z',
     status: 'REVIEW_READY',
     category: 'FUNDAMENTAL_BASELINE',
@@ -33,15 +38,23 @@ function dossier(overrides = {}) {
     referencePrice: {
       value: 100,
       currency: 'USD',
+      nativeCurrency: 'USD',
       timestamp: '2026-08-10T13:45:00.000Z',
       source: 'Verified market feed',
+      companyId,
+      appSymbol: 'TEST',
+      sourceApproved: true,
+      timestampVerified: true,
       purpose: 'ANALYSIS_REFERENCE',
       freshnessModel: 'VERIFIED_TIMESTAMP',
       analysisReferenceEligible: true,
       executionFreshnessEligible: true,
       decisionEligible: true,
     },
-    evidence: [{ evidenceId: 'a' }, { evidenceId: 'b' }],
+    evidence: [
+      { evidenceId: 'a', companyIds: [companyId] },
+      { evidenceId: 'b', companyIds: [companyId] },
+    ],
     reviewDate: '2026-09-10',
     readiness: { publishable: true, blockers: [] },
     metrics: {
