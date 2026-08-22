@@ -1,4 +1,4 @@
-export const MOBILE_INSTRUMENT_INTEGRITY_VERSION = '2026-08-20.1';
+export const MOBILE_INSTRUMENT_INTEGRITY_VERSION = '2026-08-22.1';
 
 const MARKET_RULES = Object.freeze({
   US: { suffix: '.US', currency: 'USD', sourceRoles: ['LICENSED_MARKET_DATA'] },
@@ -98,6 +98,7 @@ export function evaluateMobileQuoteIntegrity(symbol, quote = {}, options = {}) {
     || (quote?.priceTimestampVerified !== false && updatedMs !== null);
   const advertisedDelayMinutes = Math.max(0, Number(quote?.advertisedDelayMinutes || 0));
   const maxAgeMinutes = Number(options.maxAgeMinutes ?? (route.market === 'GR' ? 360 : 240));
+  const maxClosedValuationAgeMinutes = Number(options.maxClosedValuationAgeMinutes ?? 96 * 60);
   const exactAgeMinutes = updatedMs === null ? null : Math.max(0, (nowMs - updatedMs) / 60_000);
   const checkAgeMinutes = checkedMs === null ? null : Math.max(0, (nowMs - checkedMs) / 60_000);
   const officialDelayedObservation = role === 'PRIMARY_EXCHANGE'
@@ -107,8 +108,15 @@ export function evaluateMobileQuoteIntegrity(symbol, quote = {}, options = {}) {
   const freshEnough = timestampVerified
     ? exactAgeMinutes !== null && exactAgeMinutes <= maxAgeMinutes
     : officialDelayedObservation;
+  const closedMarketReferenceEligible = options.exchangeOpen === false
+    && role === 'LICENSED_MARKET_DATA'
+    && quote?.session === 'regular-market'
+    && timestampVerified
+    && exactAgeMinutes !== null
+    && exactAgeMinutes <= maxClosedValuationAgeMinutes;
+  const valuationFreshEnough = freshEnough || closedMarketReferenceEligible;
 
-  if (!freshEnough) blockers.push('QUOTE_FRESHNESS_NOT_VERIFIED');
+  if (!valuationFreshEnough) blockers.push('QUOTE_FRESHNESS_NOT_VERIFIED');
   if (!timestampVerified) blockers.push('QUOTE_TIMESTAMP_NOT_VERIFIED');
 
   const identityBlockers = blockers.filter((code) => [
@@ -116,7 +124,10 @@ export function evaluateMobileQuoteIntegrity(symbol, quote = {}, options = {}) {
     'QUOTE_INSTRUMENT_MISMATCH', 'CURRENCY_NOT_VERIFIED', 'QUOTE_CURRENCY_MISMATCH',
   ].includes(code));
   const valuationBlockers = blockers.filter((code) => code !== 'QUOTE_TIMESTAMP_NOT_VERIFIED');
-  const decisionBlockers = [...blockers];
+  const decisionBlockers = unique([
+    ...blockers,
+    ...(!freshEnough ? ['QUOTE_DECISION_FRESHNESS_NOT_VERIFIED'] : []),
+  ]);
   const identityReady = identityBlockers.length === 0;
   const valuationReady = price !== null && valuationBlockers.length === 0;
   const decisionReady = valuationReady && timestampVerified && decisionBlockers.length === 0;
@@ -127,13 +138,15 @@ export function evaluateMobileQuoteIntegrity(symbol, quote = {}, options = {}) {
       ? 'INSTRUMENT_UNVERIFIED'
       : role === 'FALLBACK_UNVERIFIED' || !sourceApproved
         ? 'FALLBACK_NOT_VERIFIED'
-        : !freshEnough
+        : !valuationFreshEnough
           ? 'STALE'
           : !timestampVerified
             ? 'TIMESTAMP_NOT_VERIFIED'
-            : role === 'PRIMARY_EXCHANGE'
-              ? 'OFFICIAL_DELAYED_OR_EXCHANGE'
-              : 'VERIFIED';
+            : closedMarketReferenceEligible
+              ? 'CLOSED_MARKET_REFERENCE'
+              : role === 'PRIMARY_EXCHANGE'
+                ? 'OFFICIAL_DELAYED_OR_EXCHANGE'
+                : 'VERIFIED';
 
   return {
     version: MOBILE_INSTRUMENT_INTEGRITY_VERSION,
@@ -150,6 +163,9 @@ export function evaluateMobileQuoteIntegrity(symbol, quote = {}, options = {}) {
     advertisedDelayMinutes,
     exactAgeMinutes,
     checkAgeMinutes,
+    freshEnough,
+    valuationFreshEnough,
+    closedMarketReferenceEligible,
     identityReady,
     valuationReady,
     decisionReady,
@@ -157,7 +173,7 @@ export function evaluateMobileQuoteIntegrity(symbol, quote = {}, options = {}) {
     blockers: unique(blockers),
     identityBlockers: unique(identityBlockers),
     valuationBlockers: unique(valuationBlockers),
-    decisionBlockers: unique(decisionBlockers),
+    decisionBlockers,
   };
 }
 
@@ -172,6 +188,7 @@ export function mobileQuotePublicMessage(integrity) {
       ? `Επίσημη τιμή αναφοράς με δηλωμένη καθυστέρηση ${integrity.advertisedDelayMinutes}′. Ο ακριβής χρόνος συναλλαγής δεν είναι διαθέσιμος.`
       : 'Ο ακριβής χρόνος της τιμής δεν έχει επαληθευτεί.';
   }
+  if (status === 'CLOSED_MARKET_REFERENCE') return 'Επαληθευμένη τελευταία τιμή κανονικής συνεδρίασης. Χρησιμοποιείται για αποτίμηση όσο η αγορά είναι κλειστή, όχι για νέα αυτόματη απόφαση.';
   if (status === 'OFFICIAL_DELAYED_OR_EXCHANGE') return 'Επίσημη χρηματιστηριακή τιμή από την πρωτογενή αγορά.';
   if (status === 'VERIFIED') return 'Επαληθευμένη χρηματιστηριακή τιμή από εγκεκριμένη πηγή.';
   return 'Η ποιότητα της τιμής δεν έχει επαληθευτεί.';
