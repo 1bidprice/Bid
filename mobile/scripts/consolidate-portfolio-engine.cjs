@@ -4,6 +4,7 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 const portfolioPath = path.join(root, 'PortfolioApp.js');
 const marketPath = path.join(root, 'src', 'market-data.js');
+const integrityVerifierPath = path.join(root, 'scripts', 'verify-v173-universal-instrument-integrity.js');
 
 function requiredReplace(source, from, to, label) {
   if (source.includes(to)) return source;
@@ -72,11 +73,30 @@ function patchPortfolioApp() {
   fs.writeFileSync(portfolioPath, source);
 }
 
+function patchIntegrityVerifier() {
+  let source = fs.readFileSync(integrityVerifierPath, 'utf8');
+  source = requiredReplace(
+    source,
+    "const portfolio = read('PortfolioApp.js');",
+    "const portfolio = read('PortfolioApp.js');\nconst portfolioEngine = read('src/portfolio-engine.js');",
+    'portfolio-engine verifier input',
+  );
+  source = requiredReplace(
+    source,
+    "assert.ok(portfolio.includes('positionCurrencyVerified'));\nassert.ok(portfolio.includes('route.expectedCurrency === position.currency'));",
+    "assert.ok(portfolio.includes(\"import { buildPortfolioSnapshot } from './src/portfolio-engine';\"));\nassert.ok(!portfolio.includes('function positionsFrom(state) {'));\nassert.ok(portfolioEngine.includes('positionCurrencyVerified'));\nassert.ok(portfolioEngine.includes('route.expectedCurrency !== position.currency'));",
+    'portfolio integrity assertions',
+  );
+  fs.writeFileSync(integrityVerifierPath, source);
+}
+
 patchMarketData();
 patchPortfolioApp();
+patchIntegrityVerifier();
 
 const portfolio = fs.readFileSync(portfolioPath, 'utf8');
 const market = fs.readFileSync(marketPath, 'utf8');
+const verifier = fs.readFileSync(integrityVerifierPath, 'utf8');
 
 if (!portfolio.includes("import { buildPortfolioSnapshot } from './src/portfolio-engine';")) throw new Error('portfolio engine import missing');
 if (portfolio.includes('function positionsFrom(state) {')) throw new Error('legacy positionsFrom still present');
@@ -84,5 +104,6 @@ if (portfolio.includes("openFinnhubTrades(token.trim(), ['SPCE']")) throw new Er
 if (!portfolio.includes('openFinnhubTrades(token.trim(), liveUsProviderSymbols')) throw new Error('generic US websocket subscription missing');
 if (!portfolio.includes('const portfolioSnapshot = useMemo(')) throw new Error('canonical portfolio snapshot not wired');
 if (!market.includes('onTrade({ symbol: providerSymbol, appSymbol, price: Number(latest.p), timestamp, quote: classifiedQuote });')) throw new Error('classified websocket quote callback missing');
+if (!verifier.includes("portfolioEngine.includes('positionCurrencyVerified')")) throw new Error('integrity verifier not migrated to canonical portfolio engine');
 
-console.log('Portfolio consolidation PASS: UI accounting removed, generic US live subscription wired, market-data owns quote classification.');
+console.log('Portfolio consolidation PASS: UI accounting removed, generic US live subscription wired, market-data owns quote classification, verifier follows canonical engine.');
