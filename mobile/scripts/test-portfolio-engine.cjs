@@ -8,6 +8,7 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 
 function loadExportedModule(relativePath, context = {}) {
   let source = read(relativePath);
+  source = source.replace(/^import .*$/gm, '');
   const exported = [];
   source = source.replace(/export const\s+([A-Za-z0-9_]+)\s*=/g, (_, name) => {
     exported.push(name);
@@ -28,7 +29,8 @@ function loadExportedModule(relativePath, context = {}) {
 }
 
 const accounting = loadExportedModule('src/transaction-accounting.js');
-const integrity = loadExportedModule('src/instrument-quote-integrity.js');
+const marketRules = loadExportedModule('src/market-rules.js');
+const integrity = loadExportedModule('src/instrument-quote-integrity.js', { MARKET_RULES: marketRules.MARKET_RULES });
 const positionLots = require('../src/position-lots');
 
 function loadPortfolioEngine() {

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { buildMobileQuoteContract, quoteFromRegistry, safeProviderDiagnostic } from './quote-contract';
 import { routeMobileInstrument } from './instrument-quote-integrity';
+import { marketStateForSymbol } from './market-rules';
 
 const EURONEXT_ATHENS_STOCK_URL = (ticker) => `https://athens.euronext.com/en/market-data/instruments/stocks/${encodeURIComponent(ticker)}/related`;
 const YAHOO_HOSTS = ['query1.finance.yahoo.com', 'query2.finance.yahoo.com'];
@@ -23,52 +24,12 @@ function parseLocaleNumber(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function zoneParts(timeZone, at = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone,
-    weekday: 'short',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).formatToParts(at);
-  return Object.fromEntries(parts.map((part) => [part.type, part.value]));
-}
-
 export function marketSessionAt(symbol, at = new Date()) {
-  const isUs = String(symbol).toUpperCase().endsWith('.US');
-  const timeZone = isUs ? 'America/New_York' : 'Europe/Athens';
-  const parts = zoneParts(timeZone, at);
-  const weekdays = new Set(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
-  if (!weekdays.has(parts.weekday)) return 'closed';
-
-  const minutes = Number(parts.hour) * 60 + Number(parts.minute);
-  if (isUs) {
-    if (minutes >= 4 * 60 && minutes < 9 * 60 + 30) return 'pre-market';
-    if (minutes >= 9 * 60 + 30 && minutes <= 16 * 60) return 'regular-market';
-    if (minutes > 16 * 60 && minutes <= 20 * 60) return 'post-market';
-    return 'closed';
-  }
-
-  return minutes >= 10 * 60 + 15 && minutes <= 17 * 60 + 25
-    ? 'regular-market'
-    : 'closed';
+  return marketStateForSymbol(symbol, at).session;
 }
 
 export function exchangeState(symbol, at = new Date()) {
-  const isUs = String(symbol).toUpperCase().endsWith('.US');
-  const timeZone = isUs ? 'America/New_York' : 'Europe/Athens';
-  const parts = zoneParts(timeZone, at);
-  const session = marketSessionAt(symbol, at);
-  return {
-    open: session === 'regular-market',
-    timeZone,
-    localDate: `${parts.year}-${parts.month}-${parts.day}`,
-    session,
-  };
+  return marketStateForSymbol(symbol, at);
 }
 
 function htmlToText(html) {
@@ -103,7 +64,7 @@ async function fetchText(url, timeoutMs = 15_000) {
       headers: {
         Accept: 'text/html,application/xhtml+xml,application/json,text/plain,*/*',
         'Cache-Control': 'no-cache',
-        'User-Agent': 'InvestorControl/0.6.4',
+        'User-Agent': 'InvestorControl/1.7.3',
       },
       signal: controller.signal,
     });
@@ -326,6 +287,9 @@ async function fetchOfficialAthensQuote(symbol) {
   const exchange = exchangeState(symbol, checkedAt);
   const html = await fetchText(EURONEXT_ATHENS_STOCK_URL(route.baseSymbol));
   const text = htmlToText(html);
+  if (!/Traded on Euronext Athens/i.test(text) || !/Last Traded Price/i.test(text)) {
+    throw new Error('official Euronext Athens stock page identity not verified');
+  }
   const priceValue = numberAfterLabel(text, ['Last Traded Price', 'Τελευταία Τιμή Διαπραγμάτευσης']);
   const previousClose = numberAfterLabel(text, ['Previous Close', 'Προηγούμενο Κλείσιμο']);
   if (!finite(priceValue)) throw new Error(`η Euronext Athens δεν επέστρεψε τιμή για ${route.baseSymbol}`);
@@ -340,7 +304,7 @@ async function fetchOfficialAthensQuote(symbol) {
     source: 'Euronext Athens — επίσημα δεδομένα με καθυστέρηση 15′',
     providerSymbol: route.baseSymbol,
     quality: 'primary_exchange_delayed',
-    advertisedDelayMinutes: 15,
+    advertisedDelayMinutes: Number(route.advertisedDelayMinutes || 15),
     session: exchange.session,
     timestampMeaning: 'exact-trade-time-not-provided-by-adapter',
     priceTimestampVerified: false,
@@ -361,7 +325,12 @@ async function fetchEurUsd() {
 export function classifyQuote(symbol, quote) {
   if (!quote || !finite(quote.nativePrice)) return quote;
   const exchange = exchangeState(symbol);
-  const quoteContract = buildMobileQuoteContract(symbol, quote, { now: Date.now(), exchangeOpen: exchange.open, exchangeSession: exchange.session });
+  const quoteContract = buildMobileQuoteContract(symbol, quote, {
+    now: Date.now(),
+    exchangeOpen: exchange.open,
+    exchangeSession: exchange.session,
+    exchangeCalendarVerified: exchange.calendarVerified !== false,
+  });
   const updatedMs = new Date(quote.updatedAt || 0).getTime();
   const ageSeconds = Number.isFinite(updatedMs) && updatedMs > 0
     ? Math.max(0, Math.round((Date.now() - updatedMs) / 1000))

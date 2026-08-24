@@ -648,9 +648,10 @@ function MainApp({ onOpenDecisionGate }) {
   const liveUsProviderSymbols = useMemo(
     () => [...new Set(positions
       .filter((position) => position.instrumentRoute?.market === 'US' && position.instrumentRoute?.baseSymbol)
-      .map((position) => position.instrumentRoute.baseSymbol))],
+      .map((position) => position.instrumentRoute.baseSymbol))].sort(),
     [positions],
   );
+  const liveUsProviderSymbolsKey = liveUsProviderSymbols.join('|');
 
   useEffect(() => {
     if (loading || token.trim().length < 20 || !liveUsProviderSymbols.length) return undefined;
@@ -665,7 +666,7 @@ function MainApp({ onOpenDecisionGate }) {
         { silent: true },
       );
     });
-  }, [applyQuotes, liveUsProviderSymbols, loading, token]);
+  }, [applyQuotes, liveUsProviderSymbolsKey, loading, token]);
   const openNewTransaction = () => { setEditingTransaction(null); setTransactionModal(true); };
 
   const saveTransaction = async (transaction) => {

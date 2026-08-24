@@ -6,8 +6,19 @@ const assert = require('assert');
 const root = path.resolve(__dirname, '..');
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
 
+function loadMarketRulesForTest() {
+  let source = read('src/market-rules.js');
+  const exported = [];
+  source = source.replace(/export const\s+([A-Za-z0-9_]+)\s*=/g, (_, name) => { exported.push(name); return `const ${name} =`; });
+  source = source.replace(/export function\s+([A-Za-z0-9_]+)\s*\(/g, (_, name) => { exported.push(name); return `function ${name}(`; });
+  source += `\nmodule.exports = { ${[...new Set(exported)].join(', ')} };\n`;
+  const sandbox = { module: { exports: {} }, exports: {}, console, Date, Intl, Number, String, Object, Set, Math, RegExp };
+  vm.runInNewContext(source, sandbox, { filename: 'market-rules.js' });
+  return sandbox.module.exports;
+}
+
 function loadIntegrityModuleForTest() {
-  let source = read('src/instrument-quote-integrity.js');
+  let source = read('src/instrument-quote-integrity.js').replace(/^import .*$/gm, '');
   const exported = [];
   source = source.replace(/export const\s+([A-Za-z0-9_]+)\s*=/g, (_, name) => {
     exported.push(name);
@@ -18,7 +29,7 @@ function loadIntegrityModuleForTest() {
     return `function ${name}(`;
   });
   source += `\nmodule.exports = { ${[...new Set(exported)].join(', ')} };\n`;
-  const sandbox = { module: { exports: {} }, exports: {}, console, Date, Number, String, Object, Set, Math, RegExp };
+  const sandbox = { module: { exports: {} }, exports: {}, console, Date, Intl, Number, String, Object, Set, Math, RegExp, MARKET_RULES: loadMarketRulesForTest().MARKET_RULES };
   vm.runInNewContext(source, sandbox, { filename: 'instrument-quote-integrity.js' });
   return sandbox.module.exports;
 }
@@ -162,10 +173,12 @@ assert.ok(!market.includes("symbol === 'SPCE.US'"));
 assert.ok(market.includes("if (route.market === 'US')"));
 assert.ok(market.includes("if (route.market === 'GR')"));
 assert.ok(market.includes('exchangeOpen: exchange.open'));
+assert.ok(market.includes("marketStateForSymbol(symbol, at).session"));
+assert.ok(market.includes('exchangeCalendarVerified: exchange.calendarVerified !== false'));
 assert.ok(!market.includes("quote?.nativeCurrency || (symbol.endsWith('.US') ? 'USD' : 'EUR')"));
 assert.ok(quoteContract.includes("MOBILE_QUOTE_CONTRACT_VERSION = '2026-08-20.2'"));
 assert.ok(quoteContract.includes('evaluateMobileQuoteIntegrity'));
-assert.ok(integritySource.includes("MOBILE_INSTRUMENT_INTEGRITY_VERSION = '2026-08-22.1'"));
+assert.ok(integritySource.includes("MOBILE_INSTRUMENT_INTEGRITY_VERSION = '2026-08-24.1'"));
 assert.ok(integritySource.includes('CLOSED_MARKET_REFERENCE'));
 assert.ok(portfolio.includes("import { buildPortfolioSnapshot } from './src/portfolio-engine';"));
 assert.ok(!portfolio.includes('function positionsFrom(state) {'));

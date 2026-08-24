@@ -1,9 +1,6 @@
-export const MOBILE_INSTRUMENT_INTEGRITY_VERSION = '2026-08-22.1';
+import { MARKET_RULES } from './market-rules';
 
-const MARKET_RULES = Object.freeze({
-  US: { suffix: '.US', currency: 'USD', sourceRoles: ['LICENSED_MARKET_DATA'] },
-  GR: { suffix: '.GR', currency: 'EUR', sourceRoles: ['PRIMARY_EXCHANGE'] },
-});
+export const MOBILE_INSTRUMENT_INTEGRITY_VERSION = '2026-08-24.1';
 
 function upper(value) {
   return String(value || '').trim().toUpperCase();
@@ -56,6 +53,8 @@ export function routeMobileInstrument(symbol) {
       baseSymbol,
       expectedCurrency: rule.currency,
       approvedSourceRoles: [...rule.sourceRoles],
+      timeZone: rule.timeZone || null,
+      advertisedDelayMinutes: Number(rule.advertisedDelayMinutes || 0),
       blocker: null,
     };
   }
@@ -90,6 +89,9 @@ export function evaluateMobileQuoteIntegrity(symbol, quote = {}, options = {}) {
   const role = sourceRole(quote);
   const sourceApproved = route.supported && route.approvedSourceRoles.includes(role);
   if (!sourceApproved) blockers.push('QUOTE_SOURCE_NOT_APPROVED');
+
+  const exchangeCalendarVerified = options.exchangeCalendarVerified !== false;
+  if (route.market === 'GR' && !exchangeCalendarVerified) blockers.push('EXCHANGE_CALENDAR_NOT_VERIFIED');
 
   const nowMs = Number(new Date(options.now || Date.now()));
   const updatedMs = validIso(quote?.updatedAt || quote?.quoteAt);
@@ -136,8 +138,10 @@ export function evaluateMobileQuoteIntegrity(symbol, quote = {}, options = {}) {
     ? 'UNAVAILABLE'
     : !route.supported || identityBlockers.length
       ? 'INSTRUMENT_UNVERIFIED'
-      : role === 'FALLBACK_UNVERIFIED' || !sourceApproved
-        ? 'FALLBACK_NOT_VERIFIED'
+      : route.market === 'GR' && !exchangeCalendarVerified
+        ? 'CALENDAR_NOT_VERIFIED'
+        : role === 'FALLBACK_UNVERIFIED' || !sourceApproved
+          ? 'FALLBACK_NOT_VERIFIED'
         : !valuationFreshEnough
           ? 'STALE'
           : !timestampVerified
@@ -159,6 +163,7 @@ export function evaluateMobileQuoteIntegrity(symbol, quote = {}, options = {}) {
     nativeCurrency: nativeCurrency || null,
     sourceRole: role,
     sourceApproved,
+    exchangeCalendarVerified,
     timestampVerified,
     advertisedDelayMinutes,
     exactAgeMinutes,
@@ -181,6 +186,7 @@ export function mobileQuotePublicMessage(integrity) {
   const status = integrity?.publicStatus;
   if (status === 'UNAVAILABLE') return 'Δεν υπάρχει διαθέσιμη επαληθεύσιμη τιμή.';
   if (status === 'INSTRUMENT_UNVERIFIED') return 'Το προϊόν ή η αγορά του δεν έχει επαληθευτεί. Δεν χρησιμοποιείται σε αποτίμηση ή απόφαση.';
+  if (status === 'CALENDAR_NOT_VERIFIED') return 'Το επίσημο ημερολόγιο συνεδριάσεων της Euronext Athens δεν έχει επαληθευτεί για αυτή την ημερομηνία. Η τιμή δεν χρησιμοποιείται σε αποτίμηση ή απόφαση.';
   if (status === 'FALLBACK_NOT_VERIFIED') return 'Η εφεδρική τιμή είναι μόνο πληροφοριακή και δεν χρησιμοποιείται σε αποτίμηση ή απόφαση.';
   if (status === 'STALE') return 'Η φρεσκότητα της τιμής δεν έχει επαληθευτεί. Δεν χρησιμοποιείται σε αποτίμηση ή απόφαση.';
   if (status === 'TIMESTAMP_NOT_VERIFIED') {
