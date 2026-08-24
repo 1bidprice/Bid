@@ -5,6 +5,7 @@ const root = path.resolve(__dirname, '..');
 const instrumentPath = path.join(root, 'src', 'instrument-quote-integrity.js');
 const marketPath = path.join(root, 'src', 'market-data.js');
 const verifierPath = path.join(root, 'scripts', 'verify-v173-universal-instrument-integrity.js');
+const portfolioTestPath = path.join(root, 'scripts', 'test-portfolio-engine.cjs');
 
 function requiredReplace(source, from, to, label) {
   if (source.includes(to)) return source;
@@ -127,6 +128,26 @@ function patchMarketData() {
 
 function patchVerifier() {
   let source = fs.readFileSync(verifierPath, 'utf8');
+
+  if (!source.includes('function loadMarketRulesForTest()')) {
+    const helper = `function loadMarketRulesForTest() {\n  let source = read('src/market-rules.js');\n  const exported = [];\n  source = source.replace(/export const\\s+([A-Za-z0-9_]+)\\s*=/g, (_, name) => { exported.push(name); return \`const \${name} =\`; });\n  source = source.replace(/export function\\s+([A-Za-z0-9_]+)\\s*\\(/g, (_, name) => { exported.push(name); return \`function \${name}(\`; });\n  source += \`\\nmodule.exports = { \${[...new Set(exported)].join(', ')} };\\n\`;\n  const sandbox = { module: { exports: {} }, exports: {}, console, Date, Intl, Number, String, Object, Set, Math, RegExp };\n  vm.runInNewContext(source, sandbox, { filename: 'market-rules.js' });\n  return sandbox.module.exports;\n}\n\n`;
+    source = requiredReplace(
+      source,
+      'function loadIntegrityModuleForTest() {',
+      `${helper}function loadIntegrityModuleForTest() {`,
+      'market rules test loader',
+    );
+  }
+
+  source = source.replace(
+    "  let source = read('src/instrument-quote-integrity.js');",
+    "  let source = read('src/instrument-quote-integrity.js').replace(/^import .*$/gm, '');",
+  );
+  source = source.replace(
+    "  const sandbox = { module: { exports: {} }, exports: {}, console, Date, Number, String, Object, Set, Math, RegExp };",
+    "  const sandbox = { module: { exports: {} }, exports: {}, console, Date, Intl, Number, String, Object, Set, Math, RegExp, MARKET_RULES: loadMarketRulesForTest().MARKET_RULES };",
+  );
+
   source = source.replace(
     "MOBILE_INSTRUMENT_INTEGRITY_VERSION = '2026-08-22.1'",
     "MOBILE_INSTRUMENT_INTEGRITY_VERSION = '2026-08-24.1'",
@@ -142,15 +163,41 @@ function patchVerifier() {
   fs.writeFileSync(verifierPath, source);
 }
 
+function patchPortfolioTestLoader() {
+  let source = fs.readFileSync(portfolioTestPath, 'utf8');
+  if (!source.includes("source = source.replace(/^import .*$/gm, '');")) {
+    source = requiredReplace(
+      source,
+      "  let source = read(relativePath);\n  const exported = [];",
+      "  let source = read(relativePath);\n  source = source.replace(/^import .*$/gm, '');\n  const exported = [];",
+      'portfolio test import stripping',
+    );
+  }
+  if (!source.includes("const marketRules = loadExportedModule('src/market-rules.js');")) {
+    source = requiredReplace(
+      source,
+      "const accounting = loadExportedModule('src/transaction-accounting.js');\nconst integrity = loadExportedModule('src/instrument-quote-integrity.js');",
+      "const accounting = loadExportedModule('src/transaction-accounting.js');\nconst marketRules = loadExportedModule('src/market-rules.js');\nconst integrity = loadExportedModule('src/instrument-quote-integrity.js', { MARKET_RULES: marketRules.MARKET_RULES });",
+      'portfolio test canonical market rules injection',
+    );
+  }
+  fs.writeFileSync(portfolioTestPath, source);
+}
+
 patchInstrumentIntegrity();
 patchMarketData();
 patchVerifier();
+patchPortfolioTestLoader();
 
 const instrument = fs.readFileSync(instrumentPath, 'utf8');
 const market = fs.readFileSync(marketPath, 'utf8');
+const verifier = fs.readFileSync(verifierPath, 'utf8');
+const portfolioTest = fs.readFileSync(portfolioTestPath, 'utf8');
 if (!instrument.includes("import { MARKET_RULES } from './market-rules';")) throw new Error('canonical market rules not wired into instrument integrity');
-if (!instrument.includes("EXCHANGE_CALENDAR_NOT_VERIFIED")) throw new Error('Athens calendar fail-closed gate missing');
+if (!instrument.includes('EXCHANGE_CALENDAR_NOT_VERIFIED')) throw new Error('Athens calendar fail-closed gate missing');
 if (!market.includes("import { marketStateForSymbol } from './market-rules';")) throw new Error('canonical market state not wired into market-data');
 if (market.includes('17 * 60 + 25')) throw new Error('obsolete Athens 17:25 close remains');
+if (!verifier.includes('loadMarketRulesForTest')) throw new Error('instrument verifier cannot load canonical market rules');
+if (!portfolioTest.includes("MARKET_RULES: marketRules.MARKET_RULES")) throw new Error('portfolio tests cannot load canonical market rules');
 
 console.log('Athens market hardening PASS: official 10:15-17:20 session/calendar, primary delayed feed and fail-closed calendar integrity wired into canonical core.');
