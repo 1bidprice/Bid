@@ -8,6 +8,7 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 const pkg = JSON.parse(read('package.json'));
 const app = JSON.parse(read('app.json'));
 const portfolio = read('PortfolioApp.js');
+const portfolioEngine = read('src/portfolio-engine.js');
 const decision = read('DecisionOverlay.js');
 const market = read('src/market-data.js');
 const quoteContract = read('src/quote-contract.js');
@@ -25,15 +26,30 @@ assert.ok(portfolio.includes("const VERSION = '1.7.3';"), 'PortfolioApp must be 
 assert.ok(decision.includes("const VERSION = '1.7.3';"), 'DecisionOverlay must be canonical v1.7.3 source');
 
 assert.ok(portfolio.includes('function quoteHeadlineLabel(quote)'), 'quote timing UI must be materialized in canonical source');
-assert.ok(portfolio.includes('positionCurrencyVerified'), 'position currency integrity must be materialized in canonical source');
 assert.ok(portfolio.includes('<OpportunitiesView portfolioPositions={positions} />'), 'portfolio-aware decision bridge must be canonical source');
 assert.ok(portfolio.includes("maxWidth: '48%', flexShrink: 1"), 'mobile quote badge regression fix must be canonical source');
+
+assert.ok(portfolio.includes("import { buildPortfolioSnapshot } from './src/portfolio-engine';"), 'PortfolioApp must consume canonical portfolio engine');
+assert.ok(portfolio.includes('const portfolioSnapshot = useMemo('), 'canonical portfolio snapshot wiring missing');
+assert.ok(!portfolio.includes('function positionsFrom(state) {'), 'UI must not own portfolio accounting logic');
+assert.ok(!portfolio.includes("openFinnhubTrades(token.trim(), ['SPCE']"), 'UI must not hardcode SPCE live subscription');
+assert.ok(portfolio.includes('openFinnhubTrades(token.trim(), liveUsProviderSymbols'), 'generic US live subscription missing');
+assert.ok(!portfolio.includes("current.prices['SPCE.US']"), 'UI must not hardcode SPCE quote state');
+
+assert.ok(portfolioEngine.includes('export function buildOpenPositionLedger('), 'canonical position ledger missing');
+assert.ok(portfolioEngine.includes('export function buildPortfolioPositions('), 'canonical position valuation engine missing');
+assert.ok(portfolioEngine.includes('export function buildPortfolioSummary('), 'canonical portfolio summary engine missing');
+assert.ok(portfolioEngine.includes("blockers.push('POSITION_CURRENCY_MISMATCH')"), 'portfolio currency fail-closed rule missing');
+assert.ok(portfolioEngine.includes("blockers.push('FX_RATE_MISSING')"), 'USD FX fail-closed rule missing');
+assert.ok(portfolioEngine.includes("quote.quoteContract?.valuationEligible !== true"), 'portfolio quote eligibility gate missing');
+assert.ok(portfolioEngine.includes('nativePrice / fxRate'), 'EUR valuation must derive from native quote plus FX');
 
 assert.ok(!market.includes('EURONEXT_ALWN_URL'), 'canonical market routing must not contain ALWN-only endpoint');
 assert.ok(!market.includes("symbol === 'SPCE.US'"), 'canonical market routing must not contain SPCE-only logic');
 assert.ok(market.includes("if (route.market === 'US')"), 'US routing must be market-based');
 assert.ok(market.includes("if (route.market === 'GR')"), 'GR routing must be market-based');
 assert.ok(market.includes('exchangeOpen: exchange.open'), 'quote integrity must receive exchange state');
+assert.ok(market.includes('appSymbol, price: Number(latest.p), timestamp, quote: classifiedQuote'), 'market-data must publish classified generic live quote payload');
 
 assert.ok(quoteContract.includes("MOBILE_QUOTE_CONTRACT_VERSION = '2026-08-20.2'"), 'canonical quote contract version missing');
 assert.ok(quoteContract.includes('evaluateMobileQuoteIntegrity'), 'quote contract must use the universal integrity engine');
@@ -44,4 +60,4 @@ assert.ok(accounting.includes('export function accountingInvariantReport(transac
 assert.ok(accounting.includes('broker/settlement total is authoritative'), 'canonical accounting cash hierarchy missing');
 assert.ok(accounting.includes('roundMoney(quantity * candidate) === gross'), 'execution price reconciliation rule missing');
 
-console.log('Canonical mobile source PASS: no production patch chain; accounting, quote, routing, decision and UI invariants are materialized in source.');
+console.log('Canonical mobile source PASS: patch chain retired; accounting, portfolio, quote, routing, decision and UI responsibilities are separated and guarded.');
