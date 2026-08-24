@@ -20,6 +20,31 @@ function removeBetween(source, startMarker, endMarker, label) {
   return `${source.slice(0, start)}${source.slice(end + 2)}`;
 }
 
+function stabilizeGenericLiveSymbols(source) {
+  const keyLine = "  const liveUsProviderSymbolsKey = liveUsProviderSymbols.join('|');";
+  if (!source.includes('  const liveUsProviderSymbols = useMemo(')) return source;
+
+  if (!source.includes(keyLine)) {
+    const liveStart = source.indexOf('  const liveUsProviderSymbols = useMemo(');
+    const effectStart = source.indexOf('\n\n  useEffect(() => {', liveStart);
+    if (effectStart < 0) throw new Error('portfolio consolidation failed: generic live symbol effect not found');
+    let liveBlock = source.slice(liveStart, effectStart);
+    if (!liveBlock.includes('].sort()')) {
+      liveBlock = liveBlock.replace('))],\n    [positions],', '))].sort(),\n    [positions],');
+    }
+    liveBlock = `${liveBlock}\n${keyLine}`;
+    source = `${source.slice(0, liveStart)}${liveBlock}${source.slice(effectStart)}`;
+  }
+
+  if (source.includes('[applyQuotes, liveUsProviderSymbols, loading, token]')) {
+    source = source.replace(
+      '[applyQuotes, liveUsProviderSymbols, loading, token]',
+      '[applyQuotes, liveUsProviderSymbolsKey, loading, token]',
+    );
+  }
+  return source;
+}
+
 function patchMarketData() {
   let source = fs.readFileSync(marketPath, 'utf8');
   source = requiredReplace(
@@ -65,6 +90,7 @@ function patchPortfolioApp() {
     source = `${source.slice(0, start)}${replacement}${source.slice(end)}`;
   }
 
+  source = stabilizeGenericLiveSymbols(source);
   source = source.replace("import { routeMobileInstrument } from './src/instrument-quote-integrity';\n", '');
   source = source.replace("import { buildMobileQuoteContract } from './src/quote-contract';\n", '');
   source = source.replace("const { buildPositionLots } = require('./src/position-lots');\n", '');
