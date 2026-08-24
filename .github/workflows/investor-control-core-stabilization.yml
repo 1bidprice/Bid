@@ -1,0 +1,77 @@
+name: Investor Control Core Stabilization
+
+on:
+  push:
+    branches:
+      - investor-control-core-stabilization-v174
+    paths:
+      - mobile/**
+      - .github/workflows/investor-control-core-stabilization.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-core-stabilization-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-and-capture-canonical-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install and materialize current production source
+        working-directory: mobile
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: Verify canonical accounting and existing product contracts
+        working-directory: mobile
+        run: npm run test:core
+
+      - name: Verify Expo dependency compatibility
+        working-directory: mobile
+        run: npx expo install --check
+
+      - name: Expo Doctor
+        working-directory: mobile
+        run: npx expo-doctor@latest
+
+      - name: Export Android JavaScript bundle
+        working-directory: mobile
+        run: npx expo export --platform android --output-dir dist-core-stabilization
+
+      - name: Capture materialized canonical source and exact generated diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf canonical-mobile-source
+          mkdir -p canonical-mobile-source/mobile
+          cp mobile/App.js canonical-mobile-source/mobile/App.js
+          cp mobile/PortfolioApp.js canonical-mobile-source/mobile/PortfolioApp.js
+          cp mobile/DecisionOverlay.js canonical-mobile-source/mobile/DecisionOverlay.js
+          cp mobile/app.json canonical-mobile-source/mobile/app.json
+          cp mobile/package.json canonical-mobile-source/mobile/package.json
+          cp -R mobile/src canonical-mobile-source/mobile/src
+          git diff -- mobile > canonical-mobile-source/generated-source.diff
+          git diff --name-only -- mobile > canonical-mobile-source/generated-files.txt
+          printf '%s\n' "${GITHUB_SHA}" > canonical-mobile-source/source-commit.txt
+          cat canonical-mobile-source/generated-files.txt
+
+      - name: Upload canonical source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-canonical-source-${{ github.sha }}
+          path: canonical-mobile-source
+          if-no-files-found: error
+          retention-days: 14
