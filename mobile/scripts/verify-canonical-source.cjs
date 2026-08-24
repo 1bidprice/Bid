@@ -11,6 +11,7 @@ const portfolio = read('PortfolioApp.js');
 const portfolioEngine = read('src/portfolio-engine.js');
 const decision = read('DecisionOverlay.js');
 const market = read('src/market-data.js');
+const marketRules = read('src/market-rules.js');
 const quoteContract = read('src/quote-contract.js');
 const integrity = read('src/instrument-quote-integrity.js');
 const accounting = read('src/transaction-accounting.js');
@@ -34,6 +35,7 @@ assert.ok(portfolio.includes('const portfolioSnapshot = useMemo('), 'canonical p
 assert.ok(!portfolio.includes('function positionsFrom(state) {'), 'UI must not own portfolio accounting logic');
 assert.ok(!portfolio.includes("openFinnhubTrades(token.trim(), ['SPCE']"), 'UI must not hardcode SPCE live subscription');
 assert.ok(portfolio.includes('openFinnhubTrades(token.trim(), liveUsProviderSymbols'), 'generic US live subscription missing');
+assert.ok(portfolio.includes("const liveUsProviderSymbolsKey = liveUsProviderSymbols.join('|');"), 'stable live symbol dependency key missing');
 assert.ok(!portfolio.includes("current.prices['SPCE.US']"), 'UI must not hardcode SPCE quote state');
 
 assert.ok(portfolioEngine.includes('export function buildOpenPositionLedger('), 'canonical position ledger missing');
@@ -44,20 +46,39 @@ assert.ok(portfolioEngine.includes("blockers.push('FX_RATE_MISSING')"), 'USD FX 
 assert.ok(portfolioEngine.includes("quote.quoteContract?.valuationEligible !== true"), 'portfolio quote eligibility gate missing');
 assert.ok(portfolioEngine.includes('nativePrice / fxRate'), 'EUR valuation must derive from native quote plus FX');
 
+assert.ok(marketRules.includes("MARKET_RULES_VERSION = '2026-08-24.1'"), 'canonical market rules version missing');
+assert.ok(marketRules.includes("suffix: '.GR'"), 'Euronext Athens route missing');
+assert.ok(marketRules.includes("currency: 'EUR'"), 'Euronext Athens EUR rule missing');
+assert.ok(marketRules.includes("timeZone: 'Europe/Athens'"), 'Euronext Athens timezone rule missing');
+assert.ok(marketRules.includes('regularStart: 10 * 60 + 15'), 'Euronext Athens 10:15 open missing');
+assert.ok(marketRules.includes('regularEnd: 17 * 60 + 20'), 'Euronext Athens 17:20 close missing');
+assert.ok(marketRules.includes('ATHENS_MARKET_HOLIDAYS'), 'Euronext Athens calendar registry missing');
+assert.ok(marketRules.includes("'2026-10-28'"), 'Euronext Athens 2026 holiday coverage missing');
+assert.ok(marketRules.includes("'2026-12-24'"), 'Euronext Athens Christmas Eve closure missing');
+assert.ok(marketRules.includes("'calendar-unverified'"), 'unknown Athens calendar years must fail closed');
+
 assert.ok(!market.includes('EURONEXT_ALWN_URL'), 'canonical market routing must not contain ALWN-only endpoint');
 assert.ok(!market.includes("symbol === 'SPCE.US'"), 'canonical market routing must not contain SPCE-only logic');
 assert.ok(market.includes("if (route.market === 'US')"), 'US routing must be market-based');
 assert.ok(market.includes("if (route.market === 'GR')"), 'GR routing must be market-based');
-assert.ok(market.includes('exchangeOpen: exchange.open'), 'quote integrity must receive exchange state');
+assert.ok(market.includes("import { marketStateForSymbol } from './market-rules';"), 'market-data must consume canonical market rules');
+assert.ok(market.includes("marketStateForSymbol(symbol, at).session"), 'market session must come from canonical market rules');
+assert.ok(market.includes('exchangeCalendarVerified: exchange.calendarVerified !== false'), 'quote integrity must receive Athens calendar verification');
+assert.ok(market.includes('EURONEXT_ATHENS_STOCK_URL'), 'generic official Euronext Athens quote adapter missing');
+assert.ok(market.includes('official Euronext Athens stock page identity not verified'), 'official Athens page identity guard missing');
+assert.ok(!market.includes('17 * 60 + 25'), 'obsolete Athens 17:25 close remains');
 assert.ok(market.includes('appSymbol, price: Number(latest.p), timestamp, quote: classifiedQuote'), 'market-data must publish classified generic live quote payload');
 
 assert.ok(quoteContract.includes("MOBILE_QUOTE_CONTRACT_VERSION = '2026-08-20.2'"), 'canonical quote contract version missing');
 assert.ok(quoteContract.includes('evaluateMobileQuoteIntegrity'), 'quote contract must use the universal integrity engine');
-assert.ok(integrity.includes("MOBILE_INSTRUMENT_INTEGRITY_VERSION = '2026-08-22.1'"), 'canonical instrument integrity version missing');
+assert.ok(integrity.includes("MOBILE_INSTRUMENT_INTEGRITY_VERSION = '2026-08-24.1'"), 'canonical instrument integrity version missing');
+assert.ok(integrity.includes("import { MARKET_RULES } from './market-rules';"), 'instrument integrity must use canonical market rules');
+assert.ok(integrity.includes('EXCHANGE_CALENDAR_NOT_VERIFIED'), 'Athens calendar integrity blocker missing');
+assert.ok(integrity.includes('CALENDAR_NOT_VERIFIED'), 'Athens calendar public fail-closed state missing');
 assert.ok(integrity.includes('CLOSED_MARKET_REFERENCE'), 'closed-market valuation policy must be canonical source');
 
 assert.ok(accounting.includes('export function accountingInvariantReport(transaction)'), 'canonical accounting invariant report missing');
 assert.ok(accounting.includes('broker/settlement total is authoritative'), 'canonical accounting cash hierarchy missing');
 assert.ok(accounting.includes('roundMoney(quantity * candidate) === gross'), 'execution price reconciliation rule missing');
 
-console.log('Canonical mobile source PASS: patch chain retired; accounting, portfolio, quote, routing, decision and UI responsibilities are separated and guarded.');
+console.log('Canonical mobile source PASS: patch chain retired; accounting, portfolio, Euronext Athens/US market rules, quote, decision and UI responsibilities are separated and guarded.');
