@@ -281,7 +281,7 @@ export function openFinnhubTrades(token, symbols, onTrade, onStatus = () => {}) 
       const changeBase = session === 'post-market' && regularMarketPrice > 0
         ? regularMarketPrice
         : previousClose;
-      inMemoryQuotes[appSymbol] = classifyQuote(appSymbol, {
+      const classifiedQuote = classifyQuote(appSymbol, {
         ...current,
         symbol: appSymbol,
         nativePrice: Number(latest.p),
@@ -300,7 +300,8 @@ export function openFinnhubTrades(token, symbols, onTrade, onStatus = () => {}) 
           ? ((Number(latest.p) - changeBase) / changeBase) * 100
           : current?.changePct,
       });
-      onTrade({ symbol: providerSymbol, price: Number(latest.p), timestamp });
+      inMemoryQuotes[appSymbol] = classifiedQuote;
+      onTrade({ symbol: providerSymbol, appSymbol, price: Number(latest.p), timestamp, quote: classifiedQuote });
     } catch (_) {}
   };
 

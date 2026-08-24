@@ -151,6 +151,7 @@ assert.ok(wrongCurrency.blockers.includes('QUOTE_CURRENCY_MISMATCH'));
 
 const market = read('src/market-data.js');
 const portfolio = read('PortfolioApp.js');
+const portfolioEngine = read('src/portfolio-engine.js');
 const quoteContract = read('src/quote-contract.js');
 const integritySource = read('src/instrument-quote-integrity.js');
 const app = JSON.parse(read('app.json'));
@@ -166,8 +167,10 @@ assert.ok(quoteContract.includes("MOBILE_QUOTE_CONTRACT_VERSION = '2026-08-20.2'
 assert.ok(quoteContract.includes('evaluateMobileQuoteIntegrity'));
 assert.ok(integritySource.includes("MOBILE_INSTRUMENT_INTEGRITY_VERSION = '2026-08-22.1'"));
 assert.ok(integritySource.includes('CLOSED_MARKET_REFERENCE'));
-assert.ok(portfolio.includes('positionCurrencyVerified'));
-assert.ok(portfolio.includes('route.expectedCurrency === position.currency'));
+assert.ok(portfolio.includes("import { buildPortfolioSnapshot } from './src/portfolio-engine';"));
+assert.ok(!portfolio.includes('function positionsFrom(state) {'));
+assert.ok(portfolioEngine.includes('positionCurrencyVerified'));
+assert.ok(portfolioEngine.includes('route.expectedCurrency !== position.currency'));
 assert.ok(portfolio.includes("maxWidth: '48%', flexShrink: 1"));
 assert.equal(app.expo.version, '1.7.3');
 assert.equal(app.expo.android.versionCode, 31);

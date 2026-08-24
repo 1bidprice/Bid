@@ -3,7 +3,7 @@ import { routeMobileInstrument } from './instrument-quote-integrity';
 const { buildPositionLots } = require('./position-lots');
 
 const EPSILON = 1e-8;
-const finite = (value) => Number.isFinite(Number(value));
+const finite = (value) => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
 const positive = (value) => finite(value) && Number(value) > 0;
 
 function normalizeSymbol(value) {

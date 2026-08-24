@@ -24,7 +24,6 @@ import {
   SafeAreaView,
   initialWindowMetrics,
 } from 'react-native-safe-area-context';
-import { routeMobileInstrument } from './src/instrument-quote-integrity';
 import {
   FINNHUB_TOKEN_KEY,
   MARKET_REFRESH_MS,
@@ -47,8 +46,8 @@ import {
   syncBackgroundAlertTask,
 } from './src/background-alert-task';
 import { exportBackupAsync, pickBackupAsync } from './src/backup';
-import { buildMobileQuoteContract } from './src/quote-contract';
 import OpportunitiesView from './src/OpportunitiesView';
+import { buildPortfolioSnapshot } from './src/portfolio-engine';
 import {
   allInPrice,
   buildTransaction,
@@ -58,9 +57,7 @@ import {
   transactionFees,
   transactionGross,
   transactionOrderPrice,
-  transactionTotal,
 } from './src/transaction-accounting';
-const { buildPositionLots } = require('./src/position-lots');
 
 const VERSION = '1.7.3';
 const PRIVACY_POLICY_URL = 'https://1bidprice.github.io/Bid/privacy-policy.html';
@@ -141,77 +138,6 @@ function normalizeState(raw) {
     },
     alerts: normalizeAlerts(raw.alerts),
   };
-}
-
-function positionsFrom(state) {
-  const ledger = {};
-  [...state.transactions]
-    .sort((a, b) => String(a.date).localeCompare(String(b.date)))
-    .forEach((transaction) => {
-      if (!['buy', 'sell'].includes(transaction.type)) return;
-      const symbol = String(transaction.symbol || '').trim().toUpperCase();
-      const quantity = Number(transaction.quantity || 0);
-      if (!symbol || quantity <= 0) return;
-
-      const position = ledger[symbol] || {
-        symbol,
-        company: transaction.company || symbol,
-        currency: transaction.currency || (symbol.endsWith('.US') ? 'USD' : 'EUR'),
-        quantity: 0,
-        cost: 0,
-      };
-
-      if (transaction.type === 'buy') {
-        position.quantity += quantity;
-        position.cost += transactionTotal(transaction);
-      } else if (position.quantity > 0) {
-        const sold = Math.min(quantity, position.quantity);
-        position.cost -= (position.cost / position.quantity) * sold;
-        position.quantity -= sold;
-      }
-      ledger[symbol] = position;
-    });
-
-  return Object.values(ledger)
-    .filter((position) => position.quantity > 0)
-    .map((position) => {
-      const quote = state.prices[position.symbol];
-      const route = routeMobileInstrument(position.symbol);
-      const positionCurrencyVerified = route.supported === true && route.expectedCurrency === position.currency;
-      const usable = quote?.usable === true && positionCurrencyVerified;
-      const nativePrice = usable ? Number(quote.nativePrice) : null;
-      const eurPrice = usable ? Number(quote.price) : null;
-      const fxRate = position.currency === 'USD' ? Number(quote?.fxRate || 0) : 1;
-      const nativeValue = nativePrice === null ? null : nativePrice * position.quantity;
-      const eurValue = eurPrice === null ? null : eurPrice * position.quantity;
-      const nativePnl = nativeValue === null ? null : nativeValue - position.cost;
-      const eurCost = position.currency === 'USD' ? (fxRate > 0 ? position.cost / fxRate : null) : position.cost;
-      const lotSummary = buildPositionLots(state.transactions, position.symbol, nativePrice);
-      return {
-        ...position,
-        quote,
-        instrumentRoute: route,
-        positionCurrencyVerified,
-        instrumentIntegrityWarning: !route.supported
-          ? 'Η αγορά αυτού του προϊόντος δεν έχει ακόμη επαληθευμένο αυτόματο route. Η θέση παραμένει αποθηκευμένη χωρίς αυτόματη αποτίμηση.'
-          : !positionCurrencyVerified
-            ? `Το δηλωμένο νόμισμα (${position.currency}) δεν συμφωνεί με την επαληθευμένη αγορά (${route.expectedCurrency}). Η θέση δεν αποτιμάται αυτόματα.`
-            : null,
-        nativePrice,
-        eurPrice,
-        nativeValue,
-        eurValue,
-        nativePnl,
-        nativePct: nativePnl === null ? null : (nativePnl / position.cost) * 100,
-        eurCost,
-        eurPnl: eurValue === null ? null : eurValue - eurCost,
-        average: position.quantity > 0 ? position.cost / position.quantity : 0,
-        lots: lotSummary.openLots,
-        lotMethod: lotSummary.method,
-        hadLotSales: lotSummary.hadSales,
-        unmatchedSellQuantity: lotSummary.unmatchedSellQuantity,
-      };
-    });
 }
 
 function Field({ label, helper, value, onChangeText, keyboardType = 'default', autoCapitalize = 'sentences', placeholder, multiline = false }) {
@@ -704,31 +630,42 @@ function MainApp({ onOpenDecisionGate }) {
     return () => { clearInterval(interval); subscription.remove(); };
   }, [loading, refresh]);
 
-  useEffect(() => {
-    if (loading || token.trim().length < 20) return undefined;
-    return openFinnhubTrades(token.trim(), ['SPCE'], async (trade) => {
-      const current = stateRef.current;
-      const old = current.prices['SPCE.US'];
-      const fxRate = Number(old?.fxRate || 0);
-      if (!fxRate) return;
-      const previousClose = Number(old?.nativePreviousClose || 0);
-      const candidate = { ...old, symbol: 'SPCE.US', nativePrice: trade.price, price: trade.price / fxRate, updatedAt: new Date(trade.timestamp).toISOString(), checkedAt: new Date().toISOString(), source: 'Finnhub WebSocket real-time trade', quality: 'realtime', status: 'live', ageSeconds: 0, priceTimestampVerified: true, dayChangeVerified: previousClose > 0, changePct: previousClose > 0 ? ((trade.price - previousClose) / previousClose) * 100 : null };
-      const quoteContract = buildMobileQuoteContract('SPCE.US', candidate, { now: Date.now() });
-      const quote = { ...candidate, quoteContract, usable: quoteContract.valuationEligible === true, dayChangeVerified: quoteContract.dayChangeEligible === true };
-      await applyQuotes(current, { 'SPCE.US': quote }, new Date().toISOString(), current.meta.errors || [], { silent: true });
-    });
-  }, [applyQuotes, loading, token]);
+  const portfolioSnapshot = useMemo(
+    () => buildPortfolioSnapshot(state.transactions, state.prices),
+    [state.transactions, state.prices],
+  );
+  const positions = portfolioSnapshot.positions;
+  const {
+    valuesReady,
+    costsReady,
+    totalValue,
+    totalCost,
+    totalPnl,
+    valuationCoverage,
+    missingValuationSymbols,
+  } = portfolioSnapshot.summary;
 
-  const positions = useMemo(() => positionsFrom(state), [state]);
-  const valuedPositions = positions.filter((position) => position.eurValue !== null && valid(position.eurCost));
-  const costedPositions = positions.filter((position) => valid(position.eurCost));
-  const missingValuationSymbols = positions.filter((position) => position.eurValue === null || !valid(position.eurCost)).map((position) => position.symbol);
-  const valuesReady = positions.length === valuedPositions.length;
-  const costsReady = positions.length === costedPositions.length;
-  const totalValue = positions.length === 0 ? 0 : valuedPositions.length ? valuedPositions.reduce((sum, position) => sum + position.eurValue, 0) : null;
-  const totalCost = positions.length === 0 ? 0 : costedPositions.length ? costedPositions.reduce((sum, position) => sum + position.eurCost, 0) : null;
-  const totalPnl = positions.length === 0 ? 0 : valuedPositions.length ? valuedPositions.reduce((sum, position) => sum + position.eurPnl, 0) : null;
-  const valuationCoverage = positions.length ? `${valuedPositions.length}/${positions.length}` : '0/0';
+  const liveUsProviderSymbols = useMemo(
+    () => [...new Set(positions
+      .filter((position) => position.instrumentRoute?.market === 'US' && position.instrumentRoute?.baseSymbol)
+      .map((position) => position.instrumentRoute.baseSymbol))],
+    [positions],
+  );
+
+  useEffect(() => {
+    if (loading || token.trim().length < 20 || !liveUsProviderSymbols.length) return undefined;
+    return openFinnhubTrades(token.trim(), liveUsProviderSymbols, async (trade) => {
+      if (!trade?.appSymbol || !trade?.quote) return;
+      const current = stateRef.current;
+      await applyQuotes(
+        current,
+        { [trade.appSymbol]: trade.quote },
+        new Date().toISOString(),
+        current.meta.errors || [],
+        { silent: true },
+      );
+    });
+  }, [applyQuotes, liveUsProviderSymbols, loading, token]);
   const openNewTransaction = () => { setEditingTransaction(null); setTransactionModal(true); };
 
   const saveTransaction = async (transaction) => {

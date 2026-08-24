@@ -1,4 +1,4 @@
-const finite = (value) => Number.isFinite(Number(value));
+const finite = (value) => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
 const positive = (value) => finite(value) && Number(value) > 0;
 
 export const ACCOUNTING_VERSION = 2;
