@@ -49,6 +49,10 @@ jobs:
         working-directory: mobile
         run: node scripts/harden-core-numeric-invariants.cjs
 
+      - name: Harden Euronext Athens market rules
+        working-directory: mobile
+        run: node scripts/harden-athens-market.cjs
+
       - name: Verify canonical core invariants
         working-directory: mobile
         run: npm run test:core
@@ -100,6 +104,8 @@ jobs:
           git add \
             mobile/PortfolioApp.js \
             mobile/src/market-data.js \
+            mobile/src/market-rules.js \
+            mobile/src/instrument-quote-integrity.js \
             mobile/src/transaction-accounting.js \
             mobile/src/portfolio-engine.js \
             mobile/src/position-lots.js \
@@ -108,5 +114,5 @@ jobs:
             echo 'Canonical core consolidation already materialized.'
             exit 0
           fi
-          git commit -m 'Materialize canonical portfolio and numeric invariants'
+          git commit -m 'Materialize canonical portfolio, Athens market and numeric invariants'
           git push origin HEAD:investor-control-core-stabilization-v174
