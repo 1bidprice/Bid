@@ -45,6 +45,10 @@ jobs:
         working-directory: mobile
         run: node scripts/consolidate-portfolio-engine.cjs
 
+      - name: Harden null-safe numeric invariants
+        working-directory: mobile
+        run: node scripts/harden-core-numeric-invariants.cjs
+
       - name: Verify canonical core invariants
         working-directory: mobile
         run: npm run test:core
@@ -86,7 +90,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Commit verified portfolio/UI consolidation
+      - name: Commit verified core consolidation
         if: github.event_name == 'push' && github.ref == 'refs/heads/investor-control-core-stabilization-v174'
         shell: bash
         run: |
@@ -96,10 +100,13 @@ jobs:
           git add \
             mobile/PortfolioApp.js \
             mobile/src/market-data.js \
+            mobile/src/transaction-accounting.js \
+            mobile/src/portfolio-engine.js \
+            mobile/src/position-lots.js \
             mobile/scripts/verify-v173-universal-instrument-integrity.js
           if git diff --cached --quiet; then
-            echo 'Portfolio/UI canonical consolidation already materialized.'
+            echo 'Canonical core consolidation already materialized.'
             exit 0
           fi
-          git commit -m 'Wire canonical portfolio engine and generic live quote flow'
+          git commit -m 'Materialize canonical portfolio and numeric invariants'
           git push origin HEAD:investor-control-core-stabilization-v174
