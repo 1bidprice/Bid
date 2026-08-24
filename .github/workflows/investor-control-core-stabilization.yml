@@ -93,7 +93,10 @@ jobs:
           set -euo pipefail
           git config user.name 'investor-control-stabilizer'
           git config user.email 'actions@users.noreply.github.com'
-          git add mobile/PortfolioApp.js mobile/src/market-data.js
+          git add \
+            mobile/PortfolioApp.js \
+            mobile/src/market-data.js \
+            mobile/scripts/verify-v173-universal-instrument-integrity.js
           if git diff --cached --quiet; then
             echo 'Portfolio/UI canonical consolidation already materialized.'
             exit 0
