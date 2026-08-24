@@ -38,14 +38,28 @@ Reason: live device QA of v1.7.3 build 31 exposed a reconciliation defect in the
 16. Generalized the official Athens quote adapter to any verified `.GR` symbol instead of ALWN-only handling, with page-identity checks and EUR enforcement.
 17. Added a dedicated Athens invariant suite covering open/close boundaries, holidays, calendar uncertainty, CREDIA.GR routing, official delayed-price valuation, fallback rejection and US/GR separation.
 18. Core stabilization CI run #55 passed canonical core tests, Expo dependency compatibility, Expo Doctor and Android JavaScript export, then materialized the verified canonical portfolio/Athens/numeric source in commit `1be663a4d26844330e347dc21f39ce65c72f1f28`.
+19. A clean repeat stabilization run passed without requiring another source-materialization repair, proving the canonical source is idempotent under the stabilization workflow.
+20. Replaced the obsolete signed-APK patch-chain workflow with a canonical-source v1.7.3 signed build path.
+21. Canonical Market Integrity workflow run `32732130516` passed end-to-end: autonomous Market Intelligence validation, canonical mobile integrity, Android prebuild, release APK build, signing verification and artifact upload.
+22. Signed Canonical Core APK workflow run `32732130412` passed end-to-end and produced artifact `investor-control-v1.7.3-canonical-core-signed-apk` (artifact id `9522114548`).
+23. Final APK SHA-256: `a892f67b95ab9e3052c183a2dd8c5618471856d798efa36608d3c60f0dce2c13`.
+24. Final APK signature certificate SHA-256: `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`, preserving update-certificate continuity.
+25. The live Market Intelligence feed already carries multiple Euronext Athens instruments beyond the original Allwyn seed, including CREDIA.GR, OLYMP.GR and ORILINA.GR, while autonomous discovery continues to treat discovery as WATCH/research until strict evidence gates pass.
 
-### Current verification gate
+### Stabilization gate status
 
-This log update intentionally triggers a fresh human-authored CI run against the already-materialized canonical source. The gate is not considered closed until the second run passes without needing another source-materialization repair. Legacy workflows that still try to execute the retired historical patch chain are not release authority and must be retired or rewritten before final release packaging.
+**CLOSED FOR BUILD/INSTALL TESTING.**
+
+The canonical accounting, portfolio, quote-integrity, Euronext Athens market rules and native Android release build now pass the dedicated stabilization and canonical market-integrity gates. The resulting signed v1.7.3 APK is the only release artifact from this branch that should be used for the next device test.
+
+This does not waive the final real-device regression requirement. A build can be structurally correct and still expose a UI/device-only defect. Do not call a future Play/production release final until ALWN.GR, CREDIA.GR and SPCE.US have been checked on the actual device.
 
 ### Next locked milestone
 
-1. Prove the materialized canonical source is idempotent under a clean CI/build run.
-2. Retire/update legacy APK workflows that still depend on the old patch chain.
-3. Audit the Market Intelligence focus/discovery universe so Euronext Athens coverage is broader than the current Allwyn-focused seed, without weakening evidence gates or manufacturing Greek BUY/SELL recommendations.
-4. Only after those gates pass, create a new release candidate and perform live-device regression on ALWN.GR, CREDIA.GR and SPCE.US before calling the product final.
+Install the signed canonical v1.7.3 APK on the real Android device **over the existing app without clearing data**, then verify exactly these three positions and nothing else first:
+
+1. `ALWN.GR` — quantity, authoritative cash cost, average/all-in, official delayed Athens price and EUR valuation.
+2. `CREDIA.GR` — position visibility, official Athens routing, EUR valuation and no fallback promoted to authority.
+3. `SPCE.US` — 720-share quantity, authoritative USD cash cost 2,282.72, reconciled average/all-in, current quote, FX-derived EUR valuation and P/L.
+
+If those pass, stabilization is complete and the branch can move to release integration. If any one fails, fix only the failing canonical layer and rerun the same gate; do not reopen the historical patch chain.
