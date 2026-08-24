@@ -5,11 +5,13 @@
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "postinstall": "node scripts/apply-v065-native-ui-fix.js && node scripts/apply-v070-opportunities.js && node scripts/apply-v071-live-sync.js && node scripts/apply-v080-autonomous-decisions.js && node scripts/apply-v081-position-performance.js && node scripts/apply-v081b-fix-source-newline.js && node scripts/apply-v090-discovery-clarity.js && node scripts/apply-v090b-background-intelligence.js && node scripts/apply-v091-reliability.js && node scripts/apply-v100-production-health.js && node scripts/apply-v101-integrity-recovery.js && node scripts/apply-v110-unified-intelligence.js && node scripts/apply-v111-alert-integrity.js && node scripts/apply-v120-play-store-release.js && node scripts/apply-v121-play-permission-minimization.js && node scripts/apply-v170-opportunity-purchase-ui.js && node scripts/apply-v170-release-identity.js && node scripts/apply-v171-portfolio-aware-decisions.js && node scripts/apply-v172-quote-transparency.js && node scripts/apply-v173-universal-instrument-integrity.js && node scripts/apply-v173b-closed-market-layout-fix.js",
+    "test:accounting": "node scripts/test-accounting-invariants.cjs",
     "test:lots": "node scripts/test-position-lots.cjs",
     "test:hunter-ui": "node scripts/verify-v170-opportunity-purchase-ui.js",
     "test:release-identity": "node scripts/verify-v171-portfolio-aware-decisions.js",
     "test:quote-transparency": "node scripts/verify-v172-quote-transparency.js",
     "test:instrument-integrity": "node scripts/verify-v173-universal-instrument-integrity.js",
+    "test:core": "npm run test:accounting && npm run test:lots && npm run test:hunter-ui && npm run test:release-identity && npm run test:quote-transparency && npm run test:instrument-integrity",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
