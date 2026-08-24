@@ -1,4 +1,6 @@
-export const MOBILE_QUOTE_CONTRACT_VERSION = '2026-08-04.2';
+import { evaluateMobileQuoteIntegrity, mobileQuotePublicMessage } from './instrument-quote-integrity';
+
+export const MOBILE_QUOTE_CONTRACT_VERSION = '2026-08-20.2';
 
 const SOURCE_ROLES = Object.freeze({
   PRIMARY_EXCHANGE: 'PRIMARY_EXCHANGE',
@@ -38,7 +40,12 @@ function safePublicMessage(status, quote = {}) {
   if (status === 'UNAVAILABLE') return 'Δεν υπάρχει διαθέσιμη και επαληθεύσιμη τιμή.';
   if (status === 'STALE') return 'Η τιμή είναι παρωχημένη και δεν χρησιμοποιείται σε αποτίμηση ή απόφαση.';
   if (status === 'FALLBACK_NOT_VERIFIED') return 'Η εφεδρική τιμή εμφανίζεται μόνο πληροφοριακά και δεν χρησιμοποιείται σε αποτίμηση ή τελική απόφαση.';
-  if (status === 'TIMESTAMP_NOT_VERIFIED') return 'Ο χρόνος της τιμής δεν έχει επιβεβαιωθεί επαρκώς.';
+  if (status === 'TIMESTAMP_NOT_VERIFIED') {
+    const delay = Number(quote.advertisedDelayMinutes || 0);
+    return delay > 0
+      ? `Επίσημη τιμή αναφοράς με δηλωμένη καθυστέρηση ${delay}′. Ο ακριβής χρόνος της τιμής δεν έχει επαληθευτεί.`
+      : 'Τιμή αναφοράς από εγκεκριμένη πηγή, αλλά ο ακριβής χρόνος της τιμής δεν έχει επαληθευτεί.';
+  }
   if (status === 'OFFICIAL_DELAYED_OR_EXCHANGE') {
     return Number(quote.advertisedDelayMinutes || 0) > 0
       ? `Επίσημη χρηματιστηριακή τιμή με δηλωμένη καθυστέρηση ${Number(quote.advertisedDelayMinutes)} λεπτών.`
@@ -48,61 +55,32 @@ function safePublicMessage(status, quote = {}) {
 }
 
 export function buildMobileQuoteContract(symbol, quote = {}, options = {}) {
-  const inherited = quote?.quoteContract && typeof quote.quoteContract === 'object'
-    ? quote.quoteContract
-    : null;
-  const role = inherited?.sourceRole || sourceRole(quote);
-  const price = positive(quote.nativePrice ?? quote.price);
-  const ageHours = quoteAgeHours(quote, options.now || Date.now());
-  const maxAgeHours = Number(options.maxAgeHours ?? (String(symbol).endsWith('.GR') ? 6 : 4));
-  const timestampVerified = inherited?.timestampVerified !== false
-    && quote.priceTimestampVerified !== false
-    && ageHours !== null;
-  const stale = quote.status === 'stale' || ageHours === null || ageHours > maxAgeHours;
-  const sourceApproved = inherited?.sourceApproved === true
-    || [SOURCE_ROLES.PRIMARY_EXCHANGE, SOURCE_ROLES.LICENSED_MARKET_DATA].includes(role);
-  const valuationEligible = price !== null && !stale && sourceApproved
-    && role !== SOURCE_ROLES.FALLBACK_UNVERIFIED;
-  const decisionEligible = valuationEligible && timestampVerified
-    && inherited?.decisionEligible !== false;
+  const integrity = evaluateMobileQuoteIntegrity(symbol, quote, options);
   const previousClose = positive(quote.nativePreviousClose ?? quote.previousClose);
-  const dayChangeEligible = decisionEligible
+  const dayChangeEligible = integrity.decisionReady === true
     && quote.dayChangeVerified !== false
-    && inherited?.dayChangeEligible !== false
+    && quote?.quoteContract?.dayChangeEligible !== false
     && previousClose !== null;
-
-  const status = price === null
-    ? 'UNAVAILABLE'
-    : stale
-      ? 'STALE'
-      : role === SOURCE_ROLES.FALLBACK_UNVERIFIED
-        ? 'FALLBACK_NOT_VERIFIED'
-        : !timestampVerified
-          ? 'TIMESTAMP_NOT_VERIFIED'
-          : role === SOURCE_ROLES.PRIMARY_EXCHANGE
-            ? 'OFFICIAL_DELAYED_OR_EXCHANGE'
-            : 'VERIFIED';
-
-  const diagnosticCodes = [];
-  if (price === null) diagnosticCodes.push('QUOTE_PRICE_MISSING');
-  if (ageHours === null) diagnosticCodes.push('QUOTE_TIMESTAMP_MISSING');
-  if (stale) diagnosticCodes.push('QUOTE_STALE');
-  if (!sourceApproved) diagnosticCodes.push('QUOTE_SOURCE_NOT_APPROVED');
-  if (!timestampVerified) diagnosticCodes.push('QUOTE_TIMESTAMP_NOT_VERIFIED');
-  if (previousClose === null) diagnosticCodes.push('PREVIOUS_CLOSE_NOT_VERIFIED');
-  if (inherited?.diagnosticCodes) diagnosticCodes.push(...inherited.diagnosticCodes);
-
+  const diagnosticCodes = [...new Set([
+    ...integrity.blockers,
+    ...(previousClose === null ? ['PREVIOUS_CLOSE_NOT_VERIFIED'] : []),
+    ...(Array.isArray(quote?.quoteContract?.diagnosticCodes) ? quote.quoteContract.diagnosticCodes : []),
+  ])];
   return {
     version: MOBILE_QUOTE_CONTRACT_VERSION,
-    sourceRole: role,
-    sourceApproved,
-    timestampVerified,
-    valuationEligible,
-    decisionEligible,
+    integrityVersion: integrity.version,
+    invariant: integrity.invariant,
+    sourceRole: integrity.sourceRole,
+    sourceApproved: integrity.sourceApproved,
+    timestampVerified: integrity.timestampVerified,
+    identityVerified: integrity.identityReady,
+    valuationEligible: integrity.valuationReady,
+    decisionEligible: integrity.decisionReady,
     dayChangeEligible,
-    publicStatus: status,
-    publicMessage: safePublicMessage(status, quote),
-    diagnosticCodes: [...new Set(diagnosticCodes)],
+    publicStatus: integrity.publicStatus,
+    publicMessage: mobileQuotePublicMessage(integrity),
+    diagnosticCodes,
+    instrumentIntegrity: integrity,
   };
 }
 
@@ -120,14 +98,14 @@ export function quoteFromRegistry(symbol, entry, options = {}) {
     nativePreviousClose: positive(entry.previousClose),
     nativeChangeBase: positive(entry.previousClose),
     nativeRegularMarketPrice: nativePrice,
-    nativeCurrency: entry.currency || (String(symbol).endsWith('.US') ? 'USD' : 'EUR'),
+    nativeCurrency: /^[A-Z]{3}$/.test(String(entry.currency || '').toUpperCase()) ? String(entry.currency).toUpperCase() : null,
     updatedAt: entry.quoteAt,
     checkedAt: entry.checkedAt || entry.quoteAt,
     source: entry.source || 'Investor Control canonical quote registry',
-    providerSymbol: entry.appSymbol || symbol,
+    providerSymbol: entry.providerSymbol || entry.appSymbol || symbol,
     quality: role === SOURCE_ROLES.PRIMARY_EXCHANGE ? 'delayed15' : 'realtime',
     session: 'regular-market',
-    priceTimestampVerified: inherited?.timestampVerified !== false,
+    priceTimestampVerified: inherited?.timestampVerified === true,
     dayChangeVerified: inherited?.dayChangeEligible === true,
     quoteContract: inherited,
     canonicalRegistry: true,

@@ -10,6 +10,10 @@ function when(value) {
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('el-GR');
 }
 
+function canonicalPositionSymbol(value) {
+  return String(value || '').trim().toUpperCase().replace(/\.(US|GR)$/, '');
+}
+
 function actionLabel(code, finalAction) {
   if (code === finalAction?.holderAction) return finalAction.holderActionLabel;
   if (code === finalAction?.nonHolderAction) return finalAction.nonHolderActionLabel;
@@ -22,6 +26,23 @@ function actionLabel(code, finalAction) {
     AVOID: 'ΑΠΕΦΥΓΕ',
     WATCH: 'ΠΑΡΑΚΟΛΟΥΘΗΣΗ',
   }[code] || code || 'ΠΑΡΑΚΟΛΟΥΘΗΣΗ';
+}
+
+function blockerLabel(code) {
+  return {
+    DOSSIER_NOT_PUBLISHABLE: 'Ο φάκελος δεν έχει ολοκληρώσει όλους τους ελέγχους',
+    DOSSIER_NOT_READY: 'Η ανάλυση δεν είναι έτοιμη για τελική ενέργεια',
+    CROSS_CHECK_NOT_READY: 'Λείπει ανεξάρτητη διασταύρωση του ίδιου γεγονότος',
+    FUNDAMENTALS_NOT_READY: 'Λείπουν επαρκή και επαληθευμένα θεμελιώδη στοιχεία',
+    MARKET_METRICS_NOT_READY: 'Δεν έχουν ολοκληρωθεί οι έλεγχοι ιστορικού, όγκου και σχετικής ισχύος',
+    MARKET_HISTORY_SOURCE_NOT_READY: 'Η πηγή ιστορικών δεδομένων δεν έχει εγκριθεί',
+    MARKET_HISTORY_NOT_CROSSCHECKED: 'Το ιστορικό τιμών δεν έχει διασταυρωθεί με ανεξάρτητη τρέχουσα τιμή',
+    MARKET_BENCHMARK_NOT_READY: 'Λείπει έγκυρο benchmark αγοράς',
+    REFERENCE_PRICE_REQUIRED: 'Λείπει έγκυρη τιμή αναφοράς',
+    REFERENCE_PRICE_STALE: 'Η τιμή αναφοράς είναι παρωχημένη',
+    MARKET_HISTORY_STALE: 'Τα ιστορικά δεδομένα δεν είναι αρκετά πρόσφατα',
+    UNRESOLVED_CONTRADICTION: 'Υπάρχει ανεπίλυτη αντίφαση στις πηγές',
+  }[code] || code;
 }
 
 function tone(code) {
@@ -40,7 +61,7 @@ export default function FinalDecisionCard({ item }) {
       const raw = await AsyncStorage.getItem(STORAGE_KEY);
       const state = raw ? JSON.parse(raw) : { transactions: [], prices: {} };
       const snapshot = portfolioSnapshot(state);
-      setHasPosition(snapshot.positions.some((position) => position.symbol === item?.symbol && Number(position.quantity) > 0));
+      setHasPosition(snapshot.positions.some((position) => canonicalPositionSymbol(position.symbol) === canonicalPositionSymbol(item?.symbol) && Number(position.quantity) > 0));
     } catch {
       setHasPosition(false);
     }
@@ -55,6 +76,7 @@ export default function FinalDecisionCard({ item }) {
   }, [loadPosition]);
 
   const finalAction = item?.finalAction || null;
+  const blockers = Array.isArray(finalAction?.blockers) ? finalAction.blockers : [];
   const personalized = useMemo(() => {
     if (!finalAction || finalAction.status !== 'FINAL') return null;
     const code = hasPosition ? finalAction.holderAction : finalAction.nonHolderAction;
@@ -66,7 +88,8 @@ export default function FinalDecisionCard({ item }) {
       <View style={styles.blocked}>
         <Text style={styles.blockedEyebrow}>ΤΕΛΙΚΟ ΣΥΜΠΕΡΑΣΜΑ</Text>
         <Text style={styles.blockedTitle}>Δεν έχει εγκριθεί τελική ενέργεια</Text>
-        <Text style={styles.blockedText}>Το σύστημα παραμένει σε παρακολούθηση μέχρι να περάσουν όλοι οι έλεγχοι πηγών, τιμών, θεμελιωδών, ρευστότητας και αντιφάσεων.</Text>
+        <Text style={styles.blockedText}>Δεν παράγεται αγορά ή πώληση μέχρι να περάσουν όλοι οι υποχρεωτικοί έλεγχοι.</Text>
+        {blockers.slice(0, 4).map((code) => <Text key={code} style={styles.blockedReason}>• {blockerLabel(code)}</Text>)}
       </View>
     );
   }
@@ -102,7 +125,7 @@ const styles = StyleSheet.create({
   blocked: { backgroundColor: '#f5f8fc', borderWidth: 1, borderColor: '#d7e0ec', borderRadius: 17, padding: 13, marginTop: 13 },
   blockedEyebrow: { color: '#718096', fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
   blockedTitle: { color: '#16345f', fontSize: 16, fontWeight: '900', marginTop: 4 },
-  blockedText: { color: '#62738a', fontSize: 12, lineHeight: 18, marginTop: 5 },
+  blockedText: { color: '#62738a', fontSize: 12, lineHeight: 18, marginTop: 5 }, blockedReason: { color: '#735f31', fontSize: 10, lineHeight: 15, marginTop: 4 },
   card: { backgroundColor: '#eef3f8', borderWidth: 1, borderColor: '#cfd9e6', borderRadius: 18, padding: 14, marginTop: 13 },
   positive: { backgroundColor: '#e9f8ef', borderColor: '#9fd8b7' },
   hold: { backgroundColor: '#edf4ff', borderColor: '#b4cdf5' },
