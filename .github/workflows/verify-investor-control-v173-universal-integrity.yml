@@ -1,8 +1,9 @@
-name: Investor Control v1.7.3 Universal Integrity
+name: Investor Control v1.7.3 Canonical Market Integrity
 
 on:
   push:
     branches:
+      - investor-control-core-stabilization-v174
       - investor-control-recommendation-integrity-fix-v2
     paths:
       - market-intelligence/**
@@ -21,7 +22,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: investor-control-v173-universal-integrity-${{ github.ref }}
+  group: investor-control-v173-canonical-integrity-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -43,21 +44,19 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Validate universal market-intelligence integrity
+      - name: Validate autonomous market intelligence
         working-directory: market-intelligence
         run: npm test
 
-      - name: Install and apply mobile migration chain
+      - name: Install canonical mobile source
         working-directory: mobile
         run: npm install --legacy-peer-deps --no-audit --no-fund
 
-      - name: Validate universal mobile integrity
+      - name: Validate canonical mobile and market integrity
         working-directory: mobile
         run: |
           set -euo pipefail
-          npm run test:lots
-          npm run test:quote-transparency
-          npm run test:instrument-integrity
+          npm run test:core
           npx expo install --check
           npx expo-doctor@latest
           npx expo export --platform android --output-dir dist-v173-integrity
@@ -66,17 +65,28 @@ jobs:
           const app = require('./app.json');
           const pkg = require('./package.json');
           const market = fs.readFileSync('./src/market-data.js', 'utf8');
+          const marketRules = fs.readFileSync('./src/market-rules.js', 'utf8');
           const portfolio = fs.readFileSync('./PortfolioApp.js', 'utf8');
+          const portfolioEngine = fs.readFileSync('./src/portfolio-engine.js', 'utf8');
           const quoteContract = fs.readFileSync('./src/quote-contract.js', 'utf8');
+          const integrity = fs.readFileSync('./src/instrument-quote-integrity.js', 'utf8');
           if (app.expo.version !== '1.7.3' || app.expo.android.versionCode !== 31) throw new Error('v1.7.3 build 31 identity mismatch');
           if (app.expo.android.package !== 'gr.investorcontrol.app') throw new Error('package continuity mismatch');
           if (pkg.version !== '1.7.3') throw new Error('package version mismatch');
+          if (String(pkg.scripts?.postinstall || '').includes('apply-v')) throw new Error('legacy patch chain returned');
           if (market.includes('EURONEXT_ATHENS_URLS')) throw new Error('ticker-specific Athens whitelist remains');
           if (market.includes("symbol === 'SPCE.US'")) throw new Error('ticker-specific US route remains');
           if (!market.includes("if (route.market === 'US')") || !market.includes("if (route.market === 'GR')")) throw new Error('market-based routing missing');
-          if (market.includes("quote?.nativeCurrency || (symbol.endsWith('.US') ? 'USD' : 'EUR')")) throw new Error('currency inference remains');
+          if (!market.includes("import { marketStateForSymbol } from './market-rules';")) throw new Error('canonical market-state routing missing');
+          if (!market.includes('EURONEXT_ATHENS_STOCK_URL')) throw new Error('generic official Athens adapter missing');
+          if (market.includes('17 * 60 + 25')) throw new Error('obsolete Athens close remains');
+          if (!marketRules.includes('regularStart: 10 * 60 + 15') || !marketRules.includes('regularEnd: 17 * 60 + 20')) throw new Error('Athens 10:15-17:20 session missing');
+          if (!marketRules.includes('ATHENS_MARKET_HOLIDAYS')) throw new Error('Athens holiday calendar missing');
+          if (!integrity.includes('EXCHANGE_CALENDAR_NOT_VERIFIED')) throw new Error('Athens calendar fail-closed gate missing');
           if (!quoteContract.includes('evaluateMobileQuoteIntegrity')) throw new Error('universal quote gate missing');
-          if (!portfolio.includes('positionCurrencyVerified')) throw new Error('position currency gate missing');
+          if (!portfolio.includes("import { buildPortfolioSnapshot } from './src/portfolio-engine';")) throw new Error('canonical portfolio bridge missing');
+          if (!portfolioEngine.includes('positionCurrencyVerified')) throw new Error('position currency gate missing from canonical engine');
+          console.log('PASS canonical US + Euronext Athens routing, calendars, currency, quote and portfolio integrity');
           NODE
 
       - name: Prebuild Android
@@ -116,7 +126,7 @@ jobs:
       - name: Upload verified v1.7.3 APK
         uses: actions/upload-artifact@v4
         with:
-          name: investor-control-v1.7.3-build31-universal-integrity
+          name: investor-control-v1.7.3-build31-canonical-market-integrity
           path: |
             mobile/Investor-Control-v1.7.3-build31.apk
             mobile/Investor-Control-v1.7.3-build31.sha256
