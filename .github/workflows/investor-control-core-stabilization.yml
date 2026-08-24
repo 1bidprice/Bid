@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify-and-capture-canonical-source:
+  verify-and-consolidate-core:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -37,11 +37,15 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install and materialize current production source
+      - name: Install canonical dependencies
         working-directory: mobile
         run: npm install --legacy-peer-deps --no-audit --no-fund
 
-      - name: Verify canonical accounting and existing product contracts
+      - name: Apply one-time portfolio/UI responsibility consolidation
+        working-directory: mobile
+        run: node scripts/consolidate-portfolio-engine.cjs
+
+      - name: Verify canonical core invariants
         working-directory: mobile
         run: npm run test:core
 
@@ -57,7 +61,7 @@ jobs:
         working-directory: mobile
         run: npx expo export --platform android --output-dir dist-core-stabilization
 
-      - name: Capture materialized canonical source and exact generated diff
+      - name: Capture exact stabilization diff
         shell: bash
         run: |
           set -euo pipefail
@@ -82,43 +86,17 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Consolidate materialized source and retire production patch chain
+      - name: Commit verified portfolio/UI consolidation
         if: github.event_name == 'push' && github.ref == 'refs/heads/investor-control-core-stabilization-v174'
         shell: bash
         run: |
           set -euo pipefail
-          node - <<'NODE'
-          const fs = require('fs');
-          const path = 'mobile/package.json';
-          const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
-          pkg.scripts = pkg.scripts || {};
-          delete pkg.scripts.postinstall;
-          pkg.scripts['test:canonical-source'] = 'node scripts/verify-canonical-source.cjs';
-          pkg.scripts['test:core'] = 'npm run test:canonical-source && npm run test:accounting && npm run test:lots && npm run test:hunter-ui && npm run test:release-identity && npm run test:quote-transparency && npm run test:instrument-integrity';
-          fs.writeFileSync(path, `${JSON.stringify(pkg, null, 2)}\n`);
-          NODE
-
-          node mobile/scripts/verify-canonical-source.cjs
-
           git config user.name 'investor-control-stabilizer'
           git config user.email 'actions@users.noreply.github.com'
-          git add \
-            mobile/App.js \
-            mobile/DecisionOverlay.js \
-            mobile/PortfolioApp.js \
-            mobile/app.json \
-            mobile/package.json \
-            mobile/src/FinalDecisionCard.js \
-            mobile/src/OpportunitiesView.js \
-            mobile/src/alert-engine.js \
-            mobile/src/intelligence-feed-store.js \
-            mobile/src/market-data.js \
-            mobile/src/quote-contract.js
-
+          git add mobile/PortfolioApp.js mobile/src/market-data.js
           if git diff --cached --quiet; then
-            echo 'Canonical source already materialized; no consolidation commit required.'
+            echo 'Portfolio/UI canonical consolidation already materialized.'
             exit 0
           fi
-
-          git commit -m 'Consolidate canonical mobile source and retire patch-chain runtime'
+          git commit -m 'Wire canonical portfolio engine and generic live quote flow'
           git push origin HEAD:investor-control-core-stabilization-v174
