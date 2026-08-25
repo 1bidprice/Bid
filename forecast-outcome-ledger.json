@@ -3,7 +3,7 @@
   "version": 1,
   "policyVersion": "2026-08-11.1",
   "ledgerPolicyVersion": "2026-08-12.1",
-  "updatedAt": "2026-08-25T20:49:20.275Z",
+  "updatedAt": "2026-08-25T21:47:18.239Z",
   "records": [
     {
       "format": "investor-control-forecast-outcome-record",
@@ -209598,14 +209598,243 @@
         "horizon": "day1",
         "forecastSampleDate": "2026-08-25"
       }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-12.1",
+      "forecastId": "forecast:0bb090c26970d9ab9d52c7220906",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:sec:0002047455",
+      "instrumentId": "company:sec:0002047455",
+      "displayName": "Quartzsea Acquisition",
+      "symbol": "QSEA",
+      "listing": {
+        "symbol": "QSEA",
+        "mic": "XNAS",
+        "exchange": "Nasdaq",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0002047455",
+        "instrumentId": "company:sec:0002047455",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0002047455.json",
+        "sourceDocumentId": "CIK0002047455",
+        "capturedAt": "2026-08-25T21:45:10.597Z",
+        "taxonomy": "SEC_SIC",
+        "code": "6770",
+        "description": "Blank Checks",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "marketRegimeSnapshot": {
+        "contract": "FORECAST_TIME_MARKET_REGIME_SNAPSHOT_V1",
+        "policyVersion": "2026-08-12.1",
+        "capturedAt": "2026-08-25T21:45:10.597Z",
+        "benchmarkAsOf": "2026-08-25T13:30:00.000Z",
+        "benchmarkSymbol": "SPY",
+        "benchmarkSource": "Yahoo Finance Chart",
+        "benchmarkSourceQuality": "SECONDARY_VALIDATED",
+        "observationCount": 501,
+        "status": "REGIME_READY",
+        "regimeKey": "RISK_ON|BULL_TREND|NORMAL_VOLATILITY|POSITIVE_MOMENTUM",
+        "riskTone": "RISK_ON",
+        "trendRegime": "BULL_TREND",
+        "momentumRegime": "POSITIVE_MOMENTUM",
+        "volatilityRegime": "NORMAL_VOLATILITY",
+        "metrics": {
+          "latestClose": 765.909973,
+          "return20Pct": 3.3812,
+          "return60Pct": 1.5074,
+          "return120Pct": 12.3846,
+          "sma50": 752.63157,
+          "sma200": 705.921049,
+          "annualizedVolatility20Pct": 13.2538,
+          "annualizedVolatility60Pct": 13.9793,
+          "volatility20Percentile": 61.11,
+          "maxDrawdown120Pct": -6.9886
+        },
+        "blockers": [],
+        "researchOnly": true,
+        "modelDerived": true,
+        "finalActionEligible": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "day1",
+      "tradingDays": 1,
+      "forecastSampleDate": "2026-08-25",
+      "forecastAt": "2026-08-25T21:45:10.597Z",
+      "referencePrice": {
+        "value": 10.600099563598633,
+        "timestamp": "2026-08-25T13:30:00.000Z",
+        "currency": "USD",
+        "source": "Historical market series"
+      },
+      "rawProbabilityPositive": 0.3039,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": null,
+      "rawLatentFactorScore": -0.034734,
+      "factorScoreStatus": "RESEARCH_SCORE_BLOCKED",
+      "factorAvailableDomainCount": 4,
+      "factorAvailableWeight": 0.52,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": -0.273772,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": 0.24205,
+          "weight": 0.16,
+          "verifiedDriverCount": 2
+        },
+        {
+          "domain": "RISK",
+          "value": -0.484,
+          "weight": 0.09,
+          "verifiedDriverCount": 5
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.94,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": 0.0256,
+      "distribution": {
+        "p10ReturnPct": -0.0945,
+        "p25ReturnPct": -0.0379,
+        "medianReturnPct": 0,
+        "p75ReturnPct": 0.0951,
+        "p90ReturnPct": 0.1907,
+        "downsideProbabilityPct": 69.61,
+        "bullCaseReturnPct": 0.1907,
+        "baseCaseReturnPct": 0,
+        "bearCaseReturnPct": -0.0945
+      },
+      "patternConfidenceScore": 56.96,
+      "evidenceQualityScore": 0,
+      "regime": "BULL_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-18.3",
+        "generatedAt": "2026-08-25T21:45:10.597Z",
+        "validUntil": "2026-08-26T21:45:10.597Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 34,
+        "confidenceMeaning": "POLICY_COMPLETENESS_HEURISTIC_NOT_PROBABILITY",
+        "dataQualityScore": 15,
+        "integrity": {
+          "contractVersion": 1,
+          "strict": true,
+          "passed": true,
+          "blockers": [],
+          "companyId": "company:sec:0002047455",
+          "listingSymbol": "QSEA",
+          "referenceSymbol": "QSEA",
+          "evidenceCount": 3
+        },
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY",
+          "MARKET_METRICS_NOT_READY",
+          "MARKET_HISTORY_SOURCE_NOT_READY",
+          "MARKET_HISTORY_NOT_CROSSCHECKED"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 8.25294361111111,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 8.25294361111111,
+          "referencePricePurpose": "HISTORICAL_REFERENCE",
+          "referencePriceFreshnessModel": "HISTORICAL_CLOSE",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": null,
+          "fundamentalFlags": [
+            "NON_POSITIVE_EQUITY"
+          ],
+          "marketFlags": [
+            "LOW_LIQUIDITY"
+          ]
+        },
+        "controlledPlan": {
+          "status": "AVAILABLE",
+          "level": "INTERIM_RISK_CONTROL",
+          "title": "Πλάνο τώρα",
+          "holderAction": "HOLD",
+          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ",
+          "nonHolderAction": "DO_NOT_BUY",
+          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
+          "marketAction": "WATCH",
+          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+          "newBuyAllowed": false,
+          "sellSignalApproved": false,
+          "confidenceScore": 34,
+          "dataQualityScore": 15,
+          "rationale": "Δεν έχουν ολοκληρωθεί όλοι οι υποχρεωτικοί έλεγχοι για τελική αγορά ή πώληση. Μέχρι τότε η πειθαρχημένη στάση είναι διατήρηση υπάρχουσας θέσης χωρίς νέα ενίσχυση και αποφυγή νέας εισόδου.",
+          "blockers": [
+            "DOSSIER_NOT_PUBLISHABLE",
+            "DOSSIER_NOT_READY",
+            "CROSS_CHECK_NOT_READY",
+            "FUNDAMENTALS_NOT_READY",
+            "MARKET_METRICS_NOT_READY",
+            "MARKET_HISTORY_SOURCE_NOT_READY",
+            "MARKET_HISTORY_NOT_CROSSCHECKED"
+          ],
+          "validUntil": "2026-08-26T21:45:10.597Z"
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0002047455",
+        "instrumentId": "company:sec:0002047455",
+        "horizon": "day1",
+        "forecastSampleDate": "2026-08-25"
+      }
     }
   ],
   "summary": {
     "format": "investor-control-forecast-outcome-ledger-summary",
     "version": 1,
     "policyVersion": "2026-08-12.1",
-    "recordCount": 1021,
-    "openCount": 215,
+    "recordCount": 1022,
+    "openCount": 216,
     "maturedCount": 806,
     "groups": [
       {
@@ -209819,8 +210048,8 @@
     ]
   },
   "evaluation": {
-    "baseRecordCount": 1016,
-    "incomingRecordCount": 1021,
-    "mergedRecordCount": 1021
+    "baseRecordCount": 1021,
+    "incomingRecordCount": 1022,
+    "mergedRecordCount": 1022
   }
 }
