@@ -3,7 +3,7 @@
   "version": 1,
   "policyVersion": "2026-08-11.1",
   "ledgerPolicyVersion": "2026-08-12.1",
-  "updatedAt": "2026-08-26T10:10:31.593Z",
+  "updatedAt": "2026-08-26T10:55:21.250Z",
   "records": [
     {
       "format": "investor-control-forecast-outcome-record",
@@ -212353,14 +212353,452 @@
         "horizon": "week1",
         "forecastSampleDate": "2026-08-26"
       }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-12.1",
+      "forecastId": "forecast:e2eaa4c50e69e6574c37ee52cdec",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:sec:0001651308",
+      "instrumentId": "company:sec:0001651308",
+      "displayName": "BeOne Medicines",
+      "symbol": "ONC",
+      "listing": {
+        "symbol": "ONC",
+        "mic": "XNAS",
+        "exchange": "Nasdaq",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001651308",
+        "instrumentId": "company:sec:0001651308",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0001651308.json",
+        "sourceDocumentId": "CIK0001651308",
+        "capturedAt": "2026-08-26T10:53:15.993Z",
+        "taxonomy": "SEC_SIC",
+        "code": "2834",
+        "description": "Pharmaceutical Preparations",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "marketRegimeSnapshot": {
+        "contract": "FORECAST_TIME_MARKET_REGIME_SNAPSHOT_V1",
+        "policyVersion": "2026-08-12.1",
+        "capturedAt": "2026-08-26T10:53:15.993Z",
+        "benchmarkAsOf": "2026-08-25T13:30:00.000Z",
+        "benchmarkSymbol": "SPY",
+        "benchmarkSource": "Yahoo Finance Chart",
+        "benchmarkSourceQuality": "SECONDARY_VALIDATED",
+        "observationCount": 501,
+        "status": "REGIME_READY",
+        "regimeKey": "RISK_ON|BULL_TREND|NORMAL_VOLATILITY|POSITIVE_MOMENTUM",
+        "riskTone": "RISK_ON",
+        "trendRegime": "BULL_TREND",
+        "momentumRegime": "POSITIVE_MOMENTUM",
+        "volatilityRegime": "NORMAL_VOLATILITY",
+        "metrics": {
+          "latestClose": 765.909973,
+          "return20Pct": 3.3812,
+          "return60Pct": 1.5074,
+          "return120Pct": 12.3845,
+          "sma50": 752.63157,
+          "sma200": 705.921048,
+          "annualizedVolatility20Pct": 13.2538,
+          "annualizedVolatility60Pct": 13.9793,
+          "volatility20Percentile": 61.11,
+          "maxDrawdown120Pct": -6.9886
+        },
+        "blockers": [],
+        "researchOnly": true,
+        "modelDerived": true,
+        "finalActionEligible": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "day1",
+      "tradingDays": 1,
+      "forecastSampleDate": "2026-08-25",
+      "forecastAt": "2026-08-26T10:53:15.993Z",
+      "referencePrice": {
+        "value": 376.37,
+        "timestamp": "2026-08-25T20:00:00.000Z",
+        "currency": "USD",
+        "source": "Finnhub Quote API"
+      },
+      "rawProbabilityPositive": 0.4152,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": null,
+      "rawLatentFactorScore": 0.278975,
+      "factorScoreStatus": "RESEARCH_SCORE_BLOCKED",
+      "factorAvailableDomainCount": 4,
+      "factorAvailableWeight": 0.52,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": -0.124014,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": 1,
+          "weight": 0.16,
+          "verifiedDriverCount": 2
+        },
+        {
+          "domain": "RISK",
+          "value": -0.385,
+          "weight": 0.09,
+          "verifiedDriverCount": 4
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.94,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": -0.1765,
+      "distribution": {
+        "p10ReturnPct": -2.7836,
+        "p25ReturnPct": -1.5678,
+        "medianReturnPct": -0.3766,
+        "p75ReturnPct": 1.4384,
+        "p90ReturnPct": 2.3646,
+        "downsideProbabilityPct": 58.48,
+        "bullCaseReturnPct": 2.3646,
+        "baseCaseReturnPct": -0.3766,
+        "bearCaseReturnPct": -2.7836
+      },
+      "patternConfidenceScore": 65,
+      "evidenceQualityScore": 20,
+      "regime": "BULL_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-18.3",
+        "generatedAt": "2026-08-26T10:53:15.993Z",
+        "validUntil": "2026-08-27T10:53:15.993Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 70,
+        "confidenceMeaning": "POLICY_COMPLETENESS_HEURISTIC_NOT_PROBABILITY",
+        "dataQualityScore": 35,
+        "integrity": {
+          "contractVersion": 1,
+          "strict": true,
+          "passed": true,
+          "blockers": [],
+          "companyId": "company:sec:0001651308",
+          "listingSymbol": "ONC",
+          "referenceSymbol": "ONC",
+          "evidenceCount": 3
+        },
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 14.887775833333333,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 21.387775833333333,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "CLOSED_MARKET_LAST_VERIFIED_CLOSE",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": null,
+          "fundamentalFlags": [],
+          "marketFlags": []
+        },
+        "controlledPlan": {
+          "status": "AVAILABLE",
+          "level": "INTERIM_RISK_CONTROL",
+          "title": "Πλάνο τώρα",
+          "holderAction": "HOLD",
+          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ",
+          "nonHolderAction": "DO_NOT_BUY",
+          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
+          "marketAction": "WATCH",
+          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+          "newBuyAllowed": false,
+          "sellSignalApproved": false,
+          "confidenceScore": 70,
+          "dataQualityScore": 35,
+          "rationale": "Δεν έχουν ολοκληρωθεί όλοι οι υποχρεωτικοί έλεγχοι για τελική αγορά ή πώληση. Μέχρι τότε η πειθαρχημένη στάση είναι διατήρηση υπάρχουσας θέσης χωρίς νέα ενίσχυση και αποφυγή νέας εισόδου.",
+          "blockers": [
+            "DOSSIER_NOT_PUBLISHABLE",
+            "DOSSIER_NOT_READY",
+            "CROSS_CHECK_NOT_READY",
+            "FUNDAMENTALS_NOT_READY"
+          ],
+          "validUntil": "2026-08-27T10:53:15.993Z"
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001651308",
+        "instrumentId": "company:sec:0001651308",
+        "horizon": "day1",
+        "forecastSampleDate": "2026-08-25"
+      }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-12.1",
+      "forecastId": "forecast:ec063f1fc35540951087ad928714",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:sec:0001651308",
+      "instrumentId": "company:sec:0001651308",
+      "displayName": "BeOne Medicines",
+      "symbol": "ONC",
+      "listing": {
+        "symbol": "ONC",
+        "mic": "XNAS",
+        "exchange": "Nasdaq",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001651308",
+        "instrumentId": "company:sec:0001651308",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0001651308.json",
+        "sourceDocumentId": "CIK0001651308",
+        "capturedAt": "2026-08-26T10:53:15.993Z",
+        "taxonomy": "SEC_SIC",
+        "code": "2834",
+        "description": "Pharmaceutical Preparations",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "marketRegimeSnapshot": {
+        "contract": "FORECAST_TIME_MARKET_REGIME_SNAPSHOT_V1",
+        "policyVersion": "2026-08-12.1",
+        "capturedAt": "2026-08-26T10:53:15.993Z",
+        "benchmarkAsOf": "2026-08-25T13:30:00.000Z",
+        "benchmarkSymbol": "SPY",
+        "benchmarkSource": "Yahoo Finance Chart",
+        "benchmarkSourceQuality": "SECONDARY_VALIDATED",
+        "observationCount": 501,
+        "status": "REGIME_READY",
+        "regimeKey": "RISK_ON|BULL_TREND|NORMAL_VOLATILITY|POSITIVE_MOMENTUM",
+        "riskTone": "RISK_ON",
+        "trendRegime": "BULL_TREND",
+        "momentumRegime": "POSITIVE_MOMENTUM",
+        "volatilityRegime": "NORMAL_VOLATILITY",
+        "metrics": {
+          "latestClose": 765.909973,
+          "return20Pct": 3.3812,
+          "return60Pct": 1.5074,
+          "return120Pct": 12.3845,
+          "sma50": 752.63157,
+          "sma200": 705.921048,
+          "annualizedVolatility20Pct": 13.2538,
+          "annualizedVolatility60Pct": 13.9793,
+          "volatility20Percentile": 61.11,
+          "maxDrawdown120Pct": -6.9886
+        },
+        "blockers": [],
+        "researchOnly": true,
+        "modelDerived": true,
+        "finalActionEligible": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "week1",
+      "tradingDays": 5,
+      "forecastSampleDate": "2026-08-25",
+      "forecastAt": "2026-08-26T10:53:15.993Z",
+      "referencePrice": {
+        "value": 376.37,
+        "timestamp": "2026-08-25T20:00:00.000Z",
+        "currency": "USD",
+        "source": "Finnhub Quote API"
+      },
+      "rawProbabilityPositive": 0.371,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": null,
+      "rawLatentFactorScore": 0.230263,
+      "factorScoreStatus": "RESEARCH_SCORE_BLOCKED",
+      "factorAvailableDomainCount": 4,
+      "factorAvailableWeight": 0.52,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": -0.239152,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": 1,
+          "weight": 0.16,
+          "verifiedDriverCount": 2
+        },
+        {
+          "domain": "RISK",
+          "value": -0.385,
+          "weight": 0.09,
+          "verifiedDriverCount": 4
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.94,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": -1.9771,
+      "distribution": {
+        "p10ReturnPct": -9.9519,
+        "p25ReturnPct": -5.1995,
+        "medianReturnPct": -2.218,
+        "p75ReturnPct": 2.1509,
+        "p90ReturnPct": 7.0997,
+        "downsideProbabilityPct": 62.9,
+        "bullCaseReturnPct": 7.0997,
+        "baseCaseReturnPct": -2.218,
+        "bearCaseReturnPct": -9.9519
+      },
+      "patternConfidenceScore": 52.04,
+      "evidenceQualityScore": 20,
+      "regime": "BULL_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-18.3",
+        "generatedAt": "2026-08-26T10:53:15.993Z",
+        "validUntil": "2026-08-27T10:53:15.993Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 70,
+        "confidenceMeaning": "POLICY_COMPLETENESS_HEURISTIC_NOT_PROBABILITY",
+        "dataQualityScore": 35,
+        "integrity": {
+          "contractVersion": 1,
+          "strict": true,
+          "passed": true,
+          "blockers": [],
+          "companyId": "company:sec:0001651308",
+          "listingSymbol": "ONC",
+          "referenceSymbol": "ONC",
+          "evidenceCount": 3
+        },
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 14.887775833333333,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 21.387775833333333,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "CLOSED_MARKET_LAST_VERIFIED_CLOSE",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": null,
+          "fundamentalFlags": [],
+          "marketFlags": []
+        },
+        "controlledPlan": {
+          "status": "AVAILABLE",
+          "level": "INTERIM_RISK_CONTROL",
+          "title": "Πλάνο τώρα",
+          "holderAction": "HOLD",
+          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ",
+          "nonHolderAction": "DO_NOT_BUY",
+          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
+          "marketAction": "WATCH",
+          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+          "newBuyAllowed": false,
+          "sellSignalApproved": false,
+          "confidenceScore": 70,
+          "dataQualityScore": 35,
+          "rationale": "Δεν έχουν ολοκληρωθεί όλοι οι υποχρεωτικοί έλεγχοι για τελική αγορά ή πώληση. Μέχρι τότε η πειθαρχημένη στάση είναι διατήρηση υπάρχουσας θέσης χωρίς νέα ενίσχυση και αποφυγή νέας εισόδου.",
+          "blockers": [
+            "DOSSIER_NOT_PUBLISHABLE",
+            "DOSSIER_NOT_READY",
+            "CROSS_CHECK_NOT_READY",
+            "FUNDAMENTALS_NOT_READY"
+          ],
+          "validUntil": "2026-08-27T10:53:15.993Z"
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001651308",
+        "instrumentId": "company:sec:0001651308",
+        "horizon": "week1",
+        "forecastSampleDate": "2026-08-25"
+      }
     }
   ],
   "summary": {
     "format": "investor-control-forecast-outcome-ledger-summary",
     "version": 1,
     "policyVersion": "2026-08-12.1",
-    "recordCount": 1035,
-    "openCount": 217,
+    "recordCount": 1037,
+    "openCount": 219,
     "maturedCount": 818,
     "groups": [
       {
@@ -212575,7 +213013,7 @@
   },
   "evaluation": {
     "baseRecordCount": 1035,
-    "incomingRecordCount": 1035,
-    "mergedRecordCount": 1035
+    "incomingRecordCount": 1037,
+    "mergedRecordCount": 1037
   }
 }
