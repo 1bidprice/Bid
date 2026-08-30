@@ -42,24 +42,36 @@ Reason: live device QA of v1.7.3 build 31 exposed a reconciliation defect in the
 20. Replaced the obsolete signed-APK patch-chain workflow with a canonical-source v1.7.3 signed build path.
 21. Canonical Market Integrity workflow run `32732130516` passed end-to-end: autonomous Market Intelligence validation, canonical mobile integrity, Android prebuild, release APK build, signing verification and artifact upload.
 22. Signed Canonical Core APK workflow run `32732130412` passed end-to-end and produced artifact `investor-control-v1.7.3-canonical-core-signed-apk` (artifact id `9522114548`).
-23. Final APK SHA-256: `a892f67b95ab9e3052c183a2dd8c5618471856d798efa36608d3c60f0dce2c13`.
-24. Final APK signature certificate SHA-256: `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`, preserving update-certificate continuity.
-25. The live Market Intelligence feed already carries multiple Euronext Athens instruments beyond the original Allwyn seed, including CREDIA.GR, OLYMP.GR and ORILINA.GR, while autonomous discovery continues to treat discovery as WATCH/research until strict evidence gates pass.
+23. APK signature certificate SHA-256 remains `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`, preserving update-certificate continuity.
+24. The live Market Intelligence feed already carries multiple Euronext Athens instruments beyond the original Allwyn seed, including CREDIA.GR, OLYMP.GR and ORILINA.GR, while autonomous discovery continues to treat discovery as WATCH/research until strict evidence gates pass.
+
+## 2026-08-30 — live-device release QA
+
+Real-device testing found two release-blocking regressions in the canonical APK:
+
+1. Tapping the bottom `Συναλλαγές` tab closed the application. Root cause: `TransactionCard` invoked `transactionTotal(transaction)` but `PortfolioApp.js` did not import `transactionTotal` from the canonical accounting module. The JavaScript bundle could be produced without exercising that render path, so the undefined identifier survived build-time validation and failed only when the tab rendered on device.
+2. `SPCE.US` was incorrectly excluded from weekend valuation as stale even though the Friday regular-session Finnhub close was verified and still inside the 96-hour closed-market valuation window. Root cause: canonical-registry quotes were reclassified without the current `exchangeOpen`, session and calendar context, so the existing closed-market integrity rule could not activate.
+
+Both defects are now materialized in canonical source at commit `75640c7d1ff3df4a69aef45f48c01f57e9e6951d`:
+
+- `PortfolioApp.js` imports `transactionTotal`; the Transactions render path is now guarded by the permanent canonical-source verifier.
+- `readCanonicalFeedQuotes()` supplies current exchange open/session/calendar state to `quoteFromRegistry()`, using the same market context as direct-provider quote classification.
+- The existing SPCE closed-market invariant remains strict: last verified regular-session price may value a position while the market is closed, but it is not eligible for a new automatic decision.
+- The canonical-source verifier now fails if either live-device regression returns.
+- Stabilization run `33318807389` passed core invariants, Expo compatibility, Expo Doctor and Android JavaScript export before the fixes were materialized by the stabilization workflow.
 
 ### Stabilization gate status
 
-**CLOSED FOR BUILD/INSTALL TESTING.**
+**REOPENED FOR ONE FINAL SIGNED DEVICE HOTFIX.**
 
-The canonical accounting, portfolio, quote-integrity, Euronext Athens market rules and native Android release build now pass the dedicated stabilization and canonical market-integrity gates. The resulting signed v1.7.3 APK is the only release artifact from this branch that should be used for the next device test.
-
-This does not waive the final real-device regression requirement. A build can be structurally correct and still expose a UI/device-only defect. Do not call a future Play/production release final until ALWN.GR, CREDIA.GR and SPCE.US have been checked on the actual device.
+The previous APK is no longer release authority because the device exposed a Transactions runtime crash and a closed-market SPCE valuation regression. No new feature work is allowed in this gate.
 
 ### Next locked milestone
 
-Install the signed canonical v1.7.3 APK on the real Android device **over the existing app without clearing data**, then verify exactly these three positions and nothing else first:
+Run the complete human-triggered CI/build suite against the already-materialized source, produce a newly signed update APK with the same package/update certificate, and verify on the real device only:
 
-1. `ALWN.GR` — quantity, authoritative cash cost, average/all-in, official delayed Athens price and EUR valuation.
-2. `CREDIA.GR` — position visibility, official Athens routing, EUR valuation and no fallback promoted to authority.
-3. `SPCE.US` — 720-share quantity, authoritative USD cash cost 2,282.72, reconciled average/all-in, current quote, FX-derived EUR valuation and P/L.
+1. Bottom `Συναλλαγές` opens and renders the three stored transactions without a crash.
+2. `SPCE.US` uses the last verified regular-session close for valuation while the US market is closed, but remains blocked from a new automatic decision.
+3. `ALWN.GR` and `CREDIA.GR` retain official Euronext Athens routing, EUR accounting and fail-closed decision behavior.
 
-If those pass, stabilization is complete and the branch can move to release integration. If any one fails, fix only the failing canonical layer and rerun the same gate; do not reopen the historical patch chain.
+If these three checks pass, close stabilization and stop changing the core.
