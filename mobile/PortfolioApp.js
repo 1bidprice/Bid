@@ -57,6 +57,7 @@ import {
   transactionFees,
   transactionGross,
   transactionOrderPrice,
+  transactionTotal,
 } from './src/transaction-accounting';
 
 const VERSION = '1.7.3';

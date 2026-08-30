@@ -469,7 +469,13 @@ async function readCanonicalFeedQuotes(symbols = []) {
       : {};
     const quotes = {};
     for (const symbol of symbols) {
-      const quote = quoteFromRegistry(symbol, registry[symbol], { now: Date.now() });
+      const exchange = exchangeState(symbol);
+      const quote = quoteFromRegistry(symbol, registry[symbol], {
+        now: Date.now(),
+        exchangeOpen: exchange.open,
+        exchangeSession: exchange.session,
+        exchangeCalendarVerified: exchange.calendarVerified !== false,
+      });
       if (quote) quotes[symbol] = quote;
     }
     return quotes;
