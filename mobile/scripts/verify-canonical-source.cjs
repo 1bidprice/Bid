@@ -37,6 +37,8 @@ assert.ok(!portfolio.includes("openFinnhubTrades(token.trim(), ['SPCE']"), 'UI m
 assert.ok(portfolio.includes('openFinnhubTrades(token.trim(), liveUsProviderSymbols'), 'generic US live subscription missing');
 assert.ok(portfolio.includes("const liveUsProviderSymbolsKey = liveUsProviderSymbols.join('|');"), 'stable live symbol dependency key missing');
 assert.ok(!portfolio.includes("current.prices['SPCE.US']"), 'UI must not hardcode SPCE quote state');
+assert.ok(portfolio.includes("  transactionOrderPrice,\n  transactionTotal,\n} from './src/transaction-accounting';"), 'Transactions tab must import transactionTotal before rendering');
+assert.ok(portfolio.includes('const total = transactionTotal(transaction);'), 'Transactions tab canonical total render missing');
 
 assert.ok(portfolioEngine.includes('export function buildOpenPositionLedger('), 'canonical position ledger missing');
 assert.ok(portfolioEngine.includes('export function buildPortfolioPositions('), 'canonical position valuation engine missing');
@@ -68,6 +70,7 @@ assert.ok(market.includes('EURONEXT_ATHENS_STOCK_URL'), 'generic official Eurone
 assert.ok(market.includes('official Euronext Athens stock page identity not verified'), 'official Athens page identity guard missing');
 assert.ok(!market.includes('17 * 60 + 25'), 'obsolete Athens 17:25 close remains');
 assert.ok(market.includes('appSymbol, price: Number(latest.p), timestamp, quote: classifiedQuote'), 'market-data must publish classified generic live quote payload');
+assert.ok(market.includes("      const exchange = exchangeState(symbol);\n      const quote = quoteFromRegistry(symbol, registry[symbol], {\n        now: Date.now(),\n        exchangeOpen: exchange.open,\n        exchangeSession: exchange.session,\n        exchangeCalendarVerified: exchange.calendarVerified !== false,\n      });"), 'canonical feed quotes must be reclassified with current exchange state');
 
 assert.ok(quoteContract.includes("MOBILE_QUOTE_CONTRACT_VERSION = '2026-08-20.2'"), 'canonical quote contract version missing');
 assert.ok(quoteContract.includes('evaluateMobileQuoteIntegrity'), 'quote contract must use the universal integrity engine');
@@ -81,4 +84,4 @@ assert.ok(accounting.includes('export function accountingInvariantReport(transac
 assert.ok(accounting.includes('broker/settlement total is authoritative'), 'canonical accounting cash hierarchy missing');
 assert.ok(accounting.includes('roundMoney(quantity * candidate) === gross'), 'execution price reconciliation rule missing');
 
-console.log('Canonical mobile source PASS: patch chain retired; accounting, portfolio, Euronext Athens/US market rules, quote, decision and UI responsibilities are separated and guarded.');
+console.log('Canonical mobile source PASS: patch chain retired; accounting, portfolio, Euronext Athens/US market rules, quote, decision and UI responsibilities are separated and guarded, including Transactions runtime and closed-market feed regressions.');
