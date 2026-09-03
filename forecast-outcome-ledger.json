@@ -3,7 +3,7 @@
   "version": 1,
   "policyVersion": "2026-08-11.1",
   "ledgerPolicyVersion": "2026-08-12.1",
-  "updatedAt": "2026-09-03T21:11:09.920Z",
+  "updatedAt": "2026-09-03T21:49:54.232Z",
   "records": [
     {
       "format": "investor-control-forecast-outcome-record",
@@ -297417,10 +297417,14 @@
         }
       },
       "decisionImpact": "NONE",
-      "realisedOutcome": null,
-      "positiveOutcome": null,
-      "outcomeEvaluatedAt": null,
-      "status": "OPEN",
+      "realisedOutcome": {
+        "timestamp": "2026-09-03T13:30:00.000Z",
+        "close": 31.469999313354492,
+        "realisedReturnPct": 1.3853
+      },
+      "positiveOutcome": 1,
+      "outcomeEvaluatedAt": "2026-09-03T21:43:59.359Z",
+      "status": "MATURED",
       "appendOnlyIdentity": {
         "policyVersion": "2026-08-11.2",
         "historicalPatternPolicyVersion": "2026-08-11.1",
@@ -312296,25 +312300,25 @@
     "version": 1,
     "policyVersion": "2026-08-12.1",
     "recordCount": 1496,
-    "openCount": 184,
-    "maturedCount": 1312,
+    "openCount": 183,
+    "maturedCount": 1313,
     "groups": [
       {
         "assetClass": "EQUITY",
         "horizon": "day1",
-        "recordCount": 854,
+        "recordCount": 855,
         "calibration": {
           "format": "investor-control-forecast-calibration",
           "version": 1,
           "policyVersion": "2026-08-11.3",
           "status": "OOS_METRICS_READY",
-          "sampleSize": 854,
-          "brierScore": 0.259974,
-          "logLoss": 0.77855,
-          "expectedCalibrationError": 0.076023,
-          "baseRate": 0.522248,
-          "naiveBrierScore": 0.249505,
-          "skillVsBaseRatePct": -4.2,
+          "sampleSize": 855,
+          "brierScore": 0.259929,
+          "logLoss": 0.778383,
+          "expectedCalibrationError": 0.075384,
+          "baseRate": 0.522807,
+          "naiveBrierScore": 0.24948,
+          "skillVsBaseRatePct": -4.19,
           "validationModes": [
             "LIVE_SHADOW_OOS"
           ],
@@ -312363,9 +312367,9 @@
               "index": 5,
               "lower": 0.5,
               "upper": 0.6,
-              "count": 317,
-              "meanForecast": 0.5477,
-              "empiricalRate": 0.5268
+              "count": 318,
+              "meanForecast": 0.5476,
+              "empiricalRate": 0.5283
             },
             {
               "index": 6,
@@ -312510,7 +312514,7 @@
     ]
   },
   "evaluation": {
-    "baseRecordCount": 1492,
+    "baseRecordCount": 1496,
     "incomingRecordCount": 1496,
     "mergedRecordCount": 1496
   }
