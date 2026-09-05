@@ -45,7 +45,7 @@ jobs:
         working-directory: mobile
         run: node scripts/consolidate-portfolio-engine.cjs
 
-      - name: Harden null-safe numeric invariants
+      - name: Harden null-safe numeric and live-device invariants
         working-directory: mobile
         run: node scripts/harden-core-numeric-invariants.cjs
 
@@ -109,11 +109,17 @@ jobs:
             mobile/src/transaction-accounting.js \
             mobile/src/portfolio-engine.js \
             mobile/src/position-lots.js \
+            mobile/src/FinalDecisionCard.js \
+            mobile/src/OpportunitiesView.js \
+            mobile/src/decision-validity.js \
+            mobile/package.json \
+            mobile/scripts/test-decision-validity.cjs \
             mobile/scripts/test-portfolio-engine.cjs \
+            mobile/scripts/verify-canonical-source.cjs \
             mobile/scripts/verify-v173-universal-instrument-integrity.js
           if git diff --cached --quiet; then
             echo 'Canonical core consolidation already materialized.'
             exit 0
           fi
-          git commit -m 'Materialize canonical portfolio, Athens market and numeric invariants'
+          git commit -m 'Materialize canonical portfolio, market and decision validity invariants'
           git push origin HEAD:investor-control-core-stabilization-v174
