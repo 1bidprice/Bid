@@ -56,4 +56,100 @@ for (const relativePath of files) {
   fs.writeFileSync(fullPath, source);
 }
 
-console.log('Core live-device hardening PASS: null-safe numerics, Transactions runtime import and closed-market canonical feed context are enforced.');
+// Live-device QA: a FINAL SPCE SELL_NOW action remained visible on 5 Sep even
+// though validUntil had already passed on 4 Sep and the research feed itself
+// was stale. Final actions now share one fail-closed validity gate.
+{
+  const fullPath = path.join(root, 'src', 'FinalDecisionCard.js');
+  let source = fs.readFileSync(fullPath, 'utf8');
+
+  const oldImports = "import { portfolioSnapshot } from './decision-engine';";
+  const newImports = "import { portfolioSnapshot } from './decision-engine';\nimport { finalActionValidity } from './decision-validity';";
+  if (source.includes(oldImports) && !source.includes("from './decision-validity'")) source = source.replace(oldImports, newImports);
+
+  source = source.replace(
+    'export default function FinalDecisionCard({ item }) {',
+    'export default function FinalDecisionCard({ item, decisionContext = {} }) {',
+  );
+
+  const oldDecisionBlock = `  const finalAction = item?.finalAction || null;\n  const blockers = Array.isArray(finalAction?.blockers) ? finalAction.blockers : [];\n  const personalized = useMemo(() => {\n    if (!finalAction || finalAction.status !== 'FINAL') return null;\n    const code = hasPosition ? finalAction.holderAction : finalAction.nonHolderAction;\n    return { code, label: actionLabel(code, finalAction), tone: tone(code) };\n  }, [finalAction, hasPosition]);`;
+  const newDecisionBlock = `  const finalAction = item?.finalAction || null;\n  const blockers = Array.isArray(finalAction?.blockers) ? finalAction.blockers : [];\n  const decisionValidity = useMemo(\n    () => finalActionValidity(finalAction, decisionContext),\n    [finalAction, decisionContext?.feedFresh, decisionContext?.systemReady],\n  );\n  const personalized = useMemo(() => {\n    if (!decisionValidity.eligible) return null;\n    const code = hasPosition ? finalAction.holderAction : finalAction.nonHolderAction;\n    return { code, label: actionLabel(code, finalAction), tone: tone(code) };\n  }, [decisionValidity.eligible, finalAction, hasPosition]);`;
+  if (source.includes(oldDecisionBlock)) source = source.replace(oldDecisionBlock, newDecisionBlock);
+
+  const oldBlocked = `        <Text style={styles.blockedTitle}>Δεν έχει εγκριθεί τελική ενέργεια</Text>\n        <Text style={styles.blockedText}>Δεν παράγεται αγορά ή πώληση μέχρι να περάσουν όλοι οι υποχρεωτικοί έλεγχοι.</Text>`;
+  const newBlocked = `        <Text style={styles.blockedTitle}>{decisionValidity.reason === 'DECISION_EXPIRED' ? 'Η προηγούμενη τελική ενέργεια έχει λήξει' : decisionValidity.reason === 'FEED_NOT_FRESH' ? 'Απαιτείται νέα ενημέρωση της έρευνας' : decisionValidity.reason === 'SYSTEM_NOT_READY' ? 'Η τελική ενέργεια έχει παγώσει' : 'Δεν έχει εγκριθεί τελική ενέργεια'}</Text>\n        <Text style={styles.blockedText}>{decisionValidity.reason === 'DECISION_EXPIRED' ? 'Το παλιό BUY/SELL δεν θεωρείται ενεργό. Απαιτείται νέα τεκμηριωμένη αξιολόγηση.' : decisionValidity.reason === 'FEED_NOT_FRESH' ? 'Η αγορά μπορεί να έχει νεότερη τιμή, αλλά παλιά ερευνητική ροή δεν επιτρέπεται να εμφανίσει ενεργό BUY/SELL.' : decisionValidity.reason === 'SYSTEM_NOT_READY' ? 'Η τελική κατεύθυνση παραμένει ανενεργή μέχρι να είναι ξανά έτοιμοι όλοι οι υποχρεωτικοί έλεγχοι.' : 'Δεν παράγεται αγορά ή πώληση μέχρι να περάσουν όλοι οι υποχρεωτικοί έλεγχοι.'}</Text>`;
+  if (source.includes(oldBlocked)) source = source.replace(oldBlocked, newBlocked);
+
+  if (!source.includes("import { finalActionValidity } from './decision-validity';")) throw new Error('FinalDecisionCard decision validity import missing');
+  if (!source.includes('if (!decisionValidity.eligible) return null;')) throw new Error('FinalDecisionCard current-decision gate missing');
+  if (!source.includes("decisionValidity.reason === 'DECISION_EXPIRED'")) throw new Error('FinalDecisionCard expired-action UX missing');
+  fs.writeFileSync(fullPath, source);
+}
+
+// The Research screen and its top BUY/SELL counters must use the same validity
+// gate as the card. A stale feed or expired validUntil can never count as
+// "Αγορά τώρα" or "Πώληση τώρα" even when the latest market quote is fresh.
+{
+  const fullPath = path.join(root, 'src', 'OpportunitiesView.js');
+  let source = fs.readFileSync(fullPath, 'utf8');
+
+  const importAnchor = "import FinalDecisionCard from './FinalDecisionCard';";
+  const importWithGate = "import FinalDecisionCard from './FinalDecisionCard';\nimport { finalActionIsCurrent } from './decision-validity';";
+  if (source.includes(importAnchor) && !source.includes("from './decision-validity'")) source = source.replace(importAnchor, importWithGate);
+
+  source = source.replace(
+    'function personalizedDecisionCounts(feed, portfolioPositions) {',
+    'function personalizedDecisionCounts(feed, portfolioPositions, decisionContext = {}) {',
+  );
+  source = source.replace(
+    "    if (!finalAction || finalAction.status !== 'FINAL') continue;",
+    '    if (!finalActionIsCurrent(finalAction, decisionContext)) continue;',
+  );
+
+  source = source.replace(
+    'function IntelligenceCard({ item }) {',
+    'function IntelligenceCard({ item, decisionContext }) {',
+  );
+  source = source.replace(
+    '<FinalDecisionCard item={item} />',
+    '<FinalDecisionCard item={item} decisionContext={decisionContext} />',
+  );
+
+  source = source.replace(
+    'function Section({ title, subtitle, items }) {',
+    'function Section({ title, subtitle, items, decisionContext }) {',
+  );
+  source = source.replace(
+    'items.map((item) => <IntelligenceCard key={item.id} item={item} />)',
+    'items.map((item) => <IntelligenceCard key={item.id} item={item} decisionContext={decisionContext} />)',
+  );
+
+  const oldHealth = `  const freshness = useMemo(() => intelligenceFeedFreshness(feed), [feed]);\n  const personalizedCounts = useMemo(() => personalizedDecisionCounts(feed, portfolioPositions), [feed, portfolioPositions]);\n  const operationalHealth = feed?.operationalHealth || null;\n  const sourceHealth = feed?.sourceHealth || null;\n  const productionReady = operationalHealth?.status === 'OPERATIONAL'\n    && operationalHealth?.marketDataStatus === 'OPERATIONAL'\n    && operationalHealth?.fundamentalsStatus === 'OPERATIONAL'\n    && freshness.state === 'fresh';`;
+  const newHealth = `  const freshness = useMemo(() => intelligenceFeedFreshness(feed), [feed]);\n  const operationalHealth = feed?.operationalHealth || null;\n  const sourceHealth = feed?.sourceHealth || null;\n  const systemReady = operationalHealth?.status === 'OPERATIONAL'\n    && operationalHealth?.marketDataStatus === 'OPERATIONAL'\n    && operationalHealth?.fundamentalsStatus === 'OPERATIONAL'\n    && operationalHealth?.decisionEngineStatus === 'READY';\n  const decisionContext = useMemo(() => ({\n    feedFresh: freshness.state === 'fresh',\n    systemReady,\n  }), [freshness.state, systemReady]);\n  const productionReady = decisionContext.feedFresh && decisionContext.systemReady;\n  const personalizedCounts = useMemo(\n    () => personalizedDecisionCounts(feed, portfolioPositions, decisionContext),\n    [feed, portfolioPositions, decisionContext],\n  );`;
+  if (source.includes(oldHealth)) source = source.replace(oldHealth, newHealth);
+
+  source = source.replace(
+    'items={feed.confirmedBuyOpportunities || []} />',
+    'items={decisionContext.feedFresh && decisionContext.systemReady ? (feed.confirmedBuyOpportunities || []) : []} />',
+  );
+
+  const sectionTitles = [
+    'Αυξημένη προτεραιότητα',
+    'Δημοσιευμένες ευκαιρίες',
+    'Έτοιμα για τελικό έλεγχο',
+    'Έρευνα σε εξέλιξη',
+  ];
+  for (const title of sectionTitles) {
+    const pattern = new RegExp(`(<Section title=\\"${title.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}\\"[^>]*items=\\{[^>]+?\\})( \\/>)`);
+    if (pattern.test(source)) source = source.replace(pattern, '$1 decisionContext={decisionContext}$2');
+  }
+
+  if (!source.includes("import { finalActionIsCurrent } from './decision-validity';")) throw new Error('OpportunitiesView decision validity import missing');
+  if (!source.includes('if (!finalActionIsCurrent(finalAction, decisionContext)) continue;')) throw new Error('Research BUY/SELL count validity gate missing');
+  if (!source.includes('<FinalDecisionCard item={item} decisionContext={decisionContext} />')) throw new Error('Research card decision context missing');
+  if (!source.includes("decisionEngineStatus === 'READY'")) throw new Error('Decision engine readiness gate missing');
+  if (!source.includes('items={decisionContext.feedFresh && decisionContext.systemReady ? (feed.confirmedBuyOpportunities || []) : []}')) throw new Error('Stale confirmed-buy suppression missing');
+  fs.writeFileSync(fullPath, source);
+}
+
+console.log('Core live-device hardening PASS: null-safe numerics, Transactions runtime import, closed-market quote context, and stale/expired decision fail-closed rules are enforced.');
