@@ -3,6 +3,7 @@ import { AppState, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEY } from './background-alert-task';
 import { portfolioSnapshot } from './decision-engine';
+import { finalActionValidity } from './decision-validity';
 
 function when(value) {
   if (!value) return '—';
@@ -53,7 +54,7 @@ function tone(code) {
   return 'neutral';
 }
 
-export default function FinalDecisionCard({ item }) {
+export default function FinalDecisionCard({ item, decisionContext = {} }) {
   const [hasPosition, setHasPosition] = useState(false);
 
   const loadPosition = useCallback(async () => {
@@ -77,18 +78,22 @@ export default function FinalDecisionCard({ item }) {
 
   const finalAction = item?.finalAction || null;
   const blockers = Array.isArray(finalAction?.blockers) ? finalAction.blockers : [];
+  const decisionValidity = useMemo(
+    () => finalActionValidity(finalAction, decisionContext),
+    [finalAction, decisionContext?.feedFresh, decisionContext?.systemReady],
+  );
   const personalized = useMemo(() => {
-    if (!finalAction || finalAction.status !== 'FINAL') return null;
+    if (!decisionValidity.eligible) return null;
     const code = hasPosition ? finalAction.holderAction : finalAction.nonHolderAction;
     return { code, label: actionLabel(code, finalAction), tone: tone(code) };
-  }, [finalAction, hasPosition]);
+  }, [decisionValidity.eligible, finalAction, hasPosition]);
 
   if (!personalized) {
     return (
       <View style={styles.blocked}>
         <Text style={styles.blockedEyebrow}>ΤΕΛΙΚΟ ΣΥΜΠΕΡΑΣΜΑ</Text>
-        <Text style={styles.blockedTitle}>Δεν έχει εγκριθεί τελική ενέργεια</Text>
-        <Text style={styles.blockedText}>Δεν παράγεται αγορά ή πώληση μέχρι να περάσουν όλοι οι υποχρεωτικοί έλεγχοι.</Text>
+        <Text style={styles.blockedTitle}>{decisionValidity.reason === 'DECISION_EXPIRED' ? 'Η προηγούμενη τελική ενέργεια έχει λήξει' : decisionValidity.reason === 'FEED_NOT_FRESH' ? 'Απαιτείται νέα ενημέρωση της έρευνας' : decisionValidity.reason === 'SYSTEM_NOT_READY' ? 'Η τελική ενέργεια έχει παγώσει' : 'Δεν έχει εγκριθεί τελική ενέργεια'}</Text>
+        <Text style={styles.blockedText}>{decisionValidity.reason === 'DECISION_EXPIRED' ? 'Το παλιό BUY/SELL δεν θεωρείται ενεργό. Απαιτείται νέα τεκμηριωμένη αξιολόγηση.' : decisionValidity.reason === 'FEED_NOT_FRESH' ? 'Η αγορά μπορεί να έχει νεότερη τιμή, αλλά παλιά ερευνητική ροή δεν επιτρέπεται να εμφανίσει ενεργό BUY/SELL.' : decisionValidity.reason === 'SYSTEM_NOT_READY' ? 'Η τελική κατεύθυνση παραμένει ανενεργή μέχρι να είναι ξανά έτοιμοι όλοι οι υποχρεωτικοί έλεγχοι.' : 'Δεν παράγεται αγορά ή πώληση μέχρι να περάσουν όλοι οι υποχρεωτικοί έλεγχοι.'}</Text>
         {blockers.slice(0, 4).map((code) => <Text key={code} style={styles.blockedReason}>• {blockerLabel(code)}</Text>)}
       </View>
     );

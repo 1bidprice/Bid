@@ -17,6 +17,7 @@ import {
   syncIntelligenceFeedAsync,
 } from './intelligence-feed-store';
 import FinalDecisionCard from './FinalDecisionCard';
+import { finalActionIsCurrent } from './decision-validity';
 
 function money(referencePrice, item) {
   const value = Number(referencePrice?.value);
@@ -49,7 +50,7 @@ function inferredReferenceCurrency(referencePrice, item) {
   return null;
 }
 
-function personalizedDecisionCounts(feed, portfolioPositions) {
+function personalizedDecisionCounts(feed, portfolioPositions, decisionContext = {}) {
   const held = new Set((Array.isArray(portfolioPositions) ? portfolioPositions : [])
     .filter((position) => Number(position?.quantity || 0) > 0)
     .map((position) => canonicalDecisionSymbol(position?.symbol))
@@ -59,7 +60,7 @@ function personalizedDecisionCounts(feed, portfolioPositions) {
   let sellNowCount = 0;
   for (const item of decisions) {
     const finalAction = item?.finalAction;
-    if (!finalAction || finalAction.status !== 'FINAL') continue;
+    if (!finalActionIsCurrent(finalAction, decisionContext)) continue;
     const hasPosition = held.has(canonicalDecisionSymbol(item?.symbol));
     const action = hasPosition ? finalAction.holderAction : finalAction.nonHolderAction;
     if (action === 'BUY_NOW') buyNowCount += 1;
@@ -94,7 +95,7 @@ function StatusBadge({ item }) {
   );
 }
 
-function IntelligenceCard({ item }) {
+function IntelligenceCard({ item, decisionContext }) {
   const [expanded, setExpanded] = useState(false);
   const risk = ['EVENT_RISK', 'DETERIORATION'].includes(item.category);
   const referenceAge = Number(item.referencePriceAgeHours);
@@ -109,7 +110,7 @@ function IntelligenceCard({ item }) {
           <StatusBadge item={item} />
         </View>
         <Text style={[styles.category, risk && styles.riskText]}>{item.categoryLabel}</Text>
-        <FinalDecisionCard item={item} />
+        <FinalDecisionCard item={item} decisionContext={decisionContext} />
         <View style={styles.actionRow}>
           <View style={styles.actionBox}><Text style={styles.muted}>Αξιολόγηση</Text><Text style={[styles.action, risk && styles.riskText]}>{item.actionLabel}</Text></View>
           <View style={styles.actionBox}><Text style={styles.muted}>Τιμή αναφοράς</Text><Text style={styles.action}>{money(item.referencePrice, item)}</Text><Text style={styles.ageText}>{Number.isFinite(referenceAge) ? (referenceAge < 1 ? 'πριν από λιγότερο από 1 ώρα' : 'πριν από ' + referenceAge.toFixed(1) + ' ώρες') : 'χωρίς έγκυρη ώρα'}</Text></View>
@@ -222,9 +223,9 @@ function PurchaseSection({ title, subtitle, items }) {
   );
 }
 
-function Section({ title, subtitle, items }) {
+function Section({ title, subtitle, items, decisionContext }) {
   if (!items.length) return null;
-  return <View style={styles.sectionBlock}><Text style={styles.sectionTitle}>{title}</Text>{subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}{items.map((item) => <IntelligenceCard key={item.id} item={item} />)}</View>;
+  return <View style={styles.sectionBlock}><Text style={styles.sectionTitle}>{title}</Text>{subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}{items.map((item) => <IntelligenceCard key={item.id} item={item} decisionContext={decisionContext} />)}</View>;
 }
 
 export default function OpportunitiesView({ portfolioPositions = [] }) {
@@ -290,13 +291,21 @@ export default function OpportunitiesView({ portfolioPositions = [] }) {
     discoveryDeepAnalysisCount: 0,
   }, [feed]);
   const freshness = useMemo(() => intelligenceFeedFreshness(feed), [feed]);
-  const personalizedCounts = useMemo(() => personalizedDecisionCounts(feed, portfolioPositions), [feed, portfolioPositions]);
   const operationalHealth = feed?.operationalHealth || null;
   const sourceHealth = feed?.sourceHealth || null;
-  const productionReady = operationalHealth?.status === 'OPERATIONAL'
+  const systemReady = operationalHealth?.status === 'OPERATIONAL'
     && operationalHealth?.marketDataStatus === 'OPERATIONAL'
     && operationalHealth?.fundamentalsStatus === 'OPERATIONAL'
-    && freshness.state === 'fresh';
+    && operationalHealth?.decisionEngineStatus === 'READY';
+  const decisionContext = useMemo(() => ({
+    feedFresh: freshness.state === 'fresh',
+    systemReady,
+  }), [freshness.state, systemReady]);
+  const productionReady = decisionContext.feedFresh && decisionContext.systemReady;
+  const personalizedCounts = useMemo(
+    () => personalizedDecisionCounts(feed, portfolioPositions, decisionContext),
+    [feed, portfolioPositions, decisionContext],
+  );
 
   const importFeed = async () => {
     setImporting(true);
@@ -398,15 +407,15 @@ export default function OpportunitiesView({ portfolioPositions = [] }) {
           </View>
 
           {feed.discoveryRadar?.length ? <View style={styles.sectionBlock}><Text style={styles.sectionTitle}>Ραντάρ νέων μετοχών</Text><Text style={styles.sectionSubtitle}>Το σύστημα σαρώνει αυτόματα επίσημα γεγονότα της αγοράς, κατατάσσει νέες εταιρείες και περνά τις ισχυρότερες σε πλήρη ανάλυση.</Text>{feed.discoveryRadar.map((item) => <DiscoveryRadarCard key={item.discoveryId} item={item} />)}</View> : null}
-          <PurchaseSection title="ΑΓΟΡΑ ΕΠΙΒΕΒΑΙΩΘΗΚΕ" subtitle="Μόνο ευκαιρίες που πέρασαν και τη δεύτερη αυστηρή πολιτική BUY_NOW. Καμία αυτόματη συναλλαγή." items={feed.confirmedBuyOpportunities || []} />
+          <PurchaseSection title="ΑΓΟΡΑ ΕΠΙΒΕΒΑΙΩΘΗΚΕ" subtitle="Μόνο ευκαιρίες που πέρασαν και τη δεύτερη αυστηρή πολιτική BUY_NOW. Καμία αυτόματη συναλλαγή." items={decisionContext.feedFresh && decisionContext.systemReady ? (feed.confirmedBuyOpportunities || []) : []} />
           <PurchaseSection title="Ισχυρές ευκαιρίες — αναμονή εισόδου" subtitle="Υψηλή κατάταξη Opportunity Hunter, αλλά δεν έχουν επιβεβαιωθεί ακόμη όλα τα strict BUY gates." items={feed.waitingEntryOpportunities || []} />
           <PurchaseSection title="Απορρίφθηκαν για αγορά" subtitle="Ο Opportunity Hunter τις εντόπισε, αλλά ο αυστηρός τελικός έλεγχος απέρριψε αγορά με τα τωρινά δεδομένα." items={feed.rejectedOpportunities || []} />
           <PurchaseSection title="Μπλοκαρισμένες ευκαιρίες" subtitle="Χρειάζονται πλήρη ανάλυση ή υποχρεωτικούς ελέγχους πριν μπορούν να αξιολογηθούν για αγορά." items={feed.blockedOpportunities || []} />
 
-          <Section title="Αυξημένη προτεραιότητα" subtitle="Κίνδυνοι ή εξελίξεις που χρειάζονται πρώτα προσοχή" items={feed.urgent || []} />
-          <Section title="Δημοσιευμένες ευκαιρίες" subtitle="Φάκελοι που πέρασαν όλους τους ελέγχους και τη διαδικασία δημοσίευσης" items={feed.published || []} />
-          <Section title="Έτοιμα για τελικό έλεγχο" subtitle="Πλήρεις φάκελοι που δεν έχουν ακόμη δημοσιευτεί" items={feed.reviewReady || []} />
-          <Section title="Έρευνα σε εξέλιξη" subtitle="Το σύστημα δείχνει καθαρά τι λείπει και δεν επιτρέπει πρόωρη κατεύθυνση αγοράς ή πώλησης" items={feed.research || []} />
+          <Section title="Αυξημένη προτεραιότητα" subtitle="Κίνδυνοι ή εξελίξεις που χρειάζονται πρώτα προσοχή" items={feed.urgent || []} decisionContext={decisionContext} />
+          <Section title="Δημοσιευμένες ευκαιρίες" subtitle="Φάκελοι που πέρασαν όλους τους ελέγχους και τη διαδικασία δημοσίευσης" items={feed.published || []} decisionContext={decisionContext} />
+          <Section title="Έτοιμα για τελικό έλεγχο" subtitle="Πλήρεις φάκελοι που δεν έχουν ακόμη δημοσιευτεί" items={feed.reviewReady || []} decisionContext={decisionContext} />
+          <Section title="Έρευνα σε εξέλιξη" subtitle="Το σύστημα δείχνει καθαρά τι λείπει και δεν επιτρέπει πρόωρη κατεύθυνση αγοράς ή πώλησης" items={feed.research || []} decisionContext={decisionContext} />
           {!feed.published?.length && !feed.reviewReady?.length && !feed.research?.length && !feed.opportunityPurchaseDecisions?.length ? <View style={styles.empty}><Text style={styles.emptyTitle}>Η σύνδεση λειτουργεί, αλλά η τρέχουσα ροή δεν περιέχει ακόμη εταιρικούς φακέλους.</Text><Text style={styles.emptyText}>Αυτό είναι ασφαλέστερο από το να εμφανιστεί μη τεκμηριωμένη πρόταση. Η επόμενη επιτυχής ημερήσια εκτέλεση θα ενημερώσει αυτόματα την οθόνη.</Text></View> : null}
           <Text style={styles.disclosure}>{feed.disclosure}</Text>
           <Pressable style={styles.secondary} onPress={importFeed} disabled={importing}><Text style={styles.secondaryText}>Εφεδρική εισαγωγή αρχείου</Text></Pressable>
