@@ -3,11 +3,16 @@ import { AppState, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEY } from './background-alert-task';
 import { portfolioSnapshot } from './decision-engine';
+import { finalActionValidity } from './decision-validity';
 
 function when(value) {
   if (!value) return '—';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('el-GR');
+}
+
+function canonicalPositionSymbol(value) {
+  return String(value || '').trim().toUpperCase().replace(/\.(US|GR)$/, '');
 }
 
 function actionLabel(code, finalAction) {
@@ -24,6 +29,23 @@ function actionLabel(code, finalAction) {
   }[code] || code || 'ΠΑΡΑΚΟΛΟΥΘΗΣΗ';
 }
 
+function blockerLabel(code) {
+  return {
+    DOSSIER_NOT_PUBLISHABLE: 'Ο φάκελος δεν έχει ολοκληρώσει όλους τους ελέγχους',
+    DOSSIER_NOT_READY: 'Η ανάλυση δεν είναι έτοιμη για τελική ενέργεια',
+    CROSS_CHECK_NOT_READY: 'Λείπει ανεξάρτητη διασταύρωση του ίδιου γεγονότος',
+    FUNDAMENTALS_NOT_READY: 'Λείπουν επαρκή και επαληθευμένα θεμελιώδη στοιχεία',
+    MARKET_METRICS_NOT_READY: 'Δεν έχουν ολοκληρωθεί οι έλεγχοι ιστορικού, όγκου και σχετικής ισχύος',
+    MARKET_HISTORY_SOURCE_NOT_READY: 'Η πηγή ιστορικών δεδομένων δεν έχει εγκριθεί',
+    MARKET_HISTORY_NOT_CROSSCHECKED: 'Το ιστορικό τιμών δεν έχει διασταυρωθεί με ανεξάρτητη τρέχουσα τιμή',
+    MARKET_BENCHMARK_NOT_READY: 'Λείπει έγκυρο benchmark αγοράς',
+    REFERENCE_PRICE_REQUIRED: 'Λείπει έγκυρη τιμή αναφοράς',
+    REFERENCE_PRICE_STALE: 'Η τιμή αναφοράς είναι παρωχημένη',
+    MARKET_HISTORY_STALE: 'Τα ιστορικά δεδομένα δεν είναι αρκετά πρόσφατα',
+    UNRESOLVED_CONTRADICTION: 'Υπάρχει ανεπίλυτη αντίφαση στις πηγές',
+  }[code] || code;
+}
+
 function tone(code) {
   if (code === 'BUY_NOW') return 'positive';
   if (code === 'HOLD') return 'hold';
@@ -32,7 +54,7 @@ function tone(code) {
   return 'neutral';
 }
 
-export default function FinalDecisionCard({ item }) {
+export default function FinalDecisionCard({ item, decisionContext = {} }) {
   const [hasPosition, setHasPosition] = useState(false);
 
   const loadPosition = useCallback(async () => {
@@ -40,7 +62,7 @@ export default function FinalDecisionCard({ item }) {
       const raw = await AsyncStorage.getItem(STORAGE_KEY);
       const state = raw ? JSON.parse(raw) : { transactions: [], prices: {} };
       const snapshot = portfolioSnapshot(state);
-      setHasPosition(snapshot.positions.some((position) => position.symbol === item?.symbol && Number(position.quantity) > 0));
+      setHasPosition(snapshot.positions.some((position) => canonicalPositionSymbol(position.symbol) === canonicalPositionSymbol(item?.symbol) && Number(position.quantity) > 0));
     } catch {
       setHasPosition(false);
     }
@@ -55,18 +77,24 @@ export default function FinalDecisionCard({ item }) {
   }, [loadPosition]);
 
   const finalAction = item?.finalAction || null;
+  const blockers = Array.isArray(finalAction?.blockers) ? finalAction.blockers : [];
+  const decisionValidity = useMemo(
+    () => finalActionValidity(finalAction, decisionContext),
+    [finalAction, decisionContext?.feedFresh, decisionContext?.systemReady],
+  );
   const personalized = useMemo(() => {
-    if (!finalAction || finalAction.status !== 'FINAL') return null;
+    if (!decisionValidity.eligible) return null;
     const code = hasPosition ? finalAction.holderAction : finalAction.nonHolderAction;
     return { code, label: actionLabel(code, finalAction), tone: tone(code) };
-  }, [finalAction, hasPosition]);
+  }, [decisionValidity.eligible, finalAction, hasPosition]);
 
   if (!personalized) {
     return (
       <View style={styles.blocked}>
         <Text style={styles.blockedEyebrow}>ΤΕΛΙΚΟ ΣΥΜΠΕΡΑΣΜΑ</Text>
-        <Text style={styles.blockedTitle}>Δεν έχει εγκριθεί τελική ενέργεια</Text>
-        <Text style={styles.blockedText}>Το σύστημα παραμένει σε παρακολούθηση μέχρι να περάσουν όλοι οι έλεγχοι πηγών, τιμών, θεμελιωδών, ρευστότητας και αντιφάσεων.</Text>
+        <Text style={styles.blockedTitle}>{decisionValidity.reason === 'DECISION_EXPIRED' ? 'Η προηγούμενη τελική ενέργεια έχει λήξει' : decisionValidity.reason === 'FEED_NOT_FRESH' ? 'Απαιτείται νέα ενημέρωση της έρευνας' : decisionValidity.reason === 'SYSTEM_NOT_READY' ? 'Η τελική ενέργεια έχει παγώσει' : 'Δεν έχει εγκριθεί τελική ενέργεια'}</Text>
+        <Text style={styles.blockedText}>{decisionValidity.reason === 'DECISION_EXPIRED' ? 'Το παλιό BUY/SELL δεν θεωρείται ενεργό. Απαιτείται νέα τεκμηριωμένη αξιολόγηση.' : decisionValidity.reason === 'FEED_NOT_FRESH' ? 'Η αγορά μπορεί να έχει νεότερη τιμή, αλλά παλιά ερευνητική ροή δεν επιτρέπεται να εμφανίσει ενεργό BUY/SELL.' : decisionValidity.reason === 'SYSTEM_NOT_READY' ? 'Η τελική κατεύθυνση παραμένει ανενεργή μέχρι να είναι ξανά έτοιμοι όλοι οι υποχρεωτικοί έλεγχοι.' : 'Δεν παράγεται αγορά ή πώληση μέχρι να περάσουν όλοι οι υποχρεωτικοί έλεγχοι.'}</Text>
+        {blockers.slice(0, 4).map((code) => <Text key={code} style={styles.blockedReason}>• {blockerLabel(code)}</Text>)}
       </View>
     );
   }
@@ -102,7 +130,7 @@ const styles = StyleSheet.create({
   blocked: { backgroundColor: '#f5f8fc', borderWidth: 1, borderColor: '#d7e0ec', borderRadius: 17, padding: 13, marginTop: 13 },
   blockedEyebrow: { color: '#718096', fontSize: 10, fontWeight: '900', letterSpacing: 0.8 },
   blockedTitle: { color: '#16345f', fontSize: 16, fontWeight: '900', marginTop: 4 },
-  blockedText: { color: '#62738a', fontSize: 12, lineHeight: 18, marginTop: 5 },
+  blockedText: { color: '#62738a', fontSize: 12, lineHeight: 18, marginTop: 5 }, blockedReason: { color: '#735f31', fontSize: 10, lineHeight: 15, marginTop: 4 },
   card: { backgroundColor: '#eef3f8', borderWidth: 1, borderColor: '#cfd9e6', borderRadius: 18, padding: 14, marginTop: 13 },
   positive: { backgroundColor: '#e9f8ef', borderColor: '#9fd8b7' },
   hold: { backgroundColor: '#edf4ff', borderColor: '#b4cdf5' },

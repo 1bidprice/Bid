@@ -1,8 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { buildMobileQuoteContract, quoteFromRegistry, safeProviderDiagnostic } from './quote-contract';
+import { routeMobileInstrument } from './instrument-quote-integrity';
+import { marketStateForSymbol } from './market-rules';
 
-const EURONEXT_ALWN_URL = 'https://athens.euronext.com/en/market-data/instruments/stocks/ALWN/related';
+const EURONEXT_ATHENS_STOCK_URL = (ticker) => `https://athens.euronext.com/en/market-data/instruments/stocks/${encodeURIComponent(ticker)}/related`;
 const YAHOO_HOSTS = ['query1.finance.yahoo.com', 'query2.finance.yahoo.com'];
 const PERSISTED_STATE_KEY = 'investor-control-mobile-state-v2';
+const INTELLIGENCE_FEED_STORAGE_KEY = 'investor-control.intelligence-feed.v1';
 const inMemoryQuotes = {};
 
 export const MARKET_REFRESH_MS = 30_000;
@@ -20,52 +24,12 @@ function parseLocaleNumber(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function zoneParts(timeZone, at = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone,
-    weekday: 'short',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).formatToParts(at);
-  return Object.fromEntries(parts.map((part) => [part.type, part.value]));
-}
-
 export function marketSessionAt(symbol, at = new Date()) {
-  const isUs = String(symbol).toUpperCase().endsWith('.US');
-  const timeZone = isUs ? 'America/New_York' : 'Europe/Athens';
-  const parts = zoneParts(timeZone, at);
-  const weekdays = new Set(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
-  if (!weekdays.has(parts.weekday)) return 'closed';
-
-  const minutes = Number(parts.hour) * 60 + Number(parts.minute);
-  if (isUs) {
-    if (minutes >= 4 * 60 && minutes < 9 * 60 + 30) return 'pre-market';
-    if (minutes >= 9 * 60 + 30 && minutes <= 16 * 60) return 'regular-market';
-    if (minutes > 16 * 60 && minutes <= 20 * 60) return 'post-market';
-    return 'closed';
-  }
-
-  return minutes >= 10 * 60 + 15 && minutes <= 17 * 60 + 25
-    ? 'regular-market'
-    : 'closed';
+  return marketStateForSymbol(symbol, at).session;
 }
 
 export function exchangeState(symbol, at = new Date()) {
-  const isUs = String(symbol).toUpperCase().endsWith('.US');
-  const timeZone = isUs ? 'America/New_York' : 'Europe/Athens';
-  const parts = zoneParts(timeZone, at);
-  const session = marketSessionAt(symbol, at);
-  return {
-    open: session === 'regular-market',
-    timeZone,
-    localDate: `${parts.year}-${parts.month}-${parts.day}`,
-    session,
-  };
+  return marketStateForSymbol(symbol, at);
 }
 
 function htmlToText(html) {
@@ -100,7 +64,7 @@ async function fetchText(url, timeoutMs = 15_000) {
       headers: {
         Accept: 'text/html,application/xhtml+xml,application/json,text/plain,*/*',
         'Cache-Control': 'no-cache',
-        'User-Agent': 'InvestorControl/0.6.4',
+        'User-Agent': 'InvestorControl/1.7.3',
       },
       signal: controller.signal,
     });
@@ -207,6 +171,9 @@ async function fetchYahooQuote(ticker) {
         providerSymbol: ticker,
         quality: 'unofficial',
         session: point.session,
+    timestampMeaning: 'provider-market-time',
+    priceTimestampVerified: true,
+    dayChangeVerified: finite(previousClose),
       };
     } catch (error) {
       errors.push(`${host}: ${error.message}`);
@@ -221,7 +188,9 @@ async function fetchFinnhubQuote(ticker, token) {
     `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(ticker)}&token=${encodeURIComponent(token)}`,
   );
   if (!finite(payload?.c)) throw new Error('το Finnhub δεν επέστρεψε έγκυρη τιμή');
-  const timestamp = finite(payload?.t) ? Number(payload.t) : Math.floor(Date.now() / 1000);
+  const timestampVerified = finite(payload?.t);
+  const timestamp = timestampVerified ? Number(payload.t) : null;
+  const checkedAt = new Date();
   return {
     nativePrice: Number(payload.c),
     nativePreviousClose: finite(payload.pc) ? Number(payload.pc) : null,
@@ -229,12 +198,13 @@ async function fetchFinnhubQuote(ticker, token) {
     nativeRegularMarketPrice: Number(payload.c),
     nativeProviderChangePct: Number.isFinite(Number(payload?.dp)) ? Number(payload.dp) : null,
     nativeCurrency: 'USD',
-    updatedAt: new Date(timestamp * 1000).toISOString(),
-    checkedAt: new Date().toISOString(),
+    updatedAt: timestampVerified ? new Date(timestamp * 1000).toISOString() : null,
+    checkedAt: checkedAt.toISOString(),
     source: 'Finnhub US quote',
     providerSymbol: ticker,
     quality: 'realtime',
-    session: marketSessionAt(`${ticker}.US`, new Date(timestamp * 1000)),
+    priceTimestampVerified: timestampVerified,
+    session: timestampVerified ? marketSessionAt(`${ticker}.US`, new Date(timestamp * 1000)) : marketSessionAt(`${ticker}.US`, checkedAt),
   };
 }
 
@@ -272,7 +242,7 @@ export function openFinnhubTrades(token, symbols, onTrade, onStatus = () => {}) 
       const changeBase = session === 'post-market' && regularMarketPrice > 0
         ? regularMarketPrice
         : previousClose;
-      inMemoryQuotes[appSymbol] = classifyQuote(appSymbol, {
+      const classifiedQuote = classifyQuote(appSymbol, {
         ...current,
         symbol: appSymbol,
         nativePrice: Number(latest.p),
@@ -291,7 +261,8 @@ export function openFinnhubTrades(token, symbols, onTrade, onStatus = () => {}) 
           ? ((Number(latest.p) - changeBase) / changeBase) * 100
           : current?.changePct,
       });
-      onTrade({ symbol: providerSymbol, price: Number(latest.p), timestamp });
+      inMemoryQuotes[appSymbol] = classifiedQuote;
+      onTrade({ symbol: providerSymbol, appSymbol, price: Number(latest.p), timestamp, quote: classifiedQuote });
     } catch (_) {}
   };
 
@@ -309,25 +280,35 @@ export function openFinnhubTrades(token, symbols, onTrade, onStatus = () => {}) 
   };
 }
 
-async function fetchOfficialAllwynQuote() {
-  const html = await fetchText(EURONEXT_ALWN_URL);
+async function fetchOfficialAthensQuote(symbol) {
+  const route = routeMobileInstrument(symbol);
+  if (!route.supported || route.market !== 'GR') throw new Error('μη επαληθευμένη αγορά για επίσημη πηγή Αθήνας');
+  const checkedAt = new Date();
+  const exchange = exchangeState(symbol, checkedAt);
+  const html = await fetchText(EURONEXT_ATHENS_STOCK_URL(route.baseSymbol));
   const text = htmlToText(html);
+  if (!/Traded on Euronext Athens/i.test(text) || !/Last Traded Price/i.test(text)) {
+    throw new Error('official Euronext Athens stock page identity not verified');
+  }
   const priceValue = numberAfterLabel(text, ['Last Traded Price', 'Τελευταία Τιμή Διαπραγμάτευσης']);
   const previousClose = numberAfterLabel(text, ['Previous Close', 'Προηγούμενο Κλείσιμο']);
-  if (!finite(priceValue)) throw new Error('η Euronext Athens δεν επέστρεψε τιμή ALWN');
+  if (!finite(priceValue)) throw new Error(`η Euronext Athens δεν επέστρεψε τιμή για ${route.baseSymbol}`);
   return {
     nativePrice: priceValue,
     nativePreviousClose: finite(previousClose) ? previousClose : null,
     nativeChangeBase: finite(previousClose) ? previousClose : null,
     nativeRegularMarketPrice: priceValue,
     nativeCurrency: 'EUR',
-    updatedAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-    checkedAt: new Date().toISOString(),
+    updatedAt: null,
+    checkedAt: checkedAt.toISOString(),
     source: 'Euronext Athens — επίσημα δεδομένα με καθυστέρηση 15′',
-    providerSymbol: 'ALWN',
-    quality: 'delayed15',
-    advertisedDelayMinutes: 15,
-    session: 'regular-market',
+    providerSymbol: route.baseSymbol,
+    quality: 'primary_exchange_delayed',
+    advertisedDelayMinutes: Number(route.advertisedDelayMinutes || 15),
+    session: exchange.session,
+    timestampMeaning: 'exact-trade-time-not-provided-by-adapter',
+    priceTimestampVerified: false,
+    dayChangeVerified: false,
   };
 }
 
@@ -342,34 +323,42 @@ async function fetchEurUsd() {
 }
 
 export function classifyQuote(symbol, quote) {
-  if (!quote || !finite(quote.nativePrice) || !quote.updatedAt) return quote;
+  if (!quote || !finite(quote.nativePrice)) return quote;
   const exchange = exchangeState(symbol);
-  const updatedMs = new Date(quote.updatedAt).getTime();
-  const ageSeconds = Number.isFinite(updatedMs)
+  const quoteContract = buildMobileQuoteContract(symbol, quote, {
+    now: Date.now(),
+    exchangeOpen: exchange.open,
+    exchangeSession: exchange.session,
+    exchangeCalendarVerified: exchange.calendarVerified !== false,
+  });
+  const updatedMs = new Date(quote.updatedAt || 0).getTime();
+  const ageSeconds = Number.isFinite(updatedMs) && updatedMs > 0
     ? Math.max(0, Math.round((Date.now() - updatedMs) / 1000))
-    : Number.POSITIVE_INFINITY;
-  const allowedAge = symbol === 'ALWN.GR' ? 25 * 60 : 3 * 60;
-  let status;
-
-  if (!exchange.open) {
+    : null;
+  let status = 'unverified';
+  if (quoteContract.publicStatus === 'STALE') status = 'stale';
+  else if (quoteContract.publicStatus === 'FALLBACK_NOT_VERIFIED' || quoteContract.publicStatus === 'INSTRUMENT_UNVERIFIED' || quoteContract.publicStatus === 'UNAVAILABLE') status = 'unverified';
+  else if (!exchange.open) {
     if (quote.session === 'pre-market') status = 'pre-market';
     else if (quote.session === 'post-market') status = 'post-market';
     else status = 'closed';
-  } else if (quote.quality === 'delayed15') status = 'delayed';
-  else if (ageSeconds <= allowedAge) status = quote.quality === 'realtime' ? 'live' : 'near-live';
-  else status = 'stale';
+  } else if (quoteContract.publicStatus === 'TIMESTAMP_NOT_VERIFIED' || quoteContract.sourceRole === 'PRIMARY_EXCHANGE') status = 'delayed';
+  else status = quote.quality === 'realtime' ? 'live' : 'near-live';
 
   return {
     ...quote,
     ageSeconds,
     status,
     exchangeOpen: exchange.open,
-    usable: status !== 'stale',
+    quoteContract,
+    instrumentIntegrity: quoteContract.instrumentIntegrity,
+    usable: quoteContract.valuationEligible === true,
+    dayChangeVerified: quoteContract.dayChangeEligible === true,
   };
 }
 
 function quoteTimestamp(quote) {
-  const value = new Date(quote?.updatedAt || 0).getTime();
+  const value = new Date(quote?.updatedAt || quote?.checkedAt || 0).getTime();
   return Number.isFinite(value) ? value : 0;
 }
 
@@ -400,9 +389,12 @@ export function chooseMostRecentQuote(symbol, currentQuote, incomingQuote) {
   const currentTime = quoteTimestamp(currentQuote);
   const incomingTime = quoteTimestamp(incomingQuote);
   const toleranceMs = 1000;
+  const currentApproved = currentQuote?.quoteContract?.valuationEligible === true;
+  const incomingApproved = incomingQuote?.quoteContract?.valuationEligible === true;
   let selected;
 
-  if (incomingTime > currentTime + toleranceMs) selected = incomingQuote;
+  if (currentApproved !== incomingApproved) selected = incomingApproved ? incomingQuote : currentQuote;
+  else if (incomingTime > currentTime + toleranceMs) selected = incomingQuote;
   else if (currentTime > incomingTime + toleranceMs) selected = currentQuote;
   else selected = quotePriority(incomingQuote) >= quotePriority(currentQuote)
     ? incomingQuote
@@ -467,9 +459,38 @@ async function readPersistedPrices() {
   }
 }
 
+async function readCanonicalFeedQuotes(symbols = []) {
+  try {
+    const raw = await AsyncStorage.getItem(INTELLIGENCE_FEED_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    const registry = parsed?.quoteRegistry && typeof parsed.quoteRegistry === 'object'
+      ? parsed.quoteRegistry
+      : {};
+    const quotes = {};
+    for (const symbol of symbols) {
+      const exchange = exchangeState(symbol);
+      const quote = quoteFromRegistry(symbol, registry[symbol], {
+        now: Date.now(),
+        exchangeOpen: exchange.open,
+        exchangeSession: exchange.session,
+        exchangeCalendarVerified: exchange.calendarVerified !== false,
+      });
+      if (quote) quotes[symbol] = quote;
+    }
+    return quotes;
+  } catch (_) {
+    return {};
+  }
+}
+
 function applyFx(symbol, quote, fx) {
-  const nativeCurrency = quote?.nativeCurrency || (symbol.endsWith('.US') ? 'USD' : 'EUR');
-  if (nativeCurrency !== 'USD') {
+  const route = routeMobileInstrument(symbol);
+  if (!route.supported) throw new Error('MARKET_ROUTE_UNVERIFIED');
+  const nativeCurrency = String(quote?.nativeCurrency || '').trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(nativeCurrency)) throw new Error('CURRENCY_NOT_VERIFIED');
+  if (route.expectedCurrency !== nativeCurrency) throw new Error('QUOTE_CURRENCY_MISMATCH');
+  if (nativeCurrency === 'EUR') {
     return {
       ...quote,
       price: Number(quote.nativePrice),
@@ -480,13 +501,12 @@ function applyFx(symbol, quote, fx) {
       fxUpdatedAt: null,
     };
   }
+  if (nativeCurrency !== 'USD') throw new Error('UNSUPPORTED_NATIVE_CURRENCY');
   if (!finite(fx?.rate)) throw new Error('λείπει η ισοτιμία EUR/USD');
   return {
     ...quote,
     price: Number(quote.nativePrice) / Number(fx.rate),
-    previousClose: quote.nativePreviousClose == null
-      ? null
-      : Number(quote.nativePreviousClose) / Number(fx.rate),
+    previousClose: quote.nativePreviousClose == null ? null : Number(quote.nativePreviousClose) / Number(fx.rate),
     currency: 'EUR',
     nativeCurrency,
     fxRate: Number(fx.rate),
@@ -495,35 +515,33 @@ function applyFx(symbol, quote, fx) {
 }
 
 async function fetchNativeQuote(symbol, finnhubToken) {
-  if (symbol === 'ALWN.GR') {
+  const route = routeMobileInstrument(symbol);
+  if (!route.supported) throw new Error(route.blocker || 'MARKET_ROUTE_UNVERIFIED');
+
+  if (route.market === 'US') {
+    if (finnhubToken) {
+      const licensed = await fetchFinnhubQuote(route.baseSymbol, finnhubToken).catch(() => null);
+      if (licensed) return licensed;
+    }
+    return await fetchYahooQuote(route.baseSymbol);
+  }
+
+  if (route.market === 'GR') {
     try {
-      return await fetchOfficialAllwynQuote();
+      return await fetchOfficialAthensQuote(symbol);
     } catch (officialError) {
-      const fallback = await fetchYahooQuote('ALWN.AT');
+      const fallback = await fetchYahooQuote(`${route.baseSymbol}.AT`);
       return {
         ...fallback,
         nativeCurrency: 'EUR',
-        source: `${fallback.source} · Euronext error: ${officialError.message}`,
+        source: fallback.source,
+        userNotice: 'Η επίσημη πηγή Euronext Athens δεν ήταν διαθέσιμη. Η εφεδρική τιμή είναι μόνο πληροφοριακή.',
+        providerDiagnostic: safeProviderDiagnostic(officialError, 'OFFICIAL_ATHENS_QUOTE_UNAVAILABLE'),
       };
     }
   }
 
-  if (symbol === 'SPCE.US') {
-    // When a user has a Finnhub token, keep Finnhub as the canonical source for
-    // previous close/reference prices. Yahoo remains a fallback only.
-    if (finnhubToken) {
-      const finnhub = await fetchFinnhubQuote('SPCE', finnhubToken).catch(() => null);
-      if (finnhub) return finnhub;
-    }
-    return await fetchYahooQuote('SPCE');
-  }
-
-  const ticker = symbol.endsWith('.US')
-    ? symbol.slice(0, -3)
-    : symbol.endsWith('.GR')
-      ? `${symbol.slice(0, -3)}.AT`
-      : symbol;
-  return await fetchYahooQuote(ticker);
+  throw new Error('MARKET_ROUTE_UNVERIFIED');
 }
 
 export async function fetchPortfolioQuotes(symbols, { finnhubToken = '' } = {}) {
@@ -536,6 +554,7 @@ export async function fetchPortfolioQuotes(symbols, { finnhubToken = '' } = {}) 
     : { rate: 1, updatedAt: null, source: null };
   const fetched = {};
   const errors = [];
+  const canonicalFeedQuotes = await readCanonicalFeedQuotes(cleanSymbols);
 
   await Promise.all(cleanSymbols.map(async (symbol) => {
     try {
@@ -549,18 +568,21 @@ export async function fetchPortfolioQuotes(symbols, { finnhubToken = '' } = {}) 
       fetched[symbol] = classifyQuote(symbol, {
         ...withFx,
         symbol,
-        changePct: finite(changeBase)
-          ? ((Number(withFx.nativePrice) - changeBase) / changeBase) * 100
-          : null,
+        changePct: Number.isFinite(Number(withFx.nativeProviderChangePct))
+          ? Number(withFx.nativeProviderChangePct)
+          : finite(changeBase)
+            ? ((Number(withFx.nativePrice) - changeBase) / changeBase) * 100
+            : null,
       });
     } catch (error) {
-      errors.push(`${symbol}: ${error.message}`);
+      errors.push(`${symbol}: ${safeProviderDiagnostic(error)}`);
     }
   }));
 
   const persisted = await readPersistedPrices();
   const baseline = mergePortfolioQuotes(persisted, inMemoryQuotes);
-  const newest = mergePortfolioQuotes(baseline, fetched);
+  const canonicalBaseline = mergePortfolioQuotes(baseline, canonicalFeedQuotes);
+  const newest = mergePortfolioQuotes(canonicalBaseline, fetched);
   const quotes = {};
 
   cleanSymbols.forEach((symbol) => {
@@ -574,7 +596,7 @@ export async function fetchPortfolioQuotes(symbols, { finnhubToken = '' } = {}) 
       });
       inMemoryQuotes[symbol] = quotes[symbol];
     } catch (error) {
-      errors.push(`${symbol}: ${error.message}`);
+      errors.push(`${symbol}: ${safeProviderDiagnostic(error)}`);
     }
   });
 
@@ -593,6 +615,7 @@ export function quoteStatusText(quote) {
   if (quote.status === 'delayed') return 'Καθυστέρηση 15′';
   if (quote.status === 'pre-market') return 'Προσυνεδριακή';
   if (quote.status === 'post-market') return 'Μετασυνεδριακή';
-  if (quote.status === 'closed') return 'Τιμή κλεισίματος';
+  if (quote.status === 'closed') return quote?.quoteContract?.timestampVerified === false ? 'Επίσημη αναφορά · χρόνος μη επιβεβαιωμένος' : 'Τιμή κλεισίματος';
+  if (quote.status === 'unverified') return 'Μη επαληθευμένη — δεν υπολογίζεται';
   return 'Παρωχημένη τιμή — δεν υπολογίζεται';
 }

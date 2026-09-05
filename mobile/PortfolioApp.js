@@ -4,6 +4,7 @@ import {
   Alert,
   AppState,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -27,6 +28,7 @@ import {
   FINNHUB_TOKEN_KEY,
   MARKET_REFRESH_MS,
   fetchPortfolioQuotes,
+  marketSessionAt,
   openFinnhubTrades,
   quoteStatusText,
 } from './src/market-data';
@@ -44,6 +46,8 @@ import {
   syncBackgroundAlertTask,
 } from './src/background-alert-task';
 import { exportBackupAsync, pickBackupAsync } from './src/backup';
+import OpportunitiesView from './src/OpportunitiesView';
+import { buildPortfolioSnapshot } from './src/portfolio-engine';
 import {
   allInPrice,
   buildTransaction,
@@ -56,7 +60,11 @@ import {
   transactionTotal,
 } from './src/transaction-accounting';
 
-const VERSION = '0.6.5';
+const VERSION = '1.7.3';
+const PRIVACY_POLICY_URL = 'https://1bidprice.github.io/Bid/privacy-policy.html';
+const TERMS_URL = 'https://1bidprice.github.io/Bid/terms.html';
+const SUPPORT_EMAIL = 'xrimapp@gmail.com';
+const LEGAL_ACCEPTANCE_KEY = 'investor-control.legal-acceptance.v1';
 const EMPTY_STATE = {
   schemaVersion: 5,
   transactions: [],
@@ -133,63 +141,6 @@ function normalizeState(raw) {
   };
 }
 
-function positionsFrom(state) {
-  const ledger = {};
-  [...state.transactions]
-    .sort((a, b) => String(a.date).localeCompare(String(b.date)))
-    .forEach((transaction) => {
-      if (!['buy', 'sell'].includes(transaction.type)) return;
-      const symbol = String(transaction.symbol || '').trim().toUpperCase();
-      const quantity = Number(transaction.quantity || 0);
-      if (!symbol || quantity <= 0) return;
-
-      const position = ledger[symbol] || {
-        symbol,
-        company: transaction.company || symbol,
-        currency: transaction.currency || (symbol.endsWith('.US') ? 'USD' : 'EUR'),
-        quantity: 0,
-        cost: 0,
-      };
-
-      if (transaction.type === 'buy') {
-        position.quantity += quantity;
-        position.cost += transactionTotal(transaction);
-      } else if (position.quantity > 0) {
-        const sold = Math.min(quantity, position.quantity);
-        position.cost -= (position.cost / position.quantity) * sold;
-        position.quantity -= sold;
-      }
-      ledger[symbol] = position;
-    });
-
-  return Object.values(ledger)
-    .filter((position) => position.quantity > 0)
-    .map((position) => {
-      const quote = state.prices[position.symbol];
-      const usable = quote?.usable === true;
-      const nativePrice = usable ? Number(quote.nativePrice) : null;
-      const eurPrice = usable ? Number(quote.price) : null;
-      const fxRate = position.currency === 'USD' ? Number(quote?.fxRate || 0) : 1;
-      const nativeValue = nativePrice === null ? null : nativePrice * position.quantity;
-      const eurValue = eurPrice === null ? null : eurPrice * position.quantity;
-      const nativePnl = nativeValue === null ? null : nativeValue - position.cost;
-      const eurCost = position.currency === 'USD' && fxRate > 0 ? position.cost / fxRate : position.cost;
-      return {
-        ...position,
-        quote,
-        nativePrice,
-        eurPrice,
-        nativeValue,
-        eurValue,
-        nativePnl,
-        nativePct: nativePnl === null ? null : (nativePnl / position.cost) * 100,
-        eurCost,
-        eurPnl: eurValue === null ? null : eurValue - eurCost,
-        average: position.quantity > 0 ? position.cost / position.quantity : 0,
-      };
-    });
-}
-
 function Field({ label, helper, value, onChangeText, keyboardType = 'default', autoCapitalize = 'sentences', placeholder, multiline = false }) {
   return (
     <View style={styles.field}>
@@ -240,14 +191,93 @@ function QuoteBadge({ quote }) {
   );
 }
 
+function lotShortDate(value) {
+  if (!value) return '—';
+  const date = new Date(String(value) + 'T12:00:00');
+  return Number.isNaN(date.getTime())
+    ? String(value)
+    : date.toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+
+function PositionPerformanceLine({ label, value, stale, primary = false }) {
+  const numeric = Number(value);
+  const valueStyle = numeric < 0 ? styles.red : numeric > 0 ? styles.green : styles.muted;
+  return (
+    <View style={styles.performanceLine}>
+      <Text style={styles.performanceLabel} numberOfLines={1}>{label}</Text>
+      <Text style={[styles.performanceValue, primary && styles.performanceValuePrimary, valueStyle]}>{stale || !Number.isFinite(numeric) ? '—' : pct(numeric)}</Text>
+    </View>
+  );
+}
+
+function PositionLotRow({ lot, currency, stale }) {
+  const performance = Number(lot.performancePct);
+  const performanceStyle = performance < 0 ? styles.red : performance > 0 ? styles.green : styles.muted;
+  const date = lot.date ? new Date(String(lot.date) + 'T12:00:00').toLocaleDateString('el-GR') : '—';
+  const remaining = Number(lot.remainingQuantity || 0);
+  const original = Number(lot.originalQuantity || 0);
+  return (
+    <View style={styles.lotCard}>
+      <View style={styles.rowTop}>
+        <View style={styles.grow}>
+          <Text style={styles.lotTitle}>Αγορά {lot.purchaseNumber}</Text>
+          <Text style={styles.lotDate}>{date}{lot.broker ? ' · ' + lot.broker : ''}</Text>
+        </View>
+        <Text style={[styles.lotPerformance, performanceStyle]}>{stale ? '—' : pct(performance)}</Text>
+      </View>
+      <Text style={styles.lotMeta}>{remaining.toLocaleString('el-GR')} μετοχές{remaining !== original ? ' από ' + original.toLocaleString('el-GR') + ' αρχικές' : ''} · all-in {quotePrice(lot.allInPrice, currency, 4)}</Text>
+      <View style={styles.lotResultRow}>
+        <Text style={styles.lotResultLabel}>Από τη συγκεκριμένη αγορά</Text>
+        <Text style={[styles.lotResultValue, performanceStyle]}>{stale ? '—' : cash(lot.pnl, currency)}</Text>
+      </View>
+    </View>
+  );
+}
+
+function quoteQualityLabel(quote) {
+  if (!quote) return 'Μη διαθέσιμη';
+  const source = String(quote.source || '').toLowerCase();
+  const quality = String(quote.quality || '').toLowerCase();
+  const status = String(quote.status || '').toLowerCase();
+  const contractStatus = quote?.quoteContract?.publicStatus;
+  if (contractStatus === 'FALLBACK_NOT_VERIFIED') return 'Εφεδρική / μη επιβεβαιωμένη';
+  if (contractStatus === 'TIMESTAMP_NOT_VERIFIED') return 'Χρόνος μη επιβεβαιωμένος';
+  if (contractStatus === 'STALE' || status === 'stale' || quote.usable === false) return 'Παρωχημένη / μη χρησιμοποιήσιμη';
+  if (quality.includes('delay') || source.includes('delay')) return 'Καθυστερημένη';
+  if (quality.includes('close') || status.includes('close')) return 'Τιμή κλεισίματος';
+  if (quality.includes('real') || source.includes('websocket') || status === 'live') return 'Ζωντανή ροή';
+  return 'Τελευταία διαθέσιμη';
+}
+
+function quoteSessionLabel(quote) {
+  return quote?.marketSession || quote?.session || 'Δεν δηλώνεται από την πηγή';
+}
+
+function quoteHeadlineLabel(quote) {
+  const contractStatus = quote?.quoteContract?.publicStatus;
+  const delay = Number(quote?.advertisedDelayMinutes || 0);
+  if (contractStatus === 'TIMESTAMP_NOT_VERIFIED') {
+    return delay > 0 ? `Τιμή αναφοράς · καθυστέρηση ≥${delay}′` : 'Τιμή αναφοράς · χρόνος μη επιβεβαιωμένος';
+  }
+  if (contractStatus === 'FALLBACK_NOT_VERIFIED') return 'Ενδεικτική τιμή · μη επιβεβαιωμένη';
+  if (contractStatus === 'STALE' || quote?.status === 'stale' || quote?.usable === false) return 'Τιμή αναφοράς · παρωχημένη';
+  if (quote?.status === 'closed') return 'Τιμή κλεισίματος';
+  if (quote?.status === 'delayed') return delay > 0 ? `Τιμή αναφοράς · καθυστέρηση ≥${delay}′` : 'Τιμή αναφοράς · καθυστερημένη';
+  return 'Τρέχουσα τιμή';
+}
+
 function PositionCard({ item, compact, expanded, onToggle, onAlert }) {
   const stale = item.quote && !item.quote.usable;
-  const change = Number(item.quote?.changePct);
+  const dayChangeVerified = item.quote?.dayChangeVerified !== false;
+  const dayChange = dayChangeVerified ? Number(item.quote?.changePct) : null;
+  const positionChange = Number(item.nativePct);
+  const currentSession = marketSessionAt(item.symbol);
+  const openLots = Array.isArray(item.lots) ? item.lots : [];
   return (
     <View style={styles.card}>
       <Pressable onPress={onToggle}>
-        <View style={styles.rowTop}>
-          <View style={styles.grow}>
+        <View style={[styles.rowTop, compact && { flexDirection: 'column', alignItems: 'flex-start', gap: 8 }]}>
+          <View style={[styles.grow, { minWidth: 0 }]}>
             <Text style={styles.cardTitle}>{item.company}</Text>
             <Text style={styles.muted}>{item.symbol} · {item.quantity.toLocaleString('el-GR')} μετοχές</Text>
           </View>
@@ -255,27 +285,62 @@ function PositionCard({ item, compact, expanded, onToggle, onAlert }) {
         </View>
         <View style={styles.priceRow}>
           <View style={styles.grow}>
-            <Text style={styles.muted}>Τρέχουσα τιμή</Text>
+            <Text style={styles.muted}>{quoteHeadlineLabel(item.quote)}</Text>
             <Text style={styles.big} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.64}>{stale ? '—' : quotePrice(item.nativePrice, item.currency)}</Text>
+            {item.quote?.quoteContract?.timestampVerified === false ? <Text style={styles.quoteHeadlineWarning}>Ο ακριβής χρόνος αυτής της τιμής δεν είναι επαληθευμένος.</Text> : null}
             {item.currency === 'USD' && !stale ? <Text style={styles.muted}>≈ {quotePrice(item.eurPrice, 'EUR')}</Text> : null}
           </View>
-          <Text style={[styles.change, change < 0 ? styles.red : styles.green]}>{stale ? '—' : pct(change)}</Text>
+        </View>
+        <View style={styles.performanceStack}>
+          <PositionPerformanceLine label={dayChangeVerified ? "Ημέρα" : "Ημέρα · μη επιβεβαιωμένη"} value={dayChange} stale={stale || !dayChangeVerified} primary />
+          {openLots.length ? openLots.map((lot) => (
+            <React.Fragment key={lot.lotId}>
+              <View style={styles.performanceDivider} />
+              <PositionPerformanceLine
+                label={openLots.length === 1 ? 'Από αγορά · ' + lotShortDate(lot.date) : lot.purchaseNumber + 'η αγορά · ' + lotShortDate(lot.date)}
+                value={lot.performancePct}
+                stale={stale}
+              />
+            </React.Fragment>
+          )) : <>
+            <View style={styles.performanceDivider} />
+            <PositionPerformanceLine label="Από θέση" value={positionChange} stale={stale} />
+          </>}
+        </View>
+        <View style={styles.quoteTransparency}>
+          <Text style={styles.quoteTransparencyTitle}>Διαφάνεια τιμής</Text>
+          <Text style={styles.quoteTransparencyText}>Πηγή: {item.quote?.source || '—'}</Text>
+          <Text style={styles.quoteTransparencyText}>{item.quote?.priceTimestampVerified === false ? 'Χρόνος δεδομένου: δεν δηλώνεται από την πηγή' : `Χρόνος δεδομένου: ${item.quote?.updatedAt ? when(item.quote.updatedAt) : '—'}`}</Text>
+          <Text style={styles.quoteTransparencyText}>Τελευταίος έλεγχος: {item.quote?.checkedAt ? when(item.quote.checkedAt) : '—'}</Text>
+          <Text style={styles.quoteTransparencyText}>Κατάσταση: {quoteQualityLabel(item.quote)} · Τρέχουσα συνεδρία: {quoteSessionLabel({ session: currentSession })}</Text>
+          {!dayChangeVerified ? <Text style={styles.quoteTransparencyWarning}>{item.quote?.dayChangeReason || 'Η ημερήσια μεταβολή δεν έχει επιβεβαιωθεί από αξιόπιστη βάση προηγούμενου κλεισίματος.'}</Text> : null}
+          {item.quote?.quoteContract?.publicMessage ? <Text style={styles.quoteContractText}>{item.quote.quoteContract.publicMessage}</Text> : null}
         </View>
         <View style={styles.grid}>
           <Metric compact={compact} label="Αξία θέσης" value={cash(item.nativeValue, item.currency)} />
           <Metric compact={compact} label="Συνολικό κόστος" value={cash(item.cost, item.currency)} />
           <Metric compact={compact} label="Κέρδος / Ζημία" value={cash(item.nativePnl, item.currency)} negative={item.nativePnl < 0} positiveValue={item.nativePnl > 0} />
-          <Metric compact={compact} label="Μέση τιμή all-in" value={quotePrice(item.average, item.currency)} />
+          <Metric compact={compact} label="Μέση τιμή all-in" value={quotePrice(item.average, item.currency, 4)} />
         </View>
       </Pressable>
       {expanded ? (
         <View style={styles.detailPanel}>
           {item.currency === 'USD' && item.eurValue !== null ? <Text style={styles.note}>Σε ευρώ: αξία ≈ {cash(item.eurValue)} · αποτέλεσμα ≈ {cash(item.eurPnl)}</Text> : null}
-          <Text style={styles.source}>Πηγή: {item.quote?.source || '—'}{item.quote?.updatedAt ? `\nΤιμή: ${when(item.quote.updatedAt)} · Έλεγχος: ${when(item.quote.checkedAt)}` : ''}</Text>
-          {stale ? <Text style={styles.warning}>Η τιμή είναι παρωχημένη και δεν χρησιμοποιείται στη συνολική αποτίμηση.</Text> : null}
+          <View style={styles.lotsSection}>
+            <View style={styles.lotsHeader}>
+              <View style={styles.grow}><Text style={styles.lotsTitle}>Επιμέρους αγορές</Text><Text style={styles.lotsSubtitle}>Κάθε αγορά κρατά το δικό της all-in και πρόσημο.</Text></View>
+              <View style={styles.lotsCountBadge}><Text style={styles.lotsCountText}>{item.lots?.length || 0}</Text></View>
+            </View>
+            {(item.lots || []).map((lot) => <PositionLotRow key={lot.lotId} lot={lot} currency={item.currency} stale={stale} />)}
+            {item.hadLotSales ? <Text style={styles.lotMethodNote}>Οι πωλήσεις κατανέμονται FIFO μόνο για την απεικόνιση των ανοιχτών αγορών. Το συνολικό κόστος της κάρτας παραμένει στο λογιστικό μοντέλο v2.</Text> : null}
+            {item.unmatchedSellQuantity > 0 ? <Text style={styles.warning}>Υπάρχει πώληση {item.unmatchedSellQuantity.toLocaleString('el-GR')} μετοχών που δεν αντιστοιχεί σε καταγεγραμμένη αγορά.</Text> : null}
+          </View>
+          <Text style={styles.source}>Έλεγχος συσκευής: {item.quote?.checkedAt ? when(item.quote.checkedAt) : '—'}</Text>
+          {item.instrumentIntegrityWarning ? <Text style={styles.warning}>{item.instrumentIntegrityWarning}</Text> : null}
+          {stale && !item.instrumentIntegrityWarning ? <Text style={styles.warning}>Η τιμή είναι παρωχημένη ή μη επαληθευμένη και δεν χρησιμοποιείται στη συνολική αποτίμηση.</Text> : null}
           <Pressable style={styles.secondaryActionFull} onPress={onAlert}><Text style={styles.secondaryStrong}>Ρύθμιση ειδοποιήσεων</Text></Pressable>
         </View>
-      ) : <Text style={styles.tapHint}>Πάτησε για στοιχεία και ειδοποιήσεις</Text>}
+      ) : <Text style={styles.tapHint}>Πάτησε για επιμέρους αγορές, στοιχεία και ειδοποιήσεις</Text>}
     </View>
   );
 }
@@ -459,7 +524,28 @@ function AlertRuleModal({ visible, position, rule, onClose, onSave }) {
   );
 }
 
-function MainApp() {
+function LegalNoticeModal({ visible, onAccept }) {
+  return (
+    <Modal visible={visible} animationType="fade" transparent={false} onRequestClose={() => {}}>
+      <SafeAreaView style={styles.legalScreen} edges={['top', 'bottom', 'left', 'right']}>
+        <ScrollView contentContainerStyle={styles.legalContent} showsVerticalScrollIndicator={false}>
+          <Text style={styles.eyebrow}>INVESTOR CONTROL</Text>
+          <Text style={styles.legalTitle}>Σημαντική ενημέρωση πριν τη χρήση</Text>
+          <Text style={styles.legalBody}>Η εφαρμογή είναι εργαλείο προσωπικής καταγραφής χαρτοφυλακίου και αυτοματοποιημένης επενδυτικής έρευνας. Δεν είναι χρηματιστηριακή εταιρεία, δεν κρατά χρήματα και δεν στέλνει εντολές αγοράς ή πώλησης σε broker.</Text>
+          <Text style={styles.legalBody}>Οι ενδείξεις ΑΓΟΡΑ, ΠΩΛΗΣΗ, ΚΡΑΤΗΣΕ ή ΑΠΟΦΥΓΕ βασίζονται σε αυτοματοποιημένους κανόνες και διαθέσιμα δεδομένα. Μπορεί να είναι ελλιπείς, καθυστερημένες ή λανθασμένες. Δεν αποτελούν εγγύηση απόδοσης ούτε εξατομικευμένη επενδυτική συμβουλή.</Text>
+          <Text style={styles.legalBody}>Οι συναλλαγές, ποσότητες, κόστη και σημειώσεις αποθηκεύονται τοπικά στη συσκευή. Για ανάκτηση τιμών μπορεί να αποστέλλεται σε παρόχους μόνο το χρηματιστηριακό σύμβολο. Δεν αποστέλλονται ποσότητες, κόστος κτήσης ή προσωπικές σημειώσεις.</Text>
+          <View style={styles.legalLinks}>
+            <Pressable style={styles.secondaryActionFull} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}><Text style={styles.secondaryStrong}>Πολιτική απορρήτου</Text></Pressable>
+            <Pressable style={styles.secondaryActionFull} onPress={() => Linking.openURL(TERMS_URL)}><Text style={styles.secondaryStrong}>Όροι χρήσης</Text></Pressable>
+          </View>
+          <Pressable style={styles.primary} onPress={onAccept}><Text style={styles.whiteStrong}>Κατανόησα και συνεχίζω</Text></Pressable>
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
+}
+
+function MainApp({ onOpenDecisionGate }) {
   const { width } = useWindowDimensions();
   const compactMetrics = width < 370;
   const [state, setState] = useState(EMPTY_STATE);
@@ -475,8 +561,20 @@ function MainApp() {
   const [token, setToken] = useState('');
   const [notificationStatus, setNotificationStatus] = useState('unknown');
   const [backgroundRegistered, setBackgroundRegistered] = useState(false);
+  const [legalAccepted, setLegalAccepted] = useState(null);
   const tokenRef = useRef('');
   const appState = useRef(AppState.currentState);
+
+  useEffect(() => {
+    AsyncStorage.getItem(LEGAL_ACCEPTANCE_KEY)
+      .then((value) => setLegalAccepted(value === 'accepted'))
+      .catch(() => setLegalAccepted(false));
+  }, []);
+
+  const acceptLegalNotice = useCallback(async () => {
+    await AsyncStorage.setItem(LEGAL_ACCEPTANCE_KEY, 'accepted');
+    setLegalAccepted(true);
+  }, []);
 
   const persist = useCallback(async (nextInput) => {
     const normalized = normalizeState(nextInput);
@@ -533,25 +631,43 @@ function MainApp() {
     return () => { clearInterval(interval); subscription.remove(); };
   }, [loading, refresh]);
 
-  useEffect(() => {
-    if (loading || token.trim().length < 20) return undefined;
-    return openFinnhubTrades(token.trim(), ['SPCE'], async (trade) => {
-      const current = stateRef.current;
-      const old = current.prices['SPCE.US'];
-      const fxRate = Number(old?.fxRate || 0);
-      if (!fxRate) return;
-      const previousClose = Number(old?.nativePreviousClose || 0);
-      const quote = { ...old, nativePrice: trade.price, price: trade.price / fxRate, updatedAt: new Date(trade.timestamp).toISOString(), checkedAt: new Date().toISOString(), source: 'Finnhub WebSocket real-time trade', quality: 'realtime', status: 'live', usable: true, ageSeconds: 0, changePct: previousClose > 0 ? ((trade.price - previousClose) / previousClose) * 100 : old?.changePct };
-      await applyQuotes(current, { 'SPCE.US': quote }, new Date().toISOString(), current.meta.errors || [], { silent: true });
-    });
-  }, [applyQuotes, loading, token]);
+  const portfolioSnapshot = useMemo(
+    () => buildPortfolioSnapshot(state.transactions, state.prices),
+    [state.transactions, state.prices],
+  );
+  const positions = portfolioSnapshot.positions;
+  const {
+    valuesReady,
+    costsReady,
+    totalValue,
+    totalCost,
+    totalPnl,
+    valuationCoverage,
+    missingValuationSymbols,
+  } = portfolioSnapshot.summary;
 
-  const positions = useMemo(() => positionsFrom(state), [state]);
-  const valuesReady = positions.every((position) => position.eurValue !== null);
-  const costsReady = positions.every((position) => valid(position.eurCost));
-  const totalValue = positions.length === 0 ? 0 : valuesReady ? positions.reduce((sum, position) => sum + position.eurValue, 0) : null;
-  const totalCost = positions.length === 0 ? 0 : costsReady ? positions.reduce((sum, position) => sum + position.eurCost, 0) : null;
-  const totalPnl = totalValue !== null && totalCost !== null ? totalValue - totalCost : null;
+  const liveUsProviderSymbols = useMemo(
+    () => [...new Set(positions
+      .filter((position) => position.instrumentRoute?.market === 'US' && position.instrumentRoute?.baseSymbol)
+      .map((position) => position.instrumentRoute.baseSymbol))].sort(),
+    [positions],
+  );
+  const liveUsProviderSymbolsKey = liveUsProviderSymbols.join('|');
+
+  useEffect(() => {
+    if (loading || token.trim().length < 20 || !liveUsProviderSymbols.length) return undefined;
+    return openFinnhubTrades(token.trim(), liveUsProviderSymbols, async (trade) => {
+      if (!trade?.appSymbol || !trade?.quote) return;
+      const current = stateRef.current;
+      await applyQuotes(
+        current,
+        { [trade.appSymbol]: trade.quote },
+        new Date().toISOString(),
+        current.meta.errors || [],
+        { silent: true },
+      );
+    });
+  }, [applyQuotes, liveUsProviderSymbolsKey, loading, token]);
   const openNewTransaction = () => { setEditingTransaction(null); setTransactionModal(true); };
 
   const saveTransaction = async (transaction) => {
@@ -583,18 +699,23 @@ function MainApp() {
   const importBackup = async () => { try { const payload = await pickBackupAsync(); if (!payload) return; Alert.alert('Επαναφορά αντιγράφου', `Θα αντικατασταθούν οι ${stateRef.current.transactions.length} τωρινές συναλλαγές με ${payload.data.transactions.length} συναλλαγές του αντιγράφου.`, [{ text: 'Άκυρο', style: 'cancel' }, { text: 'Επαναφορά', onPress: async () => { const restoredAlerts = normalizeAlerts({ ...payload.data.alerts, backgroundEnabled: false, runtime: {} }); await syncBackgroundAlertTask(false); setBackgroundRegistered(false); await persist({ transactions: payload.data.transactions, prices: {}, meta: { lastCheckedAt: null, errors: [], accountingVersion: 2 }, alerts: restoredAlerts }); setTab('summary'); refresh({ silent: true }); } }]); } catch (error) { Alert.alert('Μη έγκυρο αντίγραφο', error.message); } };
   const resetLocalData = () => Alert.alert('Διαγραφή όλων των δεδομένων', 'Η ενέργεια δεν αναιρείται. Πάρε πρώτα αντίγραφο ασφαλείας.', [{ text: 'Άκυρο', style: 'cancel' }, { text: 'Οριστική διαγραφή', style: 'destructive', onPress: async () => { await syncBackgroundAlertTask(false).catch(() => {}); await Promise.all([AsyncStorage.removeItem(STORAGE_KEY), SecureStore.deleteItemAsync(FINNHUB_TOKEN_KEY)]); tokenRef.current = ''; setToken(''); setBackgroundRegistered(false); await persist(EMPTY_STATE); } }]);
 
-  if (loading) return <SafeAreaView style={styles.center} edges={['top', 'bottom', 'left', 'right']}><ActivityIndicator size="large" color="#0B66FF" /><Text style={styles.muted}>Έλεγχος και αναβάθμιση τοπικών δεδομένων…</Text></SafeAreaView>;
+  if (loading || legalAccepted === null) return <SafeAreaView style={styles.center} edges={['top', 'bottom', 'left', 'right']}><ActivityIndicator size="large" color="#0B66FF" /><Text style={styles.muted}>Έλεγχος και αναβάθμιση τοπικών δεδομένων…</Text></SafeAreaView>;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}><StatusBar barStyle="dark-content" backgroundColor="#eef5ff" /><View style={styles.app}>
+    <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}><LegalNoticeModal visible={!legalAccepted} onAccept={acceptLegalNotice} /><StatusBar barStyle="dark-content" backgroundColor="#eef5ff" /><View style={styles.app}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <Text style={styles.eyebrow}>ΠΡΟΣΩΠΙΚΟ ΧΑΡΤΟΦΥΛΑΚΙΟ</Text>
         <View style={styles.rowTop}><View style={styles.grow}><Text style={[styles.title, width < 380 && styles.titleCompact]}>Investor Control</Text><Text style={styles.versionLine}>Λογιστική ακρίβεια · v{VERSION}</Text></View><Pressable style={styles.plus} onPress={openNewTransaction}><Text style={styles.plusText}>＋</Text></Pressable></View>
         {tab === 'summary' ? <>
           <View style={styles.refreshCard}><View style={styles.grow}><Text style={styles.muted}>Τελευταίος έλεγχος</Text><Text style={styles.checked}>{when(state.meta.lastCheckedAt)}</Text></View><Pressable style={[styles.primarySmall, refreshing && styles.disabled]} onPress={() => refresh()} disabled={refreshing}>{refreshing ? <ActivityIndicator color="#fff" /> : <Text style={styles.whiteStrong}>Ανανέωση</Text>}</Pressable></View>
           {state.meta.errors?.length ? <Text style={styles.warning}>{state.meta.errors.join('\n')}</Text> : null}
-          <View style={styles.grid}><Metric compact={compactMetrics} label="Αξία χαρτοφυλακίου" value={cash(totalValue)} /><Metric compact={compactMetrics} label="Καθαρό κόστος" value={cash(totalCost)} /><Metric compact={compactMetrics} label="Κέρδος / Ζημία" value={cash(totalPnl)} negative={totalPnl < 0} positiveValue={totalPnl > 0} /><Metric compact={compactMetrics} label="Θέσεις" value={String(positions.length)} /></View>
-          {!valuesReady ? <Text style={styles.warning}>Η συνολική αποτίμηση μένει κενή όταν κάποια τιμή είναι παρωχημένη ή μη διαθέσιμη.</Text> : null}
+          <View style={styles.grid}><Metric compact={compactMetrics} label={valuesReady ? 'Αξία χαρτοφυλακίου' : 'Επιβεβ. αξία'} value={cash(totalValue)} /><Metric compact={compactMetrics} label={costsReady ? 'Καθαρό κόστος' : 'Επιβεβ. κόστος'} value={cash(totalCost)} /><Metric compact={compactMetrics} label={valuesReady ? 'Κέρδος / Ζημία' : 'Επιβεβ. αποτέλεσμα'} value={cash(totalPnl)} negative={totalPnl < 0} positiveValue={totalPnl > 0} /><Metric compact={compactMetrics} label="Κάλυψη τιμών" value={valuationCoverage} /></View>
+          {!valuesReady ? <Text style={styles.warning}>Μερική αποτίμηση {valuationCoverage}. Εξαιρούνται από την αξία και το αποτέλεσμα μόνο οι θέσεις χωρίς χρησιμοποιήσιμη τιμή ή ισοτιμία: {missingValuationSymbols.join(', ') || '—'}.</Text> : null}
+          <Pressable style={styles.decisionEntry} onPress={onOpenDecisionGate} accessibilityLabel="Άνοιγμα Decision Gate">
+            <View style={styles.decisionEntryIcon}><Text style={styles.decisionEntryCheck}>✓</Text></View>
+            <View style={styles.grow}><Text style={styles.decisionEntryTitle}>Decision Gate</Text><Text style={styles.decisionEntryText}>Έλεγχος πειθαρχίας πριν από αγορά ή ενίσχυση θέσης</Text></View>
+            <Text style={styles.decisionEntryArrow}>›</Text>
+          </Pressable>
           <View style={styles.quickActions}><Pressable style={styles.primaryQuick} onPress={openNewTransaction}><Text style={styles.whiteStrong}>＋ Νέα συναλλαγή</Text></Pressable><Pressable style={styles.secondaryQuick} onPress={() => setTab('transactions')}><Text style={styles.secondaryStrong}>Ιστορικό</Text></Pressable></View>
           <View style={styles.sectionRow}><View><Text style={styles.section}>Θέσεις</Text><Text style={styles.muted}>{positions.length} ενεργές θέσεις</Text></View></View>
           {positions.length ? positions.map((position) => <PositionCard key={position.symbol} item={position} compact={compactMetrics} expanded={expandedPosition === position.symbol} onToggle={() => setExpandedPosition((current) => current === position.symbol ? null : position.symbol)} onAlert={() => setAlertPosition(position)} />) : <View style={styles.emptyCard}><Text style={styles.emptyTitle}>Το χαρτοφυλάκιο είναι κενό.</Text><Text style={styles.note}>Πρόσθεσε αγορά σε τρία καθαρά βήματα. Τα δεδομένα μένουν μόνο στη συσκευή.</Text><Pressable style={styles.primary} onPress={openNewTransaction}><Text style={styles.whiteStrong}>Πρώτη συναλλαγή</Text></Pressable></View>}
@@ -609,42 +730,44 @@ function MainApp() {
           <View style={styles.card}><View style={styles.rowTop}><View style={styles.grow}><Text style={styles.cardTitle}>Άδεια συσκευής</Text><Text style={styles.muted}>Κατάσταση Android</Text></View><Text style={styles.statusStrong}>{notificationStatus === 'granted' ? 'Επιτρέπονται' : notificationStatus === 'denied' ? 'Απορρίφθηκαν' : 'Δεν ζητήθηκε'}</Text></View><View style={styles.actionRow}><Pressable style={styles.secondaryAction} onPress={requestNotificationPermission}><Text style={styles.secondaryStrong}>Ζήτηση άδειας</Text></Pressable><Pressable style={styles.primaryAction} onPress={async () => { const ok = await sendTestNotificationAsync(); setNotificationStatus(ok ? 'granted' : 'denied'); if (!ok) Alert.alert('Αποτυχία', 'Δεν υπάρχει άδεια ειδοποιήσεων.'); }}><Text style={styles.whiteStrong}>Δοκιμή</Text></Pressable></View></View>
           <View style={styles.card}><View style={styles.switchLine}><View style={styles.grow}><Text style={styles.cardTitle}>Έλεγχος στο παρασκήνιο</Text><Text style={styles.note}>Ενδεικτικός έλεγχος Android, όχι άμεσος χρηματιστηριακός συναγερμός.</Text></View><Switch value={state.alerts.backgroundEnabled && backgroundRegistered} onValueChange={toggleBackground} /></View><ReviewLine label="Ελάχιστο διάστημα" value="15 λεπτά, μη εγγυημένο" /></View>
           <Text style={styles.subsection}>Όρια ανά θέση</Text>
-          {positions.map((position) => { const rule = getRule(state.alerts, position.symbol); return <View key={position.symbol} style={styles.card}><View style={styles.rowTop}><View><Text style={styles.cardTitle}>{position.symbol}</Text><Text style={styles.muted}>{position.company}</Text></View><View style={styles.badge}><Text style={styles.badgeText}>{rule.enabled ? 'Ενεργό' : 'Ανενεργό'}</Text></View></View><Text style={styles.note}>Τρέχουσα: {quotePrice(position.nativePrice, position.currency)}</Text><View style={styles.grid}><Metric compact label="Πάνω από" value={rule.above ? quotePrice(rule.above, position.currency) : '—'} /><Metric compact label="Κάτω από" value={rule.below ? quotePrice(rule.below, position.currency) : '—'} /></View><Text style={styles.note}>Ημερήσια μεταβολή: {rule.dailyPct ? `±${rule.dailyPct}%` : '—'}</Text><Pressable style={styles.secondaryActionFull} onPress={() => setAlertPosition(position)}><Text style={styles.secondaryStrong}>Ρύθμιση ορίων</Text></Pressable></View>; })}
+          {positions.map((position) => { const rule = getRule(state.alerts, position.symbol); const quoteReady = position.quote?.usable === true && position.quote?.quoteContract?.valuationEligible !== false; return <View key={position.symbol} style={styles.card}><View style={styles.rowTop}><View style={styles.grow}><Text style={styles.cardTitle}>{position.symbol}</Text><Text style={styles.muted}>{position.company}</Text></View><View style={[styles.badge, !quoteReady && styles.badgeBad]}><Text style={[styles.badgeText, !quoteReady && styles.badgeBadText]}>{!rule.enabled ? 'Ανενεργό' : quoteReady ? 'Ενεργό' : 'Παύση δεδομένων'}</Text></View></View><Text style={styles.note}>Τρέχουσα: {quotePrice(position.nativePrice, position.currency)}</Text>{rule.enabled && !quoteReady ? <Text style={styles.quoteTransparencyWarning}>Ο κανόνας παραμένει αποθηκευμένος, αλλά δεν εκτελείται χωρίς επαληθευμένη και χρησιμοποιήσιμη τιμή.</Text> : null}<View style={styles.grid}><Metric compact label="Πάνω από" value={rule.above ? quotePrice(rule.above, position.currency) : '—'} /><Metric compact label="Κάτω από" value={rule.below ? quotePrice(rule.below, position.currency) : '—'} /></View><Text style={styles.note}>Ημερήσια μεταβολή: {rule.dailyPct ? `±${rule.dailyPct}%` : '—'}</Text><Pressable style={styles.secondaryActionFull} onPress={() => setAlertPosition(position)}><Text style={styles.secondaryStrong}>Ρύθμιση ορίων</Text></Pressable></View>; })}
           {!positions.length ? <View style={styles.emptyCard}><Text style={styles.emptyTitle}>Δεν υπάρχουν θέσεις για παρακολούθηση.</Text></View> : null}
           <View style={styles.sectionRow}><Text style={styles.subsection}>Ιστορικό</Text>{state.alerts.history.length ? <Pressable onPress={() => persist({ ...stateRef.current, alerts: { ...stateRef.current.alerts, history: [] } })}><Text style={styles.link}>Καθαρισμός</Text></Pressable> : null}</View>
           {state.alerts.history.length ? state.alerts.history.map((event) => <View key={event.id} style={styles.historyItem}><Text style={styles.statusStrong}>{event.symbol}</Text><Text style={styles.note}>{event.message}</Text><Text style={styles.source}>{when(event.triggeredAt)}</Text></View>) : <View style={styles.emptyCard}><Text style={styles.emptyTitle}>Καμία ενεργοποίηση.</Text><Text style={styles.note}>Οι ειδοποιήσεις που πυροδοτούνται θα καταγράφονται εδώ.</Text></View>}
         </> : null}
+        {tab === 'opportunities' ? <OpportunitiesView portfolioPositions={positions} /> : null}
         {tab === 'settings' ? <>
           <Text style={styles.section}>Ρυθμίσεις</Text>
           <View style={styles.card}><Text style={styles.cardTitle}>Ιδιωτικότητα δεδομένων</Text><Text style={styles.note}>Συναλλαγές, όρια και ιστορικό αποθηκεύονται μόνο στη συγκεκριμένη συσκευή. Δεν υπάρχει κοινός λογαριασμός ή πρόσβαση διαχειριστή.</Text><ReviewLine label="Αποθήκευση" value="Μόνο στη συσκευή" /><ReviewLine label="Cloud συγχρονισμός" value="Ανενεργός" /></View>
           <View style={styles.card}><Text style={styles.cardTitle}>Ακρίβεια συναλλαγών</Text><Text style={styles.note}>Κάθε συναλλαγή κρατά χωριστά τιμή εντολής, μέση τιμή εκτέλεσης, αξία συναλλαγής, αναλυτικά έξοδα και τελικό κόστος.</Text><ReviewLine label="Λογιστικό μοντέλο" value="v2 ενεργό" /><ReviewLine label="Σχήμα δεδομένων" value="v5" /></View>
           <View style={styles.card}><Text style={styles.cardTitle}>Αντίγραφο ασφαλείας</Text><Text style={styles.note}>Το JSON περιλαμβάνει συναλλαγές και όρια. Δεν περιλαμβάνει το Finnhub token.</Text><Pressable style={styles.primary} onPress={exportBackup}><Text style={styles.whiteStrong}>Εξαγωγή αντιγράφου JSON</Text></Pressable><Pressable style={styles.secondaryActionFull} onPress={importBackup}><Text style={styles.secondaryStrong}>Επαναφορά από JSON</Text></Pressable></View>
-          <View style={styles.card}><Text style={styles.cardTitle}>Πηγές τιμών</Text><Text style={styles.note}>Allwyn: επίσημη Euronext Athens με καθυστέρηση. Αμερικανικές μετοχές: Finnhub real-time με προσωπικό token, διαφορετικά εφεδρική πηγή.</Text><Field label="Finnhub API token" value={token} onChangeText={setToken} autoCapitalize="none" placeholder="Επικόλλησε το προσωπικό token" /><Pressable style={styles.primary} onPress={saveToken}><Text style={styles.whiteStrong}>Αποθήκευση token</Text></Pressable></View>
-          <View style={styles.card}><Text style={styles.cardTitle}>Τοπικά δεδομένα</Text><Text style={styles.note}>Η διαγραφή αφορά μόνο αυτή τη συσκευή και δεν αναιρείται.</Text><Pressable style={styles.dangerActionFull} onPress={resetLocalData}><Text style={styles.dangerStrong}>Διαγραφή όλων των τοπικών δεδομένων</Text></Pressable></View>
+          <View style={styles.card}><Text style={styles.cardTitle}>Διαχειριζόμενες πηγές δεδομένων</Text><Text style={styles.note}>Οι εγκεκριμένες τιμές και η έρευνα ενημερώνονται από την κεντρική ροή της εφαρμογής. Δεν απαιτείται προσωπικό API token. Εφεδρικές ή μη επαληθευμένες τιμές εμφανίζονται μόνο πληροφοριακά και δεν ενεργοποιούν τελική απόφαση ή ειδοποίηση.</Text><ReviewLine label="Επίσημες ελληνικές πηγές" value="Euronext Athens" /><ReviewLine label="Αμερικανικά δεδομένα" value="Αδειοδοτημένος πάροχος / SEC" /><ReviewLine label="Προσωπικό API token" value="Δεν απαιτείται" /><Text style={styles.privacyNotice}>Για την ανάκτηση τιμής μπορεί να αποστέλλεται στον πάροχο μόνο το σύμβολο της μετοχής. Ποσότητες, κόστος, κέρδος/ζημία και σημειώσεις δεν αποστέλλονται.</Text></View>
+          <View style={styles.card}><Text style={styles.cardTitle}>Νομικά και υποστήριξη</Text><Text style={styles.note}>Η εφαρμογή δεν εκτελεί συναλλαγές και δεν εγγυάται απόδοση. Κάθε επενδυτική απόφαση και η εκτέλεσή της παραμένει αποκλειστικά στον χρήστη.</Text><Pressable style={styles.secondaryActionFull} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}><Text style={styles.secondaryStrong}>Πολιτική απορρήτου</Text></Pressable><Pressable style={styles.secondaryActionFull} onPress={() => Linking.openURL(TERMS_URL)}><Text style={styles.secondaryStrong}>Όροι χρήσης</Text></Pressable><Pressable style={styles.secondaryActionFull} onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Investor%20Control%20Support`)}><Text style={styles.secondaryStrong}>Επικοινωνία υποστήριξης</Text></Pressable></View><View style={styles.card}><Text style={styles.cardTitle}>Τοπικά δεδομένα</Text><Text style={styles.note}>Η διαγραφή αφορά μόνο αυτή τη συσκευή και δεν αναιρείται. Η αποδοχή της νομικής ενημέρωσης διατηρείται χωριστά για λόγους διαφάνειας.</Text><Pressable style={styles.dangerActionFull} onPress={resetLocalData}><Text style={styles.dangerStrong}>Διαγραφή όλων των τοπικών δεδομένων</Text></Pressable></View>
         </> : null}
       </ScrollView>
-      <View style={styles.nav}>{[['summary', '⌂', 'Σύνοψη'], ['transactions', '⇄', 'Συναλλαγές'], ['alerts', '!', 'Ειδοπ.'], ['settings', '⚙', 'Ρυθμίσεις']].map(([key, icon, label]) => <Pressable key={key} style={[styles.navItem, tab === key && styles.navItemOn]} onPress={() => setTab(key)}><Text style={[styles.navIcon, tab === key && styles.navTextOn]}>{icon}</Text><Text style={[styles.navText, tab === key && styles.navTextOn]}>{label}</Text></Pressable>)}</View>
+      <View style={styles.nav}>{[['summary', '⌂', 'Σύνοψη'], ['transactions', '⇄', 'Συναλλαγές'], ['opportunities', '◎', 'Έρευνα'], ['alerts', '!', 'Ειδοπ.'], ['settings', '⚙', 'Ρυθμίσεις']].map(([key, icon, label]) => <Pressable key={key} style={[styles.navItem, tab === key && styles.navItemOn]} onPress={() => setTab(key)}><Text style={[styles.navIcon, tab === key && styles.navTextOn]}>{icon}</Text><Text style={[styles.navText, tab === key && styles.navTextOn]}>{label}</Text></Pressable>)}</View>
       <TransactionModal visible={transactionModal} transaction={editingTransaction} onClose={() => { setTransactionModal(false); setEditingTransaction(null); }} onSave={saveTransaction} />
       <AlertRuleModal visible={Boolean(alertPosition)} position={alertPosition} rule={alertPosition ? getRule(state.alerts, alertPosition.symbol) : null} onClose={() => setAlertPosition(null)} onSave={saveAlertRule} />
     </View></SafeAreaView>
   );
 }
 
-export default function PortfolioApp() {
-  return <SafeAreaProvider initialMetrics={initialWindowMetrics}><MainApp /></SafeAreaProvider>;
+export default function PortfolioApp({ onOpenDecisionGate }) {
+  return <SafeAreaProvider initialMetrics={initialWindowMetrics}><MainApp onOpenDecisionGate={onOpenDecisionGate} /></SafeAreaProvider>;
 }
 
 const styles = StyleSheet.create({
+  legalScreen: { flex: 1, backgroundColor: '#eef5ff' }, legalContent: { paddingHorizontal: 22, paddingTop: 28, paddingBottom: 48 }, legalTitle: { color: '#16345f', fontSize: 31, lineHeight: 38, fontWeight: '900', marginBottom: 18 }, legalBody: { color: '#40536f', fontSize: 16, lineHeight: 25, marginBottom: 14 }, legalLinks: { marginTop: 4 }, privacyNotice: { color: '#40536f', fontSize: 13, lineHeight: 20, fontWeight: '700', marginTop: 14 },
   safe: { flex: 1, backgroundColor: '#eef5ff' }, app: { flex: 1 }, scroll: { flex: 1 }, content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 112 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, backgroundColor: '#eef5ff' }, eyebrow: { color: '#0B66FF', fontSize: 14, fontWeight: '900', letterSpacing: 1.7, marginBottom: 12 },
   title: { color: '#16345f', fontSize: 36, lineHeight: 41, fontWeight: '900' }, titleCompact: { fontSize: 31 }, versionLine: { color: '#718096', marginTop: 4, fontWeight: '700' }, rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }, grow: { flex: 1, minWidth: 0 },
   plus: { width: 58, height: 58, borderRadius: 20, borderWidth: 1, borderColor: '#cfdae9', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' }, plusText: { color: '#16345f', fontSize: 42, lineHeight: 46, fontWeight: '300' },
   refreshCard: { marginTop: 24, backgroundColor: '#fff', borderRadius: 24, borderWidth: 1, borderColor: '#d5dfec', padding: 18, flexDirection: 'row', alignItems: 'center', gap: 14 }, checked: { color: '#16345f', fontWeight: '900', fontSize: 20, marginTop: 4 }, muted: { color: '#7b889d', fontSize: 15, lineHeight: 22 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10, marginTop: 12 }, metric: { width: '48.5%', minHeight: 102, borderRadius: 20, borderWidth: 1, borderColor: '#d5dfec', backgroundColor: '#fff', padding: 14, justifyContent: 'space-between' }, metricCompact: { paddingHorizontal: 11 }, metricValue: { color: '#16345f', fontSize: 21, lineHeight: 26, fontWeight: '900', marginTop: 9 }, red: { color: '#d83b4d' }, green: { color: '#078548' },
-  warning: { color: '#a66700', backgroundColor: '#fff6df', borderRadius: 14, padding: 12, marginTop: 12, lineHeight: 21, fontWeight: '700' }, quickActions: { flexDirection: 'row', gap: 12, marginTop: 18 }, primaryQuick: { flex: 1.35, minHeight: 54, backgroundColor: '#0B66FF', borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 }, secondaryQuick: { flex: 0.75, minHeight: 54, backgroundColor: '#fff', borderRadius: 17, borderWidth: 1, borderColor: '#d3deeb', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  warning: { color: '#a66700', backgroundColor: '#fff6df', borderRadius: 14, padding: 12, marginTop: 12, lineHeight: 21, fontWeight: '700' }, decisionEntry: { minHeight: 76, borderRadius: 21, backgroundColor: '#07163E', flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 15, paddingVertical: 12, marginTop: 16 }, decisionEntryIcon: { width: 44, height: 44, borderRadius: 15, backgroundColor: '#0B66FF', alignItems: 'center', justifyContent: 'center' }, decisionEntryCheck: { color: '#fff', fontSize: 28, lineHeight: 32, fontWeight: '900' }, decisionEntryTitle: { color: '#fff', fontSize: 17, fontWeight: '900' }, decisionEntryText: { color: '#b8c9e8', fontSize: 12, lineHeight: 17, marginTop: 2 }, decisionEntryArrow: { color: '#8eb8ff', fontSize: 34, lineHeight: 36, fontWeight: '500' }, quickActions: { flexDirection: 'row', gap: 12, marginTop: 18 }, primaryQuick: { flex: 1.35, minHeight: 54, backgroundColor: '#0B66FF', borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 }, secondaryQuick: { flex: 0.75, minHeight: 54, backgroundColor: '#fff', borderRadius: 17, borderWidth: 1, borderColor: '#d3deeb', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   sectionRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10, marginTop: 22, marginBottom: 12 }, section: { color: '#16345f', fontSize: 28, lineHeight: 34, fontWeight: '900', marginTop: 22, marginBottom: 12 }, subsection: { color: '#16345f', fontSize: 22, fontWeight: '900', marginTop: 20, marginBottom: 10 },
-  card: { backgroundColor: '#fff', borderRadius: 22, borderWidth: 1, borderColor: '#d4deeb', padding: 17, marginBottom: 12 }, cardTitle: { color: '#16345f', fontSize: 21, lineHeight: 26, fontWeight: '900' }, badge: { backgroundColor: '#edf4ff', paddingHorizontal: 13, paddingVertical: 9, borderRadius: 18 }, badgeText: { color: '#0B66FF', fontWeight: '900', fontSize: 13 }, badgeBad: { backgroundColor: '#fff0f2' }, badgeBadText: { color: '#d83b4d' },
-  priceRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 18, gap: 10 }, big: { color: '#16345f', fontSize: 39, lineHeight: 45, fontWeight: '900', marginTop: 2 }, change: { fontSize: 21, fontWeight: '900', paddingBottom: 7 }, note: { color: '#67768c', fontSize: 15, lineHeight: 23, marginTop: 10 }, source: { color: '#8591a3', fontSize: 13, lineHeight: 20, marginTop: 10 }, tapHint: { color: '#0B66FF', fontWeight: '800', marginTop: 15, fontSize: 13 }, detailPanel: { borderTopWidth: 1, borderTopColor: '#e5ebf3', marginTop: 16, paddingTop: 14 },
+  card: { backgroundColor: '#fff', borderRadius: 22, borderWidth: 1, borderColor: '#d4deeb', padding: 17, marginBottom: 12 }, cardTitle: { color: '#16345f', fontSize: 21, lineHeight: 26, fontWeight: '900' }, badge: { backgroundColor: '#edf4ff', paddingHorizontal: 13, paddingVertical: 9, borderRadius: 18, maxWidth: '48%', flexShrink: 1 }, badgeText: { color: '#0B66FF', fontWeight: '900', fontSize: 13 }, badgeBad: { backgroundColor: '#fff0f2' }, badgeBadText: { color: '#d83b4d' },
+  priceRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 18, gap: 10 }, big: { color: '#16345f', fontSize: 39, lineHeight: 45, fontWeight: '900', marginTop: 2 }, performanceStack: { width: '100%', borderRadius: 16, borderWidth: 1, borderColor: '#d8e2ee', backgroundColor: '#f8fbff', paddingHorizontal: 13, paddingVertical: 10, marginTop: 12 }, performanceLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 7 }, performanceLabel: { color: '#617087', fontSize: 13, lineHeight: 18, fontWeight: '800', flex: 1 }, performanceValue: { fontSize: 17, lineHeight: 21, fontWeight: '900', textAlign: 'right' }, performanceValuePrimary: { fontSize: 18, lineHeight: 22 }, performanceDivider: { height: 1, backgroundColor: '#e4ebf4', marginVertical: 7 }, quoteTransparency: { backgroundColor: '#f3f7fc', borderRadius: 14, padding: 11, marginTop: 10 }, quoteTransparencyTitle: { color: '#16345f', fontSize: 12, fontWeight: '900', marginBottom: 3 }, quoteTransparencyText: { color: '#718096', fontSize: 11, lineHeight: 16 }, quoteTransparencyWarning: { color: '#9a6500', fontSize: 11, lineHeight: 16, fontWeight: '800', marginTop: 5 }, quoteHeadlineWarning: { color: '#9a6500', fontSize: 9, lineHeight: 13, fontWeight: '800', marginTop: 3 }, quoteContractText: { color: '#40536f', fontSize: 10, lineHeight: 15, fontWeight: '700', marginTop: 5 }, note: { color: '#67768c', fontSize: 15, lineHeight: 23, marginTop: 10 }, source: { color: '#8591a3', fontSize: 13, lineHeight: 20, marginTop: 10 }, tapHint: { color: '#0B66FF', fontWeight: '800', marginTop: 15, fontSize: 13 }, detailPanel: { borderTopWidth: 1, borderTopColor: '#e5ebf3', marginTop: 16, paddingTop: 14 }, lotsSection: { marginTop: 14 }, lotsHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 }, lotsTitle: { color: '#16345f', fontSize: 18, fontWeight: '900' }, lotsSubtitle: { color: '#7b889d', fontSize: 12, lineHeight: 17, marginTop: 2 }, lotsCountBadge: { minWidth: 34, height: 34, borderRadius: 17, backgroundColor: '#edf4ff', alignItems: 'center', justifyContent: 'center' }, lotsCountText: { color: '#0B66FF', fontWeight: '900' }, lotCard: { borderRadius: 17, borderWidth: 1, borderColor: '#d7e1ed', backgroundColor: '#f9fbfe', padding: 13, marginBottom: 9 }, lotTitle: { color: '#16345f', fontSize: 16, fontWeight: '900' }, lotDate: { color: '#8490a2', fontSize: 11, lineHeight: 16, marginTop: 2 }, lotPerformance: { fontSize: 17, fontWeight: '900' }, lotMeta: { color: '#62738a', fontSize: 12, lineHeight: 18, marginTop: 8 }, lotResultRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 9, paddingTop: 9, borderTopWidth: 1, borderTopColor: '#e3eaf3' }, lotResultLabel: { color: '#7b889d', fontSize: 11, flex: 1 }, lotResultValue: { fontSize: 14, fontWeight: '900', textAlign: 'right' }, lotMethodNote: { color: '#6d7b8e', backgroundColor: '#f1f5fa', borderRadius: 13, padding: 10, fontSize: 11, lineHeight: 16, marginTop: 2 },
   emptyCard: { backgroundColor: '#fff', borderRadius: 24, borderWidth: 1, borderStyle: 'dashed', borderColor: '#cbd7e6', padding: 22, marginBottom: 14 }, emptyTitle: { color: '#16345f', fontSize: 21, fontWeight: '900' }, infoBox: { backgroundColor: '#eaf3ff', borderRadius: 18, padding: 15, marginBottom: 14 }, infoTitle: { color: '#16345f', fontWeight: '900', fontSize: 16, lineHeight: 22 },
   addSmall: { width: 52, height: 52, flexShrink: 0, backgroundColor: '#0B66FF', borderRadius: 17, alignItems: 'center', justifyContent: 'center' }, addSmallText: { color: '#fff', fontSize: 29, lineHeight: 32, fontWeight: '500' }, primarySmall: { minWidth: 104, height: 50, backgroundColor: '#0B66FF', borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 15 }, primary: { minHeight: 56, backgroundColor: '#0B66FF', borderRadius: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18, marginTop: 12 }, disabled: { opacity: 0.55 }, whiteStrong: { color: '#fff', fontWeight: '900', fontSize: 16 }, secondaryStrong: { color: '#16345f', fontWeight: '900', fontSize: 15 }, dangerStrong: { color: '#cf3348', fontWeight: '900', fontSize: 15 },
   txTitle: { color: '#16345f', fontSize: 19, lineHeight: 24, fontWeight: '900' }, txAmount: { color: '#16345f', fontSize: 18, fontWeight: '900', maxWidth: '42%' }, successNote: { color: '#087846', backgroundColor: '#e8f8ef', borderRadius: 14, padding: 12, marginTop: 12, fontWeight: '800', lineHeight: 20 }, reviewLine: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 16, borderBottomWidth: 1, borderBottomColor: '#e6ecf3', paddingVertical: 12 }, statusStrong: { color: '#16345f', fontWeight: '900', textAlign: 'right' }, reviewStrong: { color: '#0B66FF', fontWeight: '900', fontSize: 18, textAlign: 'right' },

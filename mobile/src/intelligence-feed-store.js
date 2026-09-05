@@ -7,12 +7,50 @@ export const INTELLIGENCE_SYNC_STORAGE_KEY = 'investor-control.intelligence-sync
 export const DEFAULT_INTELLIGENCE_FEED_URL = 'https://raw.githubusercontent.com/1bidprice/Bid/investor-control-live-feed/mobile-intelligence-feed.json';
 
 const FEED_FORMAT = 'investor-control-mobile-intelligence-feed';
-const FEED_VERSION = 1;
+const LEGACY_FEED_VERSION = 1;
+const FEED_VERSION = 2;
+const SUPPORTED_FEED_VERSIONS = new Set([LEGACY_FEED_VERSION, FEED_VERSION]);
 const MAX_FEED_BYTES = 2_000_000;
 const DEFAULT_TIMEOUT_MS = 15_000;
 
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
+}
+
+const OPPORTUNITY_PURCHASE_STATUSES = new Set([
+  'BUY_CONFIRMED',
+  'WAIT_FOR_ENTRY_CONFIRMATION',
+  'REJECTED',
+  'BLOCKED',
+  'NO_DEEP_DOSSIER',
+]);
+
+function normalizeOpportunityPurchaseDecision(item) {
+  const rawStatus = OPPORTUNITY_PURCHASE_STATUSES.has(item?.status) ? item.status : 'BLOCKED';
+  const strictAction = item?.strictAction && typeof item.strictAction === 'object' ? item.strictAction : null;
+  const strictBuyConfirmed = rawStatus === 'BUY_CONFIRMED'
+    && item?.buyNowEligible === true
+    && strictAction?.status === 'FINAL'
+    && strictAction?.nonHolderAction === 'BUY_NOW';
+  const status = rawStatus === 'BUY_CONFIRMED' && !strictBuyConfirmed ? 'BLOCKED' : rawStatus;
+  const statusLabel = status === rawStatus && item?.statusLabel
+    ? String(item.statusLabel)
+    : status === 'BLOCKED'
+      ? 'ΜΠΛΟΚΑΡΙΣΜΕΝΟ — ΛΕΙΠΟΥΝ ΕΛΕΓΧΟΙ'
+      : String(item?.statusLabel || status);
+  return {
+    ...item,
+    instrumentId: item?.instrumentId || item?.companyId || null,
+    companyId: item?.companyId || item?.instrumentId || null,
+    companyName: item?.companyName || item?.displayName || null,
+    status,
+    statusLabel,
+    buyNowEligible: status === 'BUY_CONFIRMED' && strictBuyConfirmed,
+    strictAction,
+    whyNotBuyNow: safeArray(item?.whyNotBuyNow),
+    nextGate: item?.nextGate || null,
+    automaticBrokerOrder: false,
+  };
 }
 
 function normalizeItem(item) {
@@ -28,11 +66,18 @@ function normalizeItem(item) {
     catalysts: safeArray(item?.catalysts),
     risks: safeArray(item?.risks),
     sources: safeArray(item?.sources),
+    finalAction: item?.finalAction && typeof item.finalAction === 'object' ? item.finalAction : null,
+    publicationMode: item?.publicationMode || null,
+    origin: item?.origin === 'AUTONOMOUS_DISCOVERY' ? 'AUTONOMOUS_DISCOVERY' : 'FOCUS_UNIVERSE',
+    discovery: item?.discovery && typeof item.discovery === 'object' ? item.discovery : null,
+    referencePriceAgeHours: Number.isFinite(Number(item?.referencePriceAgeHours)) ? Number(item.referencePriceAgeHours) : null,
+    metricNotes: safeArray(item?.metricNotes),
+    marketQuote: item?.marketQuote && typeof item.marketQuote === 'object' ? item.marketQuote : null,
   };
 }
 
 export function normalizeIntelligenceFeed(payload) {
-  if (payload?.format !== FEED_FORMAT || Number(payload?.version) !== FEED_VERSION) {
+  if (payload?.format !== FEED_FORMAT || !SUPPORTED_FEED_VERSIONS.has(Number(payload?.version))) {
     throw new Error('Η ληφθείσα ροή δεν είναι έγκυρη ροή Market Intelligence του Investor Control.');
   }
   const generatedAt = new Date(payload.generatedAt);
@@ -43,24 +88,72 @@ export function normalizeIntelligenceFeed(payload) {
   const urgentIds = new Set(safeArray(payload.urgent).map((item) => item?.id).filter(Boolean));
   const all = [...published, ...reviewReady, ...research];
   const urgent = all.filter((item) => urgentIds.has(item.id));
+  const decisions = all.filter((item) => item.finalAction?.status === 'FINAL');
+  const discoveryRadar = safeArray(payload.discoveryRadar).map((item) => ({ ...item, reasons: safeArray(item?.reasons), events: safeArray(item?.events), suggestedAction: 'WATCH', scoreType: item?.scoreType || 'DISCOVERY_PRIORITY', scoreLabel: item?.scoreLabel || 'Προτεραιότητα διερεύνησης', investmentScore: null }));
+  const quoteRegistry = payload.quoteRegistry && typeof payload.quoteRegistry === 'object'
+    ? Object.fromEntries(Object.entries(payload.quoteRegistry).filter(([, item]) => item && typeof item === 'object'))
+    : {};
+  const opportunityPurchaseDecisions = safeArray(payload.opportunityPurchaseDecisions).map(normalizeOpportunityPurchaseDecision);
+  const confirmedBuyOpportunities = opportunityPurchaseDecisions.filter((item) => item.status === 'BUY_CONFIRMED' && item.buyNowEligible === true);
+  const waitingEntryOpportunities = opportunityPurchaseDecisions.filter((item) => item.status === 'WAIT_FOR_ENTRY_CONFIRMATION');
+  const rejectedOpportunities = opportunityPurchaseDecisions.filter((item) => item.status === 'REJECTED');
+  const blockedOpportunities = opportunityPurchaseDecisions.filter((item) => ['BLOCKED', 'NO_DEEP_DOSSIER'].includes(item.status));
   return {
     format: FEED_FORMAT,
     version: FEED_VERSION,
     generatedAt: generatedAt.toISOString(),
+    policyVersion: payload.policyVersion || null,
+    sourceSelection: payload.sourceSelection && typeof payload.sourceSelection === 'object' ? payload.sourceSelection : null,
+    operationalHealth: payload.operationalHealth && typeof payload.operationalHealth === 'object' ? payload.operationalHealth : null,
+    sourceHealth: payload.sourceHealth && typeof payload.sourceHealth === 'object' ? payload.sourceHealth : null,
+    quoteRegistry,
     summary: {
       publishedCount: published.length,
       reviewReadyCount: reviewReady.length,
       researchCount: research.length,
       urgentCount: urgent.length,
+      opportunityCandidateCount: opportunityPurchaseDecisions.length,
+      confirmedBuyOpportunityCount: confirmedBuyOpportunities.length,
+      waitingEntryOpportunityCount: waitingEntryOpportunities.length,
+      rejectedOpportunityCount: rejectedOpportunities.length,
+      blockedOpportunityCount: blockedOpportunities.length,
+      discoveryCandidateCount: discoveryRadar.length,
+      discoveryDeepAnalysisCount: Math.max(0, Number(payload.summary?.discoveryDeepAnalysisCount || 0)),
       unresolvedDiagnosticCount: Math.max(0, Number(payload.summary?.unresolvedDiagnosticCount || 0)),
+      finalActionCount: Math.max(0, Number(payload.summary?.finalActionCount || decisions.length)),
+      buyNowCount: Math.max(0, Number(payload.summary?.buyNowCount || 0)),
+      sellNowCount: Math.max(0, Number(payload.summary?.sellNowCount || 0)),
+      holdCount: Math.max(0, Number(payload.summary?.holdCount || 0)),
+      doNotBuyCount: Math.max(0, Number(payload.summary?.doNotBuyCount || 0)),
+      avoidCount: Math.max(0, Number(payload.summary?.avoidCount || 0)),
+      blockedDecisionCount: Math.max(0, Number(payload.summary?.blockedDecisionCount || 0)),
     },
     today: payload.today && typeof payload.today === 'object'
       ? payload.today
       : { headline: 'Δεν υπάρχει διαθέσιμη σύνοψη.', primaryItem: null },
+    discoveryRadar,
+    opportunityPurchaseDecisions,
+    confirmedBuyOpportunities,
+    waitingEntryOpportunities,
+    rejectedOpportunities,
+    blockedOpportunities,
+    decisions,
     published,
     reviewReady,
     research,
     urgent,
+    opportunityAssistantContext: opportunityPurchaseDecisions.map((item) => ({
+      companyId: item.companyId,
+      companyName: item.companyName,
+      symbol: item.symbol,
+      tier: item.tier,
+      opportunityScore: item.opportunityScore,
+      status: item.status,
+      buyNowEligible: item.buyNowEligible,
+      whyNotBuyNow: item.whyNotBuyNow,
+      nextGate: item.nextGate,
+      strictAction: item.strictAction,
+    })),
     assistantContext: safeArray(payload.assistantContext),
     disclosure: String(payload.disclosure || ''),
   };
@@ -70,8 +163,8 @@ export function intelligenceFeedFreshness(feed, nowInput = Date.now()) {
   if (!feed?.generatedAt) return { state: 'missing', ageHours: null, label: 'Δεν υπάρχει ροή' };
   const ageMs = Number(new Date(nowInput)) - new Date(feed.generatedAt).getTime();
   const ageHours = Math.max(0, ageMs / 3_600_000);
-  if (ageHours <= 36) return { state: 'fresh', ageHours, label: 'Ενημερωμένη' };
-  if (ageHours <= 96) return { state: 'delayed', ageHours, label: 'Καθυστερημένη ενημέρωση' };
+  if (ageHours <= 4) return { state: 'fresh', ageHours, label: 'Ενημερωμένη' };
+  if (ageHours <= 12) return { state: 'delayed', ageHours, label: 'Καθυστερημένη ενημέρωση' };
   return { state: 'stale', ageHours, label: 'Παρωχημένη ροή' };
 }
 

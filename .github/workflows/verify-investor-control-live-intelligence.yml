@@ -50,6 +50,8 @@ jobs:
             local url="$1"
             local output="$2"
             curl --fail --location --silent --show-error \
+              --retry 5 --retry-all-errors --retry-delay 2 \
+              --connect-timeout 20 --max-time 120 \
               -H 'Accept: text/html,application/xhtml+xml' \
               -H 'User-Agent: Investor-Control-Market-Intelligence/1.2' \
               "$url" -o "$output"
@@ -65,6 +67,7 @@ jobs:
           done
           grep -qi '<tr' "$ROOT/trading-issuers.html"
           grep -qi 'OASIS Code' "$ROOT/trading-issuers.html"
+          test -s "$ROOT/announcements.html"
           wc -c "$ROOT"/*.html "$ROOT"/trading-pages/*.html "$ROOT"/trading-letters/*.html
 
       - name: Apply contracts, test and run live autonomous intelligence
@@ -76,8 +79,36 @@ jobs:
           set -euo pipefail
           npm test
           mkdir -p out
-          node src/run-autonomous-intelligence.js out/autonomous-intelligence.json
-          node src/build-mobile-feed.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json
+          live_ready=0
+          for attempt in 1 2 3; do
+            echo "Live Athens intelligence attempt ${attempt}/3"
+            node src/run-autonomous-intelligence.js out/autonomous-intelligence.json
+            node src/build-mobile-feed.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json
+            if node - <<'NODE'
+          const report = require('./out/autonomous-intelligence.json');
+          const discovery = report.discovery || {};
+          const issuerCount = Number(discovery.athensActiveIssuerCount || 0);
+          const announcementCount = Number(discovery.athensAnnouncementEventCount || 0);
+          const hardDiscoveryFailure = (discovery.diagnostics || []).some((item) => item?.code === 'ATHENS_DISCOVERY_FAILED');
+          console.log(JSON.stringify({ issuerCount, announcementCount, hardDiscoveryFailure }));
+          // A quiet weekend/holiday with zero new announcements is a valid live state.
+          // Source capture above proves the official page is reachable; issuer discovery
+          // proves the Athens pipeline is populated. Do not manufacture an event merely
+          // to make CI green.
+          process.exit(issuerCount > 0 && !hardDiscoveryFailure ? 0 : 1);
+          NODE
+            then
+              live_ready=1
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              sleep $((attempt * 4))
+            fi
+          done
+          if [ "$live_ready" -ne 1 ]; then
+            echo 'Athens live issuer discovery remained unavailable after 3 bounded attempts.' >&2
+            exit 1
+          fi
 
       - name: Audit generated Athens parser against captured directory
         working-directory: market-intelligence
@@ -116,12 +147,16 @@ jobs:
           const discovery = report.discovery || {};
           const sourceHealth = feed.sourceHealth || {};
           const tradingHtml = fs.readFileSync('./out/athens-source/trading-issuers.html', 'utf8');
+          const announcementsHtml = fs.readFileSync('./out/athens-source/announcements.html', 'utf8');
           if (report.version !== 8) throw new Error(`unexpected report version ${report.version}`);
           if (discovery.sourcePolicy?.selector !== 'DETERMINISTIC_SOURCE_GOVERNOR') throw new Error('source governor missing');
           if (!Array.isArray(discovery.marketsScanned) || !discovery.marketsScanned.includes('US') || !discovery.marketsScanned.includes('GR')) throw new Error('US/GR scanning not active');
           if (Number(discovery.secRegistryCompanyCount || 0) < 1000) throw new Error('SEC universe incomplete');
           if (Number(discovery.athensActiveIssuerCount || 0) < 1) throw new Error(`Athens issuer discovery empty: ${discovery.athensActiveIssuerCount}`);
-          if (Number(discovery.athensAnnouncementEventCount || 0) < 1) throw new Error(`Athens announcement discovery empty: ${discovery.athensAnnouncementEventCount}`);
+          if (!announcementsHtml.trim()) throw new Error('official Athens announcements source is empty');
+          if ((discovery.diagnostics || []).some((item) => item?.code === 'ATHENS_DISCOVERY_FAILED')) throw new Error('Athens discovery reported a hard source failure');
+          // Zero recent announcements is legitimate on weekends/holidays and must not be
+          // converted into a fake event or an infrastructure outage.
           if (!/<tr\b/i.test(tradingHtml) || !/OASIS Code/i.test(tradingHtml)) throw new Error('official populated Athens trading directory is not readable');
           const greekCandidates = (discovery.shortlist || []).filter((item) => item.market === 'GR');
           const identifiedGreek = greekCandidates.filter((item) => item.symbol && item.identityStatus !== 'SYMBOL_RESOLUTION_REQUIRED');
