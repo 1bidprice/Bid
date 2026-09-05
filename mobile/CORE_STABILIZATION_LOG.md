@@ -17,6 +17,7 @@ Reason: live device QA of v1.7.3 build 31 exposed a reconciliation defect in the
 - The official Euronext Athens delayed quote is eligible for portfolio valuation only when instrument identity, currency, source and market calendar are verified. Lack of an exact trade timestamp keeps it out of automatic decision eligibility.
 - Yahoo/other fallback Greek quotes remain informational only; they cannot silently become authoritative valuation or decision inputs.
 - Unknown future Athens holiday calendars fail closed instead of assuming the exchange is open.
+- A fresh market quote is not allowed to revive an expired or stale research decision. BUY/SELL/HOLD direction is current only when the research feed is fresh, the production decision/evidence system is ready, and `validUntil` is present and still in the future.
 
 ### Completed
 
@@ -52,26 +53,44 @@ Real-device testing found two release-blocking regressions in the canonical APK:
 1. Tapping the bottom `Συναλλαγές` tab closed the application. Root cause: `TransactionCard` invoked `transactionTotal(transaction)` but `PortfolioApp.js` did not import `transactionTotal` from the canonical accounting module. The JavaScript bundle could be produced without exercising that render path, so the undefined identifier survived build-time validation and failed only when the tab rendered on device.
 2. `SPCE.US` was incorrectly excluded from weekend valuation as stale even though the Friday regular-session Finnhub close was verified and still inside the 96-hour closed-market valuation window. Root cause: canonical-registry quotes were reclassified without the current `exchangeOpen`, session and calendar context, so the existing closed-market integrity rule could not activate.
 
-Both defects are now materialized in canonical source at commit `75640c7d1ff3df4a69aef45f48c01f57e9e6951d`:
+Both defects were materialized in canonical source at commit `75640c7d1ff3df4a69aef45f48c01f57e9e6951d`:
 
-- `PortfolioApp.js` imports `transactionTotal`; the Transactions render path is now guarded by the permanent canonical-source verifier.
+- `PortfolioApp.js` imports `transactionTotal`; the Transactions render path is guarded by the permanent canonical-source verifier.
 - `readCanonicalFeedQuotes()` supplies current exchange open/session/calendar state to `quoteFromRegistry()`, using the same market context as direct-provider quote classification.
-- The existing SPCE closed-market invariant remains strict: last verified regular-session price may value a position while the market is closed, but it is not eligible for a new automatic decision.
-- The canonical-source verifier now fails if either live-device regression returns.
-- Stabilization run `33318807389` passed core invariants, Expo compatibility, Expo Doctor and Android JavaScript export before the fixes were materialized by the stabilization workflow.
+- The SPCE closed-market invariant remains strict: last verified regular-session price may value a position while the market is closed, but it is not eligible for a new automatic decision.
+- The canonical-source verifier fails if either live-device regression returns.
+
+## 2026-09-05 — second real-device QA + broker cross-check
+
+The installed pre-hotfix APK produced new evidence that closes several uncertainties and exposed one additional decision-safety defect:
+
+1. **Greek market data externally matched.** The external broker screen showed `ALWN.GR = 13.010 EUR` and `CREDIA.GR = 0.989 EUR`, exactly matching Investor Control. The Allwyn instrument detail also confirmed XATH, EUR, common shares, lot size 1 and 0.001 price step. This validates the current `.GR`/XATH/EUR routing and official-Athens quote result for the observed session.
+2. **SPCE weekend valuation externally matched.** The broker showed `SPCE.US = 3.02 USD`, 720 shares and position value `2,174.40 USD`. This proves the position should remain valued from the last verified regular-session close while the US market is closed; excluding SPCE from portfolio valuation was incorrect.
+3. **Expired decision surfaced as active.** Investor Control showed `ΑΜΕΣΗ ΠΩΛΗΣΗ / ΜΕΙΩΣΗ` for SPCE on 5 Sep even though the card itself displayed `validUntil` on 4 Sep and the research feed was marked stale. Root cause: `FinalDecisionCard` and the personalized BUY/SELL counters checked only `status === FINAL`; they did not require a current `validUntil` or fresh research feed.
+
+The decision-safety fix is now canonical at materialized commit `2aca797c5d00962c8993e0e600a3729eb7b29b35`:
+
+- Added `src/decision-validity.js` as the single fail-closed gate for current final actions.
+- Missing/invalid `validUntil`, expired actions, stale research feeds and degraded decision/evidence systems all suppress active final direction.
+- `FinalDecisionCard` no longer renders stale/expired BUY/SELL/HOLD as active and explains why the prior action is inactive.
+- The top personalized `Αγορά τώρα` / `Πώληση τώρα` counters use the same validity gate.
+- Confirmed BUY opportunities are hidden while the research/decision context is stale or degraded.
+- Added a permanent Sep-5 SPCE regression test proving a 4-Sep `SELL_NOW` cannot remain active on 5 Sep.
+- Core stabilization PR run #84 passed the updated canonical source gate, decision validity test, accounting/portfolio/Athens/lots suites, Expo dependency check, Expo Doctor and Android JavaScript export before materialization.
 
 ### Stabilization gate status
 
-**REOPENED FOR ONE FINAL SIGNED DEVICE HOTFIX.**
+**READY FOR A NEW HUMAN-TRIGGERED SIGNED BUILD, NOT YET RELEASE-CLOSED.**
 
-The previous APK is no longer release authority because the device exposed a Transactions runtime crash and a closed-market SPCE valuation regression. No new feature work is allowed in this gate.
+The previously installed APK is not release authority because it predates the materialized Transactions, closed-market SPCE and decision-expiry fixes.
 
-### Next locked milestone
+### Final locked device checks
 
-Run the complete human-triggered CI/build suite against the already-materialized source, produce a newly signed update APK with the same package/update certificate, and verify on the real device only:
+The next signed APK must be installed over the existing app without clearing local data and must pass exactly these checks before stabilization closes:
 
-1. Bottom `Συναλλαγές` opens and renders the three stored transactions without a crash.
-2. `SPCE.US` uses the last verified regular-session close for valuation while the US market is closed, but remains blocked from a new automatic decision.
-3. `ALWN.GR` and `CREDIA.GR` retain official Euronext Athens routing, EUR accounting and fail-closed decision behavior.
+1. `Συναλλαγές` opens and renders all three stored transactions without closing the app.
+2. `SPCE.US` shows 720 shares, authoritative cost `2,282.72 USD`, last verified close `3.02 USD` while the market is closed, position value `2,174.40 USD`, and no new automatic decision from that closed-market reference alone.
+3. The expired Sep-4 SPCE `SELL_NOW` is no longer shown or counted as an active Sep-5 action; stale/degraded research must show a blocked/refresh-required state instead.
+4. `ALWN.GR` remains `13.010 EUR` for the observed closed-session reference and `CREDIA.GR` remains `0.989 EUR` unless a newer verified Athens quote is fetched; both preserve XATH/EUR routing and fail-closed decision behavior.
 
-If these three checks pass, close stabilization and stop changing the core.
+If these four real-device checks pass, close stabilization and stop changing the core.
