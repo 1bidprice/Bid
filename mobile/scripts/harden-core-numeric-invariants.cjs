@@ -133,6 +133,12 @@ for (const relativePath of files) {
     'items={decisionContext.feedFresh && decisionContext.systemReady ? (feed.confirmedBuyOpportunities || []) : []} />',
   );
 
+  // Normalize any duplicate prop left by an interrupted/older materialization,
+  // then add the prop only when a target section does not already have it.
+  source = source.replace(
+    /(?: decisionContext=\{decisionContext\}){2,}/g,
+    ' decisionContext={decisionContext}',
+  );
   const sectionTitles = [
     'Αυξημένη προτεραιότητα',
     'Δημοσιευμένες ευκαιρίες',
@@ -140,8 +146,13 @@ for (const relativePath of files) {
     'Έρευνα σε εξέλιξη',
   ];
   for (const title of sectionTitles) {
-    const pattern = new RegExp(`(<Section title=\\"${title.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}\\"[^>]*items=\\{[^>]+?\\})( \\/>)`);
-    if (pattern.test(source)) source = source.replace(pattern, '$1 decisionContext={decisionContext}$2');
+    const marker = `<Section title="${title}"`;
+    source = source.split('\n').map((line) => {
+      if (line.includes(marker) && !line.includes('decisionContext={decisionContext}')) {
+        return line.replace(' />', ' decisionContext={decisionContext} />');
+      }
+      return line;
+    }).join('\n');
   }
 
   if (!source.includes("import { finalActionIsCurrent } from './decision-validity';")) throw new Error('OpportunitiesView decision validity import missing');
@@ -149,7 +160,8 @@ for (const relativePath of files) {
   if (!source.includes('<FinalDecisionCard item={item} decisionContext={decisionContext} />')) throw new Error('Research card decision context missing');
   if (!source.includes("decisionEngineStatus === 'READY'")) throw new Error('Decision engine readiness gate missing');
   if (!source.includes('items={decisionContext.feedFresh && decisionContext.systemReady ? (feed.confirmedBuyOpportunities || []) : []}')) throw new Error('Stale confirmed-buy suppression missing');
+  if (source.includes('decisionContext={decisionContext} decisionContext={decisionContext}')) throw new Error('Duplicate decision context prop remains');
   fs.writeFileSync(fullPath, source);
 }
 
-console.log('Core live-device hardening PASS: null-safe numerics, Transactions runtime import, closed-market quote context, and stale/expired decision fail-closed rules are enforced.');
+console.log('Core live-device hardening PASS: null-safe numerics, Transactions runtime import, closed-market quote context, and stale/expired decision fail-closed rules are enforced idempotently.');
