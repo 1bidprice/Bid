@@ -5,6 +5,7 @@
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "test:canonical-source": "node scripts/verify-canonical-source.cjs",
+    "test:decision-validity": "node scripts/test-decision-validity.cjs",
     "test:numeric-null": "node scripts/test-core-numeric-null.cjs",
     "test:accounting": "node scripts/test-accounting-invariants.cjs",
     "test:portfolio": "node scripts/test-portfolio-engine.cjs",
@@ -14,7 +15,7 @@
     "test:release-identity": "node scripts/verify-v171-portfolio-aware-decisions.js",
     "test:quote-transparency": "node scripts/verify-v172-quote-transparency.js",
     "test:instrument-integrity": "node scripts/verify-v173-universal-instrument-integrity.js",
-    "test:core": "npm run test:canonical-source && npm run test:numeric-null && npm run test:accounting && npm run test:portfolio && npm run test:athens && npm run test:lots && npm run test:hunter-ui && npm run test:release-identity && npm run test:quote-transparency && npm run test:instrument-integrity",
+    "test:core": "npm run test:canonical-source && npm run test:decision-validity && npm run test:numeric-null && npm run test:accounting && npm run test:portfolio && npm run test:athens && npm run test:lots && npm run test:hunter-ui && npm run test:release-identity && npm run test:quote-transparency && npm run test:instrument-integrity",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
