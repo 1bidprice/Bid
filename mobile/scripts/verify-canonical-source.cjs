@@ -10,6 +10,9 @@ const app = JSON.parse(read('app.json'));
 const portfolio = read('PortfolioApp.js');
 const portfolioEngine = read('src/portfolio-engine.js');
 const decision = read('DecisionOverlay.js');
+const finalDecision = read('src/FinalDecisionCard.js');
+const opportunities = read('src/OpportunitiesView.js');
+const decisionValidity = read('src/decision-validity.js');
 const market = read('src/market-data.js');
 const marketRules = read('src/market-rules.js');
 const quoteContract = read('src/quote-contract.js');
@@ -48,6 +51,19 @@ assert.ok(portfolioEngine.includes("blockers.push('FX_RATE_MISSING')"), 'USD FX 
 assert.ok(portfolioEngine.includes("quote.quoteContract?.valuationEligible !== true"), 'portfolio quote eligibility gate missing');
 assert.ok(portfolioEngine.includes('nativePrice / fxRate'), 'EUR valuation must derive from native quote plus FX');
 
+assert.ok(decisionValidity.includes("DECISION_VALIDITY_VERSION = '2026-09-05.1'"), 'decision validity version missing');
+assert.ok(decisionValidity.includes("reason = 'FEED_NOT_FRESH'"), 'stale research feed must fail closed');
+assert.ok(decisionValidity.includes("reason = 'SYSTEM_NOT_READY'"), 'degraded decision system must fail closed');
+assert.ok(decisionValidity.includes("reason = 'VALID_UNTIL_NOT_VERIFIED'"), 'missing decision validity must fail closed');
+assert.ok(decisionValidity.includes("reason = 'DECISION_EXPIRED'"), 'expired final action must fail closed');
+assert.ok(finalDecision.includes("import { finalActionValidity } from './decision-validity';"), 'FinalDecisionCard must use canonical decision validity');
+assert.ok(finalDecision.includes('if (!decisionValidity.eligible) return null;'), 'FinalDecisionCard must suppress inactive final actions');
+assert.ok(finalDecision.includes("decisionValidity.reason === 'DECISION_EXPIRED'"), 'expired decision UX missing');
+assert.ok(opportunities.includes("import { finalActionIsCurrent } from './decision-validity';"), 'Research counters must use canonical decision validity');
+assert.ok(opportunities.includes('if (!finalActionIsCurrent(finalAction, decisionContext)) continue;'), 'stale/expired BUY/SELL count gate missing');
+assert.ok(opportunities.includes("operationalHealth?.decisionEngineStatus === 'READY'"), 'decision engine readiness must gate active actions');
+assert.ok(opportunities.includes('items={decisionContext.feedFresh && decisionContext.systemReady ? (feed.confirmedBuyOpportunities || []) : []}'), 'stale confirmed BUY opportunities must be hidden');
+
 assert.ok(marketRules.includes("MARKET_RULES_VERSION = '2026-08-24.1'"), 'canonical market rules version missing');
 assert.ok(marketRules.includes("suffix: '.GR'"), 'Euronext Athens route missing');
 assert.ok(marketRules.includes("currency: 'EUR'"), 'Euronext Athens EUR rule missing');
@@ -84,4 +100,4 @@ assert.ok(accounting.includes('export function accountingInvariantReport(transac
 assert.ok(accounting.includes('broker/settlement total is authoritative'), 'canonical accounting cash hierarchy missing');
 assert.ok(accounting.includes('roundMoney(quantity * candidate) === gross'), 'execution price reconciliation rule missing');
 
-console.log('Canonical mobile source PASS: patch chain retired; accounting, portfolio, Euronext Athens/US market rules, quote, decision and UI responsibilities are separated and guarded, including Transactions runtime and closed-market feed regressions.');
+console.log('Canonical mobile source PASS: patch chain retired; accounting, portfolio, Euronext Athens/US market rules, quote, decision validity and UI responsibilities are separated and guarded, including Transactions runtime, closed-market valuation, and stale/expired action regressions.');
