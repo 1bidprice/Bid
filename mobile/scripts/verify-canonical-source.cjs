@@ -63,6 +63,7 @@ assert.ok(opportunities.includes("import { finalActionIsCurrent } from './decisi
 assert.ok(opportunities.includes('if (!finalActionIsCurrent(finalAction, decisionContext)) continue;'), 'stale/expired BUY/SELL count gate missing');
 assert.ok(opportunities.includes("operationalHealth?.decisionEngineStatus === 'READY'"), 'decision engine readiness must gate active actions');
 assert.ok(opportunities.includes('items={decisionContext.feedFresh && decisionContext.systemReady ? (feed.confirmedBuyOpportunities || []) : []}'), 'stale confirmed BUY opportunities must be hidden');
+assert.ok(!opportunities.includes('decisionContext={decisionContext} decisionContext={decisionContext}'), 'decisionContext prop materialization must remain idempotent');
 
 assert.ok(marketRules.includes("MARKET_RULES_VERSION = '2026-08-24.1'"), 'canonical market rules version missing');
 assert.ok(marketRules.includes("suffix: '.GR'"), 'Euronext Athens route missing');
@@ -100,4 +101,4 @@ assert.ok(accounting.includes('export function accountingInvariantReport(transac
 assert.ok(accounting.includes('broker/settlement total is authoritative'), 'canonical accounting cash hierarchy missing');
 assert.ok(accounting.includes('roundMoney(quantity * candidate) === gross'), 'execution price reconciliation rule missing');
 
-console.log('Canonical mobile source PASS: patch chain retired; accounting, portfolio, Euronext Athens/US market rules, quote, decision validity and UI responsibilities are separated and guarded, including Transactions runtime, closed-market valuation, and stale/expired action regressions.');
+console.log('Canonical mobile source PASS: patch chain retired; accounting, portfolio, Euronext Athens/US market rules, quote, decision validity and UI responsibilities are separated and guarded, including Transactions runtime, closed-market valuation, stale/expired actions and idempotent decision-context materialization.');
