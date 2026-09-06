@@ -34,13 +34,9 @@ function canonicalType(value) {
   return value === 'sell' ? 'sell' : 'buy';
 }
 
-function canonicalCurrency(value, symbol) {
+function canonicalCurrency(value) {
   const explicit = safeText(value).toUpperCase();
-  if (explicit === 'USD' || explicit === 'EUR') return explicit;
-  const normalizedSymbol = safeText(symbol).toUpperCase();
-  if (normalizedSymbol.endsWith('.US')) return 'USD';
-  if (normalizedSymbol.endsWith('.GR')) return 'EUR';
-  return 'EUR';
+  return explicit === 'USD' || explicit === 'EUR' ? explicit : null;
 }
 
 export function normalizeFeeBreakdown(input, legacyFees = 0) {
@@ -208,7 +204,7 @@ export function normalizeTransaction(transaction) {
   const symbol = safeText(migrated.symbol).toUpperCase();
   const type = canonicalType(migrated.type);
   const quantity = positive(migrated.quantity) ? Number(migrated.quantity) : 0;
-  const currency = canonicalCurrency(migrated.currency, symbol);
+  const currency = canonicalCurrency(migrated.currency);
   const company = safeText(migrated.company, symbol) || symbol;
   const date = safeText(migrated.date);
   const broker = safeText(migrated.broker);
