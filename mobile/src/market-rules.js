@@ -1,4 +1,4 @@
-export const MARKET_RULES_VERSION = '2026-08-24.1';
+export const MARKET_RULES_VERSION = '2026-09-06.1';
 
 export const MARKET_RULES = Object.freeze({
   US: Object.freeze({
@@ -134,15 +134,20 @@ export function marketStateForSymbol(symbol, at = new Date()) {
     if (holidays.includes(localDate)) return closedState(rule, localDate, 'holiday', true);
   }
 
-  const minutes = Number(parts.hour) * 60 + Number(parts.minute) + Number(parts.second) / 60;
+  const seconds = Number(parts.hour) * 3600 + Number(parts.minute) * 60 + Number(parts.second);
+  const minutes = seconds / 60;
   if (rule.market === 'US') {
     if (minutes >= rule.sessions.preMarketStart && minutes < rule.sessions.regularStart) {
       return { market: rule.market, open: false, timeZone: rule.timeZone, localDate, session: 'pre-market', calendarVerified: null, holiday: false, closeReason: null };
     }
-    if (minutes >= rule.sessions.regularStart && minutes < rule.sessions.regularEnd) {
+    // A licensed quote timestamped exactly at 16:00:00 New York is the official
+    // regular-session closing print. Keep that single boundary instant in the
+    // regular session so a Friday close remains eligible for weekend valuation.
+    // Any timestamp after 16:00:00 is post-market.
+    if (minutes >= rule.sessions.regularStart && seconds <= rule.sessions.regularEnd * 60) {
       return { market: rule.market, open: true, timeZone: rule.timeZone, localDate, session: 'regular-market', calendarVerified: null, holiday: false, closeReason: null };
     }
-    if (minutes >= rule.sessions.regularEnd && minutes < rule.sessions.postMarketEnd) {
+    if (seconds > rule.sessions.regularEnd * 60 && minutes < rule.sessions.postMarketEnd) {
       return { market: rule.market, open: false, timeZone: rule.timeZone, localDate, session: 'post-market', calendarVerified: null, holiday: false, closeReason: null };
     }
     return closedState(rule, localDate, 'outside-session', true);
