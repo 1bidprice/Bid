@@ -24,6 +24,25 @@ function grossFromTotal(type, total, fees) {
   return gross >= 0 ? gross : null;
 }
 
+function safeText(value, fallback = '') {
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return fallback;
+}
+
+function canonicalType(value) {
+  return value === 'sell' ? 'sell' : 'buy';
+}
+
+function canonicalCurrency(value, symbol) {
+  const explicit = safeText(value).toUpperCase();
+  if (explicit === 'USD' || explicit === 'EUR') return explicit;
+  const normalizedSymbol = safeText(symbol).toUpperCase();
+  if (normalizedSymbol.endsWith('.US')) return 'USD';
+  if (normalizedSymbol.endsWith('.GR')) return 'EUR';
+  return 'EUR';
+}
+
 export function normalizeFeeBreakdown(input, legacyFees = 0) {
   const source =
     input && typeof input === 'object' && !Array.isArray(input) ? input : {};
@@ -66,7 +85,7 @@ export function transactionFees(transaction) {
 export function transactionGross(transaction) {
   const fees = transactionFees(transaction);
   const total = providedTotal(transaction);
-  const fromTotal = grossFromTotal(transaction?.type, total, fees);
+  const fromTotal = grossFromTotal(canonicalType(transaction?.type), total, fees);
   if (fromTotal !== null) return fromTotal;
   if (positive(transaction?.grossAmount)) return roundMoney(transaction.grossAmount);
   const quantity = Number(transaction?.quantity || 0);
@@ -99,7 +118,7 @@ export function transactionTotal(transaction) {
   if (total !== null) return total;
   const gross = transactionGross(transaction);
   const fees = transactionFees(transaction);
-  return transaction?.type === 'sell'
+  return canonicalType(transaction?.type) === 'sell'
     ? roundMoney(Math.max(0, gross - fees))
     : roundMoney(gross + fees);
 }
@@ -118,7 +137,7 @@ export function accountingInvariantReport(transaction) {
   const grossFromPrice = positive(quantity) && positive(executionPrice)
     ? roundMoney(quantity * executionPrice)
     : null;
-  const totalFromGross = transaction?.type === 'sell'
+  const totalFromGross = canonicalType(transaction?.type) === 'sell'
     ? roundMoney(Math.max(0, gross - fees))
     : roundMoney(gross + fees);
   const grossMatchesPrice = grossFromPrice !== null && grossFromPrice === gross;
@@ -184,29 +203,60 @@ function migratedAllwyn(transaction) {
 }
 
 export function normalizeTransaction(transaction) {
-  const initial = transaction && typeof transaction === 'object' ? transaction : {};
-  const source = isKnownAllwynLegacy(initial) ? migratedAllwyn(initial) : initial;
-  const feeBreakdown = normalizeFeeBreakdown(source.feeBreakdown, source.fees);
+  const initial = transaction && typeof transaction === 'object' && !Array.isArray(transaction) ? transaction : {};
+  const migrated = isKnownAllwynLegacy(initial) ? migratedAllwyn(initial) : initial;
+  const symbol = safeText(migrated.symbol).toUpperCase();
+  const type = canonicalType(migrated.type);
+  const quantity = positive(migrated.quantity) ? Number(migrated.quantity) : 0;
+  const currency = canonicalCurrency(migrated.currency, symbol);
+  const company = safeText(migrated.company, symbol) || symbol;
+  const date = safeText(migrated.date);
+  const broker = safeText(migrated.broker);
+  const orderReference = safeText(migrated.orderReference);
+  const settlementReference = safeText(migrated.settlementReference);
+  const notes = safeText(migrated.notes);
+  const migrationNote = safeText(migrated.migrationNote);
+  const createdAt = safeText(migrated.createdAt);
+  const updatedAt = safeText(migrated.updatedAt);
+
+  const sanitized = {
+    ...migrated,
+    type,
+    symbol,
+    company,
+    date,
+    quantity,
+    currency,
+    broker,
+    orderReference,
+    settlementReference,
+    notes,
+    migrationNote,
+    createdAt,
+    updatedAt,
+  };
+
+  const feeBreakdown = normalizeFeeBreakdown(sanitized.feeBreakdown, sanitized.fees);
   const fees = roundMoney(
     Object.values(feeBreakdown).reduce(
       (sum, value) => sum + Number(value || 0),
       0,
     ),
   );
-  const working = { ...source, feeBreakdown, fees };
+  const working = { ...sanitized, feeBreakdown, fees };
   const grossAmount = transactionGross(working);
   const total = transactionTotal({ ...working, grossAmount });
   const executionPrice = transactionExecutionPrice({ ...working, grossAmount, total });
+  const id = safeText(sanitized.id)
+    || `legacy-${symbol || 'UNKNOWN'}-${date || 'NO_DATE'}-${type}-${quantity}-${total}-${orderReference || createdAt || '0'}`;
 
   return {
-    ...source,
+    ...sanitized,
+    id,
     accountingVersion: ACCOUNTING_VERSION,
-    symbol: String(source.symbol || '')
-      .trim()
-      .toUpperCase(),
     executionPrice,
     price: executionPrice,
-    orderPrice: positive(source.orderPrice) ? Number(source.orderPrice) : null,
+    orderPrice: positive(sanitized.orderPrice) ? Number(sanitized.orderPrice) : null,
     grossAmount,
     feeBreakdown,
     fees,
