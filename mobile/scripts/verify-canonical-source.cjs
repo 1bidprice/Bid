@@ -47,6 +47,7 @@ assert.ok(portfolioEngine.includes('export function buildOpenPositionLedger('), 
 assert.ok(portfolioEngine.includes('export function buildPortfolioPositions('), 'canonical position valuation engine missing');
 assert.ok(portfolioEngine.includes('export function buildPortfolioSummary('), 'canonical portfolio summary engine missing');
 assert.ok(portfolioEngine.includes("blockers.push('POSITION_CURRENCY_MISMATCH')"), 'portfolio currency fail-closed rule missing');
+assert.ok(portfolioEngine.includes("blockers.push('POSITION_CURRENCY_MISSING')"), 'missing transaction currency must remain fail-closed');
 assert.ok(portfolioEngine.includes("blockers.push('FX_RATE_MISSING')"), 'USD FX fail-closed rule missing');
 assert.ok(portfolioEngine.includes("quote.quoteContract?.valuationEligible !== true"), 'portfolio quote eligibility gate missing');
 assert.ok(portfolioEngine.includes('nativePrice / fxRate'), 'EUR valuation must derive from native quote plus FX');
@@ -102,6 +103,7 @@ assert.ok(accounting.includes('export function accountingInvariantReport(transac
 assert.ok(accounting.includes('broker/settlement total is authoritative'), 'canonical accounting cash hierarchy missing');
 assert.ok(accounting.includes('roundMoney(quantity * candidate) === gross'), 'execution price reconciliation rule missing');
 assert.ok(accounting.includes('function safeText(value, fallback ='), 'legacy transaction render-safety normalization missing');
-assert.ok(accounting.includes('function canonicalCurrency(value, symbol)'), 'canonical transaction currency guard missing');
+assert.ok(accounting.includes('function canonicalCurrency(value)'), 'canonical transaction currency guard missing');
+assert.ok(accounting.includes("return explicit === 'USD' || explicit === 'EUR' ? explicit : null;"), 'invalid transaction currency must stay missing instead of being inferred');
 
-console.log('Canonical mobile source PASS: patch chain retired; accounting, portfolio, Euronext Athens/US market rules, quote, decision validity and UI responsibilities are separated and guarded, including Transactions runtime, render-safe legacy records, closing-print valuation, stale/expired actions and idempotent decision-context materialization.');
+console.log('Canonical mobile source PASS: patch chain retired; accounting, portfolio, Euronext Athens/US market rules, quote, decision validity and UI responsibilities are separated and guarded, including Transactions runtime, render-safe fail-closed legacy records, closing-print valuation, stale/expired actions and idempotent decision-context materialization.');
