@@ -141,8 +141,9 @@ assert.equal(conflicting.grossAmount, 101);
 assert.equal(conflicting.executionPrice, 10.1);
 assert.equal(conflicting.total, 102);
 
-// Live-device crash guard: old or damaged local JSON must never put objects or an
-// invalid currency code into React Text / Intl.NumberFormat when Transactions opens.
+// Live-device crash guard: old or damaged local JSON must never put object values
+// into React Text. Invalid/missing currency remains null so valuation still fails
+// closed instead of inferring a currency from the ticker.
 const hostileLegacy = assertInvariant({
   id: { legacy: true },
   type: 'buy',
@@ -159,15 +160,15 @@ const hostileLegacy = assertInvariant({
   notes: { text: 'legacy note' },
 }, 'Malformed legacy render safety');
 assert.equal(hostileLegacy.symbol, 'SPCE.US');
-assert.equal(hostileLegacy.currency, 'USD');
+assert.equal(hostileLegacy.currency, null);
 assert.equal(hostileLegacy.company, 'SPCE.US');
 assert.equal(hostileLegacy.date, '');
-for (const key of ['id', 'symbol', 'company', 'date', 'currency', 'broker', 'orderReference', 'settlementReference', 'notes', 'migrationNote', 'createdAt', 'updatedAt']) {
+for (const key of ['id', 'symbol', 'company', 'date', 'broker', 'orderReference', 'settlementReference', 'notes', 'migrationNote', 'createdAt', 'updatedAt']) {
   assert.equal(typeof hostileLegacy[key], 'string', `render field ${key} must be a string`);
 }
 assert.doesNotThrow(() => new Intl.NumberFormat('el-GR', {
   style: 'currency',
-  currency: hostileLegacy.currency,
+  currency: hostileLegacy.currency || 'EUR',
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 }).format(hostileLegacy.total));
@@ -213,4 +214,4 @@ for (const transaction of normalizedBatch) {
   assert.equal(accountingInvariantReport(twice).ok, true);
 }
 
-console.log(`Accounting invariants PASS: SPCE live regression + render-safe legacy ledger + Allwyn migration + ${synthetic.length} synthetic transactions.`);
+console.log(`Accounting invariants PASS: SPCE live regression + render-safe fail-closed legacy ledger + Allwyn migration + ${synthetic.length} synthetic transactions.`);
