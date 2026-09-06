@@ -91,6 +91,42 @@ assert.equal(usRegular.market, 'US');
 assert.equal(usRegular.open, true);
 assert.equal(usRegular.session, 'regular-market');
 
+// Live-device regression from 2026-09-06: Finnhub timestamped the Friday close
+// exactly at 16:00:00 New York (20:00 UTC). That is the regular-session closing
+// print, not a post-market quote. One second later is post-market.
+const usExactFridayClose = marketRules.marketStateForSymbol('SPCE.US', new Date('2026-09-04T20:00:00.000Z'));
+assert.equal(usExactFridayClose.session, 'regular-market');
+const usAfterFridayClose = marketRules.marketStateForSymbol('SPCE.US', new Date('2026-09-04T20:00:01.000Z'));
+assert.equal(usAfterFridayClose.session, 'post-market');
+
+const sundayState = marketRules.marketStateForSymbol('SPCE.US', new Date('2026-09-06T19:37:35.000Z'));
+assert.equal(sundayState.open, false);
+assert.equal(sundayState.session, 'closed');
+
+const spceWeekendClose = integrity.evaluateMobileQuoteIntegrity('SPCE.US', {
+  nativePrice: 3.08,
+  nativePreviousClose: 3.08,
+  nativeCurrency: 'USD',
+  providerSymbol: 'SPCE',
+  source: 'Finnhub US quote',
+  quality: 'realtime',
+  updatedAt: '2026-09-04T20:00:00.000Z',
+  checkedAt: '2026-09-06T19:37:35.000Z',
+  priceTimestampVerified: true,
+  session: usExactFridayClose.session,
+}, {
+  now: '2026-09-06T19:37:35.000Z',
+  exchangeOpen: sundayState.open,
+  exchangeSession: sundayState.session,
+  exchangeCalendarVerified: true,
+});
+assert.equal(spceWeekendClose.closedMarketReferenceEligible, true);
+assert.equal(spceWeekendClose.valuationReady, true);
+assert.equal(spceWeekendClose.decisionReady, false);
+assert.equal(spceWeekendClose.publicStatus, 'CLOSED_MARKET_REFERENCE');
+assert.ok(spceWeekendClose.decisionBlockers.includes('QUOTE_DECISION_FRESHNESS_NOT_VERIFIED'));
+assert.ok(!spceWeekendClose.valuationBlockers.includes('QUOTE_FRESHNESS_NOT_VERIFIED'));
+
 const routedGreek = integrity.routeMobileInstrument('CREDIA.GR');
 assert.equal(routedGreek.supported, true);
 assert.equal(routedGreek.market, 'GR');
@@ -158,4 +194,4 @@ assert.ok(marketSource.includes("primary_exchange_delayed"));
 assert.ok(marketSource.includes("exchangeCalendarVerified: exchange.calendarVerified !== false"));
 assert.ok(marketSource.includes("official Euronext Athens stock page identity not verified"));
 
-console.log('Euronext Athens invariants PASS: official 10:15-17:20 schedule, 2026/2027 holidays, EUR identity, delayed-primary valuation and fallback/calendar fail-closed behavior.');
+console.log('Market invariants PASS: Athens 10:15-17:20/calendar rules + exact US closing-print weekend carry + currency/source fail-closed behavior.');
