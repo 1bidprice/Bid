@@ -65,12 +65,13 @@ assert.ok(opportunities.includes("operationalHealth?.decisionEngineStatus === 'R
 assert.ok(opportunities.includes('items={decisionContext.feedFresh && decisionContext.systemReady ? (feed.confirmedBuyOpportunities || []) : []}'), 'stale confirmed BUY opportunities must be hidden');
 assert.ok(!opportunities.includes('decisionContext={decisionContext} decisionContext={decisionContext}'), 'decisionContext prop materialization must remain idempotent');
 
-assert.ok(marketRules.includes("MARKET_RULES_VERSION = '2026-08-24.1'"), 'canonical market rules version missing');
+assert.ok(marketRules.includes("MARKET_RULES_VERSION = '2026-09-06.1'"), 'canonical market rules version missing');
 assert.ok(marketRules.includes("suffix: '.GR'"), 'Euronext Athens route missing');
 assert.ok(marketRules.includes("currency: 'EUR'"), 'Euronext Athens EUR rule missing');
 assert.ok(marketRules.includes("timeZone: 'Europe/Athens'"), 'Euronext Athens timezone rule missing');
 assert.ok(marketRules.includes('regularStart: 10 * 60 + 15'), 'Euronext Athens 10:15 open missing');
 assert.ok(marketRules.includes('regularEnd: 17 * 60 + 20'), 'Euronext Athens 17:20 close missing');
+assert.ok(marketRules.includes('seconds <= rule.sessions.regularEnd * 60'), 'exact US 16:00 closing print boundary missing');
 assert.ok(marketRules.includes('ATHENS_MARKET_HOLIDAYS'), 'Euronext Athens calendar registry missing');
 assert.ok(marketRules.includes("'2026-10-28'"), 'Euronext Athens 2026 holiday coverage missing');
 assert.ok(marketRules.includes("'2026-12-24'"), 'Euronext Athens Christmas Eve closure missing');
@@ -100,5 +101,7 @@ assert.ok(integrity.includes('CLOSED_MARKET_REFERENCE'), 'closed-market valuatio
 assert.ok(accounting.includes('export function accountingInvariantReport(transaction)'), 'canonical accounting invariant report missing');
 assert.ok(accounting.includes('broker/settlement total is authoritative'), 'canonical accounting cash hierarchy missing');
 assert.ok(accounting.includes('roundMoney(quantity * candidate) === gross'), 'execution price reconciliation rule missing');
+assert.ok(accounting.includes('function safeText(value, fallback ='), 'legacy transaction render-safety normalization missing');
+assert.ok(accounting.includes('function canonicalCurrency(value, symbol)'), 'canonical transaction currency guard missing');
 
-console.log('Canonical mobile source PASS: patch chain retired; accounting, portfolio, Euronext Athens/US market rules, quote, decision validity and UI responsibilities are separated and guarded, including Transactions runtime, closed-market valuation, stale/expired actions and idempotent decision-context materialization.');
+console.log('Canonical mobile source PASS: patch chain retired; accounting, portfolio, Euronext Athens/US market rules, quote, decision validity and UI responsibilities are separated and guarded, including Transactions runtime, render-safe legacy records, closing-print valuation, stale/expired actions and idempotent decision-context materialization.');
