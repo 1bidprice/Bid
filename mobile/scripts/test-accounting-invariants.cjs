@@ -141,6 +141,38 @@ assert.equal(conflicting.grossAmount, 101);
 assert.equal(conflicting.executionPrice, 10.1);
 assert.equal(conflicting.total, 102);
 
+// Live-device crash guard: old or damaged local JSON must never put objects or an
+// invalid currency code into React Text / Intl.NumberFormat when Transactions opens.
+const hostileLegacy = assertInvariant({
+  id: { legacy: true },
+  type: 'buy',
+  symbol: 'spce.us',
+  company: { name: 'Virgin Galactic Holdings' },
+  date: { iso: '2026-03-03' },
+  quantity: '720',
+  currency: '$',
+  executionPrice: '3.17',
+  fees: '0',
+  total: '2282.72',
+  broker: { name: 'legacy broker' },
+  orderReference: { value: 123 },
+  notes: { text: 'legacy note' },
+}, 'Malformed legacy render safety');
+assert.equal(hostileLegacy.symbol, 'SPCE.US');
+assert.equal(hostileLegacy.currency, 'USD');
+assert.equal(hostileLegacy.company, 'SPCE.US');
+assert.equal(hostileLegacy.date, '');
+for (const key of ['id', 'symbol', 'company', 'date', 'currency', 'broker', 'orderReference', 'settlementReference', 'notes', 'migrationNote', 'createdAt', 'updatedAt']) {
+  assert.equal(typeof hostileLegacy[key], 'string', `render field ${key} must be a string`);
+}
+assert.doesNotThrow(() => new Intl.NumberFormat('el-GR', {
+  style: 'currency',
+  currency: hostileLegacy.currency,
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+}).format(hostileLegacy.total));
+assert.deepEqual(normalizeTransaction(hostileLegacy), hostileLegacy);
+
 // Synthetic coverage: every normalized transaction must satisfy the same equations,
 // regardless of symbol, currency, side, quantity, fees, or intentionally rounded price.
 let seed = 0x1a2b3c4d;
@@ -181,4 +213,4 @@ for (const transaction of normalizedBatch) {
   assert.equal(accountingInvariantReport(twice).ok, true);
 }
 
-console.log(`Accounting invariants PASS: SPCE live regression + Allwyn migration + ${synthetic.length} synthetic transactions.`);
+console.log(`Accounting invariants PASS: SPCE live regression + render-safe legacy ledger + Allwyn migration + ${synthetic.length} synthetic transactions.`);
