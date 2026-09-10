@@ -1,4 +1,4 @@
-name: Investor Control Market Intelligence Canonicalize Once
+name: Investor Control Canonical Market Intelligence Commit
 
 on:
   push:
@@ -6,182 +6,24 @@ on:
       - investor-control-core-stabilization-v174
     paths:
       - .github/workflows/investor-control-market-intelligence-canonicalize-once.yml
-  workflow_dispatch:
 
 permissions:
   contents: write
 
-concurrency:
-  group: investor-control-market-intelligence-canonicalize-once
-  cancel-in-progress: false
-
 jobs:
   canonicalize:
-    if: github.event_name == 'workflow_dispatch' || github.event.head_commit.message == 'ci(core): prepare canonical market intelligence materialization'
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 20
     steps:
       - name: Checkout exact triggering head
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: investor-control-core-stabilization-v174
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
-      - name: Guard remote branch has not moved
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch origin investor-control-core-stabilization-v174
-          REMOTE_SHA="$(git rev-parse origin/investor-control-core-stabilization-v174)"
-          LOCAL_SHA="$(git rev-parse HEAD)"
-          test "$REMOTE_SHA" = "$LOCAL_SHA" || {
-            echo "Branch moved during canonicalization setup: local=$LOCAL_SHA remote=$REMOTE_SHA" >&2
-            exit 1
-          }
-
-      - name: Materialize current release chain and prove parity
-        working-directory: market-intelligence
-        run: npm test
-
-      - name: Guard materialization scope
-        shell: bash
-        run: |
-          set -euo pipefail
-          unexpected="$(git diff --name-only | grep -v '^market-intelligence/' || true)"
-          if [ -n "$unexpected" ]; then
-            echo 'Runtime materialization modified files outside market-intelligence:' >&2
-            echo "$unexpected" >&2
-            exit 1
-          fi
-          test -n "$(git diff --name-only -- market-intelligence)" || {
-            echo 'Expected materialized market-intelligence diff but found none.' >&2
-            exit 1
-          }
-
-      - name: Replace runtime patch chain with canonical direct entrypoints
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          root = Path('market-intelligence')
-          package_path = root / 'package.json'
-          pkg = json.loads(package_path.read_text())
-          pkg['scripts'] = {
-              'test': 'node scripts/verify-canonical-source.js && node --test',
-              'run:daily': 'node src/run-daily-intelligence.js out/daily-intelligence.json',
-              'run:autonomous': 'node src/run-autonomous-intelligence.js out/autonomous-intelligence.json',
-              'build:mobile': 'node src/build-mobile-feed.js out/daily-intelligence.json out/mobile-intelligence-feed.json',
-              'build:autonomous-mobile': 'node src/build-mobile-feed.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json',
-              'publish:reviewed': 'node src/publish-reviewed-research.js out/daily-intelligence.json config/review-decisions.json out/reviewed-publication.json',
-          }
-          package_path.write_text(json.dumps(pkg, indent=2, ensure_ascii=False) + '\n')
-
-          verifier = root / 'scripts' / 'verify-canonical-source.js'
-          verifier.write_text("""import fs from 'node:fs';
-          import path from 'node:path';
-          import { fileURLToPath } from 'node:url';
-
-          const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-          const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-          const forbiddenScripts = Object.entries(pkg.scripts || {}).filter(([, command]) => /run-current-release|apply-v/i.test(String(command)));
-          if (forbiddenScripts.length) throw new Error(`canonical source: runtime patch command remains in package scripts: ${forbiddenScripts.map(([name]) => name).join(', ')}`);
-
-          for (const legacy of ['config/runtime-release-manifest.json', 'scripts/run-current-release.js']) {
-            if (fs.existsSync(path.join(root, legacy))) throw new Error(`canonical source: legacy runtime materializer remains: ${legacy}`);
-          }
-
-          const scriptDir = path.join(root, 'scripts');
-          const patchFiles = fs.readdirSync(scriptDir).filter((name) => /^apply-v.*\\.js$/i.test(name));
-          if (patchFiles.length) throw new Error(`canonical source: historical apply-v scripts remain (${patchFiles.length})`);
-
-          for (const folder of ['src', 'config']) {
-            const start = path.join(root, folder);
-            const stack = fs.existsSync(start) ? [start] : [];
-            while (stack.length) {
-              const current = stack.pop();
-              for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
-                const absolute = path.join(current, entry.name);
-                if (entry.isDirectory()) stack.push(absolute);
-                else if (/\\.(?:js|json)$/i.test(entry.name)) {
-                  const text = fs.readFileSync(absolute, 'utf8');
-                  if (/run-current-release|scripts\\/apply-v/i.test(text)) {
-                    throw new Error(`canonical source: runtime patch dependency remains in ${path.relative(root, absolute)}`);
-                  }
-                }
-              }
-            }
-          }
-
-          console.log(JSON.stringify({
-            canonicalMarketIntelligenceSource: 'VERIFIED',
-            runtimePatchRunnerPresent: false,
-            runtimePatchManifestPresent: false,
-            applyPatchFileCount: 0,
-            directEntrypoints: Object.keys(pkg.scripts || {}),
-          }, null, 2));
-          """.replace(/^          /gm, ''))
-          PY
-
-          rm -f market-intelligence/config/runtime-release-manifest.json
-          rm -f market-intelligence/scripts/run-current-release.js
-          find market-intelligence/scripts -maxdepth 1 -type f -name 'apply-v*.js' -delete
-
-      - name: Verify canonical source has no runtime materializer
-        working-directory: market-intelligence
-        run: node scripts/verify-canonical-source.js
-
-      - name: Run full test suite from canonical source only
-        working-directory: market-intelligence
-        run: node --test
-
-      - name: Prove package test path is canonical
-        working-directory: market-intelligence
-        run: npm test
-
-      - name: Validate clean patch-free working tree contract
-        shell: bash
-        run: |
-          set -euo pipefail
-          git diff --check
-          ! grep -R --line-number --include='package.json' --include='*.yml' --include='*.yaml' 'run-current-release.js' market-intelligence .github/workflows || {
-            echo 'A production/test workflow still depends on run-current-release.js' >&2
-            exit 1
-          }
-          test ! -e market-intelligence/config/runtime-release-manifest.json
-          test ! -e market-intelligence/scripts/run-current-release.js
-          test -z "$(find market-intelligence/scripts -maxdepth 1 -type f -name 'apply-v*.js' -print -quit)"
-
-      - name: Remove one-shot write workflow from canonical tree
-        run: rm -f .github/workflows/investor-control-market-intelligence-canonicalize-once.yml
-
-      - name: Recheck remote head before atomic commit
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch origin investor-control-core-stabilization-v174
-          REMOTE_SHA="$(git rev-parse origin/investor-control-core-stabilization-v174)"
-          BASE_SHA="${{ github.sha }}"
-          test "$REMOTE_SHA" = "$BASE_SHA" || {
-            echo "Branch moved while canonicalization was running: trigger=$BASE_SHA remote=$REMOTE_SHA" >&2
-            exit 1
-          }
-
-      - name: Commit canonical materialized source
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A market-intelligence .github/workflows/investor-control-market-intelligence-canonicalize-once.yml
-          git status --short
-          git diff --cached --quiet && { echo 'No canonicalization changes staged.' >&2; exit 1; }
-          git commit -m 'refactor(core): materialize canonical market intelligence source'
-          git push origin HEAD:investor-control-core-stabilization-v174
+      - name: Materialize, verify and commit canonical source
+        run: bash .github/scripts/canonicalize-market-intelligence-source.sh
