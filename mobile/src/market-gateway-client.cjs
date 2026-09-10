@@ -56,9 +56,21 @@ function validateGatewayQuote(appSymbol, payload) {
   return null;
 }
 
-async function fetchCanonicalGatewayQuote(appSymbol, options = {}) {
-  const symbol = canonicalSymbol(appSymbol);
-  if (!symbol) throw new Error('MARKET_GATEWAY_SYMBOL_INVALID');
+function validateGatewayFx(payload) {
+  if (payload?.format !== 'investor-control-market-gateway-fx') return 'GATEWAY_FX_FORMAT_INVALID';
+  const reference = payload?.reference;
+  if (!reference || reference.pair !== 'EURUSD') return 'GATEWAY_FX_PAIR_INVALID';
+  if (reference.baseCurrency !== 'EUR' || reference.quoteCurrency !== 'USD') return 'GATEWAY_FX_CURRENCY_INVALID';
+  if (!Number.isFinite(Number(reference.rate)) || Number(reference.rate) <= 0) return 'GATEWAY_FX_RATE_INVALID';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(reference.referenceDate || ''))) return 'GATEWAY_FX_REFERENCE_DATE_INVALID';
+  if (reference.sourceQuality !== 'OFFICIAL_DAILY_REFERENCE') return 'GATEWAY_FX_SOURCE_INVALID';
+  if (reference.valuationReferenceEligible !== true) return 'GATEWAY_FX_VALUATION_NOT_ELIGIBLE';
+  if (reference.transactionEligible !== false) return 'GATEWAY_FX_TRANSACTION_CONTRACT_INVALID';
+  if (reference.decisionEligible !== false) return 'GATEWAY_FX_DECISION_CONTRACT_INVALID';
+  return null;
+}
+
+async function fetchGatewayJson(pathname, options = {}) {
   const baseUrl = normalizeGatewayBaseUrl(options.baseUrl);
   if (!baseUrl) throw new Error('MARKET_GATEWAY_URL_INVALID');
   const clientId = normalizeClientId(options.clientId);
@@ -69,8 +81,7 @@ async function fetchCanonicalGatewayQuote(appSymbol, options = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 10_000));
   try {
-    const url = `${baseUrl}/v1/quote?symbol=${encodeURIComponent(symbol)}`;
-    const response = await fetchImpl(url, {
+    const response = await fetchImpl(`${baseUrl}${pathname}`, {
       method: 'GET',
       headers: {
         Accept: 'application/json',
@@ -87,12 +98,26 @@ async function fetchCanonicalGatewayQuote(appSymbol, options = {}) {
       error.gatewayCode = code;
       throw error;
     }
-    const validationError = validateGatewayQuote(symbol, payload);
-    if (validationError) throw new Error(validationError);
-    return payload.quote;
+    return payload;
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function fetchCanonicalGatewayQuote(appSymbol, options = {}) {
+  const symbol = canonicalSymbol(appSymbol);
+  if (!symbol) throw new Error('MARKET_GATEWAY_SYMBOL_INVALID');
+  const payload = await fetchGatewayJson(`/v1/quote?symbol=${encodeURIComponent(symbol)}`, options);
+  const validationError = validateGatewayQuote(symbol, payload);
+  if (validationError) throw new Error(validationError);
+  return payload.quote;
+}
+
+async function fetchCanonicalGatewayFx(options = {}) {
+  const payload = await fetchGatewayJson('/v1/fx?pair=EURUSD', options);
+  const validationError = validateGatewayFx(payload);
+  if (validationError) throw new Error(validationError);
+  return payload.reference;
 }
 
 async function fetchCanonicalGatewayQuotes(symbols, options = {}) {
@@ -109,6 +134,25 @@ async function fetchCanonicalGatewayQuotes(symbols, options = {}) {
   return { quoteRegistry, errors, checkedAt: new Date().toISOString() };
 }
 
+async function fetchCanonicalGatewayMarketSnapshot(symbols, options = {}) {
+  const clean = [...new Set((symbols || []).map(canonicalSymbol).filter(Boolean))];
+  const quotes = await fetchCanonicalGatewayQuotes(clean, options);
+  let fxReference = null;
+  let fxError = null;
+  if (clean.some((symbol) => symbol.endsWith('.US'))) {
+    try {
+      fxReference = await fetchCanonicalGatewayFx(options);
+    } catch (error) {
+      fxError = String(error?.gatewayCode || error?.message || 'MARKET_GATEWAY_FX_REQUEST_FAILED');
+    }
+  }
+  return {
+    ...quotes,
+    fxReference,
+    ...(fxError ? { fxError } : {}),
+  };
+}
+
 module.exports = {
   MARKET_GATEWAY_CLIENT_HEADER,
   MARKET_GATEWAY_CLIENT_STORAGE_KEY,
@@ -118,6 +162,9 @@ module.exports = {
   createOpaqueInstallationId,
   getOrCreateInstallationId,
   validateGatewayQuote,
+  validateGatewayFx,
   fetchCanonicalGatewayQuote,
+  fetchCanonicalGatewayFx,
   fetchCanonicalGatewayQuotes,
+  fetchCanonicalGatewayMarketSnapshot,
 };
