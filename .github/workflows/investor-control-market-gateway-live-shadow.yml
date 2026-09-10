@@ -48,22 +48,21 @@ jobs:
           mkdir -p out
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
-          import { resolveCanonicalGatewayQuote } from './gateway/src/core.js';
+          import { resolveCanonicalGatewayFx, resolveCanonicalGatewayQuote } from './gateway/src/core.js';
 
           const symbols = ['SPCE.US', 'ALWN.GR', 'CREDIA.GR'];
           const evidence = {
             format: 'investor-control-market-gateway-live-shadow',
-            version: 1,
+            version: 2,
             generatedAt: new Date().toISOString(),
             commit: process.env.GITHUB_SHA,
             results: {},
+            fx: null,
           };
 
           for (const symbol of symbols) {
             const result = await resolveCanonicalGatewayQuote(symbol, { FINNHUB_TOKEN: process.env.FINNHUB_TOKEN });
-            if (result.status !== 200) {
-              throw new Error(`${symbol} gateway rejected live source: ${JSON.stringify(result.error)}`);
-            }
+            if (result.status !== 200) throw new Error(`${symbol} gateway rejected live source: ${JSON.stringify(result.error)}`);
             const quote = result.body.quote;
             const contract = quote.quoteContract || {};
             if (!quote.currency) throw new Error(`${symbol} missing currency`);
@@ -102,6 +101,14 @@ jobs:
               decisionEligible: contract.decisionEligible,
             };
           }
+
+          const fxResult = await resolveCanonicalGatewayFx('EURUSD');
+          if (fxResult.status !== 200) throw new Error(`EURUSD gateway rejected official ECB source: ${JSON.stringify(fxResult.error)}`);
+          const fx = fxResult.body.reference;
+          if (fx.sourceQuality !== 'OFFICIAL_DAILY_REFERENCE') throw new Error('EURUSD is not official ECB daily reference data');
+          if (fx.valuationReferenceEligible !== true || fx.transactionEligible !== false || fx.decisionEligible !== false) throw new Error('EURUSD reference eligibility contract invalid');
+          if (!/^https:\/\/www\.ecb\.europa\.eu\/stats\/eurofxref\/eurofxref-daily\.xml$/i.test(fx.sourceUrl)) throw new Error('EURUSD source is not official ECB XML');
+          evidence.fx = fx;
 
           const serialized = JSON.stringify(evidence, null, 2) + '\n';
           if (serialized.includes(process.env.FINNHUB_TOKEN)) throw new Error('server credential leaked into live gateway evidence');

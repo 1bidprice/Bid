@@ -1,7 +1,7 @@
 import { handleMarketGatewayRequest, parseGatewaySymbol } from './core.js';
 
 export const MARKET_GATEWAY_CLIENT_HEADER = 'X-Investor-Control-Client';
-export const MARKET_GATEWAY_EDGE_VERSION = '2026-09-10.1';
+export const MARKET_GATEWAY_EDGE_VERSION = '2026-09-11.1';
 
 function jsonError(status, code, message) {
   return new Response(`${JSON.stringify({
@@ -24,17 +24,30 @@ export function normalizeGatewayClientId(value) {
   return /^[A-Za-z0-9_-]{16,128}$/.test(clientId) ? clientId : null;
 }
 
-export function gatewayCacheTtlSeconds(appSymbol) {
-  if (String(appSymbol || '').endsWith('.US')) return 5;
-  if (String(appSymbol || '').endsWith('.GR')) return 60;
+export function gatewayCacheTtlSeconds(resourceKey) {
+  if (String(resourceKey || '').endsWith('.US')) return 5;
+  if (String(resourceKey || '').endsWith('.GR')) return 60;
+  if (String(resourceKey || '') === 'EURUSD') return 900;
   return 0;
 }
 
-function cacheKeyFor(request, appSymbol) {
+function protectedResource(url) {
+  if (url.pathname === '/v1/quote') {
+    const parsed = parseGatewaySymbol(url.searchParams.get('symbol'));
+    if (!parsed) return null;
+    return { resourceKey: parsed.appSymbol, upstreamKey: parsed.market, paramName: 'symbol', paramValue: parsed.appSymbol, pathname: '/v1/quote' };
+  }
+  if (url.pathname === '/v1/fx' && String(url.searchParams.get('pair') || '').trim().toUpperCase() === 'EURUSD') {
+    return { resourceKey: 'EURUSD', upstreamKey: 'FX', paramName: 'pair', paramValue: 'EURUSD', pathname: '/v1/fx' };
+  }
+  return null;
+}
+
+function cacheKeyFor(request, resource) {
   const url = new URL(request.url);
-  url.pathname = '/v1/quote';
+  url.pathname = resource.pathname;
   url.search = '';
-  url.searchParams.set('symbol', appSymbol);
+  url.searchParams.set(resource.paramName, resource.paramValue);
   return new Request(url.toString(), { method: 'GET' });
 }
 
@@ -69,14 +82,10 @@ async function rateLimit(limiter, key) {
 
 export async function handleMarketGatewayEdgeRequest(request, env = {}, ctx = {}, options = {}) {
   const url = new URL(request.url);
-  if (request.method !== 'GET' || url.pathname !== '/v1/quote') {
-    return handleMarketGatewayRequest(request, env, options.coreOptions || {});
-  }
+  if (request.method !== 'GET') return handleMarketGatewayRequest(request, env, options.coreOptions || {});
 
-  const parsed = parseGatewaySymbol(url.searchParams.get('symbol'));
-  if (!parsed) {
-    return handleMarketGatewayRequest(request, env, options.coreOptions || {});
-  }
+  const resource = protectedResource(url);
+  if (!resource) return handleMarketGatewayRequest(request, env, options.coreOptions || {});
 
   const clientId = normalizeGatewayClientId(request.headers.get(MARKET_GATEWAY_CLIENT_HEADER));
   if (!clientId) {
@@ -84,7 +93,7 @@ export async function handleMarketGatewayEdgeRequest(request, env = {}, ctx = {}
   }
 
   const cache = options.cache || globalThis.caches?.default || null;
-  const cacheKey = cacheKeyFor(request, parsed.appSymbol);
+  const cacheKey = cacheKeyFor(request, resource);
   if (cache && typeof cache.match === 'function') {
     const cached = await cache.match(cacheKey);
     if (cached) return clientResponse(cached, 'HIT');
@@ -103,7 +112,7 @@ export async function handleMarketGatewayEdgeRequest(request, env = {}, ctx = {}
     return response;
   }
 
-  const upstreamLimit = await rateLimit(upstreamLimiter, `upstream:${parsed.market}`);
+  const upstreamLimit = await rateLimit(upstreamLimiter, `upstream:${resource.upstreamKey}`);
   if (!upstreamLimit?.success) {
     const response = jsonError(429, 'UPSTREAM_RATE_LIMITED', 'Market-data upstream protection limit exceeded.');
     response.headers.set('Retry-After', '60');
@@ -113,7 +122,7 @@ export async function handleMarketGatewayEdgeRequest(request, env = {}, ctx = {}
   const upstreamResponse = await handleMarketGatewayRequest(request, env, options.coreOptions || {});
   if (upstreamResponse.status !== 200) return clientResponse(upstreamResponse, 'MISS');
 
-  const ttlSeconds = gatewayCacheTtlSeconds(parsed.appSymbol);
+  const ttlSeconds = gatewayCacheTtlSeconds(resource.resourceKey);
   if (cache && ttlSeconds > 0 && typeof cache.put === 'function') {
     const putPromise = cache.put(cacheKey, cacheableResponse(upstreamResponse.clone(), ttlSeconds));
     if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(putPromise);

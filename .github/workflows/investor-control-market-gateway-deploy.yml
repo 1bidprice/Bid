@@ -92,7 +92,7 @@ jobs:
           set -euo pipefail
           URL="${{ steps.deploy.outputs.deployment_url }}"
           curl --fail --silent --show-error --retry 3 --retry-delay 2 "$URL/health" > health.json
-          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('health.json','utf8')); if(p.status!=='ok'||p.providers?.us!=='configured'||p.providers?.athens!=='official_delayed_15m') { console.error('Production health contract failed'); process.exit(1); }"
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('health.json','utf8')); if(p.status!=='ok'||p.providers?.us!=='configured'||p.providers?.athens!=='official_delayed_15m'||p.providers?.fx!=='ecb_official_daily_reference') { console.error('Production health contract failed'); process.exit(1); }"
           rm -f health.json
 
       - name: Verify one authoritative US quote through deployed edge
@@ -106,3 +106,15 @@ jobs:
             "$URL/v1/quote?symbol=SPCE.US" > quote.json
           node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('quote.json','utf8')); const q=p.quote; if(p.requestedSymbol!=='SPCE.US'||q?.appSymbol!=='SPCE.US'||q?.currency!=='USD'||q?.quoteContract?.sourceApproved!==true||q?.quoteContract?.identityVerified!==true) { console.error('Production US quote contract failed'); process.exit(1); }"
           rm -f quote.json
+
+      - name: Verify official ECB EURUSD reference through deployed edge
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="${{ steps.deploy.outputs.deployment_url }}"
+          CLIENT_ID="github_deploy_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          curl --fail --silent --show-error --retry 2 --retry-delay 2 \
+            -H "X-Investor-Control-Client: $CLIENT_ID" \
+            "$URL/v1/fx?pair=EURUSD" > fx.json
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('fx.json','utf8')); const r=p.reference; if(r?.pair!=='EURUSD'||r?.sourceQuality!=='OFFICIAL_DAILY_REFERENCE'||!(Number(r?.rate)>0)||r?.valuationReferenceEligible!==true||r?.transactionEligible!==false||r?.decisionEligible!==false) { console.error('Production ECB EURUSD reference contract failed'); process.exit(1); }"
+          rm -f fx.json

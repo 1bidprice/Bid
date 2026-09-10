@@ -1,8 +1,9 @@
 import { fetchEuronextAthensQuote } from '../../src/adapters/euronext-athens-quote.js';
 import { fetchFinnhubQuote } from '../../src/adapters/finnhub-quote.js';
 import { buildCanonicalQuoteRegistry, canonicalizeMarketSnapshot } from '../../src/canonical-market-quote.js';
+import { fetchEcbEurUsdReference } from './ecb-reference-fx.js';
 
-export const MARKET_GATEWAY_CONTRACT_VERSION = '2026-09-10.1';
+export const MARKET_GATEWAY_CONTRACT_VERSION = '2026-09-11.1';
 
 const ATHENS_COMPANIES = Object.freeze({
   ALWN: Object.freeze({
@@ -21,6 +22,8 @@ const ATHENS_COMPANIES = Object.freeze({
   }),
 });
 
+const CORS_HEADERS = 'Content-Type, X-Investor-Control-Client';
+
 function json(body, status = 200) {
   return new Response(`${JSON.stringify(body)}\n`, {
     status,
@@ -29,7 +32,7 @@ function json(body, status = 200) {
       'Cache-Control': 'no-store, max-age=0',
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': CORS_HEADERS,
       'X-Content-Type-Options': 'nosniff',
     },
   });
@@ -172,8 +175,42 @@ export async function resolveCanonicalGatewayQuote(appSymbol, env = {}, options 
   };
 }
 
+export async function resolveCanonicalGatewayFx(pair, options = {}) {
+  const normalizedPair = String(pair || '').trim().toUpperCase();
+  if (normalizedPair !== 'EURUSD') {
+    return { status: 400, error: { code: 'FX_PAIR_INVALID', message: 'Gateway v1 only supports the canonical EURUSD reference pair.' } };
+  }
+  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  if (typeof fetchImpl !== 'function') {
+    return { status: 503, error: { code: 'FETCH_RUNTIME_UNAVAILABLE', message: 'Server fetch runtime is unavailable.' } };
+  }
+  const generatedAt = new Date(options.now || Date.now()).toISOString();
+  const result = await fetchEcbEurUsdReference({ fetchImpl, generatedAt });
+  if (!result?.reference) {
+    return {
+      status: 502,
+      error: {
+        code: 'FX_REFERENCE_UNAVAILABLE',
+        message: 'Official ECB EUR/USD reference rate is unavailable or unverifiable.',
+        details: { diagnostics: result?.diagnostics || [] },
+      },
+    };
+  }
+  return {
+    status: 200,
+    body: {
+      format: 'investor-control-market-gateway-fx',
+      version: 1,
+      contractVersion: MARKET_GATEWAY_CONTRACT_VERSION,
+      servedAt: generatedAt,
+      reference: result.reference,
+      diagnostics: result?.diagnostics || [],
+    },
+  };
+}
+
 export async function handleMarketGatewayRequest(request, env = {}, options = {}) {
-  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' } });
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, OPTIONS', 'Access-Control-Allow-Headers': CORS_HEADERS } });
   if (request.method !== 'GET') return gatewayError(405, 'METHOD_NOT_ALLOWED', 'Only GET is supported.');
 
   const url = new URL(request.url);
@@ -186,8 +223,14 @@ export async function handleMarketGatewayRequest(request, env = {}, options = {}
       providers: {
         us: String(env.FINNHUB_TOKEN || '').trim() ? 'configured' : 'not_configured',
         athens: 'official_delayed_15m',
+        fx: 'ecb_official_daily_reference',
       },
     });
+  }
+  if (url.pathname === '/v1/fx') {
+    const result = await resolveCanonicalGatewayFx(url.searchParams.get('pair'), options);
+    if (result.status !== 200) return gatewayError(result.status, result.error.code, result.error.message, result.error.details);
+    return json(result.body, 200);
   }
   if (url.pathname !== '/v1/quote') return gatewayError(404, 'NOT_FOUND', 'Unknown gateway route.');
 
