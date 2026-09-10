@@ -104,7 +104,7 @@ jobs:
           const sourceCommit = execFileSync('git',['-C','source','rev-parse','HEAD'],{encoding:'utf8'}).trim();
           const quotes = Object.values(feed.quoteRegistry || {});
           const missingCurrency = quotes.filter((q)=>!q?.currency);
-          const unverifiedUsIdentity = quotes.filter((q)=>String(q?.appSymbol || '').endsWith('.US') && q?.quoteIdentityVerified !== true);
+          const unverifiedUsIdentity = quotes.filter((q)=>String(q?.appSymbol || '').endsWith('.US') && q?.quoteContract?.identityVerified !== true);
           if (missingCurrency.length) throw new Error(`canonical registry contains ${missingCurrency.length} quote(s) without currency`);
           if (unverifiedUsIdentity.length) throw new Error(`canonical registry contains ${unverifiedUsIdentity.length} US quote(s) without verified identity`);
 
