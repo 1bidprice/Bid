@@ -81,8 +81,8 @@ function deriveSourceDecision(snapshot = {}, company = {}) {
   });
 }
 
-function publicStatus({ price, quoteAt, stale, sourceRole, timestampVerified, closedMarketCarry }) {
-  if (price === null || !quoteAt) return 'UNAVAILABLE';
+function publicStatus({ price, currency, quoteAt, stale, sourceRole, timestampVerified, closedMarketCarry }) {
+  if (price === null || !currency || !quoteAt) return 'UNAVAILABLE';
   if (stale) return 'STALE';
   if (closedMarketCarry) return 'MARKET_CLOSED_LAST_CLOSE';
   if (sourceRole === SOURCE_ROLES.FALLBACK_UNVERIFIED) return 'FALLBACK_NOT_VERIFIED';
@@ -115,6 +115,9 @@ export function canonicalizeMarketSnapshot(snapshot, company = {}, options = {})
     : finite(snapshot.ageHours);
   const price = positive(snapshot.currentPrice);
   const previousClose = positive(snapshot.previousClose);
+  const rawCurrency = String(snapshot.currency || '').trim().toUpperCase();
+  const currency = /^[A-Z]{3}$/.test(rawCurrency) ? rawCurrency : null;
+  const identityVerified = snapshot.quoteIdentityVerified !== false;
   const sourceDecision = deriveSourceDecision(snapshot, company);
   const timestampVerified = snapshot.quoteTimestampVerified !== false && Boolean(quoteAtValid);
   const maxAgeHours = Number(options.maxCanonicalQuoteAgeHours ?? 6);
@@ -128,6 +131,7 @@ export function canonicalizeMarketSnapshot(snapshot, company = {}, options = {})
   const stale = ageHours === null || (!strictAgeFresh && !closedMarketCarry);
   const status = publicStatus({
     price,
+    currency,
     quoteAt: quoteAtValid ? quoteAt.toISOString() : null,
     stale,
     sourceRole: sourceDecision.sourceRole,
@@ -137,6 +141,8 @@ export function canonicalizeMarketSnapshot(snapshot, company = {}, options = {})
 
   const diagnostics = [];
   if (price === null) diagnostics.push('QUOTE_PRICE_MISSING');
+  if (!currency) diagnostics.push('QUOTE_CURRENCY_MISSING');
+  if (!identityVerified) diagnostics.push('QUOTE_IDENTITY_NOT_VERIFIED');
   if (!quoteAtValid) diagnostics.push('QUOTE_TIMESTAMP_MISSING');
   if (stale) diagnostics.push('QUOTE_STALE');
   if (!sourceDecision.allowed) diagnostics.push('QUOTE_SOURCE_NOT_APPROVED');
@@ -144,7 +150,7 @@ export function canonicalizeMarketSnapshot(snapshot, company = {}, options = {})
   if (!timestampVerified) diagnostics.push('QUOTE_TIMESTAMP_NOT_VERIFIED');
   if (previousClose === null) diagnostics.push('PREVIOUS_CLOSE_NOT_VERIFIED');
 
-  const baseEligible = price !== null && quoteAtValid && !stale && sourceDecision.allowed;
+  const baseEligible = price !== null && currency !== null && identityVerified && quoteAtValid && !stale && sourceDecision.allowed;
   const valuationEligible = baseEligible && sourceDecision.sourceRole !== SOURCE_ROLES.FALLBACK_UNVERIFIED;
   const advertisedDelayMinutes = finite(snapshot.advertisedDelayMinutes);
   const boundedOfficialDelay = valuationEligible
@@ -171,6 +177,8 @@ export function canonicalizeMarketSnapshot(snapshot, company = {}, options = {})
     companyName: snapshot.companyName || company.displayName || company.legalName || null,
     currentPrice: price,
     previousClose,
+    currency,
+    quoteIdentityVerified: identityVerified,
     ageHours: ageHours === null ? null : round(ageHours, 2),
     stale,
     usable: valuationEligible,
@@ -180,6 +188,7 @@ export function canonicalizeMarketSnapshot(snapshot, company = {}, options = {})
       sourceTier: sourceDecision.tier ?? null,
       sourceApproved: sourceDecision.allowed === true,
       timestampVerified,
+      identityVerified,
       valuationEligible,
       analysisReferenceEligible,
       executionFreshnessEligible,
