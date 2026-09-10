@@ -1,0 +1,87 @@
+name: Investor Control Market Intelligence Materialization Audit
+
+on:
+  push:
+    branches:
+      - investor-control-core-stabilization-v174
+    paths:
+      - market-intelligence/**
+      - .github/workflows/investor-control-market-intelligence-materialization-audit.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-market-intelligence-materialization-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  materialize-and-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Record pristine source state
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p market-intelligence-materialization-audit
+          printf '%s\n' "$GITHUB_SHA" > market-intelligence-materialization-audit/source-commit.txt
+          git status --short > market-intelligence-materialization-audit/pristine-status.txt
+          find market-intelligence/src market-intelligence/test market-intelligence/tests market-intelligence/schemas market-intelligence/config \
+            -type f -print 2>/dev/null | sort > market-intelligence-materialization-audit/pristine-files.txt || true
+
+      - name: Apply current release chain and run full tests
+        working-directory: market-intelligence
+        run: npm test
+
+      - name: Capture exact materialized diff and source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git status --short -- market-intelligence > market-intelligence-materialization-audit/materialized-status.txt
+          git diff -- market-intelligence > market-intelligence-materialization-audit/materialized-source.diff
+          git diff --name-only -- market-intelligence > market-intelligence-materialization-audit/materialized-files.txt
+          rm -rf market-intelligence-materialization-audit/materialized
+          mkdir -p market-intelligence-materialization-audit/materialized/market-intelligence
+          for path in src test tests schemas config package.json; do
+            if [ -e "market-intelligence/$path" ]; then
+              cp -R "market-intelligence/$path" "market-intelligence-materialization-audit/materialized/market-intelligence/$path"
+            fi
+          done
+          test -s market-intelligence-materialization-audit/materialized-source.diff || {
+            echo 'Expected release runner to materialize changes, but no diff was produced.' >&2
+            exit 1
+          }
+          echo 'Materialized files:'
+          cat market-intelligence-materialization-audit/materialized-files.txt
+
+      - name: Guard materialization scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          unexpected="$(git diff --name-only | grep -v '^market-intelligence/' || true)"
+          if [ -n "$unexpected" ]; then
+            echo 'Release chain modified files outside market-intelligence:' >&2
+            echo "$unexpected" >&2
+            exit 1
+          fi
+
+      - name: Upload exact materialized source evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-market-intelligence-materialized-${{ github.sha }}
+          path: market-intelligence-materialization-audit
+          if-no-files-found: error
+          retention-days: 14
