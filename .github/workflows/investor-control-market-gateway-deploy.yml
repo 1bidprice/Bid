@@ -1,0 +1,108 @@
+name: Investor Control Market Gateway Production Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_production:
+        description: 'Type DEPLOY to authorize a production Worker deployment'
+        required: true
+        type: string
+      expected_sha:
+        description: 'Exact commit SHA that is authorized for deployment'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-market-gateway-production
+  cancel-in-progress: false
+
+jobs:
+  deploy-production-gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+    steps:
+      - name: Enforce explicit production authorization and exact source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ inputs.confirm_production }}" = "DEPLOY" || { echo 'Production confirmation is not DEPLOY.' >&2; exit 1; }
+          test "${{ inputs.expected_sha }}" = "$GITHUB_SHA" || { echo "Authorized SHA does not match workflow SHA: $GITHUB_SHA" >&2; exit 1; }
+          test "$GITHUB_REF_NAME" = "investor-control-core-stabilization-v174" || { echo "Deployment is restricted to the controlled release branch." >&2; exit 1; }
+
+      - name: Require deployment credentials without exposing values
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo 'Missing CLOUDFLARE_API_TOKEN.' >&2; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo 'Missing CLOUDFLARE_ACCOUNT_ID.' >&2; exit 1; }
+          test -n "$FINNHUB_TOKEN" || { echo 'Missing FINNHUB_TOKEN.' >&2; exit 1; }
+
+      - name: Checkout exact authorized source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Re-run canonical gateway contracts
+        working-directory: market-intelligence
+        run: |
+          set -euo pipefail
+          node scripts/verify-canonical-source.js
+          node --test test/market-gateway.test.js test/market-gateway-edge.test.js
+
+      - name: Production bundle dry-run before deployment
+        working-directory: market-intelligence/gateway
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          npx --yes wrangler@4.36.0 deploy --dry-run --outdir dist
+          find dist -type f | grep -Eq '\.(js|mjs)$'
+
+      - name: Deploy Worker and encrypted provider secret atomically
+        id: deploy
+        working-directory: market-intelligence/gateway
+        shell: bash
+        run: |
+          set -euo pipefail
+          SECRETS_FILE="$(mktemp)"
+          chmod 600 "$SECRETS_FILE"
+          cleanup() { rm -f "$SECRETS_FILE"; }
+          trap cleanup EXIT
+          SECRETS_FILE="$SECRETS_FILE" node -e "const fs=require('fs'); const token=process.env.FINNHUB_TOKEN || ''; if(!token) process.exit(2); fs.writeFileSync(process.env.SECRETS_FILE, JSON.stringify({FINNHUB_TOKEN: token}));"
+          npx --yes wrangler@4.36.0 deploy --secrets-file "$SECRETS_FILE" 2>&1 | tee deployment.log
+          DEPLOYMENT_URL="$(grep -Eo 'https://[A-Za-z0-9._-]+\.workers\.dev' deployment.log | tail -n 1 || true)"
+          test -n "$DEPLOYMENT_URL" || { echo 'Could not verify a workers.dev deployment URL from Wrangler output.' >&2; exit 1; }
+          echo "deployment_url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
+          rm -f deployment.log
+
+      - name: Verify deployed health endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="${{ steps.deploy.outputs.deployment_url }}"
+          curl --fail --silent --show-error --retry 3 --retry-delay 2 "$URL/health" > health.json
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('health.json','utf8')); if(p.status!=='ok'||p.providers?.us!=='configured'||p.providers?.athens!=='official_delayed_15m') { console.error('Production health contract failed'); process.exit(1); }"
+          rm -f health.json
+
+      - name: Verify one authoritative US quote through deployed edge
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="${{ steps.deploy.outputs.deployment_url }}"
+          CLIENT_ID="github_deploy_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          curl --fail --silent --show-error --retry 2 --retry-delay 2 \
+            -H "X-Investor-Control-Client: $CLIENT_ID" \
+            "$URL/v1/quote?symbol=SPCE.US" > quote.json
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('quote.json','utf8')); const q=p.quote; if(p.requestedSymbol!=='SPCE.US'||q?.appSymbol!=='SPCE.US'||q?.currency!=='USD'||q?.quoteContract?.sourceApproved!==true||q?.quoteContract?.identityVerified!==true) { console.error('Production US quote contract failed'); process.exit(1); }"
+          rm -f quote.json
