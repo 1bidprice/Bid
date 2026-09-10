@@ -1,0 +1,53 @@
+name: Investor Control Market Gateway
+
+on:
+  push:
+    branches:
+      - investor-control-core-stabilization-v174
+    paths:
+      - market-intelligence/gateway/**
+      - market-intelligence/test/market-gateway.test.js
+      - market-intelligence/src/adapters/finnhub-quote.js
+      - market-intelligence/src/adapters/euronext-athens-quote.js
+      - market-intelligence/src/canonical-market-quote.js
+      - .github/workflows/investor-control-market-gateway.yml
+  pull_request:
+    paths:
+      - market-intelligence/gateway/**
+      - market-intelligence/test/market-gateway.test.js
+      - market-intelligence/src/adapters/finnhub-quote.js
+      - market-intelligence/src/adapters/euronext-athens-quote.js
+      - market-intelligence/src/canonical-market-quote.js
+      - .github/workflows/investor-control-market-gateway.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify-market-gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify gateway source syntax
+        working-directory: market-intelligence
+        run: |
+          set -euo pipefail
+          node --check gateway/src/core.js
+          node --check gateway/src/index.js
+          node -e "JSON.parse(require('fs').readFileSync('gateway/wrangler.jsonc','utf8'))"
+
+      - name: Verify canonical source invariant
+        working-directory: market-intelligence
+        run: node scripts/verify-canonical-source.js
+
+      - name: Run gateway security and market-data contracts
+        working-directory: market-intelligence
+        run: node --test test/market-gateway.test.js
