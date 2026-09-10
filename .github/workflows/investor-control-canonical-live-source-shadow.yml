@@ -39,15 +39,13 @@ jobs:
             sudo apt-get install -y poppler-utils
           fi
 
-      - name: Require server-side provider credentials
+      - name: Require canonical server-side provider credentials
         env:
           FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
-          TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
         run: |
           set -euo pipefail
           test -n "$FINNHUB_TOKEN" || { echo 'FINNHUB_TOKEN is not configured server-side' >&2; exit 1; }
-          test -n "$TWELVE_DATA_API_KEY" || { echo 'TWELVE_DATA_API_KEY is not configured server-side' >&2; exit 1; }
-          echo 'Required provider credentials are configured server-side.'
+          echo 'Canonical US provider credential is configured server-side.'
 
       - name: Run canonical deterministic contracts
         working-directory: market-intelligence
@@ -58,7 +56,6 @@ jobs:
         env:
           SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
           FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
-          TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
         run: |
           set -euo pipefail
           success=0
@@ -82,7 +79,6 @@ jobs:
         working-directory: market-intelligence
         env:
           FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
-          TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
         run: node scripts/verify-canonical-live-source-connectivity.js out/mobile-intelligence-feed.json out/source-connectivity-audit.json
 
       - name: Upload shadow verification evidence
