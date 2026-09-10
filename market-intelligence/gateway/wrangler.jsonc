@@ -5,5 +5,23 @@
   "workers_dev": true,
   "observability": {
     "enabled": true
-  }
+  },
+  "ratelimits": [
+    {
+      "name": "MARKET_GATEWAY_CLIENT_RATE_LIMITER",
+      "namespace_id": "17401",
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
+    },
+    {
+      "name": "MARKET_GATEWAY_UPSTREAM_RATE_LIMITER",
+      "namespace_id": "17402",
+      "simple": {
+        "limit": 60,
+        "period": 60
+      }
+    }
+  ]
 }

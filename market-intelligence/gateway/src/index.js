@@ -1,7 +1,7 @@
-import { handleMarketGatewayRequest } from './core.js';
+import { handleMarketGatewayEdgeRequest } from './edge.js';
 
 export default {
-  async fetch(request, env) {
-    return handleMarketGatewayRequest(request, env);
+  async fetch(request, env, ctx) {
+    return handleMarketGatewayEdgeRequest(request, env, ctx);
   },
 };
