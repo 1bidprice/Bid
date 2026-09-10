@@ -102,11 +102,19 @@ function liquidityScore(avgDailyValue) {
   return 95;
 }
 
+function tradingDateKey(timestamp) {
+  const value = Number(timestamp);
+  if (!Number.isFinite(value)) return null;
+  const date = new Date(value * 1000);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+}
+
 function alignedReturn(companyCandles, benchmarkCandles, periods) {
-  const companyMap = new Map(companyCandles.map((item) => [item.timestamp, item.close]));
+  const companyMap = new Map(companyCandles.map((item) => [tradingDateKey(item.timestamp), item.close]).filter(([key]) => key));
   const aligned = benchmarkCandles
-    .filter((item) => companyMap.has(item.timestamp))
-    .map((item) => ({ timestamp: item.timestamp, company: companyMap.get(item.timestamp), benchmark: item.close }));
+    .map((item) => ({ ...item, tradingDate: tradingDateKey(item.timestamp) }))
+    .filter((item) => item.tradingDate && companyMap.has(item.tradingDate))
+    .map((item) => ({ timestamp: item.timestamp, company: companyMap.get(item.tradingDate), benchmark: item.close }));
   if (aligned.length <= periods) return null;
   const sample = aligned.slice(-(periods + 1));
   const companyReturn = ((sample.at(-1).company / sample[0].company) - 1) * 100;
@@ -145,7 +153,10 @@ export function calculateMarketMetrics(series, benchmarkSeries = null, options =
   const volumeCoverage = volumeWindow.length ? validVolumeCount / volumeWindow.length : 0;
   const liquidityReady = candles.length >= 60 && volumeCoverage >= 0.9 && valueTraded20.length >= 18;
   const relativeStrengthReady = Boolean(relative60 && relative60.alignedObservationCount >= 61);
-  const marketMetricsReady = priceHistoryReady && liquidityReady && relativeStrengthReady;
+  const sourceReady = options.sourceReady === true;
+  const crossCheckReady = options.crossCheckReady === true;
+  const benchmarkReady = options.benchmarkReady !== false;
+  const marketMetricsReady = priceHistoryReady && liquidityReady && relativeStrengthReady && sourceReady && crossCheckReady && benchmarkReady;
 
   const riskFlags = [];
   if (annualizedVolatility60 !== null && annualizedVolatility60 >= 80) riskFlags.push('EXTREME_VOLATILITY');
@@ -158,7 +169,7 @@ export function calculateMarketMetrics(series, benchmarkSeries = null, options =
 
   return {
     format: 'investor-control-historical-market-metrics',
-    version: 1,
+    version: 2,
     generatedAt: new Date(options.generatedAt || Date.now()).toISOString(),
     companyId: options.companyId || series?.companyId || null,
     symbol: options.symbol || series?.symbol || null,
@@ -201,10 +212,22 @@ export function calculateMarketMetrics(series, benchmarkSeries = null, options =
           alignedObservationCount: relative60.alignedObservationCount,
         }
       : null,
+    dataQuality: {
+      sourceReady,
+      crossCheckReady,
+      benchmarkReady,
+      historySource: options.historySource || series?.source || null,
+      historySourceQuality: options.historySourceQuality || series?.sourceQuality || null,
+      benchmarkSource: options.benchmarkSource || benchmarkSeries?.source || null,
+      validation: options.validation || null,
+    },
     readiness: {
       priceHistoryReady,
       liquidityReady,
       relativeStrengthReady,
+      sourceReady,
+      crossCheckReady,
+      benchmarkReady,
       marketMetricsReady,
     },
   };

@@ -3,7 +3,7 @@ import { evaluateOosOutcomeWindowIndependence } from './forecast-oos-outcome-win
 import { evaluateOosInstrumentConcentration } from './forecast-oos-instrument-concentration.js';
 import { evaluateOosTaxonomyConcentration } from './forecast-oos-taxonomy-concentration.js';
 
-export const FORECAST_STACKED_ENSEMBLE_RESEARCH_VERSION = '2026-08-12.1';
+export const FORECAST_STACKED_ENSEMBLE_RESEARCH_VERSION = '2026-08-12.2';
 export const FORECAST_STACKED_ENSEMBLE_CONTRACT = 'PREQUENTIAL_PATTERN_FACTOR_STACK_V1';
 
 function strictNumber(value) {
@@ -330,7 +330,7 @@ function evaluateGroup(records, options = {}) {
   const minimumPredictionClassCount = Math.max(20, Number(options.ensembleMinimumPredictionClassCount ?? 40));
   const minimumRelativeBrierImprovementPct = Number(options.ensembleMinimumRelativeBrierImprovementPct ?? 3);
   const minimumLogLossImprovement = Number(options.ensembleMinimumLogLossImprovement ?? 0);
-  const minimumEceImprovement = Number(options.ensembleMinimumEceImprovement ?? -0.01);
+  const calibrationStatus = 'UNCALIBRATED_RESEARCH_ONLY';
 
   const sampleIndependence = evaluateOosSampleIndependence(predictions, {
     minimumDistinctForecastDates: options.ensembleMinimumDistinctForecastDates ?? 40,
@@ -370,8 +370,8 @@ function evaluateGroup(records, options = {}) {
   if (!Number.isFinite(Number(comparison.improvement.logLossImprovement)) || comparison.improvement.logLossImprovement < minimumLogLossImprovement) {
     blockers.push('ENSEMBLE_LOGLOSS_NOT_BETTER_THAN_PATTERN');
   }
-  if (!Number.isFinite(Number(comparison.improvement.expectedCalibrationErrorImprovement)) || comparison.improvement.expectedCalibrationErrorImprovement < minimumEceImprovement) {
-    blockers.push('ENSEMBLE_CALIBRATION_ERROR_MATERIALLY_WORSE');
+  if (!Number.isFinite(Number(comparison.stackedEnsemble.expectedCalibrationError))) {
+    blockers.push('ENSEMBLE_CALIBRATION_DIAGNOSTIC_UNAVAILABLE');
   }
 
   const uniqueBlockers = [...new Set(blockers)];
@@ -396,6 +396,7 @@ function evaluateGroup(records, options = {}) {
     baselinePatternMetrics: comparison.baselinePattern,
     ensembleMetrics: comparison.stackedEnsemble,
     improvement: comparison.improvement,
+    calibrationStatus,
     sampleIndependence,
     outcomeWindowIndependence,
     instrumentConcentration,
@@ -408,7 +409,6 @@ function evaluateGroup(records, options = {}) {
       minimumPredictionClassCount,
       minimumRelativeBrierImprovementPct,
       minimumLogLossImprovement,
-      minimumEceImprovement,
     },
     blockers: uniqueBlockers,
     researchOnly: true,
@@ -456,7 +456,7 @@ export function buildForecastStackedEnsembleResearchStatus(input = {}) {
       model: 'DETERMINISTIC_L2_LOGISTIC_STACK',
       comparator: 'EXACT_SAME_PREQUENTIAL_TARGET_SAMPLE_RAW_PATTERN_PROBABILITY',
       regimeInteraction: 'NOT_USED_IN_V1',
-      probabilityUse: 'HISTORICAL_PREQUENTIAL_RESEARCH_EVALUATION_ONLY',
+      probabilityUse: 'UNCALIBRATED_HISTORICAL_PREQUENTIAL_RESEARCH_EVALUATION_ONLY',
     },
     automaticModelPromotionEnabled: false,
     probabilityCalibrationEnabled: false,

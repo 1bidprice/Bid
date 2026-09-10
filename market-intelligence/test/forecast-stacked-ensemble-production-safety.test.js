@@ -103,19 +103,16 @@ test('production firewall rejects stacked research authority, weakened evidence 
 });
 
 test('v1821 runtime remains present after v1822 and still invokes its independent production firewall', () => {
-  const manifest = JSON.parse(read('config/runtime-release-manifest.json'));
+  const pkg = JSON.parse(read('package.json'));
   const runner = read('src/run-autonomous-intelligence.js');
   const verifier = read('scripts/verify-production-output.js');
 
-  assert.equal(manifest.releaseVersion, '1.8.0');
-  assert.ok(manifest.testPatches.includes('apply-v1820-yahoo-history-freshness-recovery.js'));
-  assert.ok(manifest.buildPatches.includes('apply-v1820-yahoo-history-freshness-recovery.js'));
-  assert.ok(manifest.testPatches.includes('apply-v1821-stacked-ensemble-research.js'));
-  assert.ok(manifest.buildPatches.includes('apply-v1821-stacked-ensemble-research.js'));
-  assert.equal(manifest.testPatches.at(-1), 'apply-v1822-regime-stacked-ensemble-research.js');
-  assert.equal(manifest.buildPatches.at(-1), 'apply-v1822-regime-stacked-ensemble-research.js');
-  assert.equal(new Set(manifest.testPatches).size, 71);
-  assert.equal(new Set(manifest.buildPatches).size, 70);
+  assert.equal(pkg.version, '1.8.0');
+  assert.equal(fs.existsSync(path.join(root, 'config/runtime-release-manifest.json')), false);
+  assert.equal(fs.existsSync(path.join(root, 'scripts/run-current-release.js')), false);
+  assert.doesNotMatch(pkg.scripts.test, /run-current-release|apply-v/i);
+  assert.equal(pkg.scripts['run:autonomous'], 'node src/run-autonomous-intelligence.js out/autonomous-intelligence.json');
+
 
   assert.match(runner, /buildForecastStackedEnsembleResearchStatus/);
   assert.match(runner, /forecastStackedEnsembleResearchStatus/);

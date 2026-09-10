@@ -1,3 +1,6 @@
+import { classifyFundamentalModel } from '../fundamental-model.js';
+import { buildSecBankPassport } from '../sec-bank-passport.js';
+
 const CONCEPTS = Object.freeze({
   revenue: [
     'RevenueFromContractWithCustomerExcludingAssessedTax',
@@ -93,6 +96,38 @@ function annualSeries(payload, aliases, preferredUnits) {
   return latestFiledByPeriod(entries).slice(0, 5);
 }
 
+function annualSeriesForConcept(payload, alias, preferredUnits) {
+  const fact = payload?.facts?.['us-gaap']?.[alias];
+  if (!fact?.units) return [];
+  const entries = unitEntries({ name: alias, fact }, preferredUnits)
+    .filter((entry) => ['10-K', '10-K/A', '20-F', '20-F/A'].includes(entry.form))
+    .filter((entry) => entry.start && entry.end);
+  return latestFiledByPeriod(entries).slice(0, 5);
+}
+
+function selectAnnualRevenueSeries(payload) {
+  const candidates = CONCEPTS.revenue
+    .map((concept) => ({ concept, series: annualSeriesForConcept(payload, concept, ['USD']) }))
+    .filter((candidate) => candidate.series.length > 0)
+    .sort((a, b) => {
+      const endOrder = String(b.series[0]?.end || '').localeCompare(String(a.series[0]?.end || ''));
+      if (endOrder) return endOrder;
+      const historyOrder = b.series.length - a.series.length;
+      if (historyOrder) return historyOrder;
+      return Math.abs(Number(b.series[0]?.value || 0)) - Math.abs(Number(a.series[0]?.value || 0));
+    });
+  const selected = candidates[0] || null;
+  return {
+    series: selected?.series || [],
+    selection: {
+      policy: 'MOST_COMPLETE_CONSOLIDATED_ANNUAL_SERIES_V1',
+      selectedConcept: selected?.concept || null,
+      candidateConcepts: candidates.map((candidate) => candidate.concept),
+      candidateCount: candidates.length,
+    },
+  };
+}
+
 function latestInstant(payload, aliases, preferredUnits) {
   const concept = conceptFromPayload(payload, aliases);
   const entries = unitEntries(concept, preferredUnits)
@@ -128,7 +163,9 @@ function metricCoverage(snapshot) {
 }
 
 export function buildSecFundamentalSnapshot(payload, company, options = {}) {
-  const revenue = annualSeries(payload, CONCEPTS.revenue, ['USD']);
+  const revenueChoice = selectAnnualRevenueSeries(payload);
+  const revenue = revenueChoice.series;
+  const model = classifyFundamentalModel(company, { payload });
   const netIncome = annualSeries(payload, CONCEPTS.netIncome, ['USD']);
   const operatingCashFlow = annualSeries(payload, CONCEPTS.operatingCashFlow, ['USD']);
   const capitalExpenditure = annualSeries(payload, CONCEPTS.capitalExpenditure, ['USD']);
@@ -142,6 +179,8 @@ export function buildSecFundamentalSnapshot(payload, company, options = {}) {
     cik: paddedCik(company.cik),
     generatedAt: new Date(options.generatedAt || Date.now()).toISOString(),
     sourceUrl: `https://data.sec.gov/api/xbrl/companyfacts/CIK${paddedCik(company.cik)}.json`,
+    model,
+    reporting: { currency: 'USD', periodMonths: 12, annualComparable: true, genericModelEligible: model.genericValuationEligible },
     annual: {
       revenue,
       netIncome,
@@ -156,18 +195,44 @@ export function buildSecFundamentalSnapshot(payload, company, options = {}) {
       equity: latestInstant(payload, CONCEPTS.equity, ['USD']),
     },
     metrics: {
-      annualRevenueGrowthPct: growthPct(revenue[0], revenue[1]),
-      annualNetMarginPct: ratioPct(netIncome[0], revenue[0]),
+      annualRevenueGrowthPct: model.genericValuationEligible ? growthPct(revenue[0], revenue[1]) : null,
+      annualNetMarginPct: model.genericValuationEligible ? ratioPct(netIncome[0], revenue[0]) : null,
       dilutedSharesChangePct: growthPct(dilutedShares[0], dilutedShares[1]),
       latestAnnualFreeCashFlowUSD:
-        operatingCashFlow[0] && capitalExpenditure[0]
+        model.genericValuationEligible && operatingCashFlow[0] && capitalExpenditure[0]
           ? operatingCashFlow[0].value - capitalExpenditure[0].value
           : null,
+    },
+    quality: {
+      revenueSelection: revenueChoice.selection,
+      specializedModelRequired: model.specializedModelRequired,
+      genericMetricsSuppressed: !model.genericValuationEligible,
     },
   };
 
   snapshot.coverage = metricCoverage(snapshot);
-  snapshot.metricsReady = snapshot.coverage.score >= 65 && Boolean(revenue[0] || operatingCashFlow[0]);
+  snapshot.dataReady = snapshot.coverage.score >= 65 && Boolean(revenue[0] || operatingCashFlow[0]);
+  snapshot.metricsReady = Boolean(snapshot.dataReady && model.modelReady && model.genericValuationEligible);
+
+  if (model.type === 'FINANCIAL_INSTITUTION') {
+    const bankPassport = buildSecBankPassport(payload, snapshot, company, { generatedAt: snapshot.generatedAt });
+    snapshot.specializedModels = { ...(snapshot.specializedModels || {}), bank: bankPassport };
+    snapshot.model = {
+      ...snapshot.model,
+      specializedModelImplemented: true,
+      modelReady: bankPassport.modelReady,
+      specializedModelStatus: bankPassport.status,
+    };
+    snapshot.quality = {
+      ...(snapshot.quality || {}),
+      specializedModelImplemented: true,
+      bankPassportStatus: bankPassport.status,
+      bankPassportBlockers: bankPassport.blockers,
+    };
+    // Bank facts can be analytically useful while the investment decision remains
+    // fail-closed. Generic metricsReady must never be borrowed from the operating model.
+    snapshot.metricsReady = bankPassport.decisionReady === true;
+  }
   return snapshot;
 }
 
@@ -198,10 +263,21 @@ export async function fetchSecCompanyFacts(company, options = {}) {
     generatedAt: options.generatedAt,
   });
 
-  return {
-    snapshot,
-    diagnostics: snapshot.coverage.available
-      ? []
-      : [{ code: 'SEC_COMPANY_FACTS_EMPTY', companyId: company.companyId }],
-  };
+  const diagnostics = [];
+  if (!snapshot.coverage.available) diagnostics.push({ code: 'SEC_COMPANY_FACTS_EMPTY', companyId: company.companyId });
+  if (snapshot.model?.specializedModelRequired === true && snapshot.model?.specializedModelImplemented !== true) diagnostics.push({
+    code: 'SEC_FUNDAMENTAL_SPECIALIZED_MODEL_REQUIRED',
+    companyId: company.companyId,
+    modelType: snapshot.model.type,
+    requiredMetrics: snapshot.model.requiredSpecializedMetrics,
+  });
+  if (snapshot.model?.type === 'FINANCIAL_INSTITUTION' && snapshot.model?.specializedModelImplemented === true && snapshot.model?.modelReady !== true) diagnostics.push({
+    code: 'SEC_BANK_PASSPORT_INCOMPLETE',
+    companyId: company.companyId,
+    status: snapshot.specializedModels?.bank?.status || 'INSUFFICIENT_BANK_DATA',
+    blockers: snapshot.specializedModels?.bank?.blockers || [],
+    coreCoverage: snapshot.specializedModels?.bank?.coverage?.core || null,
+    assetQualityCoverage: snapshot.specializedModels?.bank?.coverage?.assetQuality || null,
+  });
+  return { snapshot, diagnostics };
 }

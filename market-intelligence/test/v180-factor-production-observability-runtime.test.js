@@ -7,7 +7,7 @@ const root = new URL('../', import.meta.url);
 test('v1.8 runtime publishes compact factor observability and production verifier enforces governance safety', () => {
   const source = fs.readFileSync(new URL('src/run-autonomous-intelligence.js', root), 'utf8');
   const verifier = fs.readFileSync(new URL('scripts/verify-production-output.js', root), 'utf8');
-  const manifest = JSON.parse(fs.readFileSync(new URL('config/runtime-release-manifest.json', root), 'utf8'));
+  const pkg = JSON.parse(fs.readFileSync(new URL('package.json', root), 'utf8'));
 
   assert.match(source, /import \{ buildForecastFactorOperationalTelemetry \} from '\.\/forecast-factor-production-safety\.js';/);
   assert.match(source, /const forecastFactorOperationalTelemetry = buildForecastFactorOperationalTelemetry\(\{/);
@@ -27,11 +27,12 @@ test('v1.8 runtime publishes compact factor observability and production verifie
   assert.match(verifier, /verifyForecastFactorProductionSafety\(report\);/);
   assert.match(verifier, /factorResearchGovernanceSafety: 'REQUIRED'/);
 
-  assert.equal(manifest.releaseVersion, '1.8.0');
-  assert.equal(manifest.testPatches.at(-1), 'apply-v1808-forecast-factor-production-observability.js');
-  assert.equal(manifest.buildPatches.at(-1), 'apply-v1808-forecast-factor-production-observability.js');
-  assert.equal(new Set(manifest.testPatches).size, 57);
-  assert.equal(new Set(manifest.buildPatches).size, 56);
+  assert.equal(pkg.version, '1.8.0');
+  assert.equal(fs.existsSync(new URL('config/runtime-release-manifest.json', root)), false);
+  assert.equal(fs.existsSync(new URL('scripts/run-current-release.js', root)), false);
+  assert.doesNotMatch(pkg.scripts.test, /run-current-release|apply-v/i);
+  assert.equal(pkg.scripts['run:autonomous'], 'node src/run-autonomous-intelligence.js out/autonomous-intelligence.json');
+
 });
 
 test('v1.8 factor telemetry is written by the single canonical production operationalHealth object', () => {

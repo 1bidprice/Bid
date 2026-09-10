@@ -209,6 +209,8 @@ export async function discoverAutonomousCandidates(options = {}) {
     registryCompanyCount: allCompanies.length,
     secRegistryCompanyCount: universeResult.companies?.length || 0,
     athensActiveIssuerCount: athensResult.companies?.length || 0,
+    classificationSnapshotCount: athensResult.classificationSnapshots?.length || 0,
+    classificationSnapshots: athensResult.classificationSnapshots || [],
     filingEventCount: recentRecords.length,
     secFilingEventCount: (filingsResult.records || []).filter((record) => hoursOld(now, record.publishedAt) <= maxEventAgeHours).length,
     athensAnnouncementEventCount: (athensResult.records || []).filter((record) => hoursOld(now, record.publishedAt) <= maxEventAgeHours).length,

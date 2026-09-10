@@ -17,6 +17,7 @@ function compactEvidence(record) {
     independenceGroup: record.independenceGroup || null,
     isPrimarySource: record.isPrimarySource === true,
     documentStatus: record.document?.status || null,
+    companyIds: Array.isArray(record.companyIds) ? unique(record.companyIds) : [],
   };
 }
 
@@ -58,12 +59,32 @@ function normalizeClaims(claims = []) {
 }
 
 function referencePrice(marketSnapshot, historicalMetrics) {
-  if (marketSnapshot?.usable && !marketSnapshot.stale && marketSnapshot.currentPrice > 0 && marketSnapshot.quoteAt) {
+  const quoteContractAllowsAnalysis = marketSnapshot?.quoteContract
+    ? marketSnapshot.quoteContract.analysisReferenceEligible === true
+    : marketSnapshot?.usable === true;
+  if (quoteContractAllowsAnalysis && !marketSnapshot.stale && marketSnapshot.currentPrice > 0 && marketSnapshot.quoteAt) {
     return {
       value: marketSnapshot.currentPrice,
       currency: marketSnapshot.currency,
       timestamp: marketSnapshot.quoteAt,
       source: marketSnapshot.source,
+      sourceUrl: marketSnapshot.sourceUrl || null,
+      companyId: marketSnapshot.companyId || null,
+      companyName: marketSnapshot.companyName || null,
+      appSymbol: marketSnapshot.appSymbol || marketSnapshot.symbol || null,
+      providerSymbol: marketSnapshot.providerSymbol || null,
+      sourceRole: marketSnapshot?.quoteContract?.sourceRole || null,
+      sourceApproved: marketSnapshot?.quoteContract?.sourceApproved === true,
+      timestampVerified: marketSnapshot?.quoteContract?.timestampVerified === true,
+      purpose: 'ANALYSIS_REFERENCE',
+      analysisReferenceEligible: true,
+      executionFreshnessEligible: marketSnapshot?.quoteContract?.executionFreshnessEligible === true,
+      decisionEligible: marketSnapshot?.quoteContract?.decisionEligible === true,
+      freshnessModel: marketSnapshot?.quoteContract?.freshnessModel || null,
+      publicStatus: marketSnapshot?.quoteContract?.publicStatus || null,
+      diagnosticCodes: Array.isArray(marketSnapshot?.quoteContract?.diagnosticCodes)
+        ? [...marketSnapshot.quoteContract.diagnosticCodes]
+        : [],
     };
   }
   if (historicalMetrics?.latestClose > 0 && historicalMetrics.latestTimestamp) {
@@ -72,9 +93,38 @@ function referencePrice(marketSnapshot, historicalMetrics) {
       currency: historicalMetrics.currency,
       timestamp: new Date(historicalMetrics.latestTimestamp * 1000).toISOString(),
       source: 'Historical market series',
+      sourceUrl: historicalMetrics.sourceUrl || null,
+      companyId: historicalMetrics.companyId || null,
+      companyName: historicalMetrics.companyName || null,
+      appSymbol: historicalMetrics.appSymbol || historicalMetrics.symbol || null,
+      providerSymbol: historicalMetrics.providerSymbol || null,
+      sourceRole: 'HISTORICAL_MARKET_SERIES',
+      sourceApproved: true,
+      timestampVerified: true,
+      purpose: 'HISTORICAL_REFERENCE',
+      analysisReferenceEligible: true,
+      executionFreshnessEligible: false,
+      decisionEligible: false,
+      freshnessModel: 'HISTORICAL_CLOSE',
+      publicStatus: 'HISTORICAL_REFERENCE_ONLY',
+      diagnosticCodes: ['HISTORICAL_REFERENCE_NOT_EXECUTION_ELIGIBLE'],
     };
   }
   return null;
+}
+
+function entityIntegrityBlockers(company, records, reference) {
+  const blockers = [];
+  const companyId = company?.companyId || null;
+  if (!companyId) blockers.push('COMPANY_IDENTITY_REQUIRED');
+
+  for (const record of records) {
+    const ids = Array.isArray(record?.companyIds) ? record.companyIds.filter(Boolean) : [];
+    if (ids.length && companyId && !ids.includes(companyId)) blockers.push('EVIDENCE_ENTITY_MISMATCH');
+  }
+
+  if (reference?.companyId && companyId && reference.companyId !== companyId) blockers.push('REFERENCE_PRICE_ENTITY_MISMATCH');
+  return unique(blockers);
 }
 
 function synthesisBlockers(input) {
@@ -104,8 +154,9 @@ export function buildResearchDossier(input = {}) {
   const baseReadiness = evaluateSignalReadiness({
     evidence: records.find((record) => record?.document?.reviewed === true) || records[0] || null,
     fundamentals: input.fundamentals,
-    marketMetrics: input.historicalMarketMetrics,
-    crossCheck,
+    marketMetrics: input.historicalMarketMetrics,    crossCheck,
+    decisionBasis: input.decisionBasis || 'EVENT_DRIVEN',
+    decisionCorroboration: input.decisionCorroboration || null,
     thesis: input.thesis,
     invalidationCondition: input.invalidationCondition,
     risks,
@@ -114,6 +165,7 @@ export function buildResearchDossier(input = {}) {
     ...baseReadiness.blockers,
     ...synthesisBlockers(input),
     ...(reference ? [] : ['REFERENCE_PRICE_REQUIRED']),
+    ...entityIntegrityBlockers(company, records, reference),
   ]);
   const publishable = blockers.length === 0;
   const category = input.category || 'INSUFFICIENT_EVIDENCE';
@@ -133,6 +185,17 @@ export function buildResearchDossier(input = {}) {
     companyId: company.companyId || 'company:unknown',
     companyName: company.displayName || company.legalName || 'Unknown company',
     listing: company.primaryListing || { exchange: 'Unknown', symbol: 'UNKNOWN', mic: null },
+    integrityContractVersion: 1,
+    listingIntegrity: {
+      activeTradingVerified: company.activeTradingVerified === true || company.primaryListing?.activeTradingVerified === true,
+      lifecycleStatus: company.listingStatus || company.primaryListing?.status || null,
+      verifiedAt: company.listingVerifiedAt || company.primaryListing?.verifiedAt || null,
+    },
+    decisionBasis: input.decisionBasis || 'EVENT_DRIVEN',
+    instrumentProfile: input.instrumentProfile || null,
+    instrumentRoute: input.instrumentRoute || null,
+    instrumentCapabilities: input.instrumentCapabilities || null,
+    instrumentCapabilityEvaluation: input.instrumentCapabilityEvaluation || null,
     generatedAt,
     status: publishable ? 'REVIEW_READY' : 'DRAFT_RESEARCH',
     category,
@@ -147,12 +210,14 @@ export function buildResearchDossier(input = {}) {
     risks,
     invalidationCondition: input.invalidationCondition?.trim() || null,
     evidence: records.map(compactEvidence),
+    marketQuote: input.marketSnapshot || null,
     metrics: {
       leadClaim: compactClaim(input.leadClaim),
       fundamentals: input.fundamentals || null,
       market: input.historicalMarketMetrics || null,
       fundamentalRisk: input.fundamentalRisk || null,
       crossCheck,
+      decisionCorroboration: input.decisionCorroboration || null,
     },
     readiness: {
       publishable,

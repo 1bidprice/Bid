@@ -6,14 +6,32 @@ function host(url) {
   try { return new URL(String(url || '')).hostname.toLowerCase(); } catch { return null; }
 }
 
-function officialFundamentalSource(snapshot) {
+function organizationRoot(url) {
+  try {
+    const host = new URL(String(url || '')).hostname.toLowerCase().replace(/^www\./, '');
+    const parts = host.split('.').filter(Boolean);
+    return parts.length <= 2 ? host : parts.slice(-2).join('.');
+  } catch { return null; }
+}
+
+function canonicalIssuerFinancialHost(sourceHost, company) {
+  if (!sourceHost) return false;
+  const roots = [company?.website, company?.investorRelationsUrl].map(organizationRoot).filter(Boolean);
+  return roots.some((root) => sourceHost === root || sourceHost.endsWith(`.${root}`));
+}
+
+function officialFundamentalSource(snapshot, company) {
   const sourceUrl = snapshot?.sourceUrl || snapshot?.sourceDocument?.detailUrl || snapshot?.sourceDocument?.indexUrl || null;
   const sourceHost = host(sourceUrl);
+  const issuerBound = snapshot?.sourceDocument?.sourceRole === 'PRIMARY_ISSUER_FINANCIAL_DOCUMENT'
+    && snapshot?.sourceDocument?.identityBinding === 'CANONICAL_ISSUER_IR_DOMAIN'
+    && canonicalIssuerFinancialHost(sourceHost, company);
   const official = sourceHost === 'data.sec.gov'
     || sourceHost === 'www.sec.gov'
     || sourceHost === 'sec.gov'
-    || sourceHost === 'athens.euronext.com';
-  return { sourceUrl, sourceHost, official };
+    || sourceHost === 'athens.euronext.com'
+    || issuerBound;
+  return { sourceUrl, sourceHost, official, issuerBound };
 }
 
 function marketSource(snapshot, metrics) {
@@ -41,7 +59,7 @@ export function buildStructuredDecisionEvidence(input = {}) {
   const marketMetrics = input.marketMetrics || null;
 
   if (fundamentals?.metricsReady === true) {
-    const source = officialFundamentalSource(fundamentals);
+    const source = officialFundamentalSource(fundamentals, company);
     if (source.official && source.sourceUrl) {
       const payload = {
         companyId: company.companyId,
@@ -54,7 +72,7 @@ export function buildStructuredDecisionEvidence(input = {}) {
       records.push({
         id: evidenceId('verified-fundamentals', payload),
         sourceType: 'STRUCTURED_FUNDAMENTALS',
-        sourceName: source.sourceHost?.includes('sec.gov') ? 'SEC structured financial data' : 'Euronext Athens reviewed financial data',
+        sourceName: source.sourceHost?.includes('sec.gov') ? 'SEC structured financial data' : source.issuerBound ? 'Issuer reviewed financial statements' : 'Euronext Athens reviewed financial data',
         sourceUrl: source.sourceUrl,
         sourceDocumentId: fundamentals?.sourceDocument?.title || null,
         publishedAt: fundamentals?.sourceDocument?.modifiedAt || fundamentals?.generatedAt || generatedAt,
@@ -77,7 +95,7 @@ export function buildStructuredDecisionEvidence(input = {}) {
           reviewed: true,
           status: 'VERIFIED_STRUCTURED_DATA',
           contentType: 'application/json',
-          sourceRole: 'PRIMARY_REGULATORY_OR_EXCHANGE_FINANCIAL_DATA',
+          sourceRole: source.issuerBound ? 'PRIMARY_ISSUER_FINANCIAL_DOCUMENT' : 'PRIMARY_REGULATORY_OR_EXCHANGE_FINANCIAL_DATA',
         },
         decisionEvidenceRole: 'FUNDAMENTAL_BASELINE',
         eventClaimEligible: false,
