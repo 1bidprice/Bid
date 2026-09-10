@@ -19,8 +19,9 @@ function requireServerCredential(name) {
   if (!String(process.env[name] || '').trim()) fail(`server-side credential missing: ${name}`);
 }
 
+// Finnhub is the canonical tier-1 US current-quote provider in source-governor.js.
+// Do not make non-canonical/optional providers release blockers here.
 requireServerCredential('FINNHUB_TOKEN');
-requireServerCredential('TWELVE_DATA_API_KEY');
 
 if (feed.format !== 'investor-control-mobile-intelligence-feed' || feed.version !== 2) {
   fail('unexpected mobile intelligence feed contract');
