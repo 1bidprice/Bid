@@ -15,7 +15,7 @@ const {
   fetchCanonicalGatewayFx,
   fetchCanonicalGatewayQuotes,
   fetchCanonicalGatewayMarketSnapshot,
-} = require('../src/market-gateway-client.cjs');
+} = require('../src/market-gateway-client.js');
 
 function quotePayload() {
   return {
@@ -172,14 +172,22 @@ async function main() {
   assert.equal(greekOnly.fxReference, null);
   assert.equal(greekOnlyCalls.length, 1);
 
-  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'market-gateway-client.cjs'), 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'market-gateway-client.js'), 'utf8');
   assert.equal(source.includes('FINNHUB_TOKEN'), false);
   assert.equal(source.includes('finnhub.io'), false);
   assert.equal(source.includes('EURUSD=X'), false);
   assert.equal(source.includes('ecb.europa.eu'), false);
   assert.equal(source.includes('api/v1/quote'), false);
 
-  console.log('market gateway mobile quote + FX client contract: PASS');
+  const runtimeSource = fs.readFileSync(path.join(__dirname, '..', 'src', 'market-gateway-runtime.js'), 'utf8');
+  assert.match(runtimeSource, /process\.env\.EXPO_PUBLIC_MARKET_GATEWAY_URL/);
+  assert.equal(runtimeSource.includes('EXPO_PUBLIC_FINNHUB'), false);
+  assert.equal(runtimeSource.includes('FINNHUB_TOKEN'), false);
+  assert.equal(runtimeSource.includes('EURUSD=X'), false);
+  assert.equal(runtimeSource.includes('finnhub.io'), false);
+  assert.equal(runtimeSource.includes('ecb.europa.eu'), false);
+
+  console.log('market gateway mobile quote + FX client/runtime contract: PASS');
 }
 
 main().catch((error) => {
