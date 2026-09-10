@@ -38,7 +38,7 @@ jobs:
           mkdir -p market-intelligence-materialization-audit
           printf '%s\n' "$GITHUB_SHA" > market-intelligence-materialization-audit/source-commit.txt
           git status --short > market-intelligence-materialization-audit/pristine-status.txt
-          find market-intelligence/src market-intelligence/test market-intelligence/tests market-intelligence/schemas market-intelligence/config \
+          find market-intelligence/src market-intelligence/test market-intelligence/tests market-intelligence/schemas market-intelligence/config market-intelligence/scripts \
             -type f -print 2>/dev/null | sort > market-intelligence-materialization-audit/pristine-files.txt || true
 
       - name: Apply current release chain and run full tests
@@ -54,7 +54,7 @@ jobs:
           git diff --name-only -- market-intelligence > market-intelligence-materialization-audit/materialized-files.txt
           rm -rf market-intelligence-materialization-audit/materialized
           mkdir -p market-intelligence-materialization-audit/materialized/market-intelligence
-          for path in src test tests schemas config package.json; do
+          for path in src test tests schemas config scripts package.json; do
             if [ -e "market-intelligence/$path" ]; then
               cp -R "market-intelligence/$path" "market-intelligence-materialization-audit/materialized/market-intelligence/$path"
             fi
