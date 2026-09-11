@@ -653,7 +653,23 @@ export async function fetchPortfolioQuotes(symbols, { finnhubToken = '' } = {}) 
   const quotes = {};
 
   cleanSymbols.forEach((symbol) => {
-    const selected = gatewayEnabled && fetched[symbol] ? fetched[symbol] : newest[symbol];
+    const persistedGateway = persisted[symbol]?.marketDataMode === 'CANONICAL_GATEWAY'
+      ? persisted[symbol]
+      : null;
+    const memoryGateway = inMemoryQuotes[symbol]?.marketDataMode === 'CANONICAL_GATEWAY'
+      ? inMemoryQuotes[symbol]
+      : null;
+    const canonicalRegistryQuote = canonicalFeedQuotes[symbol]?.canonicalRegistry === true
+      ? canonicalFeedQuotes[symbol]
+      : null;
+    const trustedGatewayFallback = chooseMostRecentQuote(
+      symbol,
+      chooseMostRecentQuote(symbol, persistedGateway, memoryGateway),
+      canonicalRegistryQuote,
+    );
+    const selected = gatewayEnabled
+      ? fetched[symbol] || trustedGatewayFallback
+      : newest[symbol];
     if (!selected) return;
     try {
       const withFx = applyFx(symbol, selected, fx);
