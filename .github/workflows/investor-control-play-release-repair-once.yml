@@ -58,7 +58,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git rm .github/scripts/repair-play-release-signing.py
+          git rm -f .github/scripts/repair-play-release-signing.py
           git rm .github/workflows/investor-control-play-release-repair-once.yml
           git add .github/workflows/verify-investor-control-play-aab.yml
           git config user.name 'github-actions[bot]'
