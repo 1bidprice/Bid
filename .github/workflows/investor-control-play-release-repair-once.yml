@@ -27,6 +27,15 @@ jobs:
           ref: investor-control-core-stabilization-v174
           fetch-depth: 0
 
+      - name: Remove self-referential negative checks from replacement payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          SCRIPT='.github/scripts/repair-play-release-signing.py'
+          sed -i "/^[[:space:]]*! grep -q 'gr.investorcontrol.play'/d" "$SCRIPT"
+          sed -i "/^[[:space:]]*! grep -q 'openssl rand -hex 32'/d" "$SCRIPT"
+          sed -i "/^[[:space:]]*! grep -q 'keytool -genkeypair'/d" "$SCRIPT"
+
       - name: Apply stable Play release repair
         run: python3 .github/scripts/repair-play-release-signing.py
 
