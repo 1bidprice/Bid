@@ -178,6 +178,7 @@ assert.ok(market.includes('exchangeCalendarVerified: exchange.calendarVerified !
 assert.ok(!market.includes("quote?.nativeCurrency || (symbol.endsWith('.US') ? 'USD' : 'EUR')"));
 assert.ok(quoteContract.includes("MOBILE_QUOTE_CONTRACT_VERSION = '2026-08-20.2'"));
 assert.ok(quoteContract.includes('evaluateMobileQuoteIntegrity'));
+assert.ok(quoteContract.includes('advertisedDelayMinutes: Math.max(0, Number(entry.advertisedDelayMinutes ?? inherited?.advertisedDelayMinutes ?? 0))'));
 assert.ok(integritySource.includes("MOBILE_INSTRUMENT_INTEGRITY_VERSION = '2026-08-24.1'"));
 assert.ok(integritySource.includes('CLOSED_MARKET_REFERENCE'));
 assert.ok(portfolio.includes("import { buildPortfolioSnapshot } from './src/portfolio-engine';"));

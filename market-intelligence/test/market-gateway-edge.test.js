@@ -55,7 +55,7 @@ test('edge client identifier is opaque, stable-format only', () => {
 });
 
 test('edge cache TTL is bounded by source cadence', () => {
-  assert.equal(gatewayCacheTtlSeconds('SPCE.US'), 5);
+  assert.equal(gatewayCacheTtlSeconds('SPCE.US'), 30);
   assert.equal(gatewayCacheTtlSeconds('ALWN.GR'), 60);
   assert.equal(gatewayCacheTtlSeconds('EURUSD'), 900);
   assert.equal(gatewayCacheTtlSeconds('UNKNOWN.X'), 0);
@@ -92,7 +92,7 @@ test('cache hit bypasses rate-limit counters and upstream providers', async () =
   assert.equal(fetchCalls, 0);
 });
 
-test('cache miss applies both limiters, calls canonical core and stores only a five-second US edge copy', async () => {
+test('cache miss applies both limiters, calls canonical core and stores a thirty-second US edge copy', async () => {
   const clientCalls = [];
   const upstreamCalls = [];
   const cache = memoryCache();
@@ -109,7 +109,7 @@ test('cache miss applies both limiters, calls canonical core and stores only a f
   assert.deepEqual(clientCalls, [`client:${CLIENT_ID}`]);
   assert.deepEqual(upstreamCalls, ['upstream:US']);
   assert.equal(cache.puts.length, 1);
-  assert.equal(cache.puts[0].cacheControl, 'public, max-age=5');
+  assert.equal(cache.puts[0].cacheControl, 'public, max-age=30');
   const body = await response.json();
   assert.equal(body.quote.currency, 'USD');
   assert.equal(body.quote.quoteContract.identityVerified, true);

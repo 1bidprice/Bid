@@ -25,7 +25,7 @@ export function normalizeGatewayClientId(value) {
 }
 
 export function gatewayCacheTtlSeconds(resourceKey) {
-  if (String(resourceKey || '').endsWith('.US')) return 5;
+  if (String(resourceKey || '').endsWith('.US')) return 30;
   if (String(resourceKey || '').endsWith('.GR')) return 60;
   if (String(resourceKey || '') === 'EURUSD') return 900;
   return 0;

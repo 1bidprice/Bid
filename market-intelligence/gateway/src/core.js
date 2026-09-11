@@ -57,7 +57,25 @@ export function parseGatewaySymbol(value) {
   return { symbol: match[1], market: match[2], appSymbol: `${match[1]}.${match[2]}` };
 }
 
+const CANONICAL_US_COMPANIES = Object.freeze({
+  SPCE: Object.freeze({
+    companyId: 'company:virgin-galactic-holdings',
+    displayName: 'Virgin Galactic',
+    country: 'US',
+    currency: 'USD',
+    active: true,
+    primaryListing: Object.freeze({
+      exchange: 'New York Stock Exchange',
+      symbol: 'SPCE',
+      mic: 'XNYS',
+      currency: 'USD',
+    }),
+  }),
+});
+
 function usCompany(symbol) {
+  const canonical = CANONICAL_US_COMPANIES[symbol];
+  if (canonical) return canonical;
   return {
     companyId: `gateway:us:${symbol}`,
     displayName: symbol,

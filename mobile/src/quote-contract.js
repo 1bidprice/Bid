@@ -105,6 +105,7 @@ export function quoteFromRegistry(symbol, entry, options = {}) {
     providerSymbol: entry.providerSymbol || entry.appSymbol || symbol,
     quality: role === SOURCE_ROLES.PRIMARY_EXCHANGE ? 'delayed15' : 'realtime',
     session: 'regular-market',
+    advertisedDelayMinutes: Math.max(0, Number(entry.advertisedDelayMinutes ?? inherited?.advertisedDelayMinutes ?? 0)),
     priceTimestampVerified: inherited?.timestampVerified === true,
     dayChangeVerified: inherited?.dayChangeEligible === true,
     quoteContract: inherited,

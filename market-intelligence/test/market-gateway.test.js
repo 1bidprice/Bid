@@ -51,7 +51,9 @@ test('US quote is identity-verified server-side and never exposes the Finnhub se
   assert.equal(body.quote.quoteContract.sourceRole, 'LICENSED_MARKET_DATA');
   assert.equal(body.quote.quoteContract.valuationEligible, true);
   assert.equal(JSON.stringify(body).includes(secret), false);
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /finnhub\.io\/api\/v1\/quote\?symbol=SPCE/);
+  assert.equal(calls.some((call) => call.url.includes('/stock/profile2')), false);
 });
 
 test('US ticker mismatch fails closed before the quote endpoint is called', async () => {
