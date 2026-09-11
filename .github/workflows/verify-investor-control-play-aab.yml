@@ -133,12 +133,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          WF='.github/workflows/verify-investor-control-play-aab.yml'
           test "$(node -p "require('./mobile/app.json').expo.android.package")" = 'gr.investorcontrol.app'
           test "$(node -p "require('./mobile/app.json').expo.android.versionCode")" = '31'
-          grep -q 'ANDROID_UPLOAD_KEYSTORE_BASE64' .github/workflows/verify-investor-control-play-aab.yml
-          ! grep -q 'gr.investorcontrol.play' .github/workflows/verify-investor-control-play-aab.yml
-          ! grep -q 'openssl rand -hex 32' .github/workflows/verify-investor-control-play-aab.yml
-          ! grep -q 'keytool -genkeypair' .github/workflows/verify-investor-control-play-aab.yml
+          KEYSTORE_SECRET='ANDROID_UPLOAD_KEYSTORE_'BASE64
+          ALIAS_SECRET='ANDROID_UPLOAD_KEY_'ALIAS
+          STORE_PASS_SECRET='ANDROID_UPLOAD_KEYSTORE_'PASSWORD
+          KEY_PASS_SECRET='ANDROID_UPLOAD_KEY_'PASSWORD
+          grep -Fq "secrets.${KEYSTORE_SECRET}" "$WF"
+          grep -Fq "secrets.${ALIAS_SECRET}" "$WF"
+          grep -Fq "secrets.${STORE_PASS_SECRET}" "$WF"
+          grep -Fq "secrets.${KEY_PASS_SECRET}" "$WF"
+          BAD_PACKAGE='gr.investorcontrol.'play
+          BAD_RAND='openssl rand -hex '32
+          BAD_KEYGEN='keytool -genkey'pair
+          ! grep -Fq "$BAD_PACKAGE" "$WF"
+          ! grep -Fq "$BAD_RAND" "$WF"
+          ! grep -Fq "$BAD_KEYGEN" "$WF"
 
       - name: Build Play preflight Android App Bundle
         working-directory: mobile/android
