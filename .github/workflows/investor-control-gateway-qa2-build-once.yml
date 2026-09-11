@@ -1,0 +1,97 @@
+name: Investor Control Corrected Live Gateway QA APK Once
+
+on:
+  push:
+    branches:
+      - investor-control-core-stabilization-v174
+    paths:
+      - .github/workflows/investor-control-gateway-qa2-build-once.yml
+
+permissions:
+  contents: read
+
+env:
+  EXPO_PUBLIC_MARKET_GATEWAY_URL: https://investor-control-market-gateway.bidprice-alerts.workers.dev
+
+jobs:
+  build-corrected-live-gateway-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout exact verified corrected source
+        uses: actions/checkout@v4
+        with:
+          ref: af1eeb35e460fbc42d3841f2d6ab62ccdb400a4d
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: Verify canonical mobile core in live gateway mode
+        working-directory: mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run test:core
+          npx expo install --check
+          npx expo-doctor@latest
+          rm -rf dist-gateway-qa2
+          npx expo export --platform android --output-dir dist-gateway-qa2
+          grep -R -F -q 'https://investor-control-market-gateway.bidprice-alerts.workers.dev' dist-gateway-qa2
+
+      - name: Generate Android project
+        working-directory: mobile
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Build release APK with live gateway URL
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -o pipefail
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee ../gradle-gateway-qa2.log
+
+      - name: Sign, verify and prove embedded gateway
+        shell: bash
+        run: |
+          set -euo pipefail
+          UNSIGNED='mobile/android/app/build/outputs/apk/release/app-release.apk'
+          KEYSTORE='mobile/android/app/debug.keystore'
+          OUTPUT='mobile/Investor-Control-v1.7.3-gateway-qa2.apk'
+          ALIGNED='mobile/Investor-Control-v1.7.3-gateway-qa2-aligned.apk'
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          ZIPALIGN="$BUILD_TOOLS/zipalign"
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+          test -s "$UNSIGNED"
+          test -s "$KEYSTORE"
+          "$ZIPALIGN" -p -f 4 "$UNSIGNED" "$ALIGNED"
+          "$APKSIGNER" sign --ks "$KEYSTORE" --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --out "$OUTPUT" "$ALIGNED"
+          "$APKSIGNER" verify --verbose --print-certs "$OUTPUT" | tee mobile/gateway-qa2-signature.txt
+          grep -qi 'fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c' mobile/gateway-qa2-signature.txt
+          rm -rf /tmp/gateway-qa2-apk && mkdir -p /tmp/gateway-qa2-apk
+          unzip -q "$OUTPUT" 'assets/index.android.bundle' -d /tmp/gateway-qa2-apk
+          grep -F -q 'https://investor-control-market-gateway.bidprice-alerts.workers.dev' /tmp/gateway-qa2-apk/assets/index.android.bundle
+          sha256sum "$OUTPUT" | tee mobile/Investor-Control-v1.7.3-gateway-qa2.sha256
+
+      - name: Upload corrected QA APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1.7.3-gateway-qa2
+          path: |
+            mobile/Investor-Control-v1.7.3-gateway-qa2.apk
+            mobile/Investor-Control-v1.7.3-gateway-qa2.sha256
+            mobile/gateway-qa2-signature.txt
+          if-no-files-found: error
+          retention-days: 30
