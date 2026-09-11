@@ -1,0 +1,42 @@
+name: Investor Control Gateway Diagnostic Once
+
+on:
+  push:
+    branches:
+      - investor-control-core-stabilization-v174
+    paths:
+      - .github/workflows/investor-control-gateway-diagnostic-once.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose-live-gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      GATEWAY_URL: https://investor-control-market-gateway.bidprice-alerts.workers.dev
+    steps:
+      - name: Capture live gateway responses without secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLIENT_ID="github_diag_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          : > diagnostic.txt
+          for symbol in SPCE.US ALWN.GR CREDIA.GR; do
+            code="$(curl --silent --show-error --max-time 20 -o "${symbol}.json" -w '%{http_code}' -H "X-Investor-Control-Client: $CLIENT_ID" "$GATEWAY_URL/v1/quote?symbol=$symbol" || true)"
+            echo "=== $symbol HTTP $code ===" >> diagnostic.txt
+            node -e "const fs=require('fs'); let p={}; try{p=JSON.parse(fs.readFileSync(process.argv[1],'utf8'))}catch{}; const q=p.quote; const out={format:p.format||null,error:p.error||null,requestedSymbol:p.requestedSymbol||null,quote:q?{appSymbol:q.appSymbol,price:q.price,currency:q.currency,quoteAt:q.quoteAt||null,checkedAt:q.checkedAt||null,source:q.source||null,providerSymbol:q.providerSymbol||null,advertisedDelayMinutes:q.advertisedDelayMinutes||null,quoteContract:q.quoteContract||null}:null}; console.log(JSON.stringify(out,null,2));" "${symbol}.json" >> diagnostic.txt
+          done
+          fx_code="$(curl --silent --show-error --max-time 20 -o fx.json -w '%{http_code}' -H "X-Investor-Control-Client: $CLIENT_ID" "$GATEWAY_URL/v1/fx?pair=EURUSD" || true)"
+          echo "=== EURUSD HTTP $fx_code ===" >> diagnostic.txt
+          node -e "const fs=require('fs'); let p={}; try{p=JSON.parse(fs.readFileSync('fx.json','utf8'))}catch{}; console.log(JSON.stringify({format:p.format||null,error:p.error||null,reference:p.reference||null},null,2));" >> diagnostic.txt
+          cat diagnostic.txt
+
+      - name: Upload diagnostic
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-gateway-diagnostic
+          path: diagnostic.txt
+          if-no-files-found: error
+          retention-days: 7
