@@ -18,6 +18,7 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isMarketGatewayConfigured } from './src/market-gateway-runtime';
 import * as SecureStore from 'expo-secure-store';
 import {
   SafeAreaProvider,
@@ -65,6 +66,7 @@ const PRIVACY_POLICY_URL = 'https://1bidprice.github.io/Bid/privacy-policy.html'
 const TERMS_URL = 'https://1bidprice.github.io/Bid/terms.html';
 const SUPPORT_EMAIL = 'xrimapp@gmail.com';
 const LEGAL_ACCEPTANCE_KEY = 'investor-control.legal-acceptance.v1';
+const MARKET_GATEWAY_CONFIGURED = isMarketGatewayConfigured();
 const EMPTY_STATE = {
   schemaVersion: 5,
   transactions: [],
@@ -655,7 +657,7 @@ function MainApp({ onOpenDecisionGate }) {
   const liveUsProviderSymbolsKey = liveUsProviderSymbols.join('|');
 
   useEffect(() => {
-    if (loading || token.trim().length < 20 || !liveUsProviderSymbols.length) return undefined;
+    if (loading || MARKET_GATEWAY_CONFIGURED || token.trim().length < 20 || !liveUsProviderSymbols.length) return undefined;
     return openFinnhubTrades(token.trim(), liveUsProviderSymbols, async (trade) => {
       if (!trade?.appSymbol || !trade?.quote) return;
       const current = stateRef.current;

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { fetchConfiguredMarketGatewaySnapshot, isMarketGatewayConfigured } from './market-gateway-runtime';
 import { buildMobileQuoteContract, quoteFromRegistry, safeProviderDiagnostic } from './quote-contract';
 import { routeMobileInstrument } from './instrument-quote-integrity';
 import { marketStateForSymbol } from './market-rules';
@@ -548,36 +549,102 @@ export async function fetchPortfolioQuotes(symbols, { finnhubToken = '' } = {}) 
   const cleanSymbols = [...new Set(
     symbols.filter(Boolean).map((value) => String(value).trim().toUpperCase()),
   )];
+  const gatewayEnabled = isMarketGatewayConfigured();
   const needsUsd = cleanSymbols.some((symbol) => symbol.endsWith('.US'));
-  const fx = needsUsd
-    ? await fetchEurUsd().catch(() => null)
-    : { rate: 1, updatedAt: null, source: null };
   const fetched = {};
   const errors = [];
   const canonicalFeedQuotes = await readCanonicalFeedQuotes(cleanSymbols);
 
-  await Promise.all(cleanSymbols.map(async (symbol) => {
-    try {
-      const native = await fetchNativeQuote(symbol, finnhubToken);
-      const withFx = applyFx(symbol, native, fx);
-      const changeBase = finite(withFx.nativeChangeBase)
-        ? Number(withFx.nativeChangeBase)
-        : finite(withFx.nativePreviousClose)
-          ? Number(withFx.nativePreviousClose)
-          : null;
-      fetched[symbol] = classifyQuote(symbol, {
-        ...withFx,
-        symbol,
-        changePct: Number.isFinite(Number(withFx.nativeProviderChangePct))
-          ? Number(withFx.nativeProviderChangePct)
-          : finite(changeBase)
-            ? ((Number(withFx.nativePrice) - changeBase) / changeBase) * 100
-            : null,
-      });
-    } catch (error) {
-      errors.push(`${symbol}: ${safeProviderDiagnostic(error)}`);
+  let fx;
+  let gatewaySnapshot = null;
+
+  if (gatewayEnabled) {
+    gatewaySnapshot = await fetchConfiguredMarketGatewaySnapshot(cleanSymbols);
+    if (gatewaySnapshot?.enabled !== true) throw new Error('MARKET_GATEWAY_CONFIGURATION_INVALID');
+
+    for (const item of gatewaySnapshot.errors || []) {
+      errors.push(`${item.symbol || 'GATEWAY'}: ${item.code || 'MARKET_GATEWAY_REQUEST_FAILED'}`);
     }
-  }));
+    if (gatewaySnapshot.fxError) errors.push(`EURUSD: ${gatewaySnapshot.fxError}`);
+
+    fx = needsUsd
+      ? gatewaySnapshot.fxReference
+        ? {
+            rate: Number(gatewaySnapshot.fxReference.rate),
+            updatedAt: null,
+            referenceDate: gatewaySnapshot.fxReference.referenceDate || null,
+            source: gatewaySnapshot.fxReference.source || 'European Central Bank reference rate',
+            sourceQuality: gatewaySnapshot.fxReference.sourceQuality || null,
+            valuationReferenceEligible: gatewaySnapshot.fxReference.valuationReferenceEligible === true,
+            transactionEligible: gatewaySnapshot.fxReference.transactionEligible === true,
+            decisionEligible: gatewaySnapshot.fxReference.decisionEligible === true,
+          }
+        : null
+      : { rate: 1, updatedAt: null, source: null };
+
+    for (const symbol of cleanSymbols) {
+      const entry = gatewaySnapshot.quoteRegistry?.[symbol];
+      if (!entry) {
+        if (!(gatewaySnapshot.errors || []).some((item) => item?.symbol === symbol)) {
+          errors.push(`${symbol}: MARKET_GATEWAY_QUOTE_UNAVAILABLE`);
+        }
+        continue;
+      }
+      try {
+        const exchange = exchangeState(symbol);
+        const native = quoteFromRegistry(symbol, entry, {
+          now: Date.now(),
+          exchangeOpen: exchange.open,
+          exchangeSession: exchange.session,
+          exchangeCalendarVerified: exchange.calendarVerified !== false,
+        });
+        if (!native) throw new Error('MARKET_GATEWAY_QUOTE_CONTRACT_REJECTED');
+        const withFx = applyFx(symbol, native, fx);
+        fetched[symbol] = classifyQuote(symbol, {
+          ...withFx,
+          symbol,
+          checkedAt: gatewaySnapshot.checkedAt || withFx.checkedAt || new Date().toISOString(),
+          marketDataMode: 'CANONICAL_GATEWAY',
+          fxSource: needsUsd ? fx?.source || null : null,
+          fxSourceQuality: needsUsd ? fx?.sourceQuality || null : null,
+          fxReferenceDate: needsUsd ? fx?.referenceDate || null : null,
+          fxValuationReferenceEligible: needsUsd ? fx?.valuationReferenceEligible === true : null,
+          fxTransactionEligible: needsUsd ? fx?.transactionEligible === true : null,
+          fxDecisionEligible: needsUsd ? fx?.decisionEligible === true : null,
+        });
+      } catch (error) {
+        errors.push(`${symbol}: ${safeProviderDiagnostic(error, error?.message || 'MARKET_GATEWAY_QUOTE_REJECTED')}`);
+      }
+    }
+  } else {
+    fx = needsUsd
+      ? await fetchEurUsd().catch(() => null)
+      : { rate: 1, updatedAt: null, source: null };
+
+    await Promise.all(cleanSymbols.map(async (symbol) => {
+      try {
+        const native = await fetchNativeQuote(symbol, finnhubToken);
+        const withFx = applyFx(symbol, native, fx);
+        const changeBase = finite(withFx.nativeChangeBase)
+          ? Number(withFx.nativeChangeBase)
+          : finite(withFx.nativePreviousClose)
+            ? Number(withFx.nativePreviousClose)
+            : null;
+        fetched[symbol] = classifyQuote(symbol, {
+          ...withFx,
+          symbol,
+          marketDataMode: 'LEGACY_DIRECT',
+          changePct: Number.isFinite(Number(withFx.nativeProviderChangePct))
+            ? Number(withFx.nativeProviderChangePct)
+            : finite(changeBase)
+              ? ((Number(withFx.nativePrice) - changeBase) / changeBase) * 100
+              : null,
+        });
+      } catch (error) {
+        errors.push(`${symbol}: ${safeProviderDiagnostic(error)}`);
+      }
+    }));
+  }
 
   const persisted = await readPersistedPrices();
   const baseline = mergePortfolioQuotes(persisted, inMemoryQuotes);
@@ -586,25 +653,35 @@ export async function fetchPortfolioQuotes(symbols, { finnhubToken = '' } = {}) 
   const quotes = {};
 
   cleanSymbols.forEach((symbol) => {
-    const selected = newest[symbol];
+    const selected = gatewayEnabled && fetched[symbol] ? fetched[symbol] : newest[symbol];
     if (!selected) return;
     try {
       const withFx = applyFx(symbol, selected, fx);
       quotes[symbol] = classifyQuote(symbol, {
         ...withFx,
         checkedAt: new Date().toISOString(),
+        marketDataMode: gatewayEnabled ? 'CANONICAL_GATEWAY' : selected.marketDataMode || 'LEGACY_DIRECT',
+        ...(gatewayEnabled && needsUsd ? {
+          fxSource: fx?.source || null,
+          fxSourceQuality: fx?.sourceQuality || null,
+          fxReferenceDate: fx?.referenceDate || null,
+          fxValuationReferenceEligible: fx?.valuationReferenceEligible === true,
+          fxTransactionEligible: fx?.transactionEligible === true,
+          fxDecisionEligible: fx?.decisionEligible === true,
+        } : {}),
       });
       inMemoryQuotes[symbol] = quotes[symbol];
     } catch (error) {
-      errors.push(`${symbol}: ${safeProviderDiagnostic(error)}`);
+      errors.push(`${symbol}: ${safeProviderDiagnostic(error, error?.message || 'QUOTE_REJECTED')}`);
     }
   });
 
   return {
     quotes,
-    errors,
+    errors: [...new Set(errors)],
     checkedAt: new Date().toISOString(),
-    fxRates: fx ? { EURUSD: fx } : {},
+    fxRates: needsUsd && fx ? { EURUSD: fx } : {},
+    marketDataMode: gatewayEnabled ? 'CANONICAL_GATEWAY' : 'LEGACY_DIRECT',
   };
 }
 
