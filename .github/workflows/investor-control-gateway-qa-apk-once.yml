@@ -1,0 +1,112 @@
+name: Investor Control Gateway QA APK Once
+
+on:
+  push:
+    branches:
+      - investor-control-core-stabilization-v174
+    paths:
+      - .github/workflows/investor-control-gateway-qa-apk-once.yml
+
+permissions:
+  contents: read
+
+jobs:
+  build-gateway-qa-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      SOURCE_SHA: e43f4267d13c2fd47589e1643597361e711c090a
+      EXPO_PUBLIC_MARKET_GATEWAY_URL: https://investor-control-market-gateway.bidprice-alerts.workers.dev
+    steps:
+      - name: Checkout exact post-deployment source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Verify live gateway before mobile build
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="$EXPO_PUBLIC_MARKET_GATEWAY_URL"
+          curl --fail --silent --show-error --retry 6 --retry-delay 3 --retry-all-errors "$URL/health" > /tmp/health.json
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('/tmp/health.json','utf8')); if(p.status!=='ok'||p.providers?.us!=='configured'||p.providers?.fx!=='ecb_official_daily_reference') process.exit(1);"
+          CLIENT_ID="github_apk_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          curl --fail --silent --show-error --retry 4 --retry-delay 3 --retry-all-errors -H "X-Investor-Control-Client: $CLIENT_ID" "$URL/v1/quote?symbol=SPCE.US" > /tmp/quote.json
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('/tmp/quote.json','utf8')); if(p.quote?.quoteContract?.identityVerified!==true||p.quote?.currency!=='USD') process.exit(1);"
+          curl --fail --silent --show-error --retry 4 --retry-delay 3 --retry-all-errors -H "X-Investor-Control-Client: $CLIENT_ID" "$URL/v1/fx?pair=EURUSD" > /tmp/fx.json
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('/tmp/fx.json','utf8')); if(p.reference?.sourceQuality!=='OFFICIAL_DAILY_REFERENCE'||p.reference?.valuationReferenceEligible!==true) process.exit(1);"
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: Verify canonical mobile with gateway mode enabled
+        working-directory: mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run test:core
+          npx expo install --check
+          npx expo-doctor@latest
+          rm -rf dist-gateway-qa
+          npx expo export --platform android --output-dir dist-gateway-qa
+          grep -R -F -q "$EXPO_PUBLIC_MARKET_GATEWAY_URL" dist-gateway-qa
+
+      - name: Generate Android project with live gateway URL
+        working-directory: mobile
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Build release APK with live gateway URL
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Sign and verify gateway QA APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          UNSIGNED='mobile/android/app/build/outputs/apk/release/app-release.apk'
+          KEYSTORE='mobile/android/app/debug.keystore'
+          ALIGNED='mobile/Investor-Control-v1.7.3-gateway-qa-aligned.apk'
+          OUTPUT='mobile/Investor-Control-v1.7.3-gateway-qa.apk'
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          test -s "$UNSIGNED" && test -s "$KEYSTORE"
+          "$BUILD_TOOLS/zipalign" -p -f 4 "$UNSIGNED" "$ALIGNED"
+          "$BUILD_TOOLS/apksigner" sign --ks "$KEYSTORE" --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --out "$OUTPUT" "$ALIGNED"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$OUTPUT" | tee mobile/Investor-Control-v1.7.3-gateway-qa-signature.txt
+          grep -qi 'fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c' mobile/Investor-Control-v1.7.3-gateway-qa-signature.txt
+          "$BUILD_TOOLS/aapt2" dump badging "$OUTPUT" | tee mobile/Investor-Control-v1.7.3-gateway-qa-badging.txt
+          grep -q "package: name='gr.investorcontrol.app' versionCode='31' versionName='1.7.3'" mobile/Investor-Control-v1.7.3-gateway-qa-badging.txt
+          unzip -p "$OUTPUT" assets/index.android.bundle > /tmp/index.android.bundle
+          grep -F -q "$EXPO_PUBLIC_MARKET_GATEWAY_URL" /tmp/index.android.bundle
+          ! grep -F -q 'EXPO_PUBLIC_FINNHUB' /tmp/index.android.bundle
+          sha256sum "$OUTPUT" | tee mobile/Investor-Control-v1.7.3-gateway-qa.sha256
+          printf 'gatewayUrl=%s\nsourceSha=%s\npackage=gr.investorcontrol.app\nversionCode=31\nversionName=1.7.3\n' "$EXPO_PUBLIC_MARKET_GATEWAY_URL" "$SOURCE_SHA" | tee mobile/Investor-Control-v1.7.3-gateway-qa-manifest.txt
+
+      - name: Upload gateway QA APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1.7.3-gateway-qa-apk
+          path: |
+            mobile/Investor-Control-v1.7.3-gateway-qa.apk
+            mobile/Investor-Control-v1.7.3-gateway-qa.sha256
+            mobile/Investor-Control-v1.7.3-gateway-qa-signature.txt
+            mobile/Investor-Control-v1.7.3-gateway-qa-badging.txt
+            mobile/Investor-Control-v1.7.3-gateway-qa-manifest.txt
+          if-no-files-found: error
+          retention-days: 30
