@@ -1,0 +1,56 @@
+name: Investor Control Market Gateway Verify Live Once
+
+on:
+  push:
+    branches:
+      - investor-control-core-stabilization-v174
+    paths:
+      - .github/workflows/investor-control-market-gateway-verify-live-once.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify-deployed-gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      GATEWAY_URL: https://investor-control-market-gateway.bidprice-alerts.workers.dev
+      SOURCE_SHA: a2f7f66c1834e6c2f79e58af3395bc922cbf9c2e
+    steps:
+      - name: Wait for workers.dev route propagation and verify health
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 20 --retry-delay 3 --retry-all-errors "$GATEWAY_URL/health" > health.json
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('health.json','utf8')); if(p.status!=='ok'||p.providers?.us!=='configured'||p.providers?.athens!=='official_delayed_15m'||p.providers?.fx!=='ecb_official_daily_reference') { console.error(JSON.stringify(p)); process.exit(1); }"
+
+      - name: Verify authoritative SPCE.US quote
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLIENT_ID="github_verify_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          curl --fail --silent --show-error --retry 6 --retry-delay 3 --retry-all-errors -H "X-Investor-Control-Client: $CLIENT_ID" "$GATEWAY_URL/v1/quote?symbol=SPCE.US" > quote.json
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('quote.json','utf8')); const q=p.quote; if(p.requestedSymbol!=='SPCE.US'||q?.appSymbol!=='SPCE.US'||q?.currency!=='USD'||q?.quoteContract?.sourceApproved!==true||q?.quoteContract?.identityVerified!==true) { console.error(JSON.stringify(p)); process.exit(1); }"
+
+      - name: Verify official ECB EURUSD reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLIENT_ID="github_verify_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          curl --fail --silent --show-error --retry 6 --retry-delay 3 --retry-all-errors -H "X-Investor-Control-Client: $CLIENT_ID" "$GATEWAY_URL/v1/fx?pair=EURUSD" > fx.json
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('fx.json','utf8')); const r=p.reference; if(r?.pair!=='EURUSD'||r?.sourceQuality!=='OFFICIAL_DAILY_REFERENCE'||!(Number(r?.rate)>0)||r?.valuationReferenceEligible!==true||r?.transactionEligible!==false||r?.decisionEligible!==false) { console.error(JSON.stringify(p)); process.exit(1); }"
+
+      - name: Record verified live deployment evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          node -e "const fs=require('fs'); fs.writeFileSync('gateway-live-verification.json', JSON.stringify({format:'investor-control-market-gateway-live-verification',sourceSha:process.env.SOURCE_SHA,deploymentUrl:process.env.GATEWAY_URL,verified:{health:true,spceUs:true,ecbEurUsd:true},generatedAt:new Date().toISOString()},null,2));"
+
+      - name: Upload live verification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-market-gateway-live-verification
+          path: gateway-live-verification.json
+          if-no-files-found: error
+          retention-days: 90
