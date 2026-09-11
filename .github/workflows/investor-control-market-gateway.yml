@@ -12,6 +12,7 @@ on:
       - market-intelligence/src/adapters/euronext-athens-quote.js
       - market-intelligence/src/canonical-market-quote.js
       - .github/workflows/investor-control-market-gateway.yml
+      - .github/workflows/investor-control-market-gateway-deploy.yml
   pull_request:
     paths:
       - market-intelligence/gateway/**
@@ -21,6 +22,7 @@ on:
       - market-intelligence/src/adapters/euronext-athens-quote.js
       - market-intelligence/src/canonical-market-quote.js
       - .github/workflows/investor-control-market-gateway.yml
+      - .github/workflows/investor-control-market-gateway-deploy.yml
 
 permissions:
   contents: read
@@ -55,12 +57,26 @@ jobs:
         working-directory: market-intelligence
         run: node --test test/market-gateway.test.js test/market-gateway-edge.test.js
 
+      - name: Verify deployment workflow is manual-only and CLI-compatible
+        shell: bash
+        run: |
+          set -euo pipefail
+          WF='.github/workflows/investor-control-market-gateway-deploy.yml'
+          test -f "$WF"
+          grep -q '^  workflow_dispatch:' "$WF"
+          ! grep -Eq '^  (push|pull_request|schedule):' "$WF"
+          grep -Fq 'confirm_production' "$WF"
+          grep -Fq 'expected_sha' "$WF"
+          grep -Fq 'investor-control-core-stabilization-v174' "$WF"
+          grep -Fq 'wrangler@4.129.1 deploy --secrets-file' "$WF"
+          npx --yes wrangler@4.129.1 deploy --help | grep -F -- '--secrets-file'
+
       - name: Wrangler production bundle dry-run only
         working-directory: market-intelligence/gateway
         run: |
           set -euo pipefail
           rm -rf dist
-          npx --yes wrangler@4.36.0 deploy --dry-run --outdir dist
+          npx --yes wrangler@4.129.1 deploy --dry-run --outdir dist
           test -d dist
           find dist -type f -maxdepth 2 -print
           find dist -type f | grep -Eq '\.(js|mjs)$'
