@@ -24,6 +24,14 @@ on:
         required: true
         default: false
         type: boolean
+      market_gateway_url:
+        description: 'Live canonical market gateway base URL required when sign_for_play=true'
+        required: false
+        type: string
+      expected_sha:
+        description: 'Exact source commit SHA authorized for a signed Play release'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -60,6 +68,59 @@ jobs:
       - name: Install and apply production mobile chain
         working-directory: mobile
         run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: Configure and verify live gateway for manual Play signing
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_for_play }}
+        working-directory: mobile
+        shell: bash
+        env:
+          MARKET_GATEWAY_URL_INPUT: ${{ inputs.market_gateway_url }}
+          EXPECTED_SHA_INPUT: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = 'investor-control-core-stabilization-v174' || { echo 'Signed Play release is restricted to the controlled stabilization branch.' >&2; exit 1; }
+          test -n "${EXPECTED_SHA_INPUT:-}" || { echo 'expected_sha is required for signed Play release.' >&2; exit 1; }
+          test "$EXPECTED_SHA_INPUT" = "$GITHUB_SHA" || { echo "Authorized SHA does not match workflow SHA: $GITHUB_SHA" >&2; exit 1; }
+          NORMALIZED_GATEWAY_URL="$(node - <<'NODE'
+          const { normalizeGatewayBaseUrl } = require('./src/market-gateway-client');
+          const normalized = normalizeGatewayBaseUrl(process.env.MARKET_GATEWAY_URL_INPUT);
+          if (!normalized) {
+            console.error('market_gateway_url must be a valid HTTPS URL without credentials, query parameters or fragments.');
+            process.exit(1);
+          }
+          process.stdout.write(normalized);
+          NODE
+          )"
+          test -n "$NORMALIZED_GATEWAY_URL"
+          printf 'EXPO_PUBLIC_MARKET_GATEWAY_URL=%s\n' "$NORMALIZED_GATEWAY_URL" >> "$GITHUB_ENV"
+          printf 'MARKET_GATEWAY_RELEASE_URL=%s\n' "$NORMALIZED_GATEWAY_URL" >> "$GITHUB_ENV"
+
+          HEALTH_FILE="$RUNNER_TEMP/investor-control-gateway-health.json"
+          QUOTE_FILE="$RUNNER_TEMP/investor-control-gateway-spce.json"
+          FX_FILE="$RUNNER_TEMP/investor-control-gateway-eurusd.json"
+          CLIENT_ID="play_release_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          curl --fail --silent --show-error --retry 3 --retry-delay 2 "$NORMALIZED_GATEWAY_URL/health" > "$HEALTH_FILE"
+          curl --fail --silent --show-error --retry 2 --retry-delay 2 \
+            -H "X-Investor-Control-Client: $CLIENT_ID" \
+            "$NORMALIZED_GATEWAY_URL/v1/quote?symbol=SPCE.US" > "$QUOTE_FILE"
+          curl --fail --silent --show-error --retry 2 --retry-delay 2 \
+            -H "X-Investor-Control-Client: $CLIENT_ID" \
+            "$NORMALIZED_GATEWAY_URL/v1/fx?pair=EURUSD" > "$FX_FILE"
+          HEALTH_FILE="$HEALTH_FILE" QUOTE_FILE="$QUOTE_FILE" FX_FILE="$FX_FILE" node - <<'NODE'
+          const fs = require('fs');
+          const { validateGatewayQuote, validateGatewayFx } = require('./src/market-gateway-client');
+          const health = JSON.parse(fs.readFileSync(process.env.HEALTH_FILE, 'utf8'));
+          if (health?.status !== 'ok' || health?.providers?.us !== 'configured' || health?.providers?.athens !== 'official_delayed_15m' || health?.providers?.fx !== 'ecb_official_daily_reference') {
+            throw new Error('live market gateway health contract failed');
+          }
+          const quote = JSON.parse(fs.readFileSync(process.env.QUOTE_FILE, 'utf8'));
+          const quoteError = validateGatewayQuote('SPCE.US', quote);
+          if (quoteError) throw new Error(`live market gateway SPCE contract failed: ${quoteError}`);
+          const fx = JSON.parse(fs.readFileSync(process.env.FX_FILE, 'utf8'));
+          const fxError = validateGatewayFx(fx);
+          if (fxError) throw new Error(`live market gateway EURUSD contract failed: ${fxError}`);
+          NODE
+          rm -f "$HEALTH_FILE" "$QUOTE_FILE" "$FX_FILE"
 
       - name: Validate release source
         working-directory: mobile
@@ -144,6 +205,9 @@ jobs:
           grep -Fq "secrets.${ALIAS_SECRET}" "$WF"
           grep -Fq "secrets.${STORE_PASS_SECRET}" "$WF"
           grep -Fq "secrets.${KEY_PASS_SECRET}" "$WF"
+          grep -Fq 'market_gateway_url' "$WF"
+          grep -Fq 'expected_sha' "$WF"
+          grep -Fq 'MARKET_GATEWAY_RELEASE_URL' "$WF"
           BAD_PACKAGE='gr.investorcontrol.'play
           BAD_RAND='openssl rand -hex '32
           BAD_KEYGEN='keytool -genkey'pair
@@ -179,6 +243,21 @@ jobs:
           test "$PLAY_VERSION_CODE" = '31'
           printf 'package=%s\nversionCode=%s\nversionName=1.7.3\ntargetSdk=36\nsigningMode=preflight-unsigned\n' "$PLAY_PACKAGE" "$PLAY_VERSION_CODE" | tee mobile/Investor-Control-v1.7.3-play-preflight-manifest.txt
           sha256sum "$PREFLIGHT_AAB" | tee mobile/Investor-Control-v1.7.3-play-preflight.sha256
+
+      - name: Verify live gateway is embedded in manual Play bundle
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_for_play }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${MARKET_GATEWAY_RELEASE_URL:-}" || { echo 'MARKET_GATEWAY_RELEASE_URL is missing.' >&2; exit 1; }
+          AAB_SOURCE='mobile/android/app/build/outputs/bundle/release/app-release.aab'
+          BUNDLE_FILE="$RUNNER_TEMP/investor-control-play-index.android.bundle"
+          unzip -p "$AAB_SOURCE" 'base/assets/index.android.bundle' > "$BUNDLE_FILE"
+          test -s "$BUNDLE_FILE"
+          grep -Fq -- "$MARKET_GATEWAY_RELEASE_URL" "$BUNDLE_FILE" || { echo 'Live gateway URL is not embedded in the Play bundle.' >&2; exit 1; }
+          grep -Fq 'CANONICAL_GATEWAY' "$BUNDLE_FILE" || { echo 'Canonical gateway runtime marker is missing from the Play bundle.' >&2; exit 1; }
+          grep -Fq 'investor-control.market-gateway-client.v1' "$BUNDLE_FILE" || { echo 'Stable gateway installation identifier runtime is missing from the Play bundle.' >&2; exit 1; }
+          rm -f "$BUNDLE_FILE"
 
       - name: Require protected Investor Control upload-key secrets
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_for_play }}
