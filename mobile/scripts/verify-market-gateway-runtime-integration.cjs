@@ -1,6 +1,6 @@
 "use strict";
 
-// Owner-authored retrigger after verified one-time runtime integration.
+// Owner-authored retrigger after verified fail-closed gateway fallback hardening.
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
