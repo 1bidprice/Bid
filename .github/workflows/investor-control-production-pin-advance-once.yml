@@ -1,0 +1,50 @@
+name: Investor Control Production Pin Advance Once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/investor-control-production-pin-advance-once.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: investor-control-production-pin-advance-once
+  cancel-in-progress: false
+
+jobs:
+  advance-pin:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Advance immutable canonical production pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          target = Path('.github/workflows/investor-control-production-intelligence-v2.yml')
+          text = target.read_text()
+          old = 'PRODUCTION_SOURCE_SHA: af1eeb35e460fbc42d3841f2d6ab62ccdb400a4d'
+          new = 'PRODUCTION_SOURCE_SHA: 22f6f56f379f07b803ccebf618a13e19ab58e9ff'
+          if text.count(old) != 1:
+              raise SystemExit(f'Expected exactly one old production pin, found {text.count(old)}')
+          if new in text:
+              raise SystemExit('New production pin is already present unexpectedly')
+          target.write_text(text.replace(old, new, 1))
+          PY
+
+          rm .github/workflows/investor-control-production-pin-advance-once.yml
+          git config user.name '1bidprice'
+          git config user.email 'bidprice.alerts@gmail.com'
+          git add .github/workflows/investor-control-production-intelligence-v2.yml .github/workflows/investor-control-production-pin-advance-once.yml
+          git diff --cached --check
+          git commit -m 'ci(production): advance canonical source pin'
+          git push origin HEAD:main
