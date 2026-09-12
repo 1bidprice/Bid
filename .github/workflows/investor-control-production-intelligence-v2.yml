@@ -16,17 +16,28 @@ concurrency:
   group: investor-control-production-intelligence
   cancel-in-progress: false
 
+env:
+  PRODUCTION_SOURCE_SHA: af1eeb35e460fbc42d3841f2d6ab62ccdb400a4d
+
 jobs:
   autonomous-intelligence:
     runs-on: ubuntu-latest
     timeout-minutes: 80
     steps:
-      - name: Checkout verified production source
+      - name: Checkout immutable canonical production source
         uses: actions/checkout@v4
         with:
-          ref: investor-control-v1-market-intelligence-foundation
+          ref: ${{ env.PRODUCTION_SOURCE_SHA }}
           path: source
           fetch-depth: 1
+
+      - name: Verify immutable production source provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTUAL_SOURCE_SHA="$(git -C source rev-parse HEAD)"
+          test "$ACTUAL_SOURCE_SHA" = "$PRODUCTION_SOURCE_SHA"
+          echo "Canonical production source verified: $ACTUAL_SOURCE_SHA"
 
       - name: Checkout live publication channel
         uses: actions/checkout@v4
@@ -48,11 +59,11 @@ jobs:
             sudo apt-get install -y poppler-utils
           fi
 
-      - name: Apply source contracts and run deterministic tests
+      - name: Verify canonical source contracts and deterministic tests
         working-directory: source/market-intelligence
         run: npm test
 
-      - name: Build live intelligence from the tested source tree
+      - name: Build live intelligence from the tested canonical source tree
         working-directory: source/market-intelligence
         env:
           SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
@@ -113,10 +124,13 @@ jobs:
           const feed = JSON.parse(fs.readFileSync('./live-feed/mobile-intelligence-feed.json','utf8'));
           const report = JSON.parse(fs.readFileSync('./live-feed/autonomous-intelligence.json','utf8'));
           const forecastArchive = JSON.parse(fs.readFileSync('./live-feed/forecast-outcome-ledger.json','utf8'));
+          const pkg = JSON.parse(fs.readFileSync('./source/market-intelligence/package.json','utf8'));
           const forecastSummary = forecastArchive.summary || {};
           const now = new Date().toISOString();
           const sourceCommit = execFileSync('git',['-C','source','rev-parse','HEAD'],{encoding:'utf8'}).trim();
-          const release = JSON.parse(fs.readFileSync('./source/market-intelligence/config/runtime-release-manifest.json','utf8')).releaseVersion;
+          const sourcePin = String(process.env.PRODUCTION_SOURCE_SHA || '').trim();
+          if (!sourcePin || sourceCommit !== sourcePin) throw new Error(`production source provenance mismatch: ${sourceCommit} != ${sourcePin}`);
+          const release = pkg.version;
           const greek = (report.discovery?.shortlist || []).filter((item) => item.market === 'GR');
           const unresolvedGreek = greek.filter((item) => !item.symbol || item.identityStatus === 'SYMBOL_RESOLUTION_REQUIRED');
           const quotes = Object.values(feed.quoteRegistry || {});
@@ -161,8 +175,10 @@ jobs:
             sourcePolicyVersion:feed.sourceSelection?.version || null,
             sourceWorkflowRunId:process.env.GITHUB_RUN_ID,
             sourceCommit,
+            sourcePin,
+            canonicalSourceVersion:pkg.version,
             runtimeReleaseVersion:release,
-            publisherContract:'TRANSACTIONAL_V2_SINGLE_WRITER',
+            publisherContract:'CANONICAL_TRANSACTIONAL_V3_SINGLE_WRITER',
             forecastArchiveContract:'DAILY_OOS_TRANSACTIONAL_V1',
             forecastLearningContract:'LIVE_SHADOW_OOS_RESEARCH_ONLY_V1',
             feedSha256:crypto.createHash('sha256').update(fs.readFileSync('./live-feed/mobile-intelligence-feed.json')).digest('hex'),
@@ -221,7 +237,7 @@ jobs:
             git -C live-feed add mobile-intelligence-feed.json autonomous-intelligence.json forecast-outcome-ledger.json status.json decision-history.json discovery-radar.json
             HAS_CHANGES=0
             if ! git -C live-feed diff --cached --quiet; then
-              git -C live-feed commit -m "chore(feed): verified forecast production ${GITHUB_RUN_ID} transactional-v2 [skip ci]"
+              git -C live-feed commit -m "chore(feed): verified canonical production ${GITHUB_RUN_ID} transactional-v3 [skip ci]"
               HAS_CHANGES=1
             fi
           }
@@ -235,7 +251,7 @@ jobs:
               exit 0
             fi
             if git -C live-feed push origin HEAD:investor-control-live-feed; then
-              echo 'Verified feed and forecast archive published successfully.'
+              echo 'Verified canonical feed and forecast archive published successfully.'
               exit 0
             fi
             echo 'Remote changed before push; rebuilding publication from the newest remote base.'
@@ -272,8 +288,11 @@ jobs:
           const broad=report.broadOpportunityScan || {};
           const hunter=report.opportunityUniverse || {};
           const ranking=hunter.ranking || {};
+          const expectedSource=String(process.env.PRODUCTION_SOURCE_SHA || '').trim();
           if (String(status.sourceWorkflowRunId) !== String(process.env.GITHUB_RUN_ID)) throw new Error('remote status belongs to a different workflow run');
-          if (status.publisherContract !== 'TRANSACTIONAL_V2_SINGLE_WRITER') throw new Error('single-writer transactional publisher marker missing');
+          if (status.publisherContract !== 'CANONICAL_TRANSACTIONAL_V3_SINGLE_WRITER') throw new Error('canonical single-writer transactional publisher marker missing');
+          if (status.sourceCommit !== expectedSource || status.sourcePin !== expectedSource) throw new Error('remote canonical source provenance mismatch');
+          if (!status.canonicalSourceVersion || status.canonicalSourceVersion !== status.runtimeReleaseVersion) throw new Error('canonical source version mismatch');
           if (status.forecastArchiveContract !== 'DAILY_OOS_TRANSACTIONAL_V1') throw new Error('forecast archive transactional contract missing');
           if (status.forecastLearningContract !== 'LIVE_SHADOW_OOS_RESEARCH_ONLY_V1') throw new Error('forecast learning research-only contract missing');
           if (status.generatedAt !== report.generatedAt) throw new Error('remote status/report generation mismatch');
@@ -292,6 +311,8 @@ jobs:
             remotePublication:'VERIFIED',
             sourceWorkflowRunId:status.sourceWorkflowRunId,
             sourceCommit:status.sourceCommit,
+            sourcePin:status.sourcePin,
+            canonicalSourceVersion:status.canonicalSourceVersion,
             runtimeReleaseVersion:status.runtimeReleaseVersion,
             publisherContract:status.publisherContract,
             forecastArchiveContract:status.forecastArchiveContract,
