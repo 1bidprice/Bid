@@ -3,7 +3,7 @@
   "version": 1,
   "policyVersion": "2026-08-11.1",
   "ledgerPolicyVersion": "2026-08-12.1",
-  "updatedAt": "2026-09-12T12:16:30.139Z",
+  "updatedAt": "2026-09-12T14:10:56.608Z",
   "records": [
     {
       "format": "investor-control-forecast-outcome-record",
@@ -370241,10 +370241,14 @@
         }
       },
       "decisionImpact": "NONE",
-      "realisedOutcome": null,
-      "positiveOutcome": null,
-      "outcomeEvaluatedAt": null,
-      "status": "OPEN",
+      "realisedOutcome": {
+        "timestamp": "2026-09-11T13:30:00.000Z",
+        "close": 19.639999389648438,
+        "realisedReturnPct": -13.442
+      },
+      "positiveOutcome": 0,
+      "outcomeEvaluatedAt": "2026-09-12T14:08:34.828Z",
+      "status": "MATURED",
       "appendOnlyIdentity": {
         "policyVersion": "2026-08-11.2",
         "historicalPatternPolicyVersion": "2026-08-11.1",
@@ -378011,10 +378015,14 @@
         }
       },
       "decisionImpact": "NONE",
-      "realisedOutcome": null,
-      "positiveOutcome": null,
-      "outcomeEvaluatedAt": null,
-      "status": "OPEN",
+      "realisedOutcome": {
+        "timestamp": "2026-09-11T13:30:00.000Z",
+        "close": 35.119998931884766,
+        "realisedReturnPct": 6.0386
+      },
+      "positiveOutcome": 1,
+      "outcomeEvaluatedAt": "2026-09-12T14:08:34.828Z",
+      "status": "MATURED",
       "appendOnlyIdentity": {
         "policyVersion": "2026-08-11.2",
         "historicalPatternPolicyVersion": "2026-08-11.1",
@@ -398899,25 +398907,25 @@
     "version": 1,
     "policyVersion": "2026-08-12.1",
     "recordCount": 1889,
-    "openCount": 229,
-    "maturedCount": 1660,
+    "openCount": 227,
+    "maturedCount": 1662,
     "groups": [
       {
         "assetClass": "EQUITY",
         "horizon": "day1",
-        "recordCount": 1060,
+        "recordCount": 1062,
         "calibration": {
           "format": "investor-control-forecast-calibration",
           "version": 1,
           "policyVersion": "2026-08-11.3",
           "status": "OOS_METRICS_READY",
-          "sampleSize": 1060,
-          "brierScore": 0.256068,
-          "logLoss": 0.758203,
-          "expectedCalibrationError": 0.059999,
-          "baseRate": 0.500943,
+          "sampleSize": 1062,
+          "brierScore": 0.255877,
+          "logLoss": 0.757716,
+          "expectedCalibrationError": 0.059146,
+          "baseRate": 0.500942,
           "naiveBrierScore": 0.249999,
-          "skillVsBaseRatePct": -2.43,
+          "skillVsBaseRatePct": -2.35,
           "validationModes": [
             "LIVE_SHADOW_OOS"
           ],
@@ -398950,9 +398958,9 @@
               "index": 3,
               "lower": 0.3,
               "upper": 0.4,
-              "count": 144,
-              "meanForecast": 0.357,
-              "empiricalRate": 0.4931
+              "count": 145,
+              "meanForecast": 0.3572,
+              "empiricalRate": 0.4897
             },
             {
               "index": 4,
@@ -398974,9 +398982,9 @@
               "index": 6,
               "lower": 0.6,
               "upper": 0.7,
-              "count": 91,
-              "meanForecast": 0.6295,
-              "empiricalRate": 0.5604
+              "count": 92,
+              "meanForecast": 0.6292,
+              "empiricalRate": 0.5652
             },
             {
               "index": 7,
@@ -399113,7 +399121,7 @@
     ]
   },
   "evaluation": {
-    "baseRecordCount": 1879,
+    "baseRecordCount": 1889,
     "incomingRecordCount": 1889,
     "mergedRecordCount": 1889
   }
