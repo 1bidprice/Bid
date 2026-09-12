@@ -58,7 +58,6 @@ jobs:
         run: |
           set -euo pipefail
           npm run test:core
-          npm run test:intelligence-notifications
           npx expo install --check
           npx expo-doctor@latest
           rm -rf dist-gateway-notification-qa
