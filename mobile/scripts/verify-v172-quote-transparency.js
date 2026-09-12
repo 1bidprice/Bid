@@ -7,6 +7,7 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 const portfolio = read('PortfolioApp.js');
 const decision = read('DecisionOverlay.js');
 const quoteContract = read('src/quote-contract.js');
+const opportunities = read('src/OpportunitiesView.js');
 const app = JSON.parse(read('app.json'));
 const pkg = JSON.parse(read('package.json'));
 
@@ -30,6 +31,19 @@ for (const invariant of [
   'Ο ακριβής χρόνος της τιμής δεν έχει επαληθευτεί.',
 ]) {
   if (!quoteContract.includes(invariant)) throw new Error(`v1.7.2+ quote contract invariant missing: ${invariant}`);
+}
+
+for (const invariant of [
+  "freshness.state === 'fresh' ? 'ΠΡΟΣΦΑΤΗ'",
+  'historicalAnalyticsStatus',
+  'Κανονική λειτουργία · μερική ιστορική κάλυψη',
+  'Ιστορική ανάλυση:',
+  'operationalHealth?.analysedCompanyCount',
+]) {
+  if (!opportunities.includes(invariant)) throw new Error(`professional intelligence UX invariant missing: ${invariant}`);
+}
+if (opportunities.includes("freshness.state === 'fresh' ? 'LIVE'")) {
+  throw new Error('fresh intelligence feed must not be mislabeled as a real-time market quote');
 }
 
 const versionParts = String(app.expo.version || '').split('.').map(Number);

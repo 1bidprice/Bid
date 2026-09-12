@@ -35,6 +35,7 @@ import { gateBroadEquityOpportunityCandidate, gateDeepEquityOpportunityModel } f
 import { selectBroadFundamentalCandidates } from './broad-equity-fundamental-selector.js';
 import { screenBroadEquityMarketCandidates } from './broad-equity-market-screen.js';
 import { reconcileOpportunityPurchaseDecisions } from './opportunity-purchase-reconciliation.js';
+import { buildOperationalHealth } from './operational-health.js';
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_UNIVERSE_PATH = path.resolve(MODULE_DIR, '../config/universe.seed.json');
@@ -496,15 +497,21 @@ export async function runAutonomousIntelligence(options = {}) {
     .filter(([key]) => key !== 'BLOCKED')
     .reduce((sum, [, value]) => sum + value, 0);
   const analysedCompanyCount = Math.max(1, expandedUniverse.length);
-  const readyHistoricalCount = (baseReport.historicalMarketMetrics || [])
-    .filter((item) => item?.readiness?.marketMetricsReady === true).length;
-  const marketCoverageRatio = Number(baseReport.marketSnapshotCount || 0) / analysedCompanyCount;
-  const historyCoverageRatio = readyHistoricalCount / analysedCompanyCount;
-  const fundamentalCoverageRatio = Number(baseReport.fundamentalSnapshotCount || 0) / analysedCompanyCount;
-  const blockedDecisionCount = Number(finalActionCounts.BLOCKED || 0);
-  const systemStatus = marketCoverageRatio >= 0.9 && historyCoverageRatio >= 0.9 && fundamentalCoverageRatio >= 0.8
-    ? 'OPERATIONAL'
-    : 'DEGRADED';
+const readyHistoricalCount = (baseReport.historicalMarketMetrics || [])
+  .filter((item) => item?.readiness?.marketMetricsReady === true).length;
+const blockedDecisionCount = Number(finalActionCounts.BLOCKED || 0);
+const operationalHealth = buildOperationalHealth({
+  generatedAt,
+  analysedCompanyCount,
+  marketSnapshotCount: baseReport.marketSnapshotCount,
+  historicalMarketMetricsCount: baseReport.historicalMarketMetricsCount,
+  readyHistoricalMarketMetricsCount: readyHistoricalCount,
+  fundamentalSnapshotCount: baseReport.fundamentalSnapshotCount,
+  finalActionCount,
+  blockedDecisionCount,
+  researchDossierCount: researchDossiers.length,
+  unresolvedDiagnosticCount: baseReport.diagnostics.length + (discovery.diagnostics?.length || 0),
+});
 
   return {
     ...baseReport,
@@ -544,25 +551,7 @@ export async function runAutonomousIntelligence(options = {}) {
     finalActionCount,
     finalActionCounts,
     operationalHealth: {
-      status: systemStatus,
-      infrastructureStatus: 'OPERATIONAL',
-      marketDataStatus: marketCoverageRatio >= 0.9 && historyCoverageRatio >= 0.9 ? 'OPERATIONAL' : 'DEGRADED',
-      fundamentalsStatus: fundamentalCoverageRatio >= 0.8 ? 'OPERATIONAL' : 'DEGRADED',
-      researchStatus: researchDossiers.length > 0 ? 'ACTIVE' : 'IDLE',
-      decisionEngineStatus: finalActionCount > 0 ? 'READY' : blockedDecisionCount > 0 ? 'BLOCKED_BY_EVIDENCE' : 'IDLE',
-      generatedAt,
-      analysedCompanyCount,
-      marketSnapshotCount: baseReport.marketSnapshotCount,
-      marketCoverageRatio: Number(marketCoverageRatio.toFixed(4)),
-      historicalMarketMetricsCount: baseReport.historicalMarketMetricsCount,
-      readyHistoricalMarketMetricsCount: readyHistoricalCount,
-      historyCoverageRatio: Number(historyCoverageRatio.toFixed(4)),
-      fundamentalSnapshotCount: baseReport.fundamentalSnapshotCount,
-      fundamentalCoverageRatio: Number(fundamentalCoverageRatio.toFixed(4)),
-      unresolvedDiagnosticCount: baseReport.diagnostics.length + (discovery.diagnostics?.length || 0),
-      finalActionCount,
-      blockedDecisionCount,
-      staleOutput: false,
+      ...operationalHealth,
       ...forecastFactorOperationalTelemetry,
       ...forecastRegimeOperationalTelemetry,
       ...forecastRegimeFactorOperationalTelemetry,

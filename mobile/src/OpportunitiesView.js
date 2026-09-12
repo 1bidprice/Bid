@@ -293,6 +293,8 @@ export default function OpportunitiesView({ portfolioPositions = [] }) {
   const freshness = useMemo(() => intelligenceFeedFreshness(feed), [feed]);
   const operationalHealth = feed?.operationalHealth || null;
   const sourceHealth = feed?.sourceHealth || null;
+  const historicalAnalyticsStatus = operationalHealth?.historicalAnalyticsStatus || 'UNAVAILABLE';
+  const historicalAnalyticsPartial = ['PARTIAL', 'UNAVAILABLE'].includes(historicalAnalyticsStatus);
   const systemReady = operationalHealth?.status === 'OPERATIONAL'
     && operationalHealth?.marketDataStatus === 'OPERATIONAL'
     && operationalHealth?.fundamentalsStatus === 'OPERATIONAL'
@@ -363,18 +365,18 @@ export default function OpportunitiesView({ portfolioPositions = [] }) {
             <Text style={styles.connectionText}>{feed ? `${freshness.label} · ηλικία ${freshness.ageHours.toFixed(1)} ωρών · δημιουργία ${when(feed.generatedAt)}` : 'Δεν έχει ληφθεί ακόμη έγκυρη ροή.'}</Text>
           </View>
           <View style={[styles.healthBadge, freshness.state === 'fresh' && styles.healthGood, freshness.state === 'stale' && styles.healthBad]}>
-            <Text style={[styles.healthText, freshness.state === 'fresh' && styles.healthGoodText, freshness.state === 'stale' && styles.healthBadText]}>{freshness.state === 'fresh' ? 'LIVE' : freshness.state === 'stale' ? 'ΠΑΛΙΑ' : 'ΕΛΕΓΧΟΣ'}</Text>
+            <Text style={[styles.healthText, freshness.state === 'fresh' && styles.healthGoodText, freshness.state === 'stale' && styles.healthBadText]}>{freshness.state === 'fresh' ? 'ΠΡΟΣΦΑΤΗ' : freshness.state === 'stale' ? 'ΠΑΛΙΑ' : 'ΕΛΕΓΧΟΣ'}</Text>
           </View>
         </View>
         <Text style={styles.connectionMeta}>Τελευταίος επιτυχής συγχρονισμός: {when(syncState?.lastSuccessAt)}</Text>
         <View style={styles.sourcePolicyBox}><Text style={styles.sourcePolicyTitle}>Ποιος επιλέγει τις πηγές;</Text><Text style={styles.sourcePolicyText}>Έκδοση πολιτικής: {feed?.sourceSelection?.version || '—'}. Οι πηγές επιλέγονται από κλειδωμένη πολιτική κώδικα και επιτρεπόμενη λίστα, όχι αυθαίρετα από το AI.</Text></View>
         <View style={[styles.productionHealth, productionReady ? styles.productionHealthGood : styles.productionHealthLimited]}>
-          <View style={styles.productionHealthTop}><View style={styles.grow}><Text style={styles.productionHealthEyebrow}>ΚΑΤΑΣΤΑΣΗ ΠΑΡΑΓΩΓΙΚΟΥ ΣΥΣΤΗΜΑΤΟΣ</Text><Text style={styles.productionHealthTitle}>{productionReady ? 'Πλήρης αυτοματοποιημένη λειτουργία' : 'Περιορισμένη λειτουργία — χωρίς αυθαίρετα σήματα'}</Text></View><View style={[styles.productionHealthBadge, productionReady && styles.productionHealthBadgeGood]}><Text style={[styles.productionHealthBadgeText, productionReady && styles.productionHealthBadgeTextGood]}>{productionReady ? 'OPERATIONAL' : 'DEGRADED'}</Text></View></View>
-          <Text style={styles.productionHealthText}>{productionReady ? 'Η ροή είναι πρόσφατη και οι υποχρεωτικοί έλεγχοι αγοράς και θεμελιωδών λειτουργούν.' : 'Το σύστημα συνεχίζει να συλλέγει και να ελέγχει δεδομένα, αλλά δεν εγκρίνει αγορά ή πώληση όταν λείπει πηγή, ιστορικό, benchmark, θεμελιώδη ή διασταύρωση.'}</Text>
-          <Text style={styles.healthSplitText}>Υποδομή: {operationalHealth?.infrastructureStatus || '—'} · Αγορά: {operationalHealth?.marketDataStatus || '—'} · Θεμελιώδη: {operationalHealth?.fundamentalsStatus || '—'} · Αποφάσεις: {operationalHealth?.decisionEngineStatus || '—'}</Text>
+          <View style={styles.productionHealthTop}><View style={styles.grow}><Text style={styles.productionHealthEyebrow}>ΚΑΤΑΣΤΑΣΗ ΠΑΡΑΓΩΓΙΚΟΥ ΣΥΣΤΗΜΑΤΟΣ</Text><Text style={styles.productionHealthTitle}>{productionReady ? (historicalAnalyticsPartial ? 'Κανονική λειτουργία · μερική ιστορική κάλυψη' : 'Πλήρης αυτοματοποιημένη λειτουργία') : 'Περιορισμένη λειτουργία — χωρίς αυθαίρετα σήματα'}</Text></View><View style={[styles.productionHealthBadge, productionReady && styles.productionHealthBadgeGood]}><Text style={[styles.productionHealthBadgeText, productionReady && styles.productionHealthBadgeTextGood]}>{productionReady ? 'OPERATIONAL' : 'DEGRADED'}</Text></View></View>
+          <Text style={styles.productionHealthText}>{productionReady ? (historicalAnalyticsPartial ? 'Η ροή είναι πρόσφατη και οι τρέχοντες έλεγχοι αγοράς και θεμελιωδών λειτουργούν. Η ιστορική ανάλυση είναι διαθέσιμη μόνο όπου έχει επαρκή και επαληθευμένα δεδομένα· οι υπόλοιποι φάκελοι παραμένουν μπλοκαρισμένοι.' : 'Η ροή είναι πρόσφατη και οι υποχρεωτικοί έλεγχοι αγοράς, ιστορικού και θεμελιωδών λειτουργούν.') : 'Το σύστημα συνεχίζει να συλλέγει και να ελέγχει δεδομένα, αλλά δεν εγκρίνει αγορά ή πώληση όταν λείπει πηγή, ιστορικό, benchmark, θεμελιώδη ή διασταύρωση.'}</Text>
+          <Text style={styles.healthSplitText}>Υποδομή: {operationalHealth?.infrastructureStatus || '—'} · Τρέχουσα αγορά: {operationalHealth?.marketDataStatus || '—'} · Ιστορική ανάλυση: {historicalAnalyticsStatus} · Θεμελιώδη: {operationalHealth?.fundamentalsStatus || '—'} · Αποφάσεις: {operationalHealth?.decisionEngineStatus || '—'}</Text>
           <View style={styles.productionMetrics}>
             <View style={styles.productionMetric}><Text style={styles.productionMetricValue}>{sourceHealth?.marketSnapshotCount || 0}</Text><Text style={styles.productionMetricLabel}>Τρέχουσες τιμές</Text></View>
-            <View style={styles.productionMetric}><Text style={styles.productionMetricValue}>{sourceHealth?.readyHistoricalMarketMetricsCount || 0}/{sourceHealth?.historicalMarketMetricsCount || 0}</Text><Text style={styles.productionMetricLabel}>Έγκυρα ιστορικά</Text></View>
+            <View style={styles.productionMetric}><Text style={styles.productionMetricValue}>{sourceHealth?.readyHistoricalMarketMetricsCount || 0}/{operationalHealth?.analysedCompanyCount || sourceHealth?.historicalMarketMetricsCount || 0}</Text><Text style={styles.productionMetricLabel}>Ιστορική κάλυψη</Text></View>
             <View style={styles.productionMetric}><Text style={styles.productionMetricValue}>{sourceHealth?.fundamentalSnapshotCount || 0}</Text><Text style={styles.productionMetricLabel}>Θεμελιώδη</Text></View>
           </View>
           <Text style={styles.productionHealthMeta}>Τελευταία παραγωγή: {when(operationalHealth?.generatedAt || feed?.generatedAt)} · Διαγνωστικά: {sourceHealth?.diagnosticCount || 0}</Text>
