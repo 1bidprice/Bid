@@ -5,8 +5,9 @@ import * as BackgroundTask from 'expo-background-task';
 import * as TaskManager from 'expo-task-manager';
 import { FINNHUB_TOKEN_KEY, fetchPortfolioQuotes } from './market-data';
 import { evaluateAlerts, normalizeAlerts, presentAlertEvents } from './alert-engine';
+import { PORTFOLIO_STATE_STORAGE_KEY } from './portfolio-state-storage';
 
-export const STORAGE_KEY = 'investor-control-mobile-state-v2';
+export const STORAGE_KEY = PORTFOLIO_STATE_STORAGE_KEY;
 export const BACKGROUND_ALERT_TASK = 'investor-control-background-alerts-v1';
 
 function normalizeState(raw) {
