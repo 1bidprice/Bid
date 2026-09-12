@@ -1,0 +1,125 @@
+name: Investor Control Core Stabilization
+
+on:
+  push:
+    branches:
+      - investor-control-core-stabilization-v174
+    paths:
+      - mobile/**
+      - .github/workflows/investor-control-core-stabilization.yml
+  pull_request:
+    branches:
+      - investor-control-v1-market-intelligence-foundation
+    paths:
+      - mobile/**
+      - .github/workflows/investor-control-core-stabilization.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: investor-control-core-stabilization-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-and-consolidate-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install canonical dependencies
+        working-directory: mobile
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+
+      - name: Apply one-time portfolio/UI responsibility consolidation
+        working-directory: mobile
+        run: node scripts/consolidate-portfolio-engine.cjs
+
+      - name: Harden null-safe numeric and live-device invariants
+        working-directory: mobile
+        run: node scripts/harden-core-numeric-invariants.cjs
+
+      - name: Harden Euronext Athens market rules
+        working-directory: mobile
+        run: node scripts/harden-athens-market.cjs
+
+      - name: Verify canonical core invariants
+        working-directory: mobile
+        run: npm run test:core
+
+      - name: Verify Expo dependency compatibility
+        working-directory: mobile
+        run: npx expo install --check
+
+      - name: Expo Doctor
+        working-directory: mobile
+        run: npx expo-doctor@latest
+
+      - name: Export Android JavaScript bundle
+        working-directory: mobile
+        run: npx expo export --platform android --output-dir dist-core-stabilization
+
+      - name: Capture exact stabilization diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf canonical-mobile-source
+          mkdir -p canonical-mobile-source/mobile
+          cp mobile/App.js canonical-mobile-source/mobile/App.js
+          cp mobile/PortfolioApp.js canonical-mobile-source/mobile/PortfolioApp.js
+          cp mobile/DecisionOverlay.js canonical-mobile-source/mobile/DecisionOverlay.js
+          cp mobile/app.json canonical-mobile-source/mobile/app.json
+          cp mobile/package.json canonical-mobile-source/mobile/package.json
+          cp -R mobile/src canonical-mobile-source/mobile/src
+          git diff -- mobile > canonical-mobile-source/generated-source.diff
+          git diff --name-only -- mobile > canonical-mobile-source/generated-files.txt
+          printf '%s\n' "${GITHUB_SHA}" > canonical-mobile-source/source-commit.txt
+          cat canonical-mobile-source/generated-files.txt
+
+      - name: Upload canonical source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-canonical-source-${{ github.sha }}
+          path: canonical-mobile-source
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Commit verified core consolidation
+        if: github.event_name == 'push' && github.ref == 'refs/heads/investor-control-core-stabilization-v174'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'investor-control-stabilizer'
+          git config user.email 'actions@users.noreply.github.com'
+          git add \
+            mobile/PortfolioApp.js \
+            mobile/src/market-data.js \
+            mobile/src/market-rules.js \
+            mobile/src/instrument-quote-integrity.js \
+            mobile/src/transaction-accounting.js \
+            mobile/src/portfolio-engine.js \
+            mobile/src/position-lots.js \
+            mobile/src/FinalDecisionCard.js \
+            mobile/src/OpportunitiesView.js \
+            mobile/src/decision-validity.js \
+            mobile/package.json \
+            mobile/scripts/test-decision-validity.cjs \
+            mobile/scripts/test-portfolio-engine.cjs \
+            mobile/scripts/verify-canonical-source.cjs \
+            mobile/scripts/verify-v173-universal-instrument-integrity.js
+          if git diff --cached --quiet; then
+            echo 'Canonical core consolidation already materialized.'
+            exit 0
+          fi
+          git commit -m 'Materialize canonical portfolio, market and decision validity invariants'
+          git push origin HEAD:investor-control-core-stabilization-v174

@@ -3,15 +3,18 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { fetchSecRecentFilings } from './adapters/sec-submissions.js';
 import { fetchSecCompanyFacts } from './adapters/sec-companyfacts.js';
-import { fetchFinnhubQuote } from './adapters/finnhub-quote.js';
-import { fetchFinnhubCandlesForSymbol, fetchFinnhubCompanyCandles } from './adapters/finnhub-candles.js';
-import { fetchAllwynRegulatoryAnnouncements } from './adapters/allwyn-regulatory.js';
+import { fetchEuronextAthensFundamentals } from './adapters/euronext-athens-fundamentals.js';
+import { fetchProfessionalMarketSnapshot, fetchProfessionalHistoricalMetrics } from './professional-market-data.js';
+import { fetchEuronextAthensAnnouncements } from './adapters/euronext-athens-announcements.js';
 import { fetchTrustedNewsEvidence } from './adapters/trusted-news-rss.js';
+import { fetchFinnhubIndependentNews } from './adapters/finnhub-independent-news.js';
 import { hydrateEvidenceDocument } from './document-hydrator.js';
 import { extractDocumentObservations } from './document-observations.js';
 import { extractPdfText } from './pdf-extractor.js';
 import { calculateMarketMetrics } from './market-metrics.js';
 import { assessFundamentalRisk } from './fundamental-risk.js';
+import { extractSecBankRegulatoryCapitalFromEvidence } from './sec-bank-regulatory-capital.js';
+import { applyReviewedRegulatoryCapitalToBankPassport } from './sec-bank-passport.js';
 import { assessIndependentEvidence } from './cross-check.js';
 import { linkEvidenceClaims, selectLeadClaim } from './claim-linker.js';
 import { evaluateSignalReadiness } from './signal-readiness.js';
@@ -20,10 +23,16 @@ import { buildResearchDossier } from './research-dossier.js';
 import { buildOpportunitiesFeed } from './opportunities-feed.js';
 import { candidateFromEvidence } from './event-classifier.js';
 import { rankSignalCandidate } from './rank-signal.js';
+import { buildInstrumentProfile } from './instrument-profile.js';
+import { buildInstrumentRoute } from './instrument-router.js';
+import { collectInstrumentCapabilities } from './instrument-capability-collector.js';
+import { evaluateInstrumentCapabilities } from './instrument-capability-evaluator.js';
+import { buildStructuredDecisionEvidence } from './decision-evidence.js';
+import { assessDecisionCorroboration } from './decision-corroboration.js';
+import { synthesizeFundamentalBaseline } from './fundamental-baseline-synthesis.js';
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_UNIVERSE_PATH = path.resolve(MODULE_DIR, '../config/universe.seed.json');
-const POSITION_COMPANY_IDS = new Set(['company:allwyn-ag', 'company:virgin-galactic-holdings']);
 
 async function loadUniverse(universePath = DEFAULT_UNIVERSE_PATH) {
   const raw = await readFile(universePath, 'utf8');
@@ -107,6 +116,9 @@ function compactMarketSummary(snapshot) {
     low: snapshot.low,
     dailyChange: snapshot.dailyChange,
     dailyChangePct: snapshot.dailyChangePct,
+    sourceQuality: snapshot.sourceQuality || null,
+    quoteTimestampVerified: snapshot.quoteTimestampVerified !== false,
+    timestampMeaning: snapshot.timestampMeaning || null,
   };
 }
 
@@ -127,6 +139,7 @@ function compactHistoricalMetrics(metrics) {
     risk: metrics.risk,
     liquidity: metrics.liquidity,
     relativeStrength: metrics.relativeStrength,
+    dataQuality: metrics.dataQuality || null,
     readiness: metrics.readiness,
   };
 }
@@ -185,7 +198,11 @@ function toSignalOutput(
 }
 
 async function collectCompanyEvidence(company, options) {
-  if (company.cik) {
+  const profile = options.instrumentProfile || buildInstrumentProfile(company);
+  const route = options.instrumentRoute || buildInstrumentRoute(company, { profile });
+  const adapter = route.routes?.officialEvidence?.adapter || null;
+
+  if (adapter === 'SEC_SUBMISSIONS') {
     return fetchSecRecentFilings(company, {
       fetchImpl: options.fetchImpl,
       userAgent: options.secUserAgent,
@@ -194,90 +211,99 @@ async function collectCompanyEvidence(company, options) {
     });
   }
 
-  if (company.companyId === 'company:allwyn-ag') {
-    return fetchAllwynRegulatoryAnnouncements(company, {
+  if (adapter === 'EURONEXT_ATHENS_ANNOUNCEMENTS') {
+    const issuerId = String(company?.issuerId || profile?.identifiers?.issuerId || '').trim();
+    const announcementsUrl = company?.marketData?.euronextIssuerAnnouncementsUrl
+      || (issuerId ? `https://athens.euronext.com/en/market-data/issuers/${encodeURIComponent(issuerId)}/announcements` : null);
+    if (!announcementsUrl) {
+      return { records: [], diagnostics: [{ code: 'INSTRUMENT_OFFICIAL_EVIDENCE_IDENTITY_INCOMPLETE', companyId: company.companyId, assetClass: profile.assetClass }] };
+    }
+    return fetchEuronextAthensAnnouncements({
+      ...company,
+      marketData: { ...(company.marketData || {}), euronextIssuerAnnouncementsUrl: announcementsUrl },
+    }, {
       fetchImpl: options.fetchImpl,
       retrievedAt: options.now,
       limit: options.limit,
+      userAgent: options.documentUserAgent,
     });
   }
 
   return {
     records: [],
-    diagnostics: [{ code: 'NO_OFFICIAL_SOURCE_ADAPTER', companyId: company.companyId }],
+    diagnostics: [{
+      code: 'INSTRUMENT_OFFICIAL_EVIDENCE_ADAPTER_UNAVAILABLE',
+      companyId: company.companyId,
+      assetClass: profile.assetClass,
+      analysisModel: profile.analysisModel,
+      requiredCapabilities: profile.requiredCapabilities,
+    }],
   };
 }
 
 async function collectCompanyFundamentals(company, options) {
-  if (company.cik) {
+  const profile = options.instrumentProfile || buildInstrumentProfile(company);
+  const route = options.instrumentRoute || buildInstrumentRoute(company, { profile });
+  const adapter = route.routes?.fundamentals?.adapter || null;
+
+  if (adapter === 'SEC_COMPANY_FACTS') {
     return fetchSecCompanyFacts(company, {
       fetchImpl: options.fetchImpl,
       userAgent: options.secUserAgent,
       generatedAt: options.now,
     });
   }
+  if (adapter === 'EURONEXT_ATHENS_FINANCIALS') {
+    return fetchEuronextAthensFundamentals(company, {
+      fetchImpl: options.fetchImpl,
+      generatedAt: options.now,
+      userAgent: options.documentUserAgent || 'Investor-Control-Market-Intelligence/1.0',
+      pdfExtractor: options.pdfExtractor,
+      maxBytes: options.maxDocumentBytes,
+      minReviewedText: options.minReviewedText,
+      timeoutMs: options.pdfTimeoutMs,
+    });
+  }
   return {
     snapshot: null,
-    diagnostics: [{ code: 'FUNDAMENTALS_ADAPTER_PENDING', companyId: company.companyId }],
+    diagnostics: [{
+      code: 'INSTRUMENT_ANALYTICS_PROVIDER_REQUIRED',
+      companyId: company.companyId,
+      assetClass: profile.assetClass,
+      analysisModel: profile.analysisModel,
+      requiredCapabilities: profile.requiredCapabilities,
+    }],
   };
 }
 
 async function collectCompanyMarketSnapshot(company, options) {
-  if (company.country === 'US') {
-    return fetchFinnhubQuote(company, {
-      fetchImpl: options.fetchImpl,
-      token: options.finnhubToken,
-      generatedAt: options.now,
-    });
+  const profile = options.instrumentProfile || buildInstrumentProfile(company);
+  const route = options.instrumentRoute || buildInstrumentRoute(company, { profile });
+  if (!route.routes?.market?.adapter) {
+    return { snapshot: null, diagnostics: [{ code: 'INSTRUMENT_MARKET_PROVIDER_REQUIRED', companyId: company.companyId, assetClass: profile.assetClass, analysisModel: profile.analysisModel }] };
   }
-  return {
-    snapshot: null,
-    diagnostics: [{ code: 'MARKET_DATA_ADAPTER_PENDING', companyId: company.companyId }],
-  };
+  return fetchProfessionalMarketSnapshot(company, {
+    fetchImpl: options.fetchImpl,
+    token: options.finnhubToken,
+    generatedAt: options.now,
+  });
 }
 
 async function collectCompanyHistoricalMetrics(company, options) {
-  if (company.country !== 'US') {
-    return {
-      series: null,
-      metrics: null,
-      diagnostics: [{ code: 'HISTORICAL_MARKET_DATA_ADAPTER_PENDING', companyId: company.companyId }],
-    };
+  const profile = options.instrumentProfile || buildInstrumentProfile(company);
+  const route = options.instrumentRoute || buildInstrumentRoute(company, { profile });
+  if (!route.routes?.history?.adapter) {
+    return { series: null, metrics: null, diagnostics: [{ code: 'INSTRUMENT_HISTORY_PROVIDER_REQUIRED', companyId: company.companyId, assetClass: profile.assetClass, analysisModel: profile.analysisModel }] };
   }
-
-  const companyResult = await fetchFinnhubCompanyCandles(company, {
+  return fetchProfessionalHistoricalMetrics(company, {
     fetchImpl: options.fetchImpl,
     token: options.finnhubToken,
     generatedAt: options.now,
     lookbackDays: options.lookbackDays,
+    benchmarkCache: options.benchmarkCache,
+    marketSnapshot: options.marketSnapshot,
+    historyCrossCheckTolerancePct: options.historyCrossCheckTolerancePct,
   });
-  const diagnostics = [...(companyResult.diagnostics || [])];
-  if (!companyResult.series?.usable) {
-    return { series: companyResult.series || null, metrics: null, diagnostics };
-  }
-
-  let benchmarkSeries = options.benchmarkCache.get('SPY') || null;
-  if (!benchmarkSeries) {
-    const benchmarkResult = await fetchFinnhubCandlesForSymbol('SPY', {
-      fetchImpl: options.fetchImpl,
-      token: options.finnhubToken,
-      generatedAt: options.now,
-      lookbackDays: options.lookbackDays,
-      currency: 'USD',
-    });
-    diagnostics.push(...(benchmarkResult.diagnostics || []).map((item) => ({ ...item, benchmark: true })));
-    benchmarkSeries = benchmarkResult.series || null;
-    if (benchmarkSeries) options.benchmarkCache.set('SPY', benchmarkSeries);
-  }
-
-  const metrics = calculateMarketMetrics(companyResult.series, benchmarkSeries, {
-    companyId: company.companyId,
-    symbol: company.primaryListing?.symbol,
-    benchmarkSymbol: 'SPY',
-    currency: company.currency || company.listings?.[0]?.currency || null,
-    generatedAt: options.now,
-  });
-  return { series: companyResult.series, metrics, diagnostics };
 }
 
 async function analyseEvidenceDocument(record, company, options) {
@@ -311,6 +337,12 @@ function recordsForClaim(records, claim) {
   return records.filter((record) => ids.has(record.id));
 }
 
+function replaceFundamentalRiskAssessment(assessments, companyId, nextAssessment) {
+  const index = assessments.findIndex((item) => item?.companyId === companyId);
+  if (index >= 0) assessments[index] = nextAssessment;
+  else assessments.push(nextAssessment);
+}
+
 export async function runDailyIntelligence(options = {}) {
   const now = new Date(options.now || Date.now()).toISOString();
   const universe = options.universe || await loadUniverse(options.universePath);
@@ -323,6 +355,13 @@ export async function runDailyIntelligence(options = {}) {
   const fundamentalRiskAssessments = [];
   const claimClusters = [];
   const researchDossiers = [];
+  const instrumentProfiles = [];
+  const instrumentRoutes = [];
+  const instrumentCapabilityPassports = [];
+  const instrumentCapabilityEvaluations = [];
+  const structuredDecisionEvidence = [];
+  const decisionCorroborations = [];
+  const classificationSnapshots = [...(options.classificationSnapshots || [])];
   const documentLimit = Math.max(0, Number(options.documentLimit ?? 5));
   const benchmarkCache = new Map();
   const pdfExtractor = options.pdfExtractor === undefined ? extractPdfText : options.pdfExtractor;
@@ -335,11 +374,24 @@ export async function runDailyIntelligence(options = {}) {
     let marketSnapshot = null;
     let marketMetrics = null;
     let fundamentalRisk = null;
+    let instrumentCapabilities = null;
+    let instrumentCapabilityEvaluation = null;
+    const instrumentProfile = buildInstrumentProfile(company);
+    const instrumentRoute = buildInstrumentRoute(company, { profile: instrumentProfile });
+    instrumentProfiles.push(instrumentProfile);
+    instrumentRoutes.push(instrumentRoute);
 
     try {
       const fundamentalResult = await collectCompanyFundamentals(company, {
         fetchImpl,
         secUserAgent,
+        instrumentProfile,
+        instrumentRoute,
+        documentUserAgent: options.documentUserAgent,
+        pdfExtractor,
+        maxDocumentBytes: options.maxDocumentBytes,
+        minReviewedText: options.minReviewedText,
+        pdfTimeoutMs: options.pdfTimeoutMs,
         now,
       });
       fundamentalSnapshot = fundamentalResult.snapshot || null;
@@ -357,6 +409,8 @@ export async function runDailyIntelligence(options = {}) {
       const marketResult = await collectCompanyMarketSnapshot(company, {
         fetchImpl,
         finnhubToken,
+        instrumentProfile,
+        instrumentRoute,
         now,
       });
       marketSnapshot = marketResult.snapshot || null;
@@ -374,11 +428,21 @@ export async function runDailyIntelligence(options = {}) {
       const historyResult = await collectCompanyHistoricalMetrics(company, {
         fetchImpl,
         finnhubToken,
+        instrumentProfile,
+        instrumentRoute,
         now,
         lookbackDays: options.lookbackDays,
         benchmarkCache,
+        marketSnapshot,
+        historyCrossCheckTolerancePct: options.historyCrossCheckTolerancePct,
       });
       marketMetrics = historyResult.metrics || null;
+      if (historyResult.series?.usable && options.historicalSeriesCollector?.set) {
+        options.historicalSeriesCollector.set(company.companyId, historyResult.series);
+      }
+      if (historyResult.benchmarkSeries?.usable && options.benchmarkSeriesCollector?.set) {
+        options.benchmarkSeriesCollector.set(company.companyId, historyResult.benchmarkSeries);
+      }
       diagnostics.push(...(historyResult.diagnostics || []));
       if (marketMetrics) historicalMarketMetrics.push(marketMetrics);
     } catch (error) {
@@ -396,20 +460,47 @@ export async function runDailyIntelligence(options = {}) {
         {
           generatedAt: now,
           companyId: company.companyId,
-          currency: company.currency || company.listings?.[0]?.currency || 'USD',
+          currency: company.currency || company.primaryListing?.currency || company.listings?.[0]?.currency || fundamentalSnapshot?.reporting?.currency || 'USD',
         },
       );
       fundamentalRiskAssessments.push(fundamentalRisk);
     }
 
     try {
+      instrumentCapabilities = await collectInstrumentCapabilities(company, instrumentProfile, {
+        route: instrumentRoute,
+        marketSnapshot,
+        marketMetrics,
+        providers: options.capabilityProviders || [],
+        fetchImpl,
+        now,
+      });
+      instrumentCapabilityPassports.push(instrumentCapabilities);
+      diagnostics.push(...(instrumentCapabilities.diagnostics || []).map((item) => ({ ...item, companyId: item.companyId || company.companyId })));
+      instrumentCapabilityEvaluation = evaluateInstrumentCapabilities(instrumentProfile, instrumentCapabilities);
+      instrumentCapabilityEvaluations.push(instrumentCapabilityEvaluation);
+    } catch (error) {
+      diagnostics.push({
+        code: 'INSTRUMENT_CAPABILITY_ENGINE_FAILED',
+        companyId: company.companyId,
+        assetClass: instrumentProfile.assetClass,
+        analysisModel: instrumentProfile.analysisModel,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    try {
       const result = await collectCompanyEvidence(company, {
         fetchImpl,
         secUserAgent,
+        instrumentProfile,
+        instrumentRoute,
+        documentUserAgent: options.documentUserAgent,
         now,
         limit: Number(options.limit || 20),
       });
       diagnostics.push(...(result.diagnostics || []));
+      if (result.classificationSnapshot) classificationSnapshots.push(result.classificationSnapshot);
 
       const officialRecords = [];
       const records = result.records || [];
@@ -419,7 +510,7 @@ export async function runDailyIntelligence(options = {}) {
           const analysed = await analyseEvidenceDocument(record, company, {
             fetchImpl,
             secUserAgent,
-            documentUserAgent: options.documentUserAgent || 'Investor-Control-Market-Intelligence/0.5',
+            documentUserAgent: options.documentUserAgent || 'Investor-Control-Market-Intelligence/1.0',
             now,
             maxDocumentBytes: options.maxDocumentBytes,
             minReviewedText: options.minReviewedText,
@@ -439,25 +530,112 @@ export async function runDailyIntelligence(options = {}) {
         evidence.push(record);
       }
 
-      let independentRecords = [];
-      if (options.collectTrustedNews !== false) {
-        try {
-          const newsResult = await fetchTrustedNewsEvidence(company, {
-            fetchImpl,
-            retrievedAt: now,
-            limit: Number(options.newsLimit || 12),
-            userAgent: options.newsUserAgent || 'Investor-Control-Market-Intelligence/0.5',
-          });
-          independentRecords = newsResult.records || [];
-          diagnostics.push(...(newsResult.diagnostics || []).map((item) => ({ ...item, companyId: item.companyId || company.companyId })));
-          evidence.push(...independentRecords);
-        } catch (error) {
+      if (
+        company.cik &&
+        fundamentalSnapshot?.model?.type === 'FINANCIAL_INSTITUTION' &&
+        fundamentalSnapshot?.specializedModels?.bank
+      ) {
+        const capitalResult = extractSecBankRegulatoryCapitalFromEvidence(officialRecords);
+        diagnostics.push(...(capitalResult.diagnostics || []).map((item) => ({
+          ...item,
+          companyId: item.companyId || company.companyId,
+        })));
+        if (capitalResult.capital) {
+          const bankPassport = applyReviewedRegulatoryCapitalToBankPassport(
+            fundamentalSnapshot.specializedModels.bank,
+            capitalResult.capital,
+          );
+          fundamentalSnapshot.specializedModels = {
+            ...(fundamentalSnapshot.specializedModels || {}),
+            bank: bankPassport,
+          };
+          fundamentalSnapshot.model = {
+            ...(fundamentalSnapshot.model || {}),
+            specializedModelImplemented: true,
+            modelReady: bankPassport.modelReady,
+            specializedModelStatus: bankPassport.status,
+          };
+          fundamentalSnapshot.quality = {
+            ...(fundamentalSnapshot.quality || {}),
+            specializedModelImplemented: true,
+            bankPassportStatus: bankPassport.status,
+            bankPassportBlockers: bankPassport.blockers,
+            regulatoryCapitalEvidenceId: capitalResult.capital.evidenceId,
+          };
+          fundamentalSnapshot.metricsReady = bankPassport.decisionReady === true;
+
+          fundamentalRisk = assessFundamentalRisk(
+            fundamentalSnapshot,
+            referencePriceForRisk(marketSnapshot, marketMetrics),
+            {
+              generatedAt: now,
+              companyId: company.companyId,
+              currency: company.currency || company.primaryListing?.currency || company.listings?.[0]?.currency || fundamentalSnapshot?.reporting?.currency || 'USD',
+            },
+          );
+          replaceFundamentalRiskAssessment(fundamentalRiskAssessments, company.companyId, fundamentalRisk);
           diagnostics.push({
-            code: 'TRUSTED_NEWS_ADAPTER_FAILED',
+            code: 'SEC_BANK_REGULATORY_CAPITAL_VERIFIED',
             companyId: company.companyId,
-            message: error instanceof Error ? error.message : String(error),
+            evidenceId: capitalResult.capital.evidenceId,
+            accession: capitalResult.capital.accession,
+            form: capitalResult.capital.form,
           });
         }
+      }
+
+      let independentRecords = [];
+      if (options.collectTrustedNews !== false) {
+        const mergeIndependent = (records = []) => {
+          const byId = new Map(independentRecords.map((record) => [record.id, record]));
+          for (const record of records) byId.set(record.id, record);
+          independentRecords = [...byId.values()];
+        };
+        const recommendationGradeCount = () => independentRecords.filter((record) => record?.document?.reviewed === true && record?.claimType === 'FACT').length;
+
+        if (finnhubToken) {
+          try {
+            const directNews = await fetchFinnhubIndependentNews(company, {
+              fetchImpl,
+              token: finnhubToken,
+              retrievedAt: now,
+              limit: Number(options.newsLimit || 12),
+              reviewLimit: Number(options.newsReviewLimit || 4),
+              userAgent: options.newsUserAgent || 'Investor-Control-Market-Intelligence/1.5',
+            });
+            mergeIndependent(directNews.records || []);
+            diagnostics.push(...(directNews.diagnostics || []).map((item) => ({ ...item, companyId: item.companyId || company.companyId })));
+          } catch (error) {
+            diagnostics.push({
+              code: 'FINNHUB_DIRECT_NEWS_ADAPTER_FAILED',
+              companyId: company.companyId,
+              message: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+
+        // Aggregator RSS remains discovery fallback only. It is queried only
+        // when the direct-URL route did not yield a reviewed publisher article.
+        if (recommendationGradeCount() === 0 && options.collectAggregatorFallback !== false) {
+          try {
+            const newsResult = await fetchTrustedNewsEvidence(company, {
+              fetchImpl,
+              retrievedAt: now,
+              limit: Number(options.newsLimit || 12),
+              reviewLimit: Number(options.newsReviewLimit || 3),
+              userAgent: options.newsUserAgent || 'Investor-Control-Market-Intelligence/1.5',
+            });
+            mergeIndependent(newsResult.records || []);
+            diagnostics.push(...(newsResult.diagnostics || []).map((item) => ({ ...item, companyId: item.companyId || company.companyId })));
+          } catch (error) {
+            diagnostics.push({
+              code: 'TRUSTED_NEWS_ADAPTER_FAILED',
+              companyId: company.companyId,
+              message: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+        evidence.push(...independentRecords);
       }
 
       const companyRecords = [...officialRecords, ...independentRecords];
@@ -465,8 +643,8 @@ export async function runDailyIntelligence(options = {}) {
       claimClusters.push(...companyClaims);
       const leadClaim = selectLeadClaim(companyClaims);
       const leadRecords = recordsForClaim(companyRecords, leadClaim);
-      const crossCheck = assessIndependentEvidence(leadRecords, now);
-      const synthesis = synthesizeEvidenceOnlyResearch({
+      const eventCrossCheck = assessIndependentEvidence(leadRecords, now);
+      const eventSynthesis = synthesizeEvidenceOnlyResearch({
         company,
         evidence: leadRecords,
         fundamentals: fundamentalSnapshot,
@@ -475,20 +653,68 @@ export async function runDailyIntelligence(options = {}) {
         generatedAt: now,
       });
 
+      const structured = buildStructuredDecisionEvidence({
+        company,
+        fundamentals: fundamentalSnapshot,
+        marketSnapshot,
+        marketMetrics,
+        generatedAt: now,
+      });
+      structuredDecisionEvidence.push(...structured.records);
+      evidence.push(...structured.records);
+      diagnostics.push(...(structured.diagnostics || []));
+
+      const decisionCorroboration = assessDecisionCorroboration({
+        company,
+        instrumentProfile,
+        structuredEvidence: structured.records,
+        fundamentals: fundamentalSnapshot,
+        fundamentalRisk,
+        marketSnapshot,
+        marketMetrics,
+        eventCrossCheck,
+      });
+      decisionCorroborations.push(decisionCorroboration);
+      const baselineSynthesis = synthesizeFundamentalBaseline({
+        company,
+        instrumentProfile,
+        decisionCorroboration,
+        fundamentals: fundamentalSnapshot,
+        fundamentalRisk,
+        historicalMarketMetrics: marketMetrics,
+        generatedAt: now,
+      });
+
+      const eventBasisReady = leadClaim?.recommendationGrade === true
+        && eventCrossCheck?.recommendationReady === true
+        && (eventSynthesis?.blockers || []).length === 0;
+      const baselineBasisReady = decisionCorroboration.ready === true
+        && (baselineSynthesis?.blockers || []).length === 0;
+      const useBaseline = !eventBasisReady && baselineBasisReady;
+      const synthesis = useBaseline ? baselineSynthesis : eventSynthesis;
+      const dossierEvidence = useBaseline ? structured.records : leadRecords;
+      const decisionBasis = useBaseline ? 'FUNDAMENTAL_BASELINE' : 'EVENT_DRIVEN';
+
       const dossier = buildResearchDossier({
         company,
+        instrumentProfile,
+        instrumentRoute,
+        instrumentCapabilities,
+        instrumentCapabilityEvaluation,
         generatedAt: now,
+        decisionBasis,
+        decisionCorroboration,
         category: synthesis.category,
         proposedAction: synthesis.proposedAction,
         timeHorizon: synthesis.timeHorizon,
-        evidence: leadRecords,
-        leadClaim,
-        requireCanonicalClaim: true,
+        evidence: dossierEvidence,
+        leadClaim: useBaseline ? null : leadClaim,
+        requireCanonicalClaim: useBaseline ? false : true,
         fundamentals: fundamentalSnapshot,
         marketSnapshot,
         historicalMarketMetrics: marketMetrics,
         fundamentalRisk,
-        crossCheck,
+        crossCheck: eventCrossCheck,
         thesis: synthesis.thesis,
         causalMechanism: synthesis.causalMechanism,
         catalysts: synthesis.catalysts,
@@ -516,7 +742,7 @@ export async function runDailyIntelligence(options = {}) {
           fundamentalSnapshot?.metricsReady === true &&
           marketMetrics?.readiness?.marketMetricsReady === true;
         const candidate = candidateFromEvidence(record, {
-          hasPosition: POSITION_COMPANY_IDS.has(company.companyId),
+          hasPosition: options.positionCompanyIds instanceof Set ? options.positionCompanyIds.has(company.companyId) : company?.portfolioContext?.hasPosition === true,
           personalisationScore: 80,
           liquidityScore: marketMetrics?.liquidity?.score ?? 50,
           metricsReady,
@@ -562,18 +788,32 @@ export async function runDailyIntelligence(options = {}) {
 
   return {
     format: 'investor-control-daily-intelligence',
-    version: 4,
+    version: 5,
     generatedAt: now,
     universe: universe.map((company) => ({
       companyId: company.companyId,
       legalName: company.legalName,
       primaryListing: company.primaryListing,
     })),
+    classificationSnapshotCount: classificationSnapshots.length,
+    classificationSnapshots,
     evidenceCount: evidence.length,
     independentDiscoveryCount: evidence.filter((record) => record.sourceType === 'FINANCIAL_NEWS').length,
     documentReviewedCount: evidence.filter((record) => record.document?.reviewed === true).length,
     documentPendingCount: evidence.filter((record) => record.document?.reviewed !== true).length,
     pdfReviewedCount: evidence.filter((record) => record.document?.status === 'REVIEWED_PDF').length,
+    instrumentProfileCount: instrumentProfiles.length,
+    instrumentProfiles,
+    instrumentRouteCount: instrumentRoutes.length,
+    instrumentRoutes,
+    instrumentCapabilityPassportCount: instrumentCapabilityPassports.length,
+    instrumentCapabilityPassports,
+    instrumentCapabilityEvaluationCount: instrumentCapabilityEvaluations.length,
+    instrumentCapabilityEvaluations,
+    structuredDecisionEvidenceCount: structuredDecisionEvidence.length,
+    structuredDecisionEvidence,
+    decisionCorroborationCount: decisionCorroborations.length,
+    decisionCorroborations,
     fundamentalSnapshotCount: fundamentalSnapshots.length,
     fundamentalSnapshots,
     fundamentalRiskAssessmentCount: fundamentalRiskAssessments.length,

@@ -1,11 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import { isMarketGatewayConfigured } from './market-gateway-runtime';
 import * as BackgroundTask from 'expo-background-task';
 import * as TaskManager from 'expo-task-manager';
 import { FINNHUB_TOKEN_KEY, fetchPortfolioQuotes } from './market-data';
 import { evaluateAlerts, normalizeAlerts, presentAlertEvents } from './alert-engine';
+import { PORTFOLIO_STATE_STORAGE_KEY } from './portfolio-state-storage';
 
-export const STORAGE_KEY = 'investor-control-mobile-state-v2';
+export const STORAGE_KEY = PORTFOLIO_STATE_STORAGE_KEY;
 export const BACKGROUND_ALERT_TASK = 'investor-control-background-alerts-v1';
 
 function normalizeState(raw) {
@@ -37,7 +39,7 @@ TaskManager.defineTask(BACKGROUND_ALERT_TASK, async () => {
     )];
     if (!symbols.length) return BackgroundTask.BackgroundTaskResult.Success;
 
-    const token = await SecureStore.getItemAsync(FINNHUB_TOKEN_KEY);
+    const token = isMarketGatewayConfigured() ? '' : await SecureStore.getItemAsync(FINNHUB_TOKEN_KEY);
     const result = await fetchPortfolioQuotes(symbols, { finnhubToken: token || '' });
     const prices = { ...current.prices, ...result.quotes };
     const evaluated = evaluateAlerts(current.alerts, prices, { background: true });

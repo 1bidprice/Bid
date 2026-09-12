@@ -1,4 +1,5 @@
 import { contentHash } from '../content-hash.js';
+import { buildSecForecastClassificationSnapshot } from '../forecast-classification-lineage.js';
 
 function isoDate(dateText) {
   if (!dateText) return null;
@@ -44,6 +45,7 @@ export async function fetchSecRecentFilings(company, options = {}) {
     Array.isArray(recent.accessionNumber) ? recent.accessionNumber.length : 0,
   );
   const retrievedAt = new Date(options.retrievedAt || Date.now()).toISOString();
+  const classificationResult = buildSecForecastClassificationSnapshot(company, payload, { capturedAt: retrievedAt });
   const records = [];
 
   for (let index = 0; index < count; index += 1) {
@@ -98,5 +100,5 @@ export async function fetchSecRecentFilings(company, options = {}) {
     });
   }
 
-  return { records, diagnostics: [] };
+  return { records, diagnostics: classificationResult.diagnostics, classificationSnapshot: classificationResult.snapshot };
 }

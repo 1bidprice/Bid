@@ -10,6 +10,32 @@ import { extractEquityOpportunityRawSignals, buildOpportunityFactorsForUniverse 
 import { scanOpportunityUniverse } from './opportunity-universe-scanner.js';
 import { createNasdaqUsListedUniverseProvider } from './adapters/nasdaq-symbol-directory-universe.js';
 import { buildSecFramesBroadEquityScreen } from './adapters/sec-frames-broad-equity-screen.js';
+import { buildShadowForecasts } from './shadow-forecast-engine.js';
+import { collectLongHistoryResearch } from './long-history-collector.js';
+import { runForecastOutcomeArchiveCycle } from './forecast-outcome-archive.js';
+import { collectDueForecastOutcomeHistory } from './forecast-outcome-maturation.js';
+import { buildForecastLearningStatus } from './forecast-learning-status.js';
+import { buildForecastFactorLearningStatus } from './forecast-factor-learning-status.js';
+import { buildForecastFactorAttributionStatus } from './forecast-factor-attribution.js';
+import { buildForecastFactorWeightGovernanceStatus } from './forecast-factor-weight-governance.js';
+import { buildForecastFactorOperationalTelemetry } from './forecast-factor-production-safety.js';
+import { buildForecastRegimeLearningStatus } from './forecast-regime-learning-status.js';
+import { buildForecastRegimeOperationalTelemetry } from './forecast-regime-production-safety.js';
+import { buildForecastRegimeFactorAttributionStatus } from './forecast-regime-factor-attribution.js';
+import { buildForecastRegimeFactorOperationalTelemetry } from './forecast-regime-factor-production-safety.js';
+import { buildForecastRegimeFactorWeightGovernanceStatus } from './forecast-regime-factor-weight-governance.js';
+import { buildForecastRegimeFactorGovernanceOperationalTelemetry } from './forecast-regime-factor-governance-production-safety.js';
+import { buildForecastStackedEnsembleResearchStatus } from './forecast-stacked-ensemble-research.js';
+import { buildForecastStackedEnsembleOperationalTelemetry } from './forecast-stacked-ensemble-production-safety.js';
+import { buildForecastRegimeStackedEnsembleResearchStatus } from './forecast-regime-stacked-ensemble-research.js';
+import { buildForecastRegimeStackedEnsembleOperationalTelemetry } from './forecast-regime-stacked-ensemble-production-safety.js';
+import { buildCrossSectionalRegimeWalkForwardRuntimeStatus } from './forecast-cross-sectional-regime-walk-forward-runtime.js';
+import { buildCrossSectionalRegimeWalkForwardOperationalTelemetry } from './forecast-cross-sectional-regime-walk-forward-production-safety.js';
+import { gateBroadEquityOpportunityCandidate, gateDeepEquityOpportunityModel } from './opportunity-model-gate.js';
+import { selectBroadFundamentalCandidates } from './broad-equity-fundamental-selector.js';
+import { screenBroadEquityMarketCandidates } from './broad-equity-market-screen.js';
+import { reconcileOpportunityPurchaseDecisions } from './opportunity-purchase-reconciliation.js';
+import { buildOperationalHealth } from './operational-health.js';
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_UNIVERSE_PATH = path.resolve(MODULE_DIR, '../config/universe.seed.json');
@@ -149,7 +175,9 @@ function buildAnalysedOpportunitySeeds(expandedUniverse, baseReport, options = {
     const marketMetrics = historyByCompany.get(company.companyId) || null;
     const dossier = dossiersByCompany.get(company.companyId) || null;
 
-    if (profile.assetClass !== 'EQUITY' || profile.analysisModel !== 'EQUITY_OPERATING') {
+    const deepOpportunityModelGate = gateDeepEquityOpportunityModel(profile, fundamentals);
+
+    if (!deepOpportunityModelGate.eligible) {
       passthrough.push({
         ...company,
         instrumentId: company.instrumentId || company.companyId,
@@ -238,14 +266,46 @@ async function runBroadOpportunityScreen(options, generatedAt, secUserAgent) {
       fetchImpl: options.fetchImpl || globalThis.fetch,
       userAgent: secUserAgent,
       now: generatedAt,
-      limit: options.broadOpportunityDeepAnalysisLimit || 12,
+      limit: options.broadOpportunityFundamentalPoolLimit || 800,
+    });
+    const riskFiltered = (screen.candidates || []).filter((candidate) => Number(candidate.broadScreen?.preliminaryRiskScore || 100) < 80);
+    const gated = riskFiltered.map((candidate) => ({ candidate, gate: gateBroadEquityOpportunityCandidate(candidate) }));
+    const genericCandidates = gated.filter((item) => item.gate.eligible).map((item) => item.candidate);
+    const specializedQuarantine = gated.filter((item) => !item.gate.eligible);
+    const fundamentalSelection = selectBroadFundamentalCandidates(genericCandidates, {
+      limit: options.broadOpportunityMarketScreenLimit || 240,
+      maxPreliminaryRiskScore: 80,
+    });
+    const marketScreen = await screenBroadEquityMarketCandidates(fundamentalSelection.candidates, {
+      fetchImpl: options.fetchImpl || globalThis.fetch,
+      now: generatedAt,
+      benchmarkSymbol: options.broadOpportunityBenchmarkSymbol || 'SPY',
+      concurrency: options.broadOpportunityMarketConcurrency || 8,
+      limit: options.broadOpportunityDeepAnalysisLimit || 24,
     });
     return {
       ...screen,
       enabled: true,
       directoryEligibleCount: directory.totalEligibleCount ?? directory.instruments?.length ?? 0,
       directoryTruncated: directory.truncated === true,
-      candidates: (screen.candidates || []).filter((candidate) => Number(candidate.broadScreen?.preliminaryRiskScore || 100) < 80),
+      fundamentalPoolCount: genericCandidates.length,
+      fundamentalSelectedCount: fundamentalSelection.selectedCount,
+      marketScreenInputCount: fundamentalSelection.selectedCount,
+      marketScreenScorableCount: marketScreen.scorableCount,
+      marketScreenEligibleCount: marketScreen.eligibleCount || 0,
+      marketScreenStatus: marketScreen.status,
+      marketScreenPolicyVersion: marketScreen.policyVersion,
+      marketScreenDiagnostics: marketScreen.diagnostics,
+      candidates: marketScreen.candidates,
+      specializedQuarantineCount: specializedQuarantine.length,
+      specializedQuarantine: specializedQuarantine.map(({ candidate, gate }) => ({
+        instrumentId: candidate.instrumentId,
+        companyId: candidate.companyId,
+        displayName: candidate.displayName,
+        primaryListing: candidate.primaryListing,
+        model: gate.model,
+        reason: gate.reason,
+      })),
     };
   } catch (error) {
     return {
@@ -290,7 +350,9 @@ export async function runAutonomousIntelligence(options = {}) {
   const broadOpportunityScan = await runBroadOpportunityScreen(options, generatedAt, secUserAgent);
   const broadCompanies = broadCandidatesToCompanies(broadOpportunityScan);
   const expandedUniverse = mergeUniverse(seedUniverse, discovery.discoveredCompanies, broadCompanies);
-  const baseReport = await runDailyIntelligence({ ...options, now: generatedAt, universe: expandedUniverse });
+  const historicalSeriesCollector = new Map();
+  const benchmarkSeriesCollector = new Map();
+  const baseReport = await runDailyIntelligence({ ...options, now: generatedAt, universe: expandedUniverse, historicalSeriesCollector, benchmarkSeriesCollector, classificationSnapshots: discovery.classificationSnapshots || [] });
 
   const analysedOpportunitySeeds = buildAnalysedOpportunitySeeds(expandedUniverse, baseReport, options);
   const opportunityUniverse = await scanOpportunityUniverse({
@@ -315,9 +377,141 @@ export async function runAutonomousIntelligence(options = {}) {
     minimumImmediateLiquidityScore: options.minimumImmediateLiquidityScore,
   });
   const researchDossiers = annotateDiscovery(policyDossiers, discovery, broadOpportunityScan, seedUniverse);
+  const opportunityPurchaseReconciliation = reconcileOpportunityPurchaseDecisions(opportunityUniverse, researchDossiers, {
+    now: generatedAt,
+    maxReferencePriceAgeHours: options.maxReferencePriceAgeHours,
+    maxDossierAgeHours: options.maxDossierAgeHours,
+    maxHistoricalMarketAgeHours: options.maxHistoricalMarketAgeHours,
+    immediatePriceAgeHours: options.immediatePriceAgeHours,
+    minimumImmediateLiquidityScore: options.minimumImmediateLiquidityScore,
+  });
+  const longHistoryResearch = await collectLongHistoryResearch({
+    universe: expandedUniverse,
+    researchDossiers,
+    historicalSeriesCollector,
+    options: { ...options, generatedAt },
+  });
+  const shadowForecasts = buildShadowForecasts({
+    generatedAt,
+    universe: expandedUniverse,
+    researchDossiers,
+    opportunityUniverse,
+    historicalSeriesCollector,
+    benchmarkSeriesCollector,
+    longHistoryResearchCollector: longHistoryResearch.collector,
+    options,
+  });
+  const forecastOutcomeMaturation = await collectDueForecastOutcomeHistory({
+    generatedAt,
+    existingRecords: options.forecastOutcomeLedgerRecords || [],
+    universe: expandedUniverse,
+    historicalSeriesCollector,
+    options,
+  });
+  for (const [companyId, series] of forecastOutcomeMaturation.collector) {
+    if (!historicalSeriesCollector.get(companyId)?.usable) historicalSeriesCollector.set(companyId, series);
+  }
+  const forecastOutcomeArchive = runForecastOutcomeArchiveCycle({
+    generatedAt,
+    existingRecords: options.forecastOutcomeLedgerRecords || [],
+    shadowForecasts,
+    researchDossiers,
+    classificationSnapshots: baseReport.classificationSnapshots || [],
+    historicalSeriesCollector,
+    options,
+  });
+  const forecastLearningStatus = buildForecastLearningStatus({
+    generatedAt,
+    records: forecastOutcomeArchive.records,
+    options,
+  });
+  const forecastFactorLearningStatus = buildForecastFactorLearningStatus({
+    generatedAt,
+    records: forecastOutcomeArchive.records,
+    options,
+  });
+  const forecastFactorAttributionStatus = buildForecastFactorAttributionStatus({
+    generatedAt,
+    records: forecastOutcomeArchive.records,
+    options,
+  });
+  const forecastFactorWeightGovernanceStatus = buildForecastFactorWeightGovernanceStatus({
+    generatedAt,
+    records: forecastOutcomeArchive.records,
+    attributionStatus: forecastFactorAttributionStatus,
+    options,
+  });
+  const forecastFactorOperationalTelemetry = buildForecastFactorOperationalTelemetry({
+    forecastFactorLearningStatus,
+    forecastFactorAttributionStatus,
+    forecastFactorWeightGovernanceStatus,
+  });
+  const forecastRegimeLearningStatus = buildForecastRegimeLearningStatus({
+    generatedAt,
+    records: forecastOutcomeArchive.records,
+    options,
+  });
+  const forecastRegimeOperationalTelemetry = buildForecastRegimeOperationalTelemetry(forecastRegimeLearningStatus);
+  const forecastRegimeFactorAttributionStatus = buildForecastRegimeFactorAttributionStatus({
+    generatedAt,
+    records: forecastOutcomeArchive.records,
+    options,
+  });
+  const forecastRegimeFactorOperationalTelemetry = buildForecastRegimeFactorOperationalTelemetry(forecastRegimeFactorAttributionStatus);
+  const forecastRegimeFactorWeightGovernanceStatus = buildForecastRegimeFactorWeightGovernanceStatus({
+    generatedAt,
+    records: forecastOutcomeArchive.records,
+    regimeFactorAttributionStatus: forecastRegimeFactorAttributionStatus,
+    regimeLearningStatus: forecastRegimeLearningStatus,
+    options,
+  });
+  const forecastRegimeFactorGovernanceOperationalTelemetry = buildForecastRegimeFactorGovernanceOperationalTelemetry(forecastRegimeFactorWeightGovernanceStatus);
+  const forecastStackedEnsembleResearchStatus = buildForecastStackedEnsembleResearchStatus({
+    generatedAt,
+    records: forecastOutcomeArchive.records,
+    options,
+  });
+  const forecastStackedEnsembleOperationalTelemetry = buildForecastStackedEnsembleOperationalTelemetry(forecastStackedEnsembleResearchStatus);
+  const forecastRegimeStackedEnsembleResearchStatus = buildForecastRegimeStackedEnsembleResearchStatus({
+    generatedAt,
+    records: forecastOutcomeArchive.records,
+    options,
+  });
+  const forecastRegimeStackedEnsembleOperationalTelemetry = buildForecastRegimeStackedEnsembleOperationalTelemetry(forecastRegimeStackedEnsembleResearchStatus);
+  const forecastCrossSectionalRegimeWalkForwardRuntimeStatus = buildCrossSectionalRegimeWalkForwardRuntimeStatus({
+    enabled: options.crossSectionalHistoricalRegimeWalkForwardEnabled === true,
+    generatedAt,
+    researchDossiers,
+    historicalSeriesByCompany: historicalSeriesCollector,
+    benchmarkSeriesByCompany: benchmarkSeriesCollector,
+    maximumInstrumentCount: options.crossSectionalHistoricalRegimeWalkForwardMaxInstruments,
+    options: options.crossSectionalHistoricalRegimeWalkForwardOptions || {},
+  });
+  const forecastCrossSectionalRegimeWalkForwardOperationalTelemetry = buildCrossSectionalRegimeWalkForwardOperationalTelemetry(forecastCrossSectionalRegimeWalkForwardRuntimeStatus);
+  if (typeof options.forecastOutcomeLedgerSink === 'function') {
+    await options.forecastOutcomeLedgerSink(forecastOutcomeArchive);
+  }
   const opportunitiesFeed = buildOpportunitiesFeed(researchDossiers, { generatedAt });
   const finalActionCounts = countByAction(researchDossiers);
-  const finalActionCount = Object.entries(finalActionCounts).filter(([key]) => key !== 'BLOCKED').reduce((sum, [, value]) => sum + value, 0);
+  const finalActionCount = Object.entries(finalActionCounts)
+    .filter(([key]) => key !== 'BLOCKED')
+    .reduce((sum, [, value]) => sum + value, 0);
+  const analysedCompanyCount = Math.max(1, expandedUniverse.length);
+const readyHistoricalCount = (baseReport.historicalMarketMetrics || [])
+  .filter((item) => item?.readiness?.marketMetricsReady === true).length;
+const blockedDecisionCount = Number(finalActionCounts.BLOCKED || 0);
+const operationalHealth = buildOperationalHealth({
+  generatedAt,
+  analysedCompanyCount,
+  marketSnapshotCount: baseReport.marketSnapshotCount,
+  historicalMarketMetricsCount: baseReport.historicalMarketMetricsCount,
+  readyHistoricalMarketMetricsCount: readyHistoricalCount,
+  fundamentalSnapshotCount: baseReport.fundamentalSnapshotCount,
+  finalActionCount,
+  blockedDecisionCount,
+  researchDossierCount: researchDossiers.length,
+  unresolvedDiagnosticCount: baseReport.diagnostics.length + (discovery.diagnostics?.length || 0),
+});
 
   return {
     ...baseReport,
@@ -336,19 +530,65 @@ export async function runAutonomousIntelligence(options = {}) {
     broadOpportunityScan,
     opportunityUniverse,
     opportunityDeepVerificationQueue,
+    opportunityPurchaseReconciliation,
     researchDossiers,
+    longHistoryResearchSummary: longHistoryResearch.summary,
+    forecastOutcomeLedgerSummary: forecastOutcomeArchive.summary,
+    forecastOutcomeMaturationSummary: forecastOutcomeMaturation.summary,
+    forecastLearningStatus,
+    forecastFactorLearningStatus,
+    forecastFactorAttributionStatus,
+    forecastFactorWeightGovernanceStatus,
+    forecastRegimeLearningStatus,
+    forecastRegimeFactorAttributionStatus,
+    forecastRegimeFactorWeightGovernanceStatus,
+    forecastStackedEnsembleResearchStatus,
+    forecastRegimeStackedEnsembleResearchStatus,
+    forecastCrossSectionalRegimeWalkForwardRuntimeStatus,
+    shadowForecastCount: shadowForecasts.length,
+    shadowForecasts,
     opportunitiesFeed,
     finalActionCount,
     finalActionCounts,
+    operationalHealth: {
+      ...operationalHealth,
+      ...forecastFactorOperationalTelemetry,
+      ...forecastRegimeOperationalTelemetry,
+      ...forecastRegimeFactorOperationalTelemetry,
+      ...forecastRegimeFactorGovernanceOperationalTelemetry,
+      ...forecastStackedEnsembleOperationalTelemetry,
+      ...forecastRegimeStackedEnsembleOperationalTelemetry,
+      ...forecastCrossSectionalRegimeWalkForwardOperationalTelemetry,
+    },
     autonomousPublicationCount: researchDossiers.filter((dossier) => dossier.publicationMode === 'AUTOMATED_POLICY').length,
   };
 }
 
 async function main() {
   const outputPath = path.resolve(process.cwd(), process.argv[2] || 'out/autonomous-intelligence.json');
-  const report = await runAutonomousIntelligence();
+  const ledgerInputPath = process.env.FORECAST_OUTCOME_LEDGER_PATH
+    ? path.resolve(process.cwd(), process.env.FORECAST_OUTCOME_LEDGER_PATH)
+    : null;
+  const ledgerOutputPath = path.resolve(process.cwd(), process.env.FORECAST_OUTCOME_LEDGER_OUTPUT || 'out/forecast-outcome-ledger.json');
+  let forecastOutcomeLedgerRecords = [];
+  if (ledgerInputPath) {
+    try {
+      const existingArchive = JSON.parse(await readFile(ledgerInputPath, 'utf8'));
+      forecastOutcomeLedgerRecords = Array.isArray(existingArchive?.records) ? existingArchive.records : [];
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+  }
+  let persistedForecastOutcomeArchive = null;
+  const report = await runAutonomousIntelligence({
+    forecastOutcomeLedgerRecords,
+    forecastOutcomeLedgerSink: (archive) => { persistedForecastOutcomeArchive = archive; },
+  });
+  if (!persistedForecastOutcomeArchive) throw new Error('Forecast outcome archive cycle did not produce a persistence payload');
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  await mkdir(path.dirname(ledgerOutputPath), { recursive: true });
+  await writeFile(ledgerOutputPath, `${JSON.stringify(persistedForecastOutcomeArchive, null, 2)}\n`, 'utf8');
   console.log(`Wrote autonomous intelligence report to ${outputPath}`);
   console.log(`Event discovery: ${report.discovery.candidateCount} candidates, ${report.discovery.deepAnalysisCompanyCount} additions`);
   console.log(`Broad opportunity screen: ${report.broadOpportunityScan.directoryEligibleCount || 0} eligible, ${report.broadOpportunityScan.candidates?.length || 0} deep-analysis additions`);

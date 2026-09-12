@@ -67,7 +67,14 @@ test('research dossier uses the current official delayed quote as analysis refer
 
 function completeDossier(executionFreshnessEligible) {
   const timestamp = now;
+  const companyId = 'company:test:decision-grade';
   return {
+    companyId,
+    companyName: 'Decision Grade Test Company',
+    assetClass: 'EQUITY',
+    listing: { symbol: 'TEST', exchange: 'Euronext Athens', mic: 'XATH', currency: 'EUR' },
+    integrityContractVersion: 1,
+    listingIntegrity: { activeTradingVerified: true, lifecycleStatus: 'ACTIVE', verifiedAt: timestamp },
     generatedAt: timestamp,
     status: 'REVIEW_READY',
     readiness: { publishable: true },
@@ -75,16 +82,24 @@ function completeDossier(executionFreshnessEligible) {
     referencePrice: {
       value: 10,
       currency: 'EUR',
+      nativeCurrency: 'EUR',
       timestamp,
-      source: 'Test market source',
+      source: 'Verified test market source',
+      companyId,
+      appSymbol: 'TEST',
+      sourceApproved: true,
+      timestampVerified: executionFreshnessEligible,
       purpose: 'ANALYSIS_REFERENCE',
       analysisReferenceEligible: true,
+      executionFreshnessEligible,
       decisionEligible: executionFreshnessEligible,
       freshnessModel: executionFreshnessEligible ? 'VERIFIED_TIMESTAMP' : 'OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY',
-      executionFreshnessEligible,
     },
     reviewDate: '2026-08-08',
-    evidence: [{ id: 'a' }, { id: 'b' }],
+    evidence: [
+      { evidenceId: 'a', companyIds: [companyId] },
+      { evidenceId: 'b', companyIds: [companyId] },
+    ],
     metrics: {
       crossCheck: { recommendationReady: true, contradictionCount: 0 },
       fundamentals: { metricsReady: true },
@@ -104,11 +119,12 @@ function completeDossier(executionFreshnessEligible) {
 
 test('BUY_NOW is impossible when the evidence is complete but the price is analysis-only', () => {
   const result = evaluateFinalAction(completeDossier(false), { now });
-  assert.equal(result.status, 'FINAL');
+  assert.equal(result.status, 'BLOCKED');
   assert.equal(result.marketAction, 'WATCH');
-  assert.equal(result.nonHolderAction, 'DO_NOT_BUY');
+  assert.equal(result.nonHolderAction, 'WATCH');
   assert.equal(result.freshness.executionFreshnessEligible, false);
-  assert.ok(result.reasons.includes('EXECUTION_PRICE_NOT_VERIFIED'));
+  assert.ok(result.blockers.includes('REFERENCE_PRICE_NOT_DECISION_ELIGIBLE'));
+  assert.ok(result.blockers.includes('REFERENCE_PRICE_NOT_EXECUTION_ELIGIBLE'));
 });
 
 test('BUY_NOW remains available when all evidence and execution-grade freshness gates are satisfied', () => {

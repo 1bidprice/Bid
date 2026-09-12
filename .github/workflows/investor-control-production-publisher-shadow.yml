@@ -1,0 +1,163 @@
+name: Investor Control Production Publisher Shadow
+
+on:
+  push:
+    branches:
+      - investor-control-core-stabilization-v174
+    paths:
+      - market-intelligence/**
+      - .github/workflows/investor-control-production-publisher-shadow.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-production-publisher-shadow-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rehearse-production-publication:
+    runs-on: ubuntu-latest
+    timeout-minutes: 80
+    steps:
+      - name: Checkout exact canonical source
+        uses: actions/checkout@v4
+        with:
+          path: source
+          fetch-depth: 1
+
+      - name: Checkout current live publication channel read-only
+        uses: actions/checkout@v4
+        with:
+          ref: investor-control-live-feed
+          path: live-feed
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install PDF extraction runtime
+        run: |
+          set -euo pipefail
+          if ! command -v pdftotext >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y poppler-utils
+          fi
+
+      - name: Require canonical server-side credentials
+        env:
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$FINNHUB_TOKEN" || { echo 'FINNHUB_TOKEN is not configured server-side' >&2; exit 1; }
+
+      - name: Verify canonical source before rehearsal
+        working-directory: source/market-intelligence
+        run: npm test
+
+      - name: Build fresh canonical intelligence
+        working-directory: source/market-intelligence
+        env:
+          SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+          FORECAST_OUTCOME_LEDGER_PATH: ../../live-feed/forecast-outcome-ledger.json
+          FORECAST_OUTCOME_LEDGER_OUTPUT: out/forecast-outcome-ledger.json
+        run: |
+          set -euo pipefail
+          node src/run-autonomous-intelligence.js out/autonomous-intelligence.json
+          node src/build-mobile-feed.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json
+          node scripts/verify-production-output.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json
+          node scripts/verify-opportunity-hunter-output.js out/autonomous-intelligence.json
+          node scripts/verify-forecast-outcome-archive.js out/forecast-outcome-ledger.json
+          node scripts/verify-canonical-live-source-connectivity.js out/mobile-intelligence-feed.json out/source-connectivity-audit.json
+
+      - name: Rehearse transactional publication without remote write
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf publication-rehearsal
+          cp -a live-feed publication-rehearsal
+
+          cp source/market-intelligence/out/mobile-intelligence-feed.json publication-rehearsal/mobile-intelligence-feed.json
+          cp source/market-intelligence/out/autonomous-intelligence.json publication-rehearsal/autonomous-intelligence.json
+
+          node source/market-intelligence/scripts/merge-forecast-outcome-archives.js \
+            publication-rehearsal/forecast-outcome-ledger.json \
+            source/market-intelligence/out/forecast-outcome-ledger.json \
+            publication-rehearsal/forecast-outcome-ledger.json
+          node source/market-intelligence/scripts/verify-forecast-outcome-archive.js \
+            publication-rehearsal/forecast-outcome-ledger.json
+
+          node - <<'NODE'
+          const fs = require('fs');
+          const crypto = require('crypto');
+          const { execFileSync } = require('child_process');
+          const feed = JSON.parse(fs.readFileSync('./publication-rehearsal/mobile-intelligence-feed.json','utf8'));
+          const report = JSON.parse(fs.readFileSync('./publication-rehearsal/autonomous-intelligence.json','utf8'));
+          const pkg = JSON.parse(fs.readFileSync('./source/market-intelligence/package.json','utf8'));
+          const forecastArchive = JSON.parse(fs.readFileSync('./publication-rehearsal/forecast-outcome-ledger.json','utf8'));
+          const forecastSummary = forecastArchive.summary || {};
+          const now = new Date().toISOString();
+          const sourceCommit = execFileSync('git',['-C','source','rev-parse','HEAD'],{encoding:'utf8'}).trim();
+          const quotes = Object.values(feed.quoteRegistry || {});
+          const missingCurrency = quotes.filter((q)=>!q?.currency);
+          const unverifiedUsIdentity = quotes.filter((q)=>String(q?.appSymbol || '').endsWith('.US') && q?.quoteContract?.identityVerified !== true);
+          if (missingCurrency.length) throw new Error(`canonical registry contains ${missingCurrency.length} quote(s) without currency`);
+          if (unverifiedUsIdentity.length) throw new Error(`canonical registry contains ${unverifiedUsIdentity.length} US quote(s) without verified identity`);
+
+          const status = {
+            format:'investor-control-live-feed-status',
+            version:9,
+            generatedAt:feed.generatedAt,
+            publishedAt:now,
+            policyVersion:feed.policyVersion,
+            sourcePolicyVersion:feed.sourceSelection?.version || null,
+            sourceWorkflowRunId:process.env.GITHUB_RUN_ID,
+            sourceCommit,
+            canonicalSourceVersion:pkg.version,
+            publisherContract:'CANONICAL_TRANSACTIONAL_V3_SHADOW',
+            feedSha256:crypto.createHash('sha256').update(fs.readFileSync('./publication-rehearsal/mobile-intelligence-feed.json')).digest('hex'),
+            forecastArchiveSha256:crypto.createHash('sha256').update(fs.readFileSync('./publication-rehearsal/forecast-outcome-ledger.json')).digest('hex'),
+            sourceHealth:{
+              canonicalQuoteCount:quotes.length,
+              missingCurrencyCount:missingCurrency.length,
+              unverifiedUsIdentityCount:unverifiedUsIdentity.length,
+              valuationEligibleQuoteCount:quotes.filter((q)=>q?.quoteContract?.valuationEligible===true).length,
+              decisionEligibleQuoteCount:quotes.filter((q)=>q?.quoteContract?.decisionEligible===true).length,
+              forecastOutcomeRecordCount:Number(forecastSummary.recordCount || 0),
+            },
+          };
+          fs.writeFileSync('./publication-rehearsal/status.shadow.json',JSON.stringify(status,null,2)+'\n');
+          NODE
+
+          node source/market-intelligence/scripts/verify-production-output.js \
+            publication-rehearsal/autonomous-intelligence.json \
+            publication-rehearsal/mobile-intelligence-feed.json
+          node source/market-intelligence/scripts/verify-opportunity-hunter-output.js \
+            publication-rehearsal/autonomous-intelligence.json
+          node source/market-intelligence/scripts/verify-forecast-outcome-archive.js \
+            publication-rehearsal/forecast-outcome-ledger.json
+
+          git -C publication-rehearsal config user.name 'Investor Control Publisher Shadow'
+          git -C publication-rehearsal config user.email 'actions@users.noreply.github.com'
+          git -C publication-rehearsal add mobile-intelligence-feed.json autonomous-intelligence.json forecast-outcome-ledger.json status.shadow.json
+          if ! git -C publication-rehearsal diff --cached --quiet; then
+            git -C publication-rehearsal commit -m "chore(feed): canonical publication shadow ${GITHUB_RUN_ID} [skip ci]"
+          fi
+          echo 'Publication rehearsal completed locally. No remote live-feed write was attempted.'
+
+      - name: Upload publisher rehearsal evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-production-publisher-shadow-${{ github.run_id }}
+          path: |
+            source/market-intelligence/out/source-connectivity-audit.json
+            publication-rehearsal/status.shadow.json
+            publication-rehearsal/mobile-intelligence-feed.json
+            publication-rehearsal/autonomous-intelligence.json
+          if-no-files-found: warn
+          retention-days: 14

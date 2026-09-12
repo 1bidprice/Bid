@@ -63,7 +63,8 @@ parser.parse(portfolio, { sourceType: 'module', plugins: ['jsx'] });
 
 assert(finalCard.includes('canonicalPositionSymbol(position.symbol) === canonicalPositionSymbol(item?.symbol)'), 'FinalDecisionCard canonical holder match missing');
 assert(portfolio.includes('<OpportunitiesView portfolioPositions={positions} />'), 'portfolio positions are not bridged to OpportunitiesView');
-assert(opportunities.includes('personalizedDecisionCounts(feed, portfolioPositions)'), 'personalized decision counter missing');
+assert(opportunities.includes('personalizedDecisionCounts(feed, portfolioPositions, decisionContext)'), 'personalized decision counter with validity context missing');
+assert(opportunities.includes("import { finalActionIsCurrent } from './decision-validity';"), 'personalized counters must fail closed through decision validity');
 assert(opportunities.includes('inferredReferenceCurrency(referencePrice, item)'), 'safe currency inference missing');
 assert(opportunities.includes("style: 'currency',\n      currency,"), 'currency formatter syntax contract missing');
 assert(!opportunities.includes("currency: referencePrice.currency || 'EUR'"), 'false EUR fallback still present');
@@ -74,4 +75,4 @@ assert(pkg.version === app.expo.version, `package/app version mismatch: ${pkg.ve
 assert(portfolio.includes(`const VERSION = '${app.expo.version}';`), `PortfolioApp runtime version mismatch: ${app.expo.version}`);
 assert(decision.includes(`const VERSION = '${app.expo.version}';`), `DecisionOverlay runtime version mismatch: ${app.expo.version}`);
 
-console.log(`PASS v1.7.1+ portfolio-aware holder/non-holder decisions, personalized counters, safe currency inference, JSX parse and consistent release identity ${app.expo.version} build ${app.expo.android.versionCode}.`);
+console.log(`PASS v1.7.1+ portfolio-aware holder/non-holder decisions, validity-gated personalized counters, safe currency inference, JSX parse and consistent release identity ${app.expo.version} build ${app.expo.android.versionCode}.`);

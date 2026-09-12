@@ -187,6 +187,7 @@ export function validateForecastMarketRegimeSnapshot(snapshot, forecastRecord = 
   if (snapshot.modelDerived !== true) errors.push('MARKET_REGIME_MODEL_DERIVED_REQUIRED');
   if (snapshot.finalActionEligible !== false) errors.push('MARKET_REGIME_FINAL_ACTION_FORBIDDEN');
   if (snapshot.decisionImpact !== 'NONE') errors.push('MARKET_REGIME_DECISION_IMPACT_FORBIDDEN');
+  if (Object.prototype.hasOwnProperty.call(snapshot, 'series') || Object.prototype.hasOwnProperty.call(snapshot, 'candles')) errors.push('MARKET_REGIME_RAW_SERIES_FORBIDDEN');
   if (!snapshot.regimeKey || !snapshot.riskTone || !snapshot.trendRegime || !snapshot.volatilityRegime || !snapshot.momentumRegime) errors.push('MARKET_REGIME_IDENTITY_INCOMPLETE');
   if (!snapshot.benchmarkAsOf || !snapshot.capturedAt) errors.push('MARKET_REGIME_TIMESTAMPS_REQUIRED');
   const capturedAt = new Date(snapshot.capturedAt).getTime();

@@ -1,6 +1,6 @@
 import { ASSET_CLASS } from './instrument-profile.js';
 
-export const OPPORTUNITY_ENGINE_VERSION = '2026-08-09.2';
+export const OPPORTUNITY_ENGINE_VERSION = '2026-08-18.1';
 
 const clamp = (value, min = 0, max = 100) => Math.max(min, Math.min(max, Number(value) || 0));
 const round = (value, digits = 2) => Number(Number(value || 0).toFixed(digits));
@@ -66,14 +66,15 @@ const MODEL = Object.freeze({
 function verifiedFactor(candidate, key) {
   const factor = candidate?.factors?.[key];
   if (factor === null || factor === undefined) return null;
-  if (typeof factor === 'number') return { score: clamp(factor), verified: true, sourceCount: 1, ageHours: null, peerSampleSize: null };
+  if (typeof factor === 'number') return null;
   if (factor.verified !== true) return null;
   const score = Number(factor.score);
-  if (!Number.isFinite(score)) return null;
+  const sourceCount = Number(factor.sourceCount);
+  if (!Number.isFinite(score) || !Number.isFinite(sourceCount) || sourceCount < 1) return null;
   return {
     score: clamp(score),
     verified: true,
-    sourceCount: Math.max(1, Number(factor.sourceCount || 1)),
+    sourceCount: Math.max(1, sourceCount),
     ageHours: Number.isFinite(Number(factor.ageHours)) ? Math.max(0, Number(factor.ageHours)) : null,
     peerSampleSize: Number.isFinite(Number(factor.peerSampleSize)) && Number(factor.peerSampleSize) > 0 ? Number(factor.peerSampleSize) : null,
     peerKey: factor.peerKey || null,
@@ -172,6 +173,7 @@ export function scoreOpportunityCandidate(candidate = {}) {
 
   const blockers = [];
   if (weighted.coverageScore < 70) blockers.push('INSUFFICIENT_FACTOR_COVERAGE');
+  if (weighted.missing.length) blockers.push('UNVERIFIED_OR_MISSING_FACTORS');
   if (evidenceQuality < 60) blockers.push('LOW_EVIDENCE_QUALITY');
   if (executionQuality < 45) blockers.push('INSUFFICIENT_EXECUTION_QUALITY');
   if (riskScore > model.maxRiskForSuper) blockers.push('RISK_TOO_HIGH_FOR_SUPER_TIER');

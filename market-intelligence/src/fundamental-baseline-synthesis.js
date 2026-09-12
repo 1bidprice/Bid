@@ -41,6 +41,7 @@ function operatingSynthesis(input, evidenceIds) {
   const market = marketState(input.historicalMarketMetrics);
   const growth = finite(f?.metrics?.annualRevenueGrowthPct);
   const margin = finite(f?.metrics?.annualNetMarginPct);
+  const marginComparable = risk?.profitability?.netMarginComparable !== false && (margin === null || Math.abs(margin) <= 1000);
   const dilution = finite(f?.metrics?.dilutedSharesChangePct);
   const riskScore = finite(risk?.riskScore);
   const ps = finite(risk?.valuation?.priceToSales);
@@ -62,7 +63,7 @@ function operatingSynthesis(input, evidenceIds) {
   } else if (
     riskScore !== null && riskScore <= 50 &&
     growth !== null && growth > 5 &&
-    margin !== null && margin > 0 &&
+    marginComparable && margin !== null && margin > 0 &&
     positive && !valuationExtreme
   ) {
     proposedAction = 'CONSIDER_BUY';
@@ -71,7 +72,7 @@ function operatingSynthesis(input, evidenceIds) {
 
   const metrics = [
     growth !== null ? `μεταβολή εσόδων ${fmt(growth)}%` : null,
-    margin !== null ? `καθαρό περιθώριο ${fmt(margin)}%` : null,
+    margin !== null ? (marginComparable ? `καθαρό περιθώριο ${fmt(margin)}%` : 'καθαρό περιθώριο μη συγκρίσιμο λόγω πολύ χαμηλής βάσης εσόδων') : null,
     ps !== null ? `P/S ${fmt(ps)}x` : null,
     pb !== null ? `P/B ${fmt(pb)}x` : null,
     riskScore !== null ? `fundamental risk ${fmt(riskScore, 0)}/100` : null,

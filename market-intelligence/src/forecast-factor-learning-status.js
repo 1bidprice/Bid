@@ -1,4 +1,9 @@
-export const FORECAST_FACTOR_LEARNING_STATUS_VERSION = '2026-08-11.2';
+import { evaluateOosSampleIndependence, splitChronologicalDateBlocks } from './forecast-oos-sample-independence.js';
+import { evaluateOosOutcomeWindowIndependence } from './forecast-oos-outcome-window-independence.js';
+import { evaluateOosInstrumentConcentration } from './forecast-oos-instrument-concentration.js';
+import { evaluateOosTaxonomyConcentration } from './forecast-oos-taxonomy-concentration.js';
+
+export const FORECAST_FACTOR_LEARNING_STATUS_VERSION = '2026-08-12.1';
 
 const SCORE_BINS = Object.freeze([
   { lower: -1, upper: -0.6, includeUpper: false },
@@ -167,12 +172,7 @@ function scoreBins(records = [], options = {}) {
 }
 
 function splitContiguous(records, blockCount) {
-  const sorted = chronological(records);
-  return Array.from({ length: blockCount }, (_, index) => {
-    const start = Math.floor(index * sorted.length / blockCount);
-    const end = Math.floor((index + 1) * sorted.length / blockCount);
-    return sorted.slice(start, end);
-  });
+  return splitChronologicalDateBlocks(records, blockCount);
 }
 
 export function evaluateFactorScoreTemporalStability(records = [], options = {}) {
@@ -245,12 +245,35 @@ function evaluateGroup(records, options = {}) {
   const minimumRealisedReturnSpreadPct = Number(options.factorMinimumRealisedReturnSpreadPct ?? 0);
   const minimumPopulatedBins = Math.max(2, Number(options.factorMinimumPopulatedBins || 3));
   const maximumMonotonicInversions = Math.max(0, Number(options.factorMaximumMonotonicInversions ?? 1));
+  const sampleIndependence = evaluateOosSampleIndependence(maturedScored, {
+    minimumDistinctForecastDates: options.factorMinimumDistinctForecastDates ?? 40,
+    minimumDistinctInstruments: options.factorMinimumDistinctInstruments ?? 10,
+    maximumSingleForecastDateSharePct: options.factorMaximumSingleForecastDateSharePct ?? 10,
+  });
+  const outcomeWindowIndependence = evaluateOosOutcomeWindowIndependence(maturedScored, {
+    minimumEffectiveNonOverlappingWindows: options.factorMinimumEffectiveNonOverlappingOutcomeWindows ?? 12,
+  });
+  const instrumentConcentration = evaluateOosInstrumentConcentration(maturedScored, {
+    maximumSingleInstrumentSharePct: options.factorMaximumSingleInstrumentSharePct ?? 25,
+    minimumEffectiveInstrumentCount: options.factorMinimumEffectiveInstrumentCount ?? 6,
+  });
+  const taxonomyConcentration = evaluateOosTaxonomyConcentration(maturedScored, {
+    minimumClassificationCoveragePct: options.factorMinimumClassificationCoveragePct ?? 80,
+    materialTaxonomyMinimumSharePct: options.factorMaterialTaxonomyMinimumSharePct ?? 15,
+    materialTaxonomyMinimumRecordCount: options.factorMaterialTaxonomyMinimumRecordCount ?? 30,
+    maximumSingleNativeClusterSharePct: options.factorMaximumSingleNativeClusterSharePct ?? 40,
+    minimumEffectiveNativeClusterCount: options.factorMinimumEffectiveNativeClusterCount ?? 3,
+  });
 
   const rocAuc = auc(maturedScored);
   const spread = tailSpread(maturedScored, options);
   const ordering = scoreBins(maturedScored, options);
   const stability = evaluateFactorScoreTemporalStability(maturedScored, options);
   const blockers = [];
+  blockers.push(...sampleIndependence.blockers);
+  blockers.push(...outcomeWindowIndependence.blockers);
+  blockers.push(...instrumentConcentration.blockers);
+  blockers.push(...taxonomyConcentration.blockers);
   if (maturedScored.length < minimumMaturedSample) blockers.push('FACTOR_MATURED_OOS_SAMPLE_TOO_SMALL');
   if (positiveCount < minimumClassCount) blockers.push('FACTOR_POSITIVE_OUTCOME_SAMPLE_TOO_SMALL');
   if (negativeCount < minimumClassCount) blockers.push('FACTOR_NEGATIVE_OUTCOME_SAMPLE_TOO_SMALL');
@@ -281,6 +304,10 @@ function evaluateGroup(records, options = {}) {
     minimumMaturedSample,
     remainingMaturedSamplesToFloor: Math.max(0, minimumMaturedSample - maturedScored.length),
     sampleProgressPct: round(Math.min(1, maturedScored.length / minimumMaturedSample) * 100, 2),
+    sampleIndependence,
+    outcomeWindowIndependence,
+    instrumentConcentration,
+    taxonomyConcentration,
     discrimination: {
       rocAuc: round(rocAuc, 4),
       topBottom: spread,

@@ -18,6 +18,20 @@ on:
       - play-store/**
       - .github/workflows/verify-investor-control-play-aab.yml
   workflow_dispatch:
+    inputs:
+      sign_for_play:
+        description: 'Create a Play-uploadable AAB using the protected Investor Control upload key'
+        required: true
+        default: false
+        type: boolean
+      market_gateway_url:
+        description: 'Live canonical market gateway base URL required when sign_for_play=true'
+        required: false
+        type: string
+      expected_sha:
+        description: 'Exact source commit SHA authorized for a signed Play release'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -55,12 +69,66 @@ jobs:
         working-directory: mobile
         run: npm install --legacy-peer-deps --no-audit --no-fund
 
+      - name: Configure and verify live gateway for manual Play signing
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_for_play }}
+        working-directory: mobile
+        shell: bash
+        env:
+          MARKET_GATEWAY_URL_INPUT: ${{ inputs.market_gateway_url }}
+          EXPECTED_SHA_INPUT: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = 'investor-control-core-stabilization-v174' || { echo 'Signed Play release is restricted to the controlled stabilization branch.' >&2; exit 1; }
+          test -n "${EXPECTED_SHA_INPUT:-}" || { echo 'expected_sha is required for signed Play release.' >&2; exit 1; }
+          test "$EXPECTED_SHA_INPUT" = "$GITHUB_SHA" || { echo "Authorized SHA does not match workflow SHA: $GITHUB_SHA" >&2; exit 1; }
+          NORMALIZED_GATEWAY_URL="$(node - <<'NODE'
+          const { normalizeGatewayBaseUrl } = require('./src/market-gateway-client');
+          const normalized = normalizeGatewayBaseUrl(process.env.MARKET_GATEWAY_URL_INPUT);
+          if (!normalized) {
+            console.error('market_gateway_url must be a valid HTTPS URL without credentials, query parameters or fragments.');
+            process.exit(1);
+          }
+          process.stdout.write(normalized);
+          NODE
+          )"
+          test -n "$NORMALIZED_GATEWAY_URL"
+          printf 'EXPO_PUBLIC_MARKET_GATEWAY_URL=%s\n' "$NORMALIZED_GATEWAY_URL" >> "$GITHUB_ENV"
+          printf 'MARKET_GATEWAY_RELEASE_URL=%s\n' "$NORMALIZED_GATEWAY_URL" >> "$GITHUB_ENV"
+
+          HEALTH_FILE="$RUNNER_TEMP/investor-control-gateway-health.json"
+          QUOTE_FILE="$RUNNER_TEMP/investor-control-gateway-spce.json"
+          FX_FILE="$RUNNER_TEMP/investor-control-gateway-eurusd.json"
+          CLIENT_ID="play_release_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          curl --fail --silent --show-error --retry 3 --retry-delay 2 "$NORMALIZED_GATEWAY_URL/health" > "$HEALTH_FILE"
+          curl --fail --silent --show-error --retry 2 --retry-delay 2 \
+            -H "X-Investor-Control-Client: $CLIENT_ID" \
+            "$NORMALIZED_GATEWAY_URL/v1/quote?symbol=SPCE.US" > "$QUOTE_FILE"
+          curl --fail --silent --show-error --retry 2 --retry-delay 2 \
+            -H "X-Investor-Control-Client: $CLIENT_ID" \
+            "$NORMALIZED_GATEWAY_URL/v1/fx?pair=EURUSD" > "$FX_FILE"
+          HEALTH_FILE="$HEALTH_FILE" QUOTE_FILE="$QUOTE_FILE" FX_FILE="$FX_FILE" node - <<'NODE'
+          const fs = require('fs');
+          const { validateGatewayQuote, validateGatewayFx } = require('./src/market-gateway-client');
+          const health = JSON.parse(fs.readFileSync(process.env.HEALTH_FILE, 'utf8'));
+          if (health?.status !== 'ok' || health?.providers?.us !== 'configured' || health?.providers?.athens !== 'official_delayed_15m' || health?.providers?.fx !== 'ecb_official_daily_reference') {
+            throw new Error('live market gateway health contract failed');
+          }
+          const quote = JSON.parse(fs.readFileSync(process.env.QUOTE_FILE, 'utf8'));
+          const quoteError = validateGatewayQuote('SPCE.US', quote);
+          if (quoteError) throw new Error(`live market gateway SPCE contract failed: ${quoteError}`);
+          const fx = JSON.parse(fs.readFileSync(process.env.FX_FILE, 'utf8'));
+          const fxError = validateGatewayFx(fx);
+          if (fxError) throw new Error(`live market gateway EURUSD contract failed: ${fxError}`);
+          NODE
+          rm -f "$HEALTH_FILE" "$QUOTE_FILE" "$FX_FILE"
+
       - name: Validate release source
         working-directory: mobile
         run: |
           set -euo pipefail
           npm run test:lots
           npm run test:quote-transparency
+          npm run test:instrument-integrity
           npx expo install --check
           npx expo-doctor@latest
           npx expo export --platform android --output-dir dist-play-aab
@@ -70,17 +138,17 @@ jobs:
           const pkg = require('./package.json');
           const portfolio = fs.readFileSync('./PortfolioApp.js', 'utf8');
           const decision = fs.readFileSync('./DecisionOverlay.js', 'utf8');
-          if (app.expo.version !== '1.7.2' || app.expo.android.versionCode !== 30) throw new Error('current release version mismatch');
-          if (app.expo.android.package !== 'gr.investorcontrol.app') throw new Error('legacy package mismatch');
+          if (app.expo.version !== '1.7.3' || app.expo.android.versionCode !== 31) throw new Error('current release version mismatch');
+          if (app.expo.android.package !== 'gr.investorcontrol.app') throw new Error('app package mismatch');
           const plugin = app.expo.plugins.find((item) => Array.isArray(item) && item[0] === 'expo-build-properties');
           if (plugin?.[1]?.android?.targetSdkVersion !== 36 || plugin?.[1]?.android?.compileSdkVersion !== 36) throw new Error('API 36 config missing');
           if (plugin?.[1]?.android?.usesCleartextTraffic !== false) throw new Error('cleartext traffic not blocked');
           for (const permission of ['android.permission.SYSTEM_ALERT_WINDOW','com.google.android.c2dm.permission.RECEIVE']) {
             if (!app.expo.android.blockedPermissions.includes(permission)) throw new Error(`permission not blocked: ${permission}`);
           }
-          if (pkg.version !== '1.7.2') throw new Error('mobile package version mismatch');
-          if (!portfolio.includes("const VERSION = '1.7.2';")) throw new Error('PortfolioApp runtime version mismatch');
-          if (!decision.includes("const VERSION = '1.7.2';")) throw new Error('DecisionOverlay runtime version mismatch');
+          if (pkg.version !== '1.7.3') throw new Error('mobile package version mismatch');
+          if (!portfolio.includes("const VERSION = '1.7.3';")) throw new Error('PortfolioApp runtime version mismatch');
+          if (!decision.includes("const VERSION = '1.7.3';")) throw new Error('DecisionOverlay runtime version mismatch');
           if (!portfolio.includes('function quoteHeadlineLabel(quote)')) throw new Error('dynamic quote headline missing');
           if (!portfolio.includes('Ο ακριβής χρόνος αυτής της τιμής δεν είναι επαληθευμένος.')) throw new Error('quote timestamp disclosure missing');
           if (!portfolio.includes('Σημαντική ενημέρωση πριν τη χρήση')) throw new Error('mandatory risk notice missing');
@@ -103,165 +171,164 @@ jobs:
         run: |
           set -euo pipefail
           APK='mobile/android/app/build/outputs/apk/release/app-release.apk'
-          UPDATE='mobile/Investor-Control-v1.7.2-update.apk'
-          ALIGNED='mobile/Investor-Control-v1.7.2-aligned.apk'
+          UPDATE='mobile/Investor-Control-v1.7.3-update.apk'
+          ALIGNED='mobile/Investor-Control-v1.7.3-aligned.apk'
           KEYSTORE='mobile/android/app/debug.keystore'
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           test -s "$APK" && test -s "$KEYSTORE"
           "$BUILD_TOOLS/zipalign" -p -f 4 "$APK" "$ALIGNED"
           "$BUILD_TOOLS/apksigner" sign --ks "$KEYSTORE" --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --out "$UPDATE" "$ALIGNED"
-          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$UPDATE" | tee mobile/Investor-Control-v1.7.2-update-signature.txt
-          grep -qi 'fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c' mobile/Investor-Control-v1.7.2-update-signature.txt
-          "$BUILD_TOOLS/aapt2" dump badging "$UPDATE" | tee mobile/Investor-Control-v1.7.2-badging.txt
-          grep -q "package: name='gr.investorcontrol.app' versionCode='30' versionName='1.7.2'" mobile/Investor-Control-v1.7.2-badging.txt
-          grep -q "targetSdkVersion:'36'" mobile/Investor-Control-v1.7.2-badging.txt
-          "$BUILD_TOOLS/aapt2" dump permissions "$UPDATE" | tee mobile/Investor-Control-v1.7.2-permissions.txt
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$UPDATE" | tee mobile/Investor-Control-v1.7.3-update-signature.txt
+          grep -qi 'fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c' mobile/Investor-Control-v1.7.3-update-signature.txt
+          "$BUILD_TOOLS/aapt2" dump badging "$UPDATE" | tee mobile/Investor-Control-v1.7.3-badging.txt
+          grep -q "package: name='gr.investorcontrol.app' versionCode='31' versionName='1.7.3'" mobile/Investor-Control-v1.7.3-badging.txt
+          grep -q "targetSdkVersion:'36'" mobile/Investor-Control-v1.7.3-badging.txt
+          "$BUILD_TOOLS/aapt2" dump permissions "$UPDATE" | tee mobile/Investor-Control-v1.7.3-permissions.txt
           for forbidden in ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION CAMERA RECORD_AUDIO READ_CONTACTS WRITE_CONTACTS READ_PHONE_STATE CALL_PHONE READ_SMS SEND_SMS SYSTEM_ALERT_WINDOW; do
-            ! grep -q "android.permission.${forbidden}" mobile/Investor-Control-v1.7.2-permissions.txt || { echo "forbidden permission ${forbidden}" >&2; exit 1; }
+            ! grep -q "android.permission.${forbidden}" mobile/Investor-Control-v1.7.3-permissions.txt || { echo "forbidden permission ${forbidden}" >&2; exit 1; }
           done
-          ! grep -q 'com.google.android.c2dm.permission.RECEIVE' mobile/Investor-Control-v1.7.2-permissions.txt || { echo 'unused push receive permission present' >&2; exit 1; }
-          sha256sum "$UPDATE" | tee mobile/Investor-Control-v1.7.2-update.sha256
+          ! grep -q 'com.google.android.c2dm.permission.RECEIVE' mobile/Investor-Control-v1.7.3-permissions.txt || { echo 'unused push receive permission present' >&2; exit 1; }
+          sha256sum "$UPDATE" | tee mobile/Investor-Control-v1.7.3-update.sha256
 
-      - name: Create isolated Play package
-        working-directory: mobile
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import re
-          path = Path('android/app/build.gradle')
-          text = path.read_text()
-          text, app_count = re.subn(r'applicationId\s+["\']gr\.investorcontrol\.app["\']', 'applicationId "gr.investorcontrol.play"', text, count=1)
-          text, code_count = re.subn(r'versionCode\s+30\b', 'versionCode 1', text, count=1)
-          if app_count != 1 or code_count != 1:
-              raise SystemExit(f'Play variant patch failed: applicationId={app_count}, versionCode={code_count}')
-          path.write_text(text)
-          PY
-          grep -q 'applicationId "gr.investorcontrol.play"' android/app/build.gradle
-          grep -q 'versionCode 1' android/app/build.gradle
-
-      - name: Generate permanent Play upload key
+      - name: Verify stable Play identity and signing contract
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p mobile/play-signing
-          STORE_PASSWORD="$(openssl rand -hex 32)"
-          KEY_PASSWORD="$(openssl rand -hex 32)"
-          KEY_ALIAS='investor-control-upload'
-          echo "::add-mask::$STORE_PASSWORD"
-          echo "::add-mask::$KEY_PASSWORD"
-          printf 'PLAY_STORE_PASSWORD=%s\nPLAY_KEY_PASSWORD=%s\nPLAY_KEY_ALIAS=%s\n' "$STORE_PASSWORD" "$KEY_PASSWORD" "$KEY_ALIAS" >> "$GITHUB_ENV"
-          keytool -genkeypair -noprompt -v \
-            -storetype JKS \
-            -keystore mobile/play-signing/investor-control-upload.jks \
-            -storepass "$STORE_PASSWORD" \
-            -alias "$KEY_ALIAS" \
-            -keypass "$KEY_PASSWORD" \
-            -keyalg RSA -keysize 4096 -validity 10000 \
-            -dname 'CN=Investor Control Upload, OU=Mobile, O=Investor Control, L=Athens, ST=Attica, C=GR'
-          keytool -exportcert -rfc \
-            -keystore mobile/play-signing/investor-control-upload.jks \
-            -storepass "$STORE_PASSWORD" \
-            -alias "$KEY_ALIAS" \
-            -file mobile/Investor-Control-play-upload-certificate.pem
-          keytool -list -v \
-            -keystore mobile/play-signing/investor-control-upload.jks \
-            -storepass "$STORE_PASSWORD" \
-            -alias "$KEY_ALIAS" | tee mobile/Investor-Control-play-upload-certificate.txt
+          WF='.github/workflows/verify-investor-control-play-aab.yml'
+          test "$(node -p "require('./mobile/app.json').expo.android.package")" = 'gr.investorcontrol.app'
+          test "$(node -p "require('./mobile/app.json').expo.android.versionCode")" = '31'
+          KEYSTORE_SECRET='ANDROID_UPLOAD_KEYSTORE_'BASE64
+          ALIAS_SECRET='ANDROID_UPLOAD_KEY_'ALIAS
+          STORE_PASS_SECRET='ANDROID_UPLOAD_KEYSTORE_'PASSWORD
+          KEY_PASS_SECRET='ANDROID_UPLOAD_KEY_'PASSWORD
+          grep -Fq "secrets.${KEYSTORE_SECRET}" "$WF"
+          grep -Fq "secrets.${ALIAS_SECRET}" "$WF"
+          grep -Fq "secrets.${STORE_PASS_SECRET}" "$WF"
+          grep -Fq "secrets.${KEY_PASS_SECRET}" "$WF"
+          grep -Fq 'market_gateway_url' "$WF"
+          grep -Fq 'expected_sha' "$WF"
+          grep -Fq 'MARKET_GATEWAY_RELEASE_URL' "$WF"
+          BAD_PACKAGE='gr.investorcontrol.'play
+          BAD_RAND='openssl rand -hex '32
+          BAD_KEYGEN='keytool -genkey'pair
+          ! grep -Fq "$BAD_PACKAGE" "$WF"
+          ! grep -Fq "$BAD_RAND" "$WF"
+          ! grep -Fq "$BAD_KEYGEN" "$WF"
 
-      - name: Build signed Play Android App Bundle
+      - name: Build Play preflight Android App Bundle
         working-directory: mobile/android
         run: |
-          ./gradlew bundleRelease --no-daemon --stacktrace \
-            -Pandroid.injected.signing.store.file="$GITHUB_WORKSPACE/mobile/play-signing/investor-control-upload.jks" \
-            -Pandroid.injected.signing.store.password="$PLAY_STORE_PASSWORD" \
-            -Pandroid.injected.signing.key.alias="$PLAY_KEY_ALIAS" \
-            -Pandroid.injected.signing.key.password="$PLAY_KEY_PASSWORD"
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew bundleRelease --no-daemon --stacktrace
 
-      - name: Validate signed Play bundle
+      - name: Validate Play preflight bundle identity
         shell: bash
         run: |
           set -euo pipefail
           AAB_SOURCE='mobile/android/app/build/outputs/bundle/release/app-release.aab'
-          AAB='mobile/Investor-Control-v1.7.2-play-signed.aab'
+          PREFLIGHT_AAB='mobile/Investor-Control-v1.7.3-play-preflight.aab'
           test -s "$AAB_SOURCE"
-          cp "$AAB_SOURCE" "$AAB"
-          jarsigner -verify -verbose -certs "$AAB" | tee mobile/Investor-Control-v1.7.2-play-signature.txt
-          grep -qi 'jar verified' mobile/Investor-Control-v1.7.2-play-signature.txt
+          cp "$AAB_SOURCE" "$PREFLIGHT_AAB"
+          zip -d "$PREFLIGHT_AAB" 'META-INF/*.RSA' 'META-INF/*.DSA' 'META-INF/*.EC' 'META-INF/*.SF' 'META-INF/MANIFEST.MF' >/dev/null 2>&1 || true
+          if unzip -l "$PREFLIGHT_AAB" | grep -Eq 'META-INF/.*\.(RSA|DSA|EC|SF)$'; then
+            echo 'Inherited AAB signature remains after sanitization' >&2
+            exit 1
+          fi
           curl --fail --location --silent --show-error 'https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar' --output /tmp/bundletool.jar
-          java -jar /tmp/bundletool.jar validate --bundle="$AAB"
-          PLAY_PACKAGE="$(java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB" --module=base --xpath='/manifest/@package')"
-          PLAY_VERSION_CODE="$(java -jar /tmp/bundletool.jar dump manifest --bundle="$AAB" --module=base --xpath='/manifest/@android:versionCode')"
-          test "$PLAY_PACKAGE" = 'gr.investorcontrol.play'
-          test "$PLAY_VERSION_CODE" = '1'
-          printf 'package=%s\nversionCode=%s\nversionName=1.7.2\ntargetSdk=36\nsigned=true\n' "$PLAY_PACKAGE" "$PLAY_VERSION_CODE" | tee mobile/Investor-Control-v1.7.2-play-manifest.txt
-          sha256sum "$AAB" | tee mobile/Investor-Control-v1.7.2-play-signed.sha256
+          java -jar /tmp/bundletool.jar validate --bundle="$PREFLIGHT_AAB"
+          PLAY_PACKAGE="$(java -jar /tmp/bundletool.jar dump manifest --bundle="$PREFLIGHT_AAB" --module=base --xpath='/manifest/@package')"
+          PLAY_VERSION_CODE="$(java -jar /tmp/bundletool.jar dump manifest --bundle="$PREFLIGHT_AAB" --module=base --xpath='/manifest/@android:versionCode')"
+          test "$PLAY_PACKAGE" = 'gr.investorcontrol.app'
+          test "$PLAY_VERSION_CODE" = '31'
+          printf 'package=%s\nversionCode=%s\nversionName=1.7.3\ntargetSdk=36\nsigningMode=preflight-unsigned\n' "$PLAY_PACKAGE" "$PLAY_VERSION_CODE" | tee mobile/Investor-Control-v1.7.3-play-preflight-manifest.txt
+          sha256sum "$PREFLIGHT_AAB" | tee mobile/Investor-Control-v1.7.3-play-preflight.sha256
 
-      - name: Encrypt upload-key recovery package
+      - name: Verify live gateway is embedded in manual Play bundle
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_for_play }}
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/play-key-backup
-          cp mobile/play-signing/investor-control-upload.jks /tmp/play-key-backup/
-          cp mobile/Investor-Control-play-upload-certificate.pem /tmp/play-key-backup/
-          cat > /tmp/play-key-backup/credentials.txt <<EOF
-          Package: gr.investorcontrol.play
-          Upload key alias: $PLAY_KEY_ALIAS
-          Keystore password: $PLAY_STORE_PASSWORD
-          Key password: $PLAY_KEY_PASSWORD
-          Created by workflow run: $GITHUB_RUN_ID
-          IMPORTANT: Keep this keystore and both passwords permanently. Future Play uploads require the same upload key.
-          EOF
-          (cd /tmp/play-key-backup && zip -q -9 ../Investor-Control-play-upload-key.zip ./*)
-          cat > /tmp/release-credentials-public.pem <<'PEM'
-          -----BEGIN PUBLIC KEY-----
-          MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEArSdOIR0T9HSxDBU9lBsd
-          r3A2HlJmIhi1J2V4zjMC0eUGmoq9qdmgQxfYRLvd0TB9XfifysyqGNSGkyE6i2tT
-          /MHFDz17XczHYgWBoZ5klUDfQEoUVyzkd7SFvK59VQfWcnKm5EYmSHaDadaP8UDW
-          GixtSj21jkSH6Fp+wvCzDu5cHOzvAkWN6CaIS827HN34/VQqpcah89C7xrXxCddE
-          N41ofu7CvqJD4+su8+5c4T22Iyhu2D6s8m9G25u0oM98Ct6TNWDHVDyVouLhxt6e
-          B1w9fnrdtYHer852EDVV/gP+23ZpXB4s0Dss99LNZ8Xct5FNmmVoHSPmCFgrFt8C
-          R7JQtsWyQ+hHfxBFN5Q/Mnkd/KDns7CYGyKJ043uao/aAgrtIrOwc+tC4kVNIoGg
-          dpyefVIqIHtlNNPUnJm7nhOmDM4+OEyDSx0OhNqmZiceT8UBR6w0lofnh8lmbJzk
-          6SdQwZEeL6cGqFsZVgu9ZMZmLxWwzPlKWC2/qymxcXYybVwY5hatL7dh6TJm3Ode
-          cXQTRj/MtZT/FqDRzo88VV8cR4gw2y2VNdt+a1PLzWjdQmuLqN2YceXC8DjKe892
-          +/4aH+SWXZ3lnytSFIV15gk2ugiJlYuYZpeMZ71yb2moeIH2H06X4iBtavxJgMCV
-          bHE/szaj/rt3JOyQJnKsHxMCAwEAAQ==
-          -----END PUBLIC KEY-----
-          PEM
-          openssl rand -hex 32 > /tmp/transport-pass
-          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 250000 \
-            -pass file:/tmp/transport-pass \
-            -in /tmp/Investor-Control-play-upload-key.zip \
-            -out mobile/Investor-Control-play-upload-key.zip.enc
-          openssl pkeyutl -encrypt -pubin \
-            -inkey /tmp/release-credentials-public.pem \
-            -pkeyopt rsa_padding_mode:oaep \
-            -pkeyopt rsa_oaep_md:sha256 \
-            -pkeyopt rsa_mgf1_md:sha256 \
-            -in /tmp/transport-pass \
-            -out mobile/Investor-Control-play-upload-key.pass.enc
-          sha256sum mobile/Investor-Control-play-upload-key.zip.enc mobile/Investor-Control-play-upload-key.pass.enc | tee mobile/Investor-Control-play-upload-key-encrypted.sha256
-          rm -rf /tmp/play-key-backup /tmp/Investor-Control-play-upload-key.zip /tmp/transport-pass mobile/play-signing
+          test -n "${MARKET_GATEWAY_RELEASE_URL:-}" || { echo 'MARKET_GATEWAY_RELEASE_URL is missing.' >&2; exit 1; }
+          AAB_SOURCE='mobile/android/app/build/outputs/bundle/release/app-release.aab'
+          BUNDLE_FILE="$RUNNER_TEMP/investor-control-play-index.android.bundle"
+          unzip -p "$AAB_SOURCE" 'base/assets/index.android.bundle' > "$BUNDLE_FILE"
+          test -s "$BUNDLE_FILE"
+          grep -Fq -- "$MARKET_GATEWAY_RELEASE_URL" "$BUNDLE_FILE" || { echo 'Live gateway URL is not embedded in the Play bundle.' >&2; exit 1; }
+          grep -Fq 'CANONICAL_GATEWAY' "$BUNDLE_FILE" || { echo 'Canonical gateway runtime marker is missing from the Play bundle.' >&2; exit 1; }
+          grep -Fq 'investor-control.market-gateway-client.v1' "$BUNDLE_FILE" || { echo 'Stable gateway installation identifier runtime is missing from the Play bundle.' >&2; exit 1; }
+          rm -f "$BUNDLE_FILE"
 
-      - name: Upload verified Play release candidate
+      - name: Require protected Investor Control upload-key secrets
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_for_play }}
+        shell: bash
+        env:
+          UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "${UPLOAD_KEYSTORE_BASE64:-}" || { echo 'Missing ANDROID_UPLOAD_KEYSTORE_BASE64' >&2; exit 1; }
+          test -n "${UPLOAD_KEY_ALIAS:-}" || { echo 'Missing ANDROID_UPLOAD_KEY_ALIAS' >&2; exit 1; }
+          test -n "${UPLOAD_KEYSTORE_PASSWORD:-}" || { echo 'Missing ANDROID_UPLOAD_KEYSTORE_PASSWORD' >&2; exit 1; }
+          test -n "${UPLOAD_KEY_PASSWORD:-}" || { echo 'Missing ANDROID_UPLOAD_KEY_PASSWORD' >&2; exit 1; }
+
+      - name: Sign and verify Play-uploadable Android App Bundle
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_for_play }}
+        shell: bash
+        env:
+          UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYSTORE="$RUNNER_TEMP/investor-control-upload.jks"
+          SOURCE_AAB='mobile/Investor-Control-v1.7.3-play-preflight.aab'
+          SIGNED_AAB='mobile/Investor-Control-v1.7.3-play-signed.aab'
+          printf '%s' "$UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          chmod 600 "$KEYSTORE"
+          keytool -list -keystore "$KEYSTORE" -storepass "$UPLOAD_KEYSTORE_PASSWORD" -alias "$UPLOAD_KEY_ALIAS" >/dev/null
+          cp "$SOURCE_AAB" "$SIGNED_AAB"
+          jarsigner -keystore "$KEYSTORE" -storepass "$UPLOAD_KEYSTORE_PASSWORD" -keypass "$UPLOAD_KEY_PASSWORD" -sigalg SHA256withRSA -digestalg SHA-256 "$SIGNED_AAB" "$UPLOAD_KEY_ALIAS"
+          jarsigner -verify -verbose -certs "$SIGNED_AAB" | tee mobile/Investor-Control-v1.7.3-play-signature.txt
+          grep -qi 'jar verified' mobile/Investor-Control-v1.7.3-play-signature.txt
+          java -jar /tmp/bundletool.jar validate --bundle="$SIGNED_AAB"
+          PLAY_PACKAGE="$(java -jar /tmp/bundletool.jar dump manifest --bundle="$SIGNED_AAB" --module=base --xpath='/manifest/@package')"
+          PLAY_VERSION_CODE="$(java -jar /tmp/bundletool.jar dump manifest --bundle="$SIGNED_AAB" --module=base --xpath='/manifest/@android:versionCode')"
+          test "$PLAY_PACKAGE" = 'gr.investorcontrol.app'
+          test "$PLAY_VERSION_CODE" = '31'
+          keytool -list -v -keystore "$KEYSTORE" -storepass "$UPLOAD_KEYSTORE_PASSWORD" -alias "$UPLOAD_KEY_ALIAS" | grep -E 'Alias name:|SHA1:|SHA256:|Valid from:' | tee mobile/Investor-Control-v1.7.3-upload-certificate.txt
+          sha256sum "$SIGNED_AAB" | tee mobile/Investor-Control-v1.7.3-play-signed.sha256
+          rm -f "$KEYSTORE"
+
+      - name: Upload verified Play preflight
         uses: actions/upload-artifact@v4
         with:
-          name: investor-control-v1.7.2-final-play-release-candidate
+          name: investor-control-v1.7.3-play-preflight
           path: |
-            mobile/Investor-Control-v1.7.2-update.apk
-            mobile/Investor-Control-v1.7.2-update.sha256
-            mobile/Investor-Control-v1.7.2-update-signature.txt
-            mobile/Investor-Control-v1.7.2-badging.txt
-            mobile/Investor-Control-v1.7.2-permissions.txt
-            mobile/Investor-Control-v1.7.2-play-signed.aab
-            mobile/Investor-Control-v1.7.2-play-signed.sha256
-            mobile/Investor-Control-v1.7.2-play-signature.txt
-            mobile/Investor-Control-v1.7.2-play-manifest.txt
-            mobile/Investor-Control-play-upload-certificate.pem
-            mobile/Investor-Control-play-upload-certificate.txt
-            mobile/Investor-Control-play-upload-key.zip.enc
-            mobile/Investor-Control-play-upload-key.pass.enc
-            mobile/Investor-Control-play-upload-key-encrypted.sha256
+            mobile/Investor-Control-v1.7.3-update.apk
+            mobile/Investor-Control-v1.7.3-update.sha256
+            mobile/Investor-Control-v1.7.3-update-signature.txt
+            mobile/Investor-Control-v1.7.3-badging.txt
+            mobile/Investor-Control-v1.7.3-permissions.txt
+            mobile/Investor-Control-v1.7.3-play-preflight.aab
+            mobile/Investor-Control-v1.7.3-play-preflight.sha256
+            mobile/Investor-Control-v1.7.3-play-preflight-manifest.txt
             play-store/**
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Play-signed release artifact
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_for_play }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1.7.3-play-signed
+          path: |
+            mobile/Investor-Control-v1.7.3-play-signed.aab
+            mobile/Investor-Control-v1.7.3-play-signed.sha256
+            mobile/Investor-Control-v1.7.3-play-signature.txt
+            mobile/Investor-Control-v1.7.3-upload-certificate.txt
           if-no-files-found: error
           retention-days: 90
