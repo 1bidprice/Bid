@@ -3,7 +3,7 @@
   "version": 1,
   "policyVersion": "2026-08-11.1",
   "ledgerPolicyVersion": "2026-08-12.1",
-  "updatedAt": "2026-09-15T07:49:20.861Z",
+  "updatedAt": "2026-09-15T11:51:23.420Z",
   "records": [
     {
       "format": "investor-control-forecast-outcome-record",
@@ -418285,14 +418285,706 @@
         "horizon": "day1",
         "forecastSampleDate": "2026-09-15"
       }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-12.1",
+      "forecastId": "forecast:2d68a0cadd24a27b02647c2407ed",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:sec:0000915840",
+      "instrumentId": "company:sec:0000915840",
+      "displayName": "BEAZER HOMES USA",
+      "symbol": "BZH",
+      "listing": {
+        "symbol": "BZH",
+        "mic": "XNYS",
+        "exchange": "NYSE",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0000915840",
+        "instrumentId": "company:sec:0000915840",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0000915840.json",
+        "sourceDocumentId": "CIK0000915840",
+        "capturedAt": "2026-09-15T11:48:05.213Z",
+        "taxonomy": "SEC_SIC",
+        "code": "1531",
+        "description": "Operative Builders",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "marketRegimeSnapshot": {
+        "contract": "FORECAST_TIME_MARKET_REGIME_SNAPSHOT_V1",
+        "policyVersion": "2026-08-12.1",
+        "capturedAt": "2026-09-15T11:48:05.213Z",
+        "benchmarkAsOf": "2026-09-14T13:30:00.000Z",
+        "benchmarkSymbol": "SPY",
+        "benchmarkSource": "Yahoo Finance Chart",
+        "benchmarkSourceQuality": "SECONDARY_VALIDATED",
+        "observationCount": 500,
+        "status": "REGIME_READY",
+        "regimeKey": "NEUTRAL|BULL_TREND|LOW_VOLATILITY|MIXED_MOMENTUM",
+        "riskTone": "NEUTRAL",
+        "trendRegime": "BULL_TREND",
+        "momentumRegime": "MIXED_MOMENTUM",
+        "volatilityRegime": "LOW_VOLATILITY",
+        "metrics": {
+          "latestClose": 760.880005,
+          "return20Pct": -1.9914,
+          "return60Pct": 2.953,
+          "return120Pct": 16.3966,
+          "sma50": 758.938401,
+          "sma200": 712.546051,
+          "annualizedVolatility20Pct": 8.8219,
+          "annualizedVolatility60Pct": 11.6122,
+          "volatility20Percentile": 13.1,
+          "maxDrawdown120Pct": -4.4947
+        },
+        "blockers": [],
+        "researchOnly": true,
+        "modelDerived": true,
+        "finalActionEligible": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "day1",
+      "tradingDays": 1,
+      "forecastSampleDate": "2026-09-14",
+      "forecastAt": "2026-09-15T11:48:05.213Z",
+      "referencePrice": {
+        "value": 33.23,
+        "timestamp": "2026-09-14T20:00:00.000Z",
+        "currency": "USD",
+        "source": "Finnhub Quote API"
+      },
+      "rawProbabilityPositive": 0.389,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": 0.15,
+      "rawLatentFactorScore": 0.297356,
+      "factorScoreStatus": "LATENT_SCORE_READY",
+      "factorAvailableDomainCount": 5,
+      "factorAvailableWeight": 0.64,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": -0.156765,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": 0.9456,
+          "weight": 0.16,
+          "verifiedDriverCount": 2
+        },
+        {
+          "domain": "FUNDAMENTAL",
+          "value": 0.576667,
+          "weight": 0.12,
+          "verifiedDriverCount": 3
+        },
+        {
+          "domain": "RISK",
+          "value": -0.43,
+          "weight": 0.09,
+          "verifiedDriverCount": 4
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.86,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": -0.0455,
+      "distribution": {
+        "p10ReturnPct": -1.5885,
+        "p25ReturnPct": -0.6142,
+        "medianReturnPct": 0,
+        "p75ReturnPct": 0.2416,
+        "p90ReturnPct": 1.9951,
+        "downsideProbabilityPct": 61.1,
+        "bullCaseReturnPct": 1.9951,
+        "baseCaseReturnPct": 0,
+        "bearCaseReturnPct": -1.5885
+      },
+      "patternConfidenceScore": 65,
+      "evidenceQualityScore": 70,
+      "regime": "BULL_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-20.1",
+        "generatedAt": "2026-09-15T11:48:05.213Z",
+        "validUntil": "2026-09-16T11:48:05.213Z",
+        "status": "FINAL",
+        "marketAction": "HOLD",
+        "marketActionLabel": "ΚΡΑΤΑ",
+        "holderAction": "HOLD",
+        "holderActionLabel": "ΚΡΑΤΑ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NORMAL",
+        "urgencyLabel": "Κανονική παρακολούθηση",
+        "confidenceScore": 100,
+        "confidenceMeaning": "POLICY_COMPLETENESS_HEURISTIC_NOT_PROBABILITY",
+        "dataQualityScore": 100,
+        "integrity": {
+          "contractVersion": 1,
+          "strict": true,
+          "passed": true,
+          "blockers": [],
+          "companyId": "company:sec:0000915840",
+          "listingSymbol": "BZH",
+          "referenceSymbol": "BZH",
+          "evidenceCount": 2,
+          "universal": {
+            "format": "investor-control-instrument-integrity",
+            "version": 1,
+            "policyVersion": "2026-08-20.1",
+            "assetClass": "EQUITY",
+            "instrumentId": "company:sec:0000915840",
+            "symbol": "BZH",
+            "mic": "XNYS",
+            "currency": "USD",
+            "purpose": "VALUATION",
+            "identityReady": true,
+            "routingReady": true,
+            "valuationReady": true,
+            "decisionReady": false,
+            "blockers": [],
+            "identityBlockers": [],
+            "routingBlockers": [],
+            "valuationBlockers": [],
+            "decisionBlockers": [
+              "ACTIVE_LISTING_NOT_VERIFIED",
+              "QUOTE_NOT_DECISION_ELIGIBLE"
+            ],
+            "invariant": "SAME_INSTRUMENT_INTEGRITY_RULES_FOR_ALL_USERS_AND_PORTFOLIOS"
+          }
+        },
+        "reasons": [
+          "THESIS_REMAINS_VALID"
+        ],
+        "blockers": [],
+        "freshness": {
+          "referencePriceAgeHours": 15.801448055555555,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 22.301448055555557,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "CLOSED_MARKET_LAST_VERIFIED_CLOSE",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": 20,
+          "fundamentalFlags": [],
+          "marketFlags": []
+        },
+        "controlledPlan": null,
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0000915840",
+        "instrumentId": "company:sec:0000915840",
+        "horizon": "day1",
+        "forecastSampleDate": "2026-09-14"
+      }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-12.1",
+      "forecastId": "forecast:811b79085ff4542a98dcede31d13",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:sec:0000915840",
+      "instrumentId": "company:sec:0000915840",
+      "displayName": "BEAZER HOMES USA",
+      "symbol": "BZH",
+      "listing": {
+        "symbol": "BZH",
+        "mic": "XNYS",
+        "exchange": "NYSE",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0000915840",
+        "instrumentId": "company:sec:0000915840",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0000915840.json",
+        "sourceDocumentId": "CIK0000915840",
+        "capturedAt": "2026-09-15T11:48:05.213Z",
+        "taxonomy": "SEC_SIC",
+        "code": "1531",
+        "description": "Operative Builders",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "marketRegimeSnapshot": {
+        "contract": "FORECAST_TIME_MARKET_REGIME_SNAPSHOT_V1",
+        "policyVersion": "2026-08-12.1",
+        "capturedAt": "2026-09-15T11:48:05.213Z",
+        "benchmarkAsOf": "2026-09-14T13:30:00.000Z",
+        "benchmarkSymbol": "SPY",
+        "benchmarkSource": "Yahoo Finance Chart",
+        "benchmarkSourceQuality": "SECONDARY_VALIDATED",
+        "observationCount": 500,
+        "status": "REGIME_READY",
+        "regimeKey": "NEUTRAL|BULL_TREND|LOW_VOLATILITY|MIXED_MOMENTUM",
+        "riskTone": "NEUTRAL",
+        "trendRegime": "BULL_TREND",
+        "momentumRegime": "MIXED_MOMENTUM",
+        "volatilityRegime": "LOW_VOLATILITY",
+        "metrics": {
+          "latestClose": 760.880005,
+          "return20Pct": -1.9914,
+          "return60Pct": 2.953,
+          "return120Pct": 16.3966,
+          "sma50": 758.938401,
+          "sma200": 712.546051,
+          "annualizedVolatility20Pct": 8.8219,
+          "annualizedVolatility60Pct": 11.6122,
+          "volatility20Percentile": 13.1,
+          "maxDrawdown120Pct": -4.4947
+        },
+        "blockers": [],
+        "researchOnly": true,
+        "modelDerived": true,
+        "finalActionEligible": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "week1",
+      "tradingDays": 5,
+      "forecastSampleDate": "2026-09-14",
+      "forecastAt": "2026-09-15T11:48:05.213Z",
+      "referencePrice": {
+        "value": 33.23,
+        "timestamp": "2026-09-14T20:00:00.000Z",
+        "currency": "USD",
+        "source": "Finnhub Quote API"
+      },
+      "rawProbabilityPositive": 0.6342,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": 0.15,
+      "rawLatentFactorScore": 0.41601,
+      "factorScoreStatus": "LATENT_SCORE_READY",
+      "factorAvailableDomainCount": 5,
+      "factorAvailableWeight": 0.64,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": 0.188411,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": 0.9456,
+          "weight": 0.16,
+          "verifiedDriverCount": 2
+        },
+        {
+          "domain": "FUNDAMENTAL",
+          "value": 0.576667,
+          "weight": 0.12,
+          "verifiedDriverCount": 3
+        },
+        {
+          "domain": "RISK",
+          "value": -0.43,
+          "weight": 0.09,
+          "verifiedDriverCount": 4
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.86,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": 0.0177,
+      "distribution": {
+        "p10ReturnPct": -7.7818,
+        "p25ReturnPct": -2.6123,
+        "medianReturnPct": 0.1506,
+        "p75ReturnPct": 2.5442,
+        "p90ReturnPct": 7.9482,
+        "downsideProbabilityPct": 36.58,
+        "bullCaseReturnPct": 7.9482,
+        "baseCaseReturnPct": 0.1506,
+        "bearCaseReturnPct": -7.7818
+      },
+      "patternConfidenceScore": 54.4,
+      "evidenceQualityScore": 70,
+      "regime": "BULL_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-20.1",
+        "generatedAt": "2026-09-15T11:48:05.213Z",
+        "validUntil": "2026-09-16T11:48:05.213Z",
+        "status": "FINAL",
+        "marketAction": "HOLD",
+        "marketActionLabel": "ΚΡΑΤΑ",
+        "holderAction": "HOLD",
+        "holderActionLabel": "ΚΡΑΤΑ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NORMAL",
+        "urgencyLabel": "Κανονική παρακολούθηση",
+        "confidenceScore": 100,
+        "confidenceMeaning": "POLICY_COMPLETENESS_HEURISTIC_NOT_PROBABILITY",
+        "dataQualityScore": 100,
+        "integrity": {
+          "contractVersion": 1,
+          "strict": true,
+          "passed": true,
+          "blockers": [],
+          "companyId": "company:sec:0000915840",
+          "listingSymbol": "BZH",
+          "referenceSymbol": "BZH",
+          "evidenceCount": 2,
+          "universal": {
+            "format": "investor-control-instrument-integrity",
+            "version": 1,
+            "policyVersion": "2026-08-20.1",
+            "assetClass": "EQUITY",
+            "instrumentId": "company:sec:0000915840",
+            "symbol": "BZH",
+            "mic": "XNYS",
+            "currency": "USD",
+            "purpose": "VALUATION",
+            "identityReady": true,
+            "routingReady": true,
+            "valuationReady": true,
+            "decisionReady": false,
+            "blockers": [],
+            "identityBlockers": [],
+            "routingBlockers": [],
+            "valuationBlockers": [],
+            "decisionBlockers": [
+              "ACTIVE_LISTING_NOT_VERIFIED",
+              "QUOTE_NOT_DECISION_ELIGIBLE"
+            ],
+            "invariant": "SAME_INSTRUMENT_INTEGRITY_RULES_FOR_ALL_USERS_AND_PORTFOLIOS"
+          }
+        },
+        "reasons": [
+          "THESIS_REMAINS_VALID"
+        ],
+        "blockers": [],
+        "freshness": {
+          "referencePriceAgeHours": 15.801448055555555,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 22.301448055555557,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "CLOSED_MARKET_LAST_VERIFIED_CLOSE",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": 20,
+          "fundamentalFlags": [],
+          "marketFlags": []
+        },
+        "controlledPlan": null,
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0000915840",
+        "instrumentId": "company:sec:0000915840",
+        "horizon": "week1",
+        "forecastSampleDate": "2026-09-14"
+      }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-12.1",
+      "forecastId": "forecast:c99e58d077d2f9ce3d144edb43a5",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:sec:0000940942",
+      "instrumentId": "company:sec:0000940942",
+      "displayName": "Hub Group,",
+      "symbol": "HUBG",
+      "listing": {
+        "symbol": "HUBG",
+        "mic": "XNAS",
+        "exchange": "Nasdaq",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0000940942",
+        "instrumentId": "company:sec:0000940942",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0000940942.json",
+        "sourceDocumentId": "CIK0000940942",
+        "capturedAt": "2026-09-15T11:48:05.213Z",
+        "taxonomy": "SEC_SIC",
+        "code": "4731",
+        "description": "Arrangement of Transportation of Freight & Cargo",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "marketRegimeSnapshot": {
+        "contract": "FORECAST_TIME_MARKET_REGIME_SNAPSHOT_V1",
+        "policyVersion": "2026-08-12.1",
+        "capturedAt": "2026-09-15T11:48:05.213Z",
+        "benchmarkAsOf": "2026-09-14T13:30:00.000Z",
+        "benchmarkSymbol": "SPY",
+        "benchmarkSource": "Yahoo Finance Chart",
+        "benchmarkSourceQuality": "SECONDARY_VALIDATED",
+        "observationCount": 500,
+        "status": "REGIME_READY",
+        "regimeKey": "NEUTRAL|BULL_TREND|LOW_VOLATILITY|MIXED_MOMENTUM",
+        "riskTone": "NEUTRAL",
+        "trendRegime": "BULL_TREND",
+        "momentumRegime": "MIXED_MOMENTUM",
+        "volatilityRegime": "LOW_VOLATILITY",
+        "metrics": {
+          "latestClose": 760.880005,
+          "return20Pct": -1.9914,
+          "return60Pct": 2.953,
+          "return120Pct": 16.3966,
+          "sma50": 758.938401,
+          "sma200": 712.546051,
+          "annualizedVolatility20Pct": 8.8219,
+          "annualizedVolatility60Pct": 11.6122,
+          "volatility20Percentile": 13.1,
+          "maxDrawdown120Pct": -4.4947
+        },
+        "blockers": [],
+        "researchOnly": true,
+        "modelDerived": true,
+        "finalActionEligible": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "day1",
+      "tradingDays": 1,
+      "forecastSampleDate": "2026-09-14",
+      "forecastAt": "2026-09-15T11:48:05.213Z",
+      "referencePrice": {
+        "value": 35.26,
+        "timestamp": "2026-09-14T20:00:00.000Z",
+        "currency": "USD",
+        "source": "Finnhub Quote API"
+      },
+      "rawProbabilityPositive": 0.5972,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": null,
+      "rawLatentFactorScore": -0.284613,
+      "factorScoreStatus": "RESEARCH_SCORE_BLOCKED",
+      "factorAvailableDomainCount": 4,
+      "factorAvailableWeight": 0.52,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": 0.144805,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": -0.99035,
+          "weight": 0.16,
+          "verifiedDriverCount": 2
+        },
+        {
+          "domain": "RISK",
+          "value": -0.76,
+          "weight": 0.09,
+          "verifiedDriverCount": 4
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.94,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": 0.2909,
+      "distribution": {
+        "p10ReturnPct": -2.1643,
+        "p25ReturnPct": -1.231,
+        "medianReturnPct": 0.7811,
+        "p75ReturnPct": 1.5816,
+        "p90ReturnPct": 2.4036,
+        "downsideProbabilityPct": 40.28,
+        "bullCaseReturnPct": 2.4036,
+        "baseCaseReturnPct": 0.7811,
+        "bearCaseReturnPct": -2.1643
+      },
+      "patternConfidenceScore": 62.37,
+      "evidenceQualityScore": 20,
+      "regime": "BEAR_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-20.1",
+        "generatedAt": "2026-09-15T11:48:05.213Z",
+        "validUntil": "2026-09-16T11:48:05.213Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 70,
+        "confidenceMeaning": "POLICY_COMPLETENESS_HEURISTIC_NOT_PROBABILITY",
+        "dataQualityScore": 30,
+        "integrity": {
+          "contractVersion": 1,
+          "strict": true,
+          "passed": true,
+          "blockers": [],
+          "companyId": "company:sec:0000940942",
+          "listingSymbol": "HUBG",
+          "referenceSymbol": "HUBG",
+          "evidenceCount": 1,
+          "universal": {
+            "format": "investor-control-instrument-integrity",
+            "version": 1,
+            "policyVersion": "2026-08-20.1",
+            "assetClass": "EQUITY",
+            "instrumentId": "company:sec:0000940942",
+            "symbol": "HUBG",
+            "mic": "XNAS",
+            "currency": "USD",
+            "purpose": "ROUTING",
+            "identityReady": true,
+            "routingReady": true,
+            "valuationReady": true,
+            "decisionReady": false,
+            "blockers": [],
+            "identityBlockers": [],
+            "routingBlockers": [],
+            "valuationBlockers": [],
+            "decisionBlockers": [
+              "ACTIVE_LISTING_NOT_VERIFIED",
+              "QUOTE_NOT_DECISION_ELIGIBLE"
+            ],
+            "invariant": "SAME_INSTRUMENT_INTEGRITY_RULES_FOR_ALL_USERS_AND_PORTFOLIOS"
+          }
+        },
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 15.801448055555555,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 22.301448055555557,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "CLOSED_MARKET_LAST_VERIFIED_CLOSE",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": null,
+          "fundamentalFlags": [],
+          "marketFlags": [
+            "HIGH_VOLATILITY",
+            "MATERIAL_DRAWDOWN",
+            "BELOW_50_DAY_AVERAGE",
+            "WEAK_RELATIVE_STRENGTH"
+          ]
+        },
+        "controlledPlan": {
+          "status": "AVAILABLE",
+          "level": "INTERIM_RISK_CONTROL",
+          "title": "Πλάνο τώρα",
+          "holderAction": "HOLD",
+          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ",
+          "nonHolderAction": "DO_NOT_BUY",
+          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
+          "marketAction": "WATCH",
+          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+          "newBuyAllowed": false,
+          "sellSignalApproved": false,
+          "confidenceScore": 70,
+          "dataQualityScore": 30,
+          "rationale": "Δεν έχουν ολοκληρωθεί όλοι οι υποχρεωτικοί έλεγχοι για τελική αγορά ή πώληση. Μέχρι τότε η πειθαρχημένη στάση είναι διατήρηση υπάρχουσας θέσης χωρίς νέα ενίσχυση και αποφυγή νέας εισόδου.",
+          "blockers": [
+            "DOSSIER_NOT_PUBLISHABLE",
+            "DOSSIER_NOT_READY",
+            "CROSS_CHECK_NOT_READY",
+            "FUNDAMENTALS_NOT_READY"
+          ],
+          "validUntil": "2026-09-16T11:48:05.213Z"
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0000940942",
+        "instrumentId": "company:sec:0000940942",
+        "horizon": "day1",
+        "forecastSampleDate": "2026-09-14"
+      }
     }
   ],
   "summary": {
     "format": "investor-control-forecast-outcome-ledger-summary",
     "version": 1,
     "policyVersion": "2026-08-12.1",
-    "recordCount": 1968,
-    "openCount": 220,
+    "recordCount": 1971,
+    "openCount": 223,
     "maturedCount": 1748,
     "groups": [
       {
@@ -418506,8 +419198,8 @@
     ]
   },
   "evaluation": {
-    "baseRecordCount": 1965,
-    "incomingRecordCount": 1968,
-    "mergedRecordCount": 1968
+    "baseRecordCount": 1968,
+    "incomingRecordCount": 1971,
+    "mergedRecordCount": 1971
   }
 }
