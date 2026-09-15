@@ -1,0 +1,142 @@
+name: Investor Control Play Signing Verification Once
+
+on:
+  push:
+    branches:
+      - investor-control-v173-release-pipeline-fix
+    paths:
+      - .github/workflows/investor-control-play-signing-check-once.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-play-signing-check-once
+  cancel-in-progress: true
+
+jobs:
+  verify-play-signing:
+    if: contains(github.event.head_commit.message, '[play-signing-check]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 80
+
+    steps:
+      - name: Checkout exact release-fix source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies without lifecycle scripts
+        working-directory: mobile
+        run: npm install --legacy-peer-deps --no-audit --no-fund --ignore-scripts
+
+      - name: Verify canonical source and release identity
+        working-directory: mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run test:core
+          node - <<'NODE'
+          const app = require('./app.json');
+          const pkg = require('./package.json');
+          if (app.expo.version !== '1.7.3') throw new Error('wrong app version');
+          if (app.expo.android.versionCode !== 31) throw new Error('wrong versionCode');
+          if (app.expo.android.package !== 'gr.investorcontrol.app') throw new Error('wrong package');
+          if (pkg.version !== '1.7.3') throw new Error('wrong package version');
+          if (pkg.scripts?.postinstall && String(pkg.scripts.postinstall).includes('apply-v')) throw new Error('historical patch chain must not run');
+          NODE
+
+      - name: Generate Android project
+        working-directory: mobile
+        run: npx expo prebuild --platform android --no-install --clean
+
+      - name: Build Android App Bundle
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew bundleRelease --no-daemon --stacktrace
+
+      - name: Prepare unsigned Play candidate and validate identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_AAB='mobile/android/app/build/outputs/bundle/release/app-release.aab'
+          PREFLIGHT_AAB='mobile/Investor-Control-v1.7.3-build31-play-signing-preflight.aab'
+          test -s "$SOURCE_AAB"
+          cp "$SOURCE_AAB" "$PREFLIGHT_AAB"
+          zip -d "$PREFLIGHT_AAB" 'META-INF/*.RSA' 'META-INF/*.DSA' 'META-INF/*.EC' 'META-INF/*.SF' 'META-INF/MANIFEST.MF' >/dev/null 2>&1 || true
+          curl --fail --location --silent --show-error \
+            'https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar' \
+            --output /tmp/bundletool.jar
+          java -jar /tmp/bundletool.jar validate --bundle="$PREFLIGHT_AAB"
+          PLAY_PACKAGE="$(java -jar /tmp/bundletool.jar dump manifest --bundle="$PREFLIGHT_AAB" --module=base --xpath='/manifest/@package')"
+          PLAY_VERSION_CODE="$(java -jar /tmp/bundletool.jar dump manifest --bundle="$PREFLIGHT_AAB" --module=base --xpath='/manifest/@android:versionCode')"
+          test "$PLAY_PACKAGE" = 'gr.investorcontrol.app'
+          test "$PLAY_VERSION_CODE" = '31'
+
+      - name: Require protected Investor Control upload-key secrets
+        shell: bash
+        env:
+          UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "${UPLOAD_KEYSTORE_BASE64:-}" || { echo 'Missing ANDROID_UPLOAD_KEYSTORE_BASE64' >&2; exit 1; }
+          test -n "${UPLOAD_KEY_ALIAS:-}" || { echo 'Missing ANDROID_UPLOAD_KEY_ALIAS' >&2; exit 1; }
+          test -n "${UPLOAD_KEYSTORE_PASSWORD:-}" || { echo 'Missing ANDROID_UPLOAD_KEYSTORE_PASSWORD' >&2; exit 1; }
+          test -n "${UPLOAD_KEY_PASSWORD:-}" || { echo 'Missing ANDROID_UPLOAD_KEY_PASSWORD' >&2; exit 1; }
+
+      - name: Sign and verify Play-uploadable Android App Bundle
+        shell: bash
+        env:
+          UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYSTORE="$RUNNER_TEMP/investor-control-upload.jks"
+          SOURCE_AAB='mobile/Investor-Control-v1.7.3-build31-play-signing-preflight.aab'
+          SIGNED_AAB='mobile/Investor-Control-v1.7.3-build31-play-signed.aab'
+          printf '%s' "$UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          chmod 600 "$KEYSTORE"
+          keytool -list -keystore "$KEYSTORE" -storepass "$UPLOAD_KEYSTORE_PASSWORD" -alias "$UPLOAD_KEY_ALIAS" >/dev/null
+          cp "$SOURCE_AAB" "$SIGNED_AAB"
+          jarsigner -keystore "$KEYSTORE" -storepass "$UPLOAD_KEYSTORE_PASSWORD" -keypass "$UPLOAD_KEY_PASSWORD" -sigalg SHA256withRSA -digestalg SHA-256 "$SIGNED_AAB" "$UPLOAD_KEY_ALIAS"
+          jarsigner -verify -verbose -certs "$SIGNED_AAB" | tee mobile/Investor-Control-v1.7.3-build31-play-signature.txt
+          grep -qi 'jar verified' mobile/Investor-Control-v1.7.3-build31-play-signature.txt
+          java -jar /tmp/bundletool.jar validate --bundle="$SIGNED_AAB"
+          PLAY_PACKAGE="$(java -jar /tmp/bundletool.jar dump manifest --bundle="$SIGNED_AAB" --module=base --xpath='/manifest/@package')"
+          PLAY_VERSION_CODE="$(java -jar /tmp/bundletool.jar dump manifest --bundle="$SIGNED_AAB" --module=base --xpath='/manifest/@android:versionCode')"
+          test "$PLAY_PACKAGE" = 'gr.investorcontrol.app'
+          test "$PLAY_VERSION_CODE" = '31'
+          keytool -list -v -keystore "$KEYSTORE" -storepass "$UPLOAD_KEYSTORE_PASSWORD" -alias "$UPLOAD_KEY_ALIAS" | grep -E 'Alias name:|SHA1:|SHA256:|Valid from:' | tee mobile/Investor-Control-v1.7.3-build31-upload-certificate.txt
+          sha256sum "$SIGNED_AAB" | tee mobile/Investor-Control-v1.7.3-build31-play-signed.sha256
+          rm -f "$KEYSTORE"
+
+      - name: Upload verified signed Play bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-v1.7.3-build31-play-signed-verification
+          path: |
+            mobile/Investor-Control-v1.7.3-build31-play-signed.aab
+            mobile/Investor-Control-v1.7.3-build31-play-signed.sha256
+            mobile/Investor-Control-v1.7.3-build31-play-signature.txt
+            mobile/Investor-Control-v1.7.3-build31-upload-certificate.txt
+          if-no-files-found: error
+          retention-days: 90
