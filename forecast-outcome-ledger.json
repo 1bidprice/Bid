@@ -3,7 +3,7 @@
   "version": 1,
   "policyVersion": "2026-08-11.1",
   "ledgerPolicyVersion": "2026-08-12.1",
-  "updatedAt": "2026-09-16T20:11:49.697Z",
+  "updatedAt": "2026-09-16T21:25:37.192Z",
   "records": [
     {
       "format": "investor-control-forecast-outcome-record",
@@ -418931,10 +418931,14 @@
         }
       },
       "decisionImpact": "NONE",
-      "realisedOutcome": null,
-      "positiveOutcome": null,
-      "outcomeEvaluatedAt": null,
-      "status": "OPEN",
+      "realisedOutcome": {
+        "timestamp": "2026-09-15T13:30:00.000Z",
+        "close": 33.349998474121094,
+        "realisedReturnPct": 0.3611
+      },
+      "positiveOutcome": 1,
+      "outcomeEvaluatedAt": "2026-09-16T21:22:27.128Z",
+      "status": "MATURED",
       "appendOnlyIdentity": {
         "policyVersion": "2026-08-11.2",
         "historicalPatternPolicyVersion": "2026-08-11.1",
@@ -453121,32 +453125,490 @@
         "horizon": "day1",
         "forecastSampleDate": "2026-09-16"
       }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-12.1",
+      "forecastId": "forecast:597fa0416082649f2451a7742c19",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:sec:0001282648",
+      "instrumentId": "company:sec:0001282648",
+      "displayName": "BATTALION OIL",
+      "symbol": "BATL",
+      "listing": {
+        "symbol": "BATL",
+        "mic": "XNYS",
+        "exchange": "NYSE",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001282648",
+        "instrumentId": "company:sec:0001282648",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0001282648.json",
+        "sourceDocumentId": "CIK0001282648",
+        "capturedAt": "2026-09-16T21:22:27.128Z",
+        "taxonomy": "SEC_SIC",
+        "code": "1311",
+        "description": "Crude Petroleum & Natural Gas",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "marketRegimeSnapshot": {
+        "contract": "FORECAST_TIME_MARKET_REGIME_SNAPSHOT_V1",
+        "policyVersion": "2026-08-12.1",
+        "capturedAt": "2026-09-16T21:22:27.128Z",
+        "benchmarkAsOf": "2026-09-16T13:30:00.000Z",
+        "benchmarkSymbol": "SPY",
+        "benchmarkSource": "Yahoo Finance Chart",
+        "benchmarkSourceQuality": "SECONDARY_VALIDATED",
+        "observationCount": 501,
+        "status": "REGIME_READY",
+        "regimeKey": "NEUTRAL|MIXED_TREND|LOW_VOLATILITY|MIXED_MOMENTUM",
+        "riskTone": "NEUTRAL",
+        "trendRegime": "MIXED_TREND",
+        "momentumRegime": "MIXED_MOMENTUM",
+        "volatilityRegime": "LOW_VOLATILITY",
+        "metrics": {
+          "latestClose": 754.049988,
+          "return20Pct": -1.746,
+          "return60Pct": 1.2977,
+          "return120Pct": 15.0989,
+          "sma50": 759.1874,
+          "sma200": 713.385407,
+          "annualizedVolatility20Pct": 8.6471,
+          "annualizedVolatility60Pct": 11.4922,
+          "volatility20Percentile": 11.11,
+          "maxDrawdown120Pct": -4.4947
+        },
+        "blockers": [],
+        "researchOnly": true,
+        "modelDerived": true,
+        "finalActionEligible": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "day1",
+      "tradingDays": 1,
+      "forecastSampleDate": "2026-09-16",
+      "forecastAt": "2026-09-16T21:22:27.128Z",
+      "referencePrice": {
+        "value": 1.24,
+        "timestamp": "2026-09-16T20:00:00.000Z",
+        "currency": "USD",
+        "source": "Finnhub Quote API"
+      },
+      "rawProbabilityPositive": 0.4884,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": -0.188506,
+      "rawLatentFactorScore": -0.188506,
+      "factorScoreStatus": "LATENT_SCORE_READY",
+      "factorAvailableDomainCount": 5,
+      "factorAvailableWeight": 0.64,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": 0.00071,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": -0.5,
+          "weight": 0.16,
+          "verifiedDriverCount": 2
+        },
+        {
+          "domain": "FUNDAMENTAL",
+          "value": -0.042833,
+          "weight": 0.12,
+          "verifiedDriverCount": 3
+        },
+        {
+          "domain": "RISK",
+          "value": -0.874,
+          "weight": 0.09,
+          "verifiedDriverCount": 5
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.86,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": 0.5656,
+      "distribution": {
+        "p10ReturnPct": -3.6496,
+        "p25ReturnPct": -1.8349,
+        "medianReturnPct": 0,
+        "p75ReturnPct": 2.8985,
+        "p90ReturnPct": 5.4545,
+        "downsideProbabilityPct": 51.16,
+        "bullCaseReturnPct": 5.4545,
+        "baseCaseReturnPct": 0,
+        "bearCaseReturnPct": -3.6496
+      },
+      "patternConfidenceScore": 65,
+      "evidenceQualityScore": 70,
+      "regime": "BEAR_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-20.1",
+        "generatedAt": "2026-09-16T21:22:27.128Z",
+        "validUntil": "2026-09-17T05:22:27.128Z",
+        "status": "FINAL",
+        "marketAction": "AVOID",
+        "marketActionLabel": "ΑΠΕΦΥΓΕ",
+        "holderAction": "HOLD",
+        "holderActionLabel": "ΚΡΑΤΑ",
+        "nonHolderAction": "AVOID",
+        "nonHolderActionLabel": "ΑΠΕΦΥΓΕ",
+        "urgency": "TODAY",
+        "urgencyLabel": "Ενέργεια σήμερα",
+        "confidenceScore": 84,
+        "confidenceMeaning": "POLICY_COMPLETENESS_HEURISTIC_NOT_PROBABILITY",
+        "dataQualityScore": 100,
+        "integrity": {
+          "contractVersion": 1,
+          "strict": true,
+          "passed": true,
+          "blockers": [],
+          "companyId": "company:sec:0001282648",
+          "listingSymbol": "BATL",
+          "referenceSymbol": "BATL",
+          "evidenceCount": 2,
+          "universal": {
+            "format": "investor-control-instrument-integrity",
+            "version": 1,
+            "policyVersion": "2026-08-20.1",
+            "assetClass": "EQUITY",
+            "instrumentId": "company:sec:0001282648",
+            "symbol": "BATL",
+            "mic": "XNYS",
+            "currency": "USD",
+            "purpose": "VALUATION",
+            "identityReady": true,
+            "routingReady": true,
+            "valuationReady": true,
+            "decisionReady": false,
+            "blockers": [],
+            "identityBlockers": [],
+            "routingBlockers": [],
+            "valuationBlockers": [],
+            "decisionBlockers": [
+              "ACTIVE_LISTING_NOT_VERIFIED",
+              "QUOTE_NOT_DECISION_ELIGIBLE"
+            ],
+            "invariant": "SAME_INSTRUMENT_INTEGRITY_RULES_FOR_ALL_USERS_AND_PORTFOLIOS"
+          }
+        },
+        "reasons": [
+          "SEVERE_RISK_CONFIGURATION",
+          "EXECUTION_PRICE_NOT_VERIFIED"
+        ],
+        "blockers": [],
+        "freshness": {
+          "referencePriceAgeHours": 1.3742022222222223,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 7.874202222222222,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "UNVERIFIED",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": 30,
+          "fundamentalFlags": [
+            "NEGATIVE_FREE_CASH_FLOW"
+          ],
+          "marketFlags": [
+            "EXTREME_VOLATILITY",
+            "SEVERE_DRAWDOWN",
+            "BELOW_50_DAY_AVERAGE"
+          ]
+        },
+        "controlledPlan": null,
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001282648",
+        "instrumentId": "company:sec:0001282648",
+        "horizon": "day1",
+        "forecastSampleDate": "2026-09-16"
+      }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-12.1",
+      "forecastId": "forecast:9e11662ca4ce48a8fa832387fb71",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:sec:0001282648",
+      "instrumentId": "company:sec:0001282648",
+      "displayName": "BATTALION OIL",
+      "symbol": "BATL",
+      "listing": {
+        "symbol": "BATL",
+        "mic": "XNYS",
+        "exchange": "NYSE",
+        "currency": "USD"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001282648",
+        "instrumentId": "company:sec:0001282648",
+        "sourceAuthority": "SEC_EDGAR_SUBMISSIONS",
+        "sourceUrl": "https://data.sec.gov/submissions/CIK0001282648.json",
+        "sourceDocumentId": "CIK0001282648",
+        "capturedAt": "2026-09-16T21:22:27.128Z",
+        "taxonomy": "SEC_SIC",
+        "code": "1311",
+        "description": "Crude Petroleum & Natural Gas",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "marketRegimeSnapshot": {
+        "contract": "FORECAST_TIME_MARKET_REGIME_SNAPSHOT_V1",
+        "policyVersion": "2026-08-12.1",
+        "capturedAt": "2026-09-16T21:22:27.128Z",
+        "benchmarkAsOf": "2026-09-16T13:30:00.000Z",
+        "benchmarkSymbol": "SPY",
+        "benchmarkSource": "Yahoo Finance Chart",
+        "benchmarkSourceQuality": "SECONDARY_VALIDATED",
+        "observationCount": 501,
+        "status": "REGIME_READY",
+        "regimeKey": "NEUTRAL|MIXED_TREND|LOW_VOLATILITY|MIXED_MOMENTUM",
+        "riskTone": "NEUTRAL",
+        "trendRegime": "MIXED_TREND",
+        "momentumRegime": "MIXED_MOMENTUM",
+        "volatilityRegime": "LOW_VOLATILITY",
+        "metrics": {
+          "latestClose": 754.049988,
+          "return20Pct": -1.746,
+          "return60Pct": 1.2977,
+          "return120Pct": 15.0989,
+          "sma50": 759.1874,
+          "sma200": 713.385407,
+          "annualizedVolatility20Pct": 8.6471,
+          "annualizedVolatility60Pct": 11.4922,
+          "volatility20Percentile": 11.11,
+          "maxDrawdown120Pct": -4.4947
+        },
+        "blockers": [],
+        "researchOnly": true,
+        "modelDerived": true,
+        "finalActionEligible": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "week1",
+      "tradingDays": 5,
+      "forecastSampleDate": "2026-09-16",
+      "forecastAt": "2026-09-16T21:22:27.128Z",
+      "referencePrice": {
+        "value": 1.24,
+        "timestamp": "2026-09-16T20:00:00.000Z",
+        "currency": "USD",
+        "source": "Finnhub Quote API"
+      },
+      "rawProbabilityPositive": 0.4945,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": -0.167011,
+      "rawLatentFactorScore": -0.167011,
+      "factorScoreStatus": "LATENT_SCORE_READY",
+      "factorAvailableDomainCount": 5,
+      "factorAvailableWeight": 0.64,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": 0.063241,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": -0.5,
+          "weight": 0.16,
+          "verifiedDriverCount": 2
+        },
+        {
+          "domain": "FUNDAMENTAL",
+          "value": -0.042833,
+          "weight": 0.12,
+          "verifiedDriverCount": 3
+        },
+        {
+          "domain": "RISK",
+          "value": -0.874,
+          "weight": 0.09,
+          "verifiedDriverCount": 5
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.86,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": 2.4103,
+      "distribution": {
+        "p10ReturnPct": -3.6765,
+        "p25ReturnPct": -1.5267,
+        "medianReturnPct": 0,
+        "p75ReturnPct": 5.5046,
+        "p90ReturnPct": 8.7719,
+        "downsideProbabilityPct": 50.55,
+        "bullCaseReturnPct": 8.7719,
+        "baseCaseReturnPct": 0,
+        "bearCaseReturnPct": -3.6765
+      },
+      "patternConfidenceScore": 57.97,
+      "evidenceQualityScore": 70,
+      "regime": "BEAR_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-20.1",
+        "generatedAt": "2026-09-16T21:22:27.128Z",
+        "validUntil": "2026-09-17T05:22:27.128Z",
+        "status": "FINAL",
+        "marketAction": "AVOID",
+        "marketActionLabel": "ΑΠΕΦΥΓΕ",
+        "holderAction": "HOLD",
+        "holderActionLabel": "ΚΡΑΤΑ",
+        "nonHolderAction": "AVOID",
+        "nonHolderActionLabel": "ΑΠΕΦΥΓΕ",
+        "urgency": "TODAY",
+        "urgencyLabel": "Ενέργεια σήμερα",
+        "confidenceScore": 84,
+        "confidenceMeaning": "POLICY_COMPLETENESS_HEURISTIC_NOT_PROBABILITY",
+        "dataQualityScore": 100,
+        "integrity": {
+          "contractVersion": 1,
+          "strict": true,
+          "passed": true,
+          "blockers": [],
+          "companyId": "company:sec:0001282648",
+          "listingSymbol": "BATL",
+          "referenceSymbol": "BATL",
+          "evidenceCount": 2,
+          "universal": {
+            "format": "investor-control-instrument-integrity",
+            "version": 1,
+            "policyVersion": "2026-08-20.1",
+            "assetClass": "EQUITY",
+            "instrumentId": "company:sec:0001282648",
+            "symbol": "BATL",
+            "mic": "XNYS",
+            "currency": "USD",
+            "purpose": "VALUATION",
+            "identityReady": true,
+            "routingReady": true,
+            "valuationReady": true,
+            "decisionReady": false,
+            "blockers": [],
+            "identityBlockers": [],
+            "routingBlockers": [],
+            "valuationBlockers": [],
+            "decisionBlockers": [
+              "ACTIVE_LISTING_NOT_VERIFIED",
+              "QUOTE_NOT_DECISION_ELIGIBLE"
+            ],
+            "invariant": "SAME_INSTRUMENT_INTEGRITY_RULES_FOR_ALL_USERS_AND_PORTFOLIOS"
+          }
+        },
+        "reasons": [
+          "SEVERE_RISK_CONFIGURATION",
+          "EXECUTION_PRICE_NOT_VERIFIED"
+        ],
+        "blockers": [],
+        "freshness": {
+          "referencePriceAgeHours": 1.3742022222222223,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 7.874202222222222,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "UNVERIFIED",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": 30,
+          "fundamentalFlags": [
+            "NEGATIVE_FREE_CASH_FLOW"
+          ],
+          "marketFlags": [
+            "EXTREME_VOLATILITY",
+            "SEVERE_DRAWDOWN",
+            "BELOW_50_DAY_AVERAGE"
+          ]
+        },
+        "controlledPlan": null,
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:sec:0001282648",
+        "instrumentId": "company:sec:0001282648",
+        "horizon": "week1",
+        "forecastSampleDate": "2026-09-16"
+      }
     }
   ],
   "summary": {
     "format": "investor-control-forecast-outcome-ledger-summary",
     "version": 1,
     "policyVersion": "2026-08-12.1",
-    "recordCount": 2113,
-    "openCount": 224,
-    "maturedCount": 1889,
+    "recordCount": 2115,
+    "openCount": 225,
+    "maturedCount": 1890,
     "groups": [
       {
         "assetClass": "EQUITY",
         "horizon": "day1",
-        "recordCount": 1195,
+        "recordCount": 1196,
         "calibration": {
           "format": "investor-control-forecast-calibration",
           "version": 1,
           "policyVersion": "2026-08-11.3",
           "status": "OOS_METRICS_READY",
-          "sampleSize": 1195,
-          "brierScore": 0.254696,
-          "logLoss": 0.74912,
-          "expectedCalibrationError": 0.057148,
-          "baseRate": 0.502092,
-          "naiveBrierScore": 0.249996,
-          "skillVsBaseRatePct": -1.88,
+          "sampleSize": 1196,
+          "brierScore": 0.254795,
+          "logLoss": 0.749283,
+          "expectedCalibrationError": 0.057611,
+          "baseRate": 0.502508,
+          "naiveBrierScore": 0.249994,
+          "skillVsBaseRatePct": -1.92,
           "validationModes": [
             "LIVE_SHADOW_OOS"
           ],
@@ -453179,9 +453641,9 @@
               "index": 3,
               "lower": 0.3,
               "upper": 0.4,
-              "count": 173,
-              "meanForecast": 0.3552,
-              "empiricalRate": 0.4913
+              "count": 174,
+              "meanForecast": 0.3554,
+              "empiricalRate": 0.4943
             },
             {
               "index": 4,
@@ -453342,8 +453804,8 @@
     ]
   },
   "evaluation": {
-    "baseRecordCount": 2106,
-    "incomingRecordCount": 2113,
-    "mergedRecordCount": 2113
+    "baseRecordCount": 2113,
+    "incomingRecordCount": 2115,
+    "mergedRecordCount": 2115
   }
 }
