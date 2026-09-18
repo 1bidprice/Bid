@@ -94,3 +94,13 @@ The next signed APK must be installed over the existing app without clearing loc
 4. `ALWN.GR` remains `13.010 EUR` for the observed closed-session reference and `CREDIA.GR` remains `0.989 EUR` unless a newer verified Athens quote is fetched; both preserve XATH/EUR routing and fail-closed decision behavior.
 
 If these four real-device checks pass, close stabilization and stop changing the core.
+
+## 2026-09-18 — Play signing verification / Closed Testing continuation
+
+- Re-read GitHub `main`, PR #22, open PRs and current-head CI before editing. PR #22 remains draft/unmerged; no `main` changes.
+- Verified the downloaded current-head Play preflight ZIP against GitHub's SHA-256. The extracted AAB is unsigned and has no configured live gateway URL. Prior preflight success must not be called Play signing success.
+- Added `VerifyPlaySigning.java`, `verify-play-upload-key.cjs` and a dedicated signing-readiness workflow. The protected upload certificate must match a separately configured public SHA-256; no release key is generated or replaced.
+- Added 13 executable regression checks with disposable test keys: missing configuration, valid certificate, wrong password, mismatch, debug, expiry, weak RSA, invalid fingerprint, unsigned payload, strict trusted verification, valid signature/hash, unsigned extra payload and tampering.
+- Strengthened the existing signed-build path with early credential/certificate checks, exact PR-head checkout, strict signature verification of every payload entry, real manifest version/SDK checks, source provenance and private-key cleanup on failure.
+- Corrected the Data Safety draft to disclose the actual gateway installation ID and to stop claiming unverified ephemeral processing or complete identifier deletion. Public policy publication/retention verification remain separate gates.
+- Recorded exact evidence and remaining Console actions in `play-store/closed-testing-readiness.md`. No Play upload, test rollout, device verification or merge is claimed.

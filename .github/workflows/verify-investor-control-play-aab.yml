@@ -49,6 +49,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -61,11 +62,41 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Verify authorized signing source before accessing the upload key
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_for_play }}
+        env:
+          EXPECTED_SHA_INPUT: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = 'investor-control-core-stabilization-v174'
+          test -n "$EXPECTED_SHA_INPUT"
+          test "$EXPECTED_SHA_INPUT" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA_INPUT"
+
+      - name: Verify upload key before starting a signed release build
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_for_play }}
+        env:
+          UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+          EXPECTED_UPLOAD_CERT_SHA256: ${{ vars.ANDROID_UPLOAD_CERTIFICATE_SHA256 }}
+        run: node mobile/scripts/verify-play-upload-key.cjs --report mobile/play-upload-key-readiness.json
+
+      - name: Preserve upload-key blocker evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-play-signing-blocker-${{ github.run_id }}
+          path: mobile/play-upload-key-readiness.json
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Validate autonomous intelligence
         working-directory: market-intelligence
         run: npm test
 
-      - name: Install and apply production mobile chain
+      - name: Install canonical mobile dependencies
         working-directory: mobile
         run: npm install --legacy-peer-deps --no-audit --no-fund
 
@@ -239,9 +270,14 @@ jobs:
           java -jar /tmp/bundletool.jar validate --bundle="$PREFLIGHT_AAB"
           PLAY_PACKAGE="$(java -jar /tmp/bundletool.jar dump manifest --bundle="$PREFLIGHT_AAB" --module=base --xpath='/manifest/@package')"
           PLAY_VERSION_CODE="$(java -jar /tmp/bundletool.jar dump manifest --bundle="$PREFLIGHT_AAB" --module=base --xpath='/manifest/@android:versionCode')"
+          PLAY_VERSION_NAME="$(java -jar /tmp/bundletool.jar dump manifest --bundle="$PREFLIGHT_AAB" --module=base --xpath='/manifest/@android:versionName')"
+          PLAY_TARGET_SDK="$(java -jar /tmp/bundletool.jar dump manifest --bundle="$PREFLIGHT_AAB" --module=base --xpath='/manifest/uses-sdk/@android:targetSdkVersion')"
           test "$PLAY_PACKAGE" = 'gr.investorcontrol.app'
           test "$PLAY_VERSION_CODE" = '31'
-          printf 'package=%s\nversionCode=%s\nversionName=1.7.3\ntargetSdk=36\nsigningMode=preflight-unsigned\n' "$PLAY_PACKAGE" "$PLAY_VERSION_CODE" | tee mobile/Investor-Control-v1.7.3-play-preflight-manifest.txt
+          test "$PLAY_VERSION_NAME" = '1.7.3'
+          test "$PLAY_TARGET_SDK" = '36'
+          printf 'package=%s\nversionCode=%s\nversionName=%s\ntargetSdk=%s\nsigningMode=preflight-unsigned\n' "$PLAY_PACKAGE" "$PLAY_VERSION_CODE" "$PLAY_VERSION_NAME" "$PLAY_TARGET_SDK" | tee mobile/Investor-Control-v1.7.3-play-preflight-manifest.txt
+          git rev-parse HEAD > mobile/Investor-Control-v1.7.3-source-commit.txt
           sha256sum "$PREFLIGHT_AAB" | tee mobile/Investor-Control-v1.7.3-play-preflight.sha256
 
       - name: Verify live gateway is embedded in manual Play bundle
@@ -282,26 +318,29 @@ jobs:
           UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
           UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
           UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+          EXPECTED_UPLOAD_CERT_SHA256: ${{ vars.ANDROID_UPLOAD_CERTIFICATE_SHA256 }}
         run: |
           set -euo pipefail
           KEYSTORE="$RUNNER_TEMP/investor-control-upload.jks"
+          trap 'rm -f "$KEYSTORE"' EXIT
           SOURCE_AAB='mobile/Investor-Control-v1.7.3-play-preflight.aab'
           SIGNED_AAB='mobile/Investor-Control-v1.7.3-play-signed.aab'
+          umask 077
           printf '%s' "$UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
           chmod 600 "$KEYSTORE"
-          keytool -list -keystore "$KEYSTORE" -storepass "$UPLOAD_KEYSTORE_PASSWORD" -alias "$UPLOAD_KEY_ALIAS" >/dev/null
+          keytool -list -keystore "$KEYSTORE" -storepass:env UPLOAD_KEYSTORE_PASSWORD -alias "$UPLOAD_KEY_ALIAS" >/dev/null
           cp "$SOURCE_AAB" "$SIGNED_AAB"
-          jarsigner -keystore "$KEYSTORE" -storepass "$UPLOAD_KEYSTORE_PASSWORD" -keypass "$UPLOAD_KEY_PASSWORD" -sigalg SHA256withRSA -digestalg SHA-256 "$SIGNED_AAB" "$UPLOAD_KEY_ALIAS"
-          jarsigner -verify -verbose -certs "$SIGNED_AAB" | tee mobile/Investor-Control-v1.7.3-play-signature.txt
-          grep -qi 'jar verified' mobile/Investor-Control-v1.7.3-play-signature.txt
+          jarsigner -keystore "$KEYSTORE" -storepass:env UPLOAD_KEYSTORE_PASSWORD -keypass:env UPLOAD_KEY_PASSWORD -sigalg SHA256withRSA -digestalg SHA-256 "$SIGNED_AAB" "$UPLOAD_KEY_ALIAS"
+          jarsigner -verify -strict -verbose -certs -keystore "$KEYSTORE" -storepass:env UPLOAD_KEYSTORE_PASSWORD "$SIGNED_AAB" | tee mobile/Investor-Control-v1.7.3-play-signature.txt
+          java mobile/scripts/VerifyPlaySigning.java --bundle "$SIGNED_AAB" --expected-sha256 "$EXPECTED_UPLOAD_CERT_SHA256" | tee mobile/Investor-Control-v1.7.3-play-signing-verification.json
           java -jar /tmp/bundletool.jar validate --bundle="$SIGNED_AAB"
           PLAY_PACKAGE="$(java -jar /tmp/bundletool.jar dump manifest --bundle="$SIGNED_AAB" --module=base --xpath='/manifest/@package')"
           PLAY_VERSION_CODE="$(java -jar /tmp/bundletool.jar dump manifest --bundle="$SIGNED_AAB" --module=base --xpath='/manifest/@android:versionCode')"
           test "$PLAY_PACKAGE" = 'gr.investorcontrol.app'
           test "$PLAY_VERSION_CODE" = '31'
-          keytool -list -v -keystore "$KEYSTORE" -storepass "$UPLOAD_KEYSTORE_PASSWORD" -alias "$UPLOAD_KEY_ALIAS" | grep -E 'Alias name:|SHA1:|SHA256:|Valid from:' | tee mobile/Investor-Control-v1.7.3-upload-certificate.txt
+          keytool -J-Duser.language=en -J-Duser.country=US -list -v -keystore "$KEYSTORE" -storepass:env UPLOAD_KEYSTORE_PASSWORD -alias "$UPLOAD_KEY_ALIAS" | grep -E 'Alias name:|SHA1:|SHA256:|Valid from:' | tee mobile/Investor-Control-v1.7.3-upload-certificate.txt
+          printf 'sourceCommit=%s\nmarketGateway=%s\nplayConsoleAccepted=UNVERIFIED\n' "$(git rev-parse HEAD)" "$MARKET_GATEWAY_RELEASE_URL" > mobile/Investor-Control-v1.7.3-play-release-provenance.txt
           sha256sum "$SIGNED_AAB" | tee mobile/Investor-Control-v1.7.3-play-signed.sha256
-          rm -f "$KEYSTORE"
 
       - name: Upload verified Play preflight
         uses: actions/upload-artifact@v4
@@ -316,6 +355,7 @@ jobs:
             mobile/Investor-Control-v1.7.3-play-preflight.aab
             mobile/Investor-Control-v1.7.3-play-preflight.sha256
             mobile/Investor-Control-v1.7.3-play-preflight-manifest.txt
+            mobile/Investor-Control-v1.7.3-source-commit.txt
             play-store/**
           if-no-files-found: error
           retention-days: 30
@@ -330,5 +370,8 @@ jobs:
             mobile/Investor-Control-v1.7.3-play-signed.sha256
             mobile/Investor-Control-v1.7.3-play-signature.txt
             mobile/Investor-Control-v1.7.3-upload-certificate.txt
+            mobile/Investor-Control-v1.7.3-play-signing-verification.json
+            mobile/Investor-Control-v1.7.3-play-release-provenance.txt
+            mobile/play-upload-key-readiness.json
           if-no-files-found: error
           retention-days: 90

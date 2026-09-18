@@ -1,0 +1,71 @@
+name: Investor Control Play Signing Readiness
+
+on:
+  push:
+    branches: [investor-control-core-stabilization-v174]
+    paths:
+      - mobile/scripts/VerifyPlaySigning.java
+      - mobile/scripts/verify-play-upload-key.cjs
+      - mobile/scripts/test-play-signing.cjs
+      - .github/workflows/investor-control-play-signing-readiness.yml
+      - .github/workflows/verify-investor-control-play-aab.yml
+  pull_request:
+    branches: [investor-control-v1-market-intelligence-foundation]
+    paths:
+      - mobile/scripts/VerifyPlaySigning.java
+      - mobile/scripts/verify-play-upload-key.cjs
+      - mobile/scripts/test-play-signing.cjs
+      - .github/workflows/investor-control-play-signing-readiness.yml
+      - .github/workflows/verify-investor-control-play-aab.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signing-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Reject unsigned, debug, wrong-key and tampered artifacts
+        run: node mobile/scripts/test-play-signing.cjs
+
+  protected-upload-key:
+    # PR validation has no access to upload secrets. Only the controlled branch audits them.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/investor-control-core-stabilization-v174'
+    needs: signing-regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify protected upload certificate against the registered fingerprint
+        env:
+          UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+          EXPECTED_UPLOAD_CERT_SHA256: ${{ vars.ANDROID_UPLOAD_CERTIFICATE_SHA256 }}
+        run: node mobile/scripts/verify-play-upload-key.cjs --report play-upload-key-readiness.json
+      - name: Preserve public readiness evidence even when blocked
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-play-upload-key-readiness-${{ github.sha }}
+          path: play-upload-key-readiness.json
+          if-no-files-found: error
+          retention-days: 30
