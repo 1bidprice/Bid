@@ -15,6 +15,16 @@
 
 ## Technical gates now implemented
 
+### Executed signing audit and continuation — 2026-09-19 UTC
+
+- Commit `c113c9a7ef9ee37bd476cf8a2983046101e95026`: all 11 PR workflows and the three existing push build/core workflows completed successfully. The separate protected signing audit failed on missing configuration; this is not an all-green release.
+- [Protected audit 35401657107](https://github.com/1bidprice/Bid/actions/runs/35401657107): 13 cryptographic regression tests passed; the protected-key job returned `BLOCKED` because all four upload-key secrets and the public certificate variable were unavailable to the workflow. Public report artifact: `10570507083`.
+- [Play preflight 35401661125](https://github.com/1bidprice/Bid/actions/runs/35401661125): actual manifest and bundle checks passed; artifact `10570603245` remains explicitly unsigned preflight. No signed Play candidate or Console acceptance has been obtained.
+- Live Play Console access stopped before credential entry: the Google sign-in destination returned `502 Bad Gateway` / connection refused. App registration, upload certificate, account type and used version codes remain unverified. No key was created or replaced.
+- Prepared [Greek privacy-policy replacement draft](privacy-policy-el-GR.draft.md), with the actual installation ID and deletion limits. Retention/provider confirmation and public publication are still pending.
+
+### Implemented controls
+
 1. `investor-control-play-signing-readiness.yml` runs signature regressions and, on the controlled branch only, audits the configured upload key. A missing/mismatched key is a failed gate with a public JSON report; it cannot be reported as Play-ready.
 2. Four existing GitHub secrets are used: `ANDROID_UPLOAD_KEYSTORE_BASE64`, `ANDROID_UPLOAD_KEY_ALIAS`, `ANDROID_UPLOAD_KEYSTORE_PASSWORD`, `ANDROID_UPLOAD_KEY_PASSWORD`. No new production key is generated.
 3. Repository variable `ANDROID_UPLOAD_CERTIFICATE_SHA256` must contain the **upload key certificate** SHA-256 verified from Play Console. It is not the AAB file hash, the QA APK certificate, or the Play app-signing certificate. For a new app, explicitly establish the intended upload certificate through initial Play setup before treating it as registered.

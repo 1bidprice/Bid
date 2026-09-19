@@ -104,3 +104,10 @@ If these four real-device checks pass, close stabilization and stop changing the
 - Strengthened the existing signed-build path with early credential/certificate checks, exact PR-head checkout, strict signature verification of every payload entry, real manifest version/SDK checks, source provenance and private-key cleanup on failure.
 - Corrected the Data Safety draft to disclose the actual gateway installation ID and to stop claiming unverified ephemeral processing or complete identifier deletion. Public policy publication/retention verification remain separate gates.
 - Recorded exact evidence and remaining Console actions in `play-store/closed-testing-readiness.md`. No Play upload, test rollout, device verification or merge is claimed.
+
+## 2026-09-19 — signing audit result and privacy-policy preparation
+
+- Confirmed all 11 PR checks and the three existing push build/core checks succeeded on `c113c9a`; the separate protected upload-key audit correctly failed because its four secrets and public certificate variable were unavailable. Recorded the exact run and artifact references in the readiness document.
+- Attempted read-only Play Console access; the sign-in destination returned HTTP 502 before credential entry. No Console state, signing enrollment, release upload or rollout was changed.
+- Prepared `play-store/privacy-policy-el-GR.draft.md` against the current client/gateway code: installation ID, transmitted symbols, hosting, local deletion limits and exported backups are explicit. Unverified retention/provider/deletion practices remain named publication blockers.
+- This continuation changes documentation only. The public `gh-pages` policy, app runtime, signing keys and `main` remain unchanged; PR #22 remains draft/unmerged.
