@@ -3,7 +3,7 @@ import { fetchSecCurrentFilings } from './adapters/sec-current-filings.js';
 import { fetchAthensDiscovery } from './adapters/euronext-athens-discovery.js';
 import { sourcePolicySummary } from './source-policy.js';
 
-export const DISCOVERY_POLICY_VERSION = '2026-08-04.1';
+export const DISCOVERY_POLICY_VERSION = '2026-09-12.1';
 
 const FORM_SCORES = Object.freeze({
   '8-K': 55,
@@ -131,6 +131,31 @@ function candidateOutput(item, seedCompanyIds) {
   };
 }
 
+function isUnresolvedAthensIssuer(item) {
+  return item?.company?.primaryListing?.mic === 'XATH' && !item?.company?.primaryListing?.symbol;
+}
+
+function identityReviewOutput(item) {
+  return {
+    companyId: item.company.companyId,
+    companyName: item.company.displayName || item.company.legalName,
+    market: 'GR',
+    mic: item.company.primaryListing?.mic || null,
+    issuerId: item.company.issuerId || null,
+    taxonomyTermId: item.company.taxonomyTermId || null,
+    identityStatus: 'SYMBOL_RESOLUTION_REQUIRED',
+    status: 'DISCOVERED_IDENTITY_REQUIRED',
+    discoveryScore: item.discoveryScore,
+    latestEventAt: item.latestEventAt,
+    eventCount: item.events.length,
+    sources: item.events.map((event) => ({
+      sourceUrl: event.sourceUrl,
+      sourceName: event.sourceName || 'Euronext Athens',
+      publishedAt: event.publishedAt,
+    })),
+  };
+}
+
 export async function discoverAutonomousCandidates(options = {}) {
   const now = new Date(options.now || Date.now());
   const generatedAt = now.toISOString();
@@ -179,8 +204,27 @@ export async function discoverAutonomousCandidates(options = {}) {
   const minimumScore = Math.max(0, Number(options.minimumScore ?? 58));
   const shortlistLimit = Math.max(1, Number(options.shortlistLimit ?? 12));
   const deepAnalysisLimit = Math.max(0, Number(options.deepAnalysisLimit ?? 5));
-  const shortlist = grouped
-    .filter((item) => item.discoveryScore >= minimumScore)
+  const scoredCandidates = grouped.filter((item) => item.discoveryScore >= minimumScore);
+  const identityExcluded = scoredCandidates.filter(isUnresolvedAthensIssuer);
+  const identityReviewQueue = identityExcluded
+    .slice(0, shortlistLimit)
+    .map(identityReviewOutput);
+
+  for (const item of identityExcluded) {
+    diagnostics.push({
+      code: 'ATHENS_UNRESOLVED_LISTING_EXCLUDED_FROM_INVESTMENT_SHORTLIST',
+      companyId: item.company.companyId,
+      companyName: item.company.displayName || item.company.legalName,
+      issuerId: item.company.issuerId || null,
+      taxonomyTermId: item.company.taxonomyTermId || null,
+      latestEventAt: item.latestEventAt,
+      eventCount: item.events.length,
+      detail: 'Official Athens issuer evidence was retained for audit, but no verified XATH stock symbol was resolved; the entity is excluded from the investment shortlist.',
+    });
+  }
+
+  const shortlist = scoredCandidates
+    .filter((item) => !isUnresolvedAthensIssuer(item))
     .slice(0, shortlistLimit)
     .map((item) => candidateOutput(item, seedCompanyIds));
 
@@ -209,11 +253,15 @@ export async function discoverAutonomousCandidates(options = {}) {
     registryCompanyCount: allCompanies.length,
     secRegistryCompanyCount: universeResult.companies?.length || 0,
     athensActiveIssuerCount: athensResult.companies?.length || 0,
+    classificationSnapshotCount: athensResult.classificationSnapshots?.length || 0,
+    classificationSnapshots: athensResult.classificationSnapshots || [],
     filingEventCount: recentRecords.length,
     secFilingEventCount: (filingsResult.records || []).filter((record) => hoursOld(now, record.publishedAt) <= maxEventAgeHours).length,
     athensAnnouncementEventCount: (athensResult.records || []).filter((record) => hoursOld(now, record.publishedAt) <= maxEventAgeHours).length,
     candidateCount: shortlist.length,
     unresolvedIdentityCount: shortlist.filter((item) => item.identityStatus !== 'CANONICAL_IDENTITY_READY').length,
+    identityExcludedCount: identityExcluded.length,
+    identityReviewQueue,
     deepAnalysisCompanyCount: discoveredCompanies.length,
     shortlist,
     discoveredCompanies,

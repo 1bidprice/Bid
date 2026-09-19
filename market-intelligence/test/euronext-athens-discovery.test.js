@@ -47,6 +47,14 @@ const searchAndro = `
   <div class="result"><a href="/en/market-data/issuers/410">ALPHA TRUST ANDROMEDA SA</a><a href="/en/market-data/instruments/stocks/ANDRO">ANDRO</a></div>
 `;
 
+const profileQuest = `
+  <table><tr><th>Sector / Sub-sector</th><td>Technology / Computer Services</td></tr></table>
+`;
+
+const profileAndro = `
+  <table><tr><th>Sector / Sub-sector</th><td>Financials / Closed End Investments</td></tr></table>
+`;
+
 test('issuer universe uses official issuer identifiers and no invented symbols', () => {
   const result = extractAthensIssuerUniverse(issuerHtml, { generatedAt: NOW });
   assert.equal(result.companies.length, 2);
@@ -96,6 +104,8 @@ test('Athens discovery fetches taxonomy registry, announcements and official ide
     if (value.includes('/market-data/issuers?letter=')) return { ok: true, text: async () => '<html>No server-rendered issuer rows</html>' };
     if (value.endsWith('/market-data/announcements')) return { ok: true, text: async () => announcementHtml };
     if (value.includes('/trading-products/trading-issuers')) throw new Error('directory unavailable in unit fixture');
+    if (value.endsWith('/market-data/issuers/623')) return { ok: true, text: async () => profileQuest };
+    if (value.endsWith('/market-data/issuers/410')) return { ok: true, text: async () => profileAndro };
     if (value.includes('QUEST HOLDINGS')) return { ok: true, text: async () => searchQuest };
     if (value.includes('ALPHA TRUST ANDROMEDA')) return { ok: true, text: async () => searchAndro };
     throw new Error(`unexpected url ${value}`);
@@ -106,12 +116,17 @@ test('Athens discovery fetches taxonomy registry, announcements and official ide
     generatedAt: NOW,
     tradingDirectoryFallbackLastPage: 0,
   });
-  assert.equal(result.version, 6);
+  assert.equal(result.version, 7);
   assert.equal(result.records.length, 2);
   assert.equal(result.companies.length, 2);
   assert.equal(result.companies.find((item) => item.taxonomyTermId === '340').issuerId, '623');
   assert.equal(result.companies.find((item) => item.taxonomyTermId === '340').primaryListing.symbol, 'QUEST');
   assert.equal(result.companies.find((item) => item.taxonomyTermId === '549').primaryListing.symbol, 'ANDRO');
+  assert.equal(result.classificationSnapshotCount, 2);
+  assert.equal(result.classificationSnapshots.length, 2);
+  assert.equal(result.classificationSnapshots.find((item) => item.companyId === 'company:xath:term-340').taxonomy, 'FTSE_RUSSELL_ICB');
+  assert.equal(result.classificationSnapshots.find((item) => item.companyId === 'company:xath:term-340').sector, 'Technology');
+  assert.equal(result.classificationSnapshots.find((item) => item.companyId === 'company:xath:term-549').subSector, 'Closed End Investments');
   const unexpectedDiagnostics = result.diagnostics.filter((item) => ![
     'ATHENS_TRADING_DIRECTORY_EMPTY',
     'ATHENS_LETTER_DIRECTORY_FETCH_FAILED',

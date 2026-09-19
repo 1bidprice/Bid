@@ -1,7 +1,7 @@
 const RULES = [
   {
     id: 'SHARE_BUYBACK',
-    terms: ['share buyback', 'own shares', 'repurchase programme', 'repurchase program'],
+    terms: ['share buyback', 'share repurchase', 'repurchase of shares', 'repurchased its own shares', 'own shares', 'repurchase programme', 'repurchase program'],
     category: 'EVENT_DRIVEN',
     fundamentalsScore: 45,
     catalystScore: 72,
@@ -57,6 +57,24 @@ const RULES = [
     rationale: 'Operational milestone with potentially high upside and high execution risk.',
   },
   {
+    id: 'SECURITIES_OFFERING_REGISTRATION',
+    terms: ['424b7 filing', '424b5 filing', '424b3 filing', 's-3asr filing', 's-3 filing', 'prospectus supplement'],
+    category: 'EVENT_RISK',
+    fundamentalsScore: 30,
+    catalystScore: 38,
+    riskScore: 72,
+    rationale: 'Securities-offering document that may enable issuance or resale and requires transaction-specific dilution and financing review.',
+  },
+  {
+    id: 'OWNERSHIP_OR_VOTING_RIGHTS',
+    terms: ['voting rights', 'major shareholder', 'major shareholding', 'shareholding notification', 'ownership threshold'],
+    category: 'EVENT_DRIVEN',
+    fundamentalsScore: 34,
+    catalystScore: 45,
+    riskScore: 42,
+    rationale: 'Ownership or voting-rights disclosure requiring holder identity, threshold and control-impact checks.',
+  },
+  {
     id: 'LEGAL_OR_SETTLEMENT',
     terms: ['settlement', 'derivative actions', 'litigation', 'legal proceedings'],
     category: 'EVENT_RISK',
@@ -67,13 +85,16 @@ const RULES = [
   },
 ];
 
-function normalizedText(record) {
-  return `${record?.title || ''} ${record?.notes || ''} ${record?.rawText || ''}`.toLowerCase();
+function normalizedHeadlineText(record) {
+  return `${record?.title || ''} ${record?.notes || ''}`.toLowerCase();
 }
 
 export function classifyEvidenceEvent(record) {
-  const text = normalizedText(record);
-  const rule = RULES.find((candidate) => candidate.terms.some((term) => text.includes(term)));
+  const headlineText = normalizedHeadlineText(record);
+  // Event type is determined only from the adapter-controlled title and notes.
+  // Full issuer/exchange pages contain menus and legal boilerplate that can refer
+  // to unrelated events and must never drive classification.
+  const rule = RULES.find((candidate) => candidate.terms.some((term) => headlineText.includes(term)));
   const documentReviewed = record?.document?.reviewed === true;
 
   if (!rule) {

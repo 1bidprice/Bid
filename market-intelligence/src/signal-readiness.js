@@ -8,6 +8,9 @@ export function evaluateSignalReadiness(input = {}) {
   const fundamentalsReady = input.fundamentals?.metricsReady === true;
   const marketMetricsReady = input.marketMetrics?.readiness?.marketMetricsReady === true;
   const crossCheckReady = input.crossCheck?.recommendationReady === true;
+  const decisionBasis = input.decisionBasis || 'EVENT_DRIVEN';
+  const decisionCorroborationReady = input.decisionCorroboration?.ready === true;
+  const baselineDecisionReady = decisionBasis === 'FUNDAMENTAL_BASELINE' && decisionCorroborationReady;
   const thesisReady = typeof input.thesis === 'string' && input.thesis.trim().length >= 80;
   const invalidationReady = typeof input.invalidationCondition === 'string' && input.invalidationCondition.trim().length >= 20;
   const risksReady = Array.isArray(input.risks) && input.risks.filter(Boolean).length >= 2;
@@ -15,7 +18,7 @@ export function evaluateSignalReadiness(input = {}) {
   if (!documentReviewed) blockers.push('DOCUMENT_REVIEW_REQUIRED');
   if (!fundamentalsReady) blockers.push('FUNDAMENTALS_REQUIRED');
   if (!marketMetricsReady) blockers.push('HISTORICAL_MARKET_METRICS_REQUIRED');
-  if (!crossCheckReady) blockers.push('INDEPENDENT_CROSS_CHECK_REQUIRED');
+  if (!crossCheckReady && !baselineDecisionReady) blockers.push('INDEPENDENT_CROSS_CHECK_REQUIRED');
   if (!thesisReady) blockers.push('THESIS_REQUIRED');
   if (!invalidationReady) blockers.push('INVALIDATION_CONDITION_REQUIRED');
   if (!risksReady) blockers.push('MATERIAL_RISKS_REQUIRED');
@@ -37,6 +40,9 @@ export function evaluateSignalReadiness(input = {}) {
       fundamentalsReady,
       marketMetricsReady,
       crossCheckReady,
+      decisionBasis,
+      decisionCorroborationReady,
+      baselineDecisionReady,
       thesisReady,
       invalidationReady,
       risksReady,

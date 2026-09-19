@@ -82,6 +82,8 @@ function eventFor(symbol, kind, quote, threshold, message) {
     threshold,
     message,
     triggeredAt: new Date().toISOString(),
+    quoteSource: quote.source || null,
+    quoteContractVersion: quote.quoteContract?.version || null,
   };
 }
 
@@ -95,6 +97,7 @@ export function evaluateAlerts(alertsInput, quotes, options = {}) {
     if (!rule.enabled) continue;
     const quote = quotes?.[rule.symbol];
     if (!quote?.usable || !finitePositive(quote.nativePrice)) continue;
+    if (quote.quoteContract && quote.quoteContract.valuationEligible !== true) continue;
 
     const price = Number(quote.nativePrice);
     const currency = quote.nativeCurrency || (rule.symbol.endsWith('.US') ? 'USD' : 'EUR');
@@ -137,7 +140,7 @@ export function evaluateAlerts(alertsInput, quotes, options = {}) {
       runtime[key] = { active, checkedAt: new Date().toISOString() };
     }
 
-    if (finitePositive(rule.dailyPct) && Number.isFinite(Number(quote.changePct))) {
+    if (finitePositive(rule.dailyPct) && quote.dayChangeVerified === true && quote.quoteContract?.dayChangeEligible !== false && Number.isFinite(Number(quote.changePct))) {
       const key = `${rule.symbol}:daily`;
       const marketDay = String(quote.updatedAt || new Date().toISOString()).slice(0, 10);
       const active = Math.abs(Number(quote.changePct)) >= Number(rule.dailyPct);

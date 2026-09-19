@@ -1,0 +1,126 @@
+name: Investor Control Market Gateway Live Shadow
+
+on:
+  push:
+    branches:
+      - investor-control-core-stabilization-v174
+    paths:
+      - market-intelligence/gateway/**
+      - market-intelligence/src/adapters/finnhub-quote.js
+      - market-intelligence/src/adapters/euronext-athens-quote.js
+      - market-intelligence/src/canonical-market-quote.js
+      - .github/workflows/investor-control-market-gateway-live-shadow.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-market-gateway-live-shadow-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-live-gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Require server-side US provider credential
+        env:
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$FINNHUB_TOKEN" || { echo 'FINNHUB_TOKEN is not configured server-side' >&2; exit 1; }
+
+      - name: Exercise live gateway orchestration
+        working-directory: market-intelligence
+        env:
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { resolveCanonicalGatewayFx, resolveCanonicalGatewayQuote } from './gateway/src/core.js';
+
+          const symbols = ['SPCE.US', 'ALWN.GR', 'CREDIA.GR'];
+          const evidence = {
+            format: 'investor-control-market-gateway-live-shadow',
+            version: 2,
+            generatedAt: new Date().toISOString(),
+            commit: process.env.GITHUB_SHA,
+            results: {},
+            fx: null,
+          };
+
+          for (const symbol of symbols) {
+            const result = await resolveCanonicalGatewayQuote(symbol, { FINNHUB_TOKEN: process.env.FINNHUB_TOKEN });
+            if (result.status !== 200) throw new Error(`${symbol} gateway rejected live source: ${JSON.stringify(result.error)}`);
+            const quote = result.body.quote;
+            const contract = quote.quoteContract || {};
+            if (!quote.currency) throw new Error(`${symbol} missing currency`);
+            if (contract.sourceApproved !== true) throw new Error(`${symbol} source is not approved`);
+            if (!quote.source || !quote.sourceUrl) throw new Error(`${symbol} source provenance missing`);
+
+            if (symbol.endsWith('.US')) {
+              if (quote.currency !== 'USD') throw new Error(`${symbol} authoritative currency is not USD`);
+              if (contract.identityVerified !== true) throw new Error(`${symbol} identity is not verified`);
+              if (contract.sourceRole !== 'LICENSED_MARKET_DATA') throw new Error(`${symbol} wrong source role`);
+              if (!/^https:\/\/finnhub\.io\/api\/v1\/quote\?/i.test(quote.sourceUrl)) throw new Error(`${symbol} wrong US provider URL`);
+            } else {
+              if (quote.currency !== 'EUR') throw new Error(`${symbol} must remain EUR`);
+              if (contract.sourceRole !== 'PRIMARY_EXCHANGE') throw new Error(`${symbol} is not primary-exchange sourced`);
+              if (!/^https:\/\/athens\.euronext\.com\//i.test(quote.sourceUrl)) throw new Error(`${symbol} is not official Euronext Athens`);
+              if (Number(contract.advertisedDelayMinutes || 0) < 15) throw new Error(`${symbol} official delay is not disclosed`);
+              if (contract.timestampVerified !== true && (contract.executionFreshnessEligible || contract.decisionEligible || contract.dayChangeEligible)) {
+                throw new Error(`${symbol} unverified delayed timestamp leaked into execution/decision/day-change eligibility`);
+              }
+            }
+
+            evidence.results[symbol] = {
+              appSymbol: quote.appSymbol,
+              currency: quote.currency,
+              source: quote.source,
+              sourceUrl: quote.sourceUrl,
+              sourceQuality: quote.sourceQuality,
+              quoteAt: quote.quoteAt,
+              checkedAt: quote.checkedAt,
+              identityVerified: contract.identityVerified ?? null,
+              timestampVerified: contract.timestampVerified,
+              advertisedDelayMinutes: contract.advertisedDelayMinutes ?? null,
+              valuationEligible: contract.valuationEligible,
+              analysisReferenceEligible: contract.analysisReferenceEligible,
+              executionFreshnessEligible: contract.executionFreshnessEligible,
+              decisionEligible: contract.decisionEligible,
+            };
+          }
+
+          const fxResult = await resolveCanonicalGatewayFx('EURUSD');
+          if (fxResult.status !== 200) throw new Error(`EURUSD gateway rejected official ECB source: ${JSON.stringify(fxResult.error)}`);
+          const fx = fxResult.body.reference;
+          if (fx.sourceQuality !== 'OFFICIAL_DAILY_REFERENCE') throw new Error('EURUSD is not official ECB daily reference data');
+          if (fx.valuationReferenceEligible !== true || fx.transactionEligible !== false || fx.decisionEligible !== false) throw new Error('EURUSD reference eligibility contract invalid');
+          if (!/^https:\/\/www\.ecb\.europa\.eu\/stats\/eurofxref\/eurofxref-daily\.xml$/i.test(fx.sourceUrl)) throw new Error('EURUSD source is not official ECB XML');
+          evidence.fx = fx;
+
+          const serialized = JSON.stringify(evidence, null, 2) + '\n';
+          if (serialized.includes(process.env.FINNHUB_TOKEN)) throw new Error('server credential leaked into live gateway evidence');
+          fs.writeFileSync('out/market-gateway-live-shadow.json', serialized);
+          console.log(serialized);
+          NODE
+
+      - name: Upload live gateway evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-market-gateway-live-shadow-${{ github.run_id }}
+          path: market-intelligence/out/market-gateway-live-shadow.json
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,98 @@
+name: Investor Control Corrected Gateway Redeploy Once
+
+on:
+  push:
+    branches:
+      - investor-control-core-stabilization-v174
+    paths:
+      - .github/workflows/investor-control-market-gateway-redeploy-once.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-market-gateway-production
+  cancel-in-progress: false
+
+jobs:
+  redeploy-corrected-gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Require deployment credentials without exposing values
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${CLOUDFLARE_API_TOKEN:-}" || exit 1
+          test -n "${CLOUDFLARE_ACCOUNT_ID:-}" || exit 1
+          test -n "${FINNHUB_TOKEN:-}" || exit 1
+
+      - name: Checkout exact verified source
+        uses: actions/checkout@v4
+        with:
+          ref: af1eeb35e460fbc42d3841f2d6ab62ccdb400a4d
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Re-run canonical gateway contracts
+        working-directory: market-intelligence
+        run: |
+          set -euo pipefail
+          node --check gateway/src/core.js
+          node --check gateway/src/edge.js
+          node --check gateway/src/index.js
+          node scripts/verify-canonical-source.js
+          node --test test/market-gateway.test.js test/market-gateway-edge.test.js
+
+      - name: Production dry-run
+        working-directory: market-intelligence/gateway
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          npx --yes wrangler@4.129.1 deploy --dry-run --outdir dist
+          find dist -type f | grep -Eq '\.(js|mjs)$'
+
+      - name: Deploy corrected Worker
+        id: deploy
+        working-directory: market-intelligence/gateway
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          SECRETS_FILE="$(mktemp)"
+          chmod 600 "$SECRETS_FILE"
+          cleanup() { rm -f "$SECRETS_FILE" deployment.log; }
+          trap cleanup EXIT
+          SECRETS_FILE="$SECRETS_FILE" node -e "const fs=require('fs'); const token=process.env.FINNHUB_TOKEN||''; if(!token) process.exit(2); fs.writeFileSync(process.env.SECRETS_FILE, JSON.stringify({FINNHUB_TOKEN:token}));"
+          npx --yes wrangler@4.129.1 deploy --secrets-file "$SECRETS_FILE" 2>&1 | tee deployment.log
+          DEPLOYMENT_URL="$(grep -Eo 'https://[A-Za-z0-9._-]+\.workers\.dev' deployment.log | tail -n 1 || true)"
+          test -n "$DEPLOYMENT_URL"
+          echo "deployment_url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Verify live corrected gateway
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="${{ steps.deploy.outputs.deployment_url }}"
+          CLIENT_ID="github_redeploy_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          for i in 1 2 3 4 5 6; do
+            if curl --fail --silent --show-error "$URL/health" > health.json; then break; fi
+            sleep 5
+          done
+          node -e "const p=require('./health.json'); if(p.status!=='ok'||p.providers?.us!=='configured'||p.providers?.athens!=='official_delayed_15m'||p.providers?.fx!=='ecb_official_daily_reference') process.exit(1)"
+          for symbol in SPCE.US ALWN.GR CREDIA.GR; do
+            curl --fail --silent --show-error --retry 4 --retry-delay 5 -H "X-Investor-Control-Client: $CLIENT_ID" "$URL/v1/quote?symbol=$symbol" > quote.json
+            SYMBOL="$symbol" node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('quote.json','utf8')); const q=p.quote; const s=process.env.SYMBOL; if(p.requestedSymbol!==s||q?.appSymbol!==s||q?.quoteContract?.sourceApproved!==true) process.exit(1); if(s.endsWith('.GR') && (q.currency!=='EUR'||q.advertisedDelayMinutes!==15||q.quoteContract?.decisionEligible!==false)) process.exit(1); if(s==='SPCE.US' && (q.currency!=='USD'||q.quoteContract?.identityVerified!==true)) process.exit(1);"
+          done
+          curl --fail --silent --show-error --retry 3 --retry-delay 3 -H "X-Investor-Control-Client: $CLIENT_ID" "$URL/v1/fx?pair=EURUSD" > fx.json
+          node -e "const p=require('./fx.json'); const r=p.reference; if(r?.pair!=='EURUSD'||r?.sourceQuality!=='OFFICIAL_DAILY_REFERENCE'||!(Number(r?.rate)>0)||r?.transactionEligible!==false||r?.decisionEligible!==false) process.exit(1)"

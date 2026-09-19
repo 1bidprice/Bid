@@ -1,0 +1,82 @@
+name: Investor Control Market Gateway
+
+on:
+  push:
+    branches:
+      - investor-control-core-stabilization-v174
+    paths:
+      - market-intelligence/gateway/**
+      - market-intelligence/test/market-gateway.test.js
+      - market-intelligence/test/market-gateway-edge.test.js
+      - market-intelligence/src/adapters/finnhub-quote.js
+      - market-intelligence/src/adapters/euronext-athens-quote.js
+      - market-intelligence/src/canonical-market-quote.js
+      - .github/workflows/investor-control-market-gateway.yml
+      - .github/workflows/investor-control-market-gateway-deploy.yml
+  pull_request:
+    paths:
+      - market-intelligence/gateway/**
+      - market-intelligence/test/market-gateway.test.js
+      - market-intelligence/test/market-gateway-edge.test.js
+      - market-intelligence/src/adapters/finnhub-quote.js
+      - market-intelligence/src/adapters/euronext-athens-quote.js
+      - market-intelligence/src/canonical-market-quote.js
+      - .github/workflows/investor-control-market-gateway.yml
+      - .github/workflows/investor-control-market-gateway-deploy.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify-market-gateway:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify gateway source syntax
+        working-directory: market-intelligence
+        run: |
+          set -euo pipefail
+          node --check gateway/src/core.js
+          node --check gateway/src/edge.js
+          node --check gateway/src/index.js
+          node -e "JSON.parse(require('fs').readFileSync('gateway/wrangler.jsonc','utf8'))"
+
+      - name: Verify canonical source invariant
+        working-directory: market-intelligence
+        run: node scripts/verify-canonical-source.js
+
+      - name: Run gateway security, edge and market-data contracts
+        working-directory: market-intelligence
+        run: node --test test/market-gateway.test.js test/market-gateway-edge.test.js
+
+      - name: Verify deployment workflow is manual-only and CLI-compatible
+        shell: bash
+        run: |
+          set -euo pipefail
+          WF='.github/workflows/investor-control-market-gateway-deploy.yml'
+          test -f "$WF"
+          grep -q '^  workflow_dispatch:' "$WF"
+          ! grep -Eq '^  (push|pull_request|schedule):' "$WF"
+          grep -Fq 'confirm_production' "$WF"
+          grep -Fq 'expected_sha' "$WF"
+          grep -Fq 'investor-control-core-stabilization-v174' "$WF"
+          grep -Fq 'wrangler@4.129.1 deploy --secrets-file' "$WF"
+          npx --yes wrangler@4.129.1 deploy --help | grep -F -- '--secrets-file'
+
+      - name: Wrangler production bundle dry-run only
+        working-directory: market-intelligence/gateway
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          npx --yes wrangler@4.129.1 deploy --dry-run --outdir dist
+          test -d dist
+          find dist -type f -maxdepth 2 -print
+          find dist -type f | grep -Eq '\.(js|mjs)$'

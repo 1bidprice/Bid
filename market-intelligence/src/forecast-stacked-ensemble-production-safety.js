@@ -55,7 +55,7 @@ function verifyReadyGroup(group, index) {
   assert(finiteNumber(thresholds.minimumPredictionClassCount) >= 40, `${prefix} prediction class threshold too weak`);
   assert(finiteNumber(thresholds.minimumRelativeBrierImprovementPct) >= 3, `${prefix} Brier improvement threshold too weak`);
   assert(finiteNumber(thresholds.minimumLogLossImprovement) >= 0, `${prefix} log-loss threshold too weak`);
-  assert(finiteNumber(thresholds.minimumEceImprovement) >= -0.01, `${prefix} calibration-error threshold too weak`);
+  assert(group?.calibrationStatus === 'UNCALIBRATED_RESEARCH_ONLY', `${prefix} calibration status must remain research-only`);
 
   assert(nonNegativeInteger(group.prequentialPredictionCount) >= thresholds.minimumPrequentialPredictions, `${prefix} prediction sample too small`);
   assert(nonNegativeInteger(group.positiveCount) >= thresholds.minimumPredictionClassCount, `${prefix} positive class too small`);
@@ -65,7 +65,8 @@ function verifyReadyGroup(group, index) {
   const improvement = group?.improvement || {};
   assert(finiteNumber(improvement.relativeBrierImprovementPct) >= thresholds.minimumRelativeBrierImprovementPct, `${prefix} Brier improvement below threshold`);
   assert(finiteNumber(improvement.logLossImprovement) >= thresholds.minimumLogLossImprovement, `${prefix} log-loss improvement below threshold`);
-  assert(finiteNumber(improvement.expectedCalibrationErrorImprovement) >= thresholds.minimumEceImprovement, `${prefix} calibration-error improvement below threshold`);
+  const ensembleEce = finiteNumber(group?.ensembleMetrics?.expectedCalibrationError);
+  assert(ensembleEce !== null && ensembleEce >= 0 && ensembleEce <= 1, `${prefix} calibration diagnostic invalid`);
 
   const sample = group?.sampleIndependence;
   assert(sample?.contract === 'OOS_SAMPLE_INDEPENDENCE_V1' && sample?.status === 'INDEPENDENCE_READY', `${prefix} sample independence not ready`);

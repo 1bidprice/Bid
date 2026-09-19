@@ -36,7 +36,11 @@ export function runForecastOutcomeArchiveCycle(input = {}) {
   const generatedAt = new Date(input.generatedAt || Date.now()).toISOString();
   const historicalSeriesCollector = input.historicalSeriesCollector instanceof Map ? input.historicalSeriesCollector : new Map();
   const existingRecords = recordsFromForecastOutcomeArchive(input.existingRecords || input.existingArchive);
-  const newRecords = createLiveShadowForecastRecords(input.shadowForecasts, input.researchDossiers, input.options || {});
+  const recordOptions = {
+    ...(input.options || {}),
+    classificationSnapshots: input.classificationSnapshots || input.options?.classificationSnapshots || [],
+  };
+  const newRecords = createLiveShadowForecastRecords(input.shadowForecasts, input.researchDossiers, recordOptions);
   const merged = mergeForecastOutcomeLedger(existingRecords, newRecords);
   let evaluatedCount = 0;
   let maturedThisRun = 0;
@@ -59,6 +63,8 @@ export function runForecastOutcomeArchiveCycle(input = {}) {
   return archivePayload(finalRecords, generatedAt, input.options || {}, {
     existingRecordCount: existingRecords.length,
     candidateRecordCount: newRecords.length,
+    candidateClassificationSnapshotRecordCount: newRecords.filter((record) => Object.prototype.hasOwnProperty.call(record, 'classificationSnapshot')).length,
+    candidateMarketRegimeSnapshotRecordCount: newRecords.filter((record) => Object.prototype.hasOwnProperty.call(record, 'marketRegimeSnapshot')).length,
     recordCountAfterMerge: finalRecords.length,
     evaluatedOpenRecordCount: evaluatedCount,
     maturedThisRun,

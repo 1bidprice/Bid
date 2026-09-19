@@ -1,8 +1,9 @@
-name: Signed Investor Control v1.1.0 Unified Intelligence APK
+name: Signed Investor Control v1.7.3 Canonical Core APK
 
 on:
   push:
     branches:
+      - investor-control-core-stabilization-v174
       - investor-control-v1.1-unified-intelligence
     paths:
       - mobile/**
@@ -19,16 +20,16 @@ permissions:
   contents: read
 
 concurrency:
-  group: investor-control-v110-unified-${{ github.ref }}
+  group: investor-control-canonical-signed-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build-signed-apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 75
 
     steps:
-      - name: Checkout v1.1.0 source
+      - name: Checkout canonical source
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
@@ -44,78 +45,39 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Install dependencies without lifecycle scripts
+      - name: Install canonical dependencies
         working-directory: mobile
-        run: npm install --legacy-peer-deps --no-audit --no-fund --ignore-scripts
+        run: npm install --legacy-peer-deps --no-audit --no-fund
 
-      - name: Apply complete native patch chain
-        working-directory: mobile
-        run: |
-          node scripts/apply-v065-native-ui-fix.js
-          node scripts/apply-v070-opportunities.js
-          node scripts/apply-v071-live-sync.js
-          node scripts/apply-v080-autonomous-decisions.js
-          node scripts/apply-v081-position-performance.js
-          node scripts/apply-v081b-fix-source-newline.js
-          node scripts/apply-v090-discovery-clarity.js
-          node scripts/apply-v090b-background-intelligence.js
-          node scripts/apply-v091-reliability.js
-          node scripts/apply-v100-production-health.js
-          node scripts/apply-v101-integrity-recovery.js
-          node scripts/apply-v110-unified-intelligence.js
-          node scripts/apply-v111-alert-integrity.js
-
-      - name: Verify purchase-lot calculations
-        working-directory: mobile
-        run: npm run test:lots
-
-      - name: Verify v1.1.0 unified intelligence invariants
+      - name: Verify canonical core before native build
         working-directory: mobile
         shell: bash
         run: |
           set -euo pipefail
-          grep -q "const VERSION = '1.1.0';" PortfolioApp.js
-          grep -q "const VERSION = '1.1.0';" DecisionOverlay.js
-          grep -q "readCanonicalFeedQuotes" src/market-data.js
-          grep -q "quoteRegistry" src/intelligence-feed-store.js
-          grep -q "buildMobileQuoteContract" src/market-data.js
-          grep -q "Βαθμός προτεραιότητας διερεύνησης" src/OpportunitiesView.js
-          grep -q "marketDataStatus" src/OpportunitiesView.js
-          grep -q "quoteContract.publicMessage" PortfolioApp.js
-          grep -q "Παύση δεδομένων" PortfolioApp.js
-          grep -q "quote.dayChangeVerified === true" src/alert-engine.js
-          if grep -q 'Euronext error:.*officialError.message' src/market-data.js; then
-            echo 'Raw provider error leak remains' >&2
-            exit 1
-          fi
+          npm run test:core
+          npx expo install --check
+          npx expo-doctor@latest
+          npx expo export --platform android --output-dir dist-v1.7.3-canonical
           node - <<'NODE'
           const fs = require('fs');
           const app = require('./app.json');
           const pkg = require('./package.json');
           const portfolio = fs.readFileSync('./PortfolioApp.js', 'utf8');
           const market = fs.readFileSync('./src/market-data.js', 'utf8');
-          const store = fs.readFileSync('./src/intelligence-feed-store.js', 'utf8');
-          const alerts = fs.readFileSync('./src/alert-engine.js', 'utf8');
-          if (app.expo.version !== '1.1.0') throw new Error('wrong Expo version');
+          const marketRules = fs.readFileSync('./src/market-rules.js', 'utf8');
+          const accounting = fs.readFileSync('./src/transaction-accounting.js', 'utf8');
+          if (app.expo.version !== '1.7.3') throw new Error('wrong Expo version');
+          if (app.expo.android.versionCode !== 31) throw new Error('wrong versionCode');
           if (app.expo.android.package !== 'gr.investorcontrol.app') throw new Error('wrong package');
-          if (app.expo.android.versionCode !== 22) throw new Error('wrong versionCode');
-          if (pkg.version !== '1.1.0') throw new Error('wrong package version');
-          if (!pkg.scripts.postinstall.includes('apply-v111-alert-integrity.js')) throw new Error('alert integrity patch missing from postinstall');
-          if (!portfolio.includes("quotePrice(item.average, item.currency, 4)")) throw new Error('four-decimal average all-in missing');
-          if (!market.includes("'CREDIA.GR'")) throw new Error('CrediaBank official quote routing missing');
-          if (!market.includes('safeProviderDiagnostic')) throw new Error('safe diagnostics missing');
-          if (!store.includes('quoteRegistry')) throw new Error('canonical quote registry missing');
-          if (!alerts.includes('quoteContract.valuationEligible')) throw new Error('canonical alert valuation gate missing');
-          console.log('PASS v1.1 canonical quotes, source governance, alert gates, honest health and local-ledger invariants');
+          if (pkg.version !== '1.7.3') throw new Error('wrong package version');
+          if (String(pkg.scripts?.postinstall || '').includes('apply-v')) throw new Error('legacy patch chain returned');
+          if (!portfolio.includes("import { buildPortfolioSnapshot } from './src/portfolio-engine';")) throw new Error('canonical portfolio engine missing');
+          if (!accounting.includes('accountingInvariantReport')) throw new Error('canonical accounting invariant engine missing');
+          if (!market.includes("if (route.market === 'GR')")) throw new Error('generic Athens routing missing');
+          if (!marketRules.includes('regularStart: 10 * 60 + 15') || !marketRules.includes('regularEnd: 17 * 60 + 20')) throw new Error('Athens session rules missing');
+          if (!marketRules.includes('ATHENS_MARKET_HOLIDAYS')) throw new Error('Athens market calendar missing');
+          console.log('PASS canonical v1.7.3 accounting, portfolio and Euronext Athens release gates');
           NODE
-
-      - name: Verify Android JavaScript bundle
-        working-directory: mobile
-        run: npx expo export --platform android --output-dir dist-v1.1.0
-
-      - name: Expo Doctor diagnostic
-        working-directory: mobile
-        run: npx expo-doctor@latest
 
       - name: Generate Android project
         working-directory: mobile
@@ -127,14 +89,14 @@ jobs:
         run: |
           set -o pipefail
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee ../gradle-v1.1.0.log
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee ../gradle-v1.7.3-canonical.log
 
       - name: Upload Gradle failure diagnostic
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: investor-control-v1.1.0-gradle-diagnostic
-          path: mobile/gradle-v1.1.0.log
+          name: investor-control-v1.7.3-canonical-gradle-diagnostic
+          path: mobile/gradle-v1.7.3-canonical.log
           if-no-files-found: warn
           retention-days: 30
 
@@ -144,8 +106,8 @@ jobs:
           set -euo pipefail
           UNSIGNED='mobile/android/app/build/outputs/apk/release/app-release.apk'
           KEYSTORE='mobile/android/app/debug.keystore'
-          OUTPUT='mobile/Investor-Control-v1.1.0.apk'
-          ALIGNED='mobile/Investor-Control-v1.1.0-aligned.apk'
+          OUTPUT='mobile/Investor-Control-v1.7.3-canonical.apk'
+          ALIGNED='mobile/Investor-Control-v1.7.3-canonical-aligned.apk'
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           ZIPALIGN="$BUILD_TOOLS/zipalign"
           APKSIGNER="$BUILD_TOOLS/apksigner"
@@ -161,18 +123,18 @@ jobs:
             --key-pass pass:android \
             --out "$OUTPUT" \
             "$ALIGNED"
-          "$APKSIGNER" verify --verbose --print-certs "$OUTPUT" | tee mobile/Investor-Control-v1.1.0-signature.txt
-          grep -qi 'fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c' mobile/Investor-Control-v1.1.0-signature.txt
+          "$APKSIGNER" verify --verbose --print-certs "$OUTPUT" | tee mobile/Investor-Control-v1.7.3-canonical-signature.txt
+          grep -qi 'fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c' mobile/Investor-Control-v1.7.3-canonical-signature.txt
           unzip -l "$OUTPUT" | grep -q 'assets/index.android.bundle'
-          sha256sum "$OUTPUT" | tee mobile/Investor-Control-v1.1.0.sha256
+          sha256sum "$OUTPUT" | tee mobile/Investor-Control-v1.7.3-canonical.sha256
 
-      - name: Upload signed v1.1.0 APK
+      - name: Upload signed canonical APK
         uses: actions/upload-artifact@v4
         with:
-          name: investor-control-v1.1.0-unified-intelligence-signed-apk
+          name: investor-control-v1.7.3-canonical-core-signed-apk
           path: |
-            mobile/Investor-Control-v1.1.0.apk
-            mobile/Investor-Control-v1.1.0.sha256
-            mobile/Investor-Control-v1.1.0-signature.txt
+            mobile/Investor-Control-v1.7.3-canonical.apk
+            mobile/Investor-Control-v1.7.3-canonical.sha256
+            mobile/Investor-Control-v1.7.3-canonical-signature.txt
           if-no-files-found: error
           retention-days: 90

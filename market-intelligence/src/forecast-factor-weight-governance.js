@@ -1,8 +1,12 @@
 import { contentHash } from './content-hash.js';
+import { evaluateOosSampleIndependence, splitChronologicalDateBlocks } from './forecast-oos-sample-independence.js';
+import { evaluateOosOutcomeWindowIndependence } from './forecast-oos-outcome-window-independence.js';
+import { evaluateOosInstrumentConcentration } from './forecast-oos-instrument-concentration.js';
+import { evaluateOosTaxonomyConcentration } from './forecast-oos-taxonomy-concentration.js';
 import { FORECAST_FEATURE_VECTOR_VERSION, FORECAST_FACTOR_DOMAIN_WEIGHTS } from './forecast-feature-vector.js';
 import { FORECAST_FACTOR_SCORE_VERSION } from './forecast-factor-score.js';
 
-export const FORECAST_FACTOR_WEIGHT_GOVERNANCE_VERSION = '2026-08-11.1';
+export const FORECAST_FACTOR_WEIGHT_GOVERNANCE_VERSION = '2026-08-12.1';
 
 const CURRENT_WEIGHTS = Object.freeze({ ...FORECAST_FACTOR_DOMAIN_WEIGHTS });
 const DOMAINS = Object.freeze(Object.keys(CURRENT_WEIGHTS));
@@ -42,12 +46,24 @@ function domainSnapshot(record, domain) {
   if (value === null || value < -1 || value > 1 || weight === null || weight <= 0) return null;
   return {
     forecastId: record.forecastId || null,
-    forecastAt: record.forecastAt || record.forecastSampleDate || null,
+    forecastAt: record.forecastAt || null,
+    forecastSampleDate: record.forecastSampleDate || null,
+    instrumentId: record.instrumentId || null,
+    companyId: record.companyId || null,
+    symbol: record.symbol || null,
+    listing: record.listing || null,
+    classificationSnapshot: record.classificationSnapshot || null,
     status: record.status || null,
     value,
     configuredWeight: weight,
     outcome: record.status === 'MATURED' && binaryOutcome(record.positiveOutcome) ? record.positiveOutcome : null,
     realisedReturnPct: record.status === 'MATURED' ? number(record?.realisedOutcome?.realisedReturnPct) : null,
+    tradingDays: Number.isInteger(Number(record?.tradingDays)) ? Number(record.tradingDays) : null,
+    referencePrice: { timestamp: record?.referencePrice?.timestamp || null },
+    realisedOutcome: record.status === 'MATURED' ? {
+      timestamp: record?.realisedOutcome?.timestamp || null,
+      realisedReturnPct: number(record?.realisedOutcome?.realisedReturnPct),
+    } : null,
     invalidMaturedOutcome: record.status === 'MATURED' && !binaryOutcome(record.positiveOutcome),
   };
 }
@@ -112,12 +128,7 @@ function chronological(observations = []) {
 }
 
 function contiguousBlocks(observations, count) {
-  const sorted = chronological(observations);
-  return Array.from({ length: count }, (_, index) => {
-    const start = Math.floor(index * sorted.length / count);
-    const end = Math.floor((index + 1) * sorted.length / count);
-    return sorted.slice(start, end);
-  });
+  return splitChronologicalDateBlocks(observations, count);
 }
 
 function temporalDirectionStatus(observations, direction, options = {}) {
@@ -233,7 +244,27 @@ function evaluateDomain(input, records, group, domain, options = {}) {
   const increaseAuc = Number(options.weightGovernanceIncreaseAuc ?? 0.60);
   const decreaseAuc = Number(options.weightGovernanceDecreaseAuc ?? 0.40);
   const minimumSpread = Number(options.weightGovernanceMinimumPositiveRateSpread ?? 0.12);
-  const blockers = [];
+  const sampleIndependence = evaluateOosSampleIndependence(matured, {
+    minimumDistinctForecastDates: options.weightGovernanceMinimumDistinctForecastDates ?? 60,
+    minimumDistinctInstruments: options.weightGovernanceMinimumDistinctInstruments ?? 10,
+    maximumSingleForecastDateSharePct: options.weightGovernanceMaximumSingleForecastDateSharePct ?? 10,
+  });
+  const outcomeWindowIndependence = evaluateOosOutcomeWindowIndependence(matured, {
+    minimumEffectiveNonOverlappingWindows: options.weightGovernanceMinimumEffectiveNonOverlappingOutcomeWindows ?? 18,
+  });
+  const instrumentConcentration = evaluateOosInstrumentConcentration(matured, {
+    maximumSingleInstrumentSharePct: options.weightGovernanceMaximumSingleInstrumentSharePct ?? 20,
+    minimumEffectiveInstrumentCount: options.weightGovernanceMinimumEffectiveInstrumentCount ?? 8,
+  });
+  const taxonomyConcentration = evaluateOosTaxonomyConcentration(matured, {
+    minimumClassificationCoveragePct: options.weightGovernanceMinimumClassificationCoveragePct ?? 90,
+    materialTaxonomyMinimumSharePct: options.weightGovernanceMaterialTaxonomyMinimumSharePct ?? 15,
+    materialTaxonomyMinimumRecordCount: options.weightGovernanceMaterialTaxonomyMinimumRecordCount ?? 50,
+    maximumSingleNativeClusterSharePct: options.weightGovernanceMaximumSingleNativeClusterSharePct ?? 30,
+    minimumEffectiveNativeClusterCount: options.weightGovernanceMinimumEffectiveNativeClusterCount ?? 4,
+  });
+  const blockers = [...sampleIndependence.blockers, ...outcomeWindowIndependence.blockers, ...instrumentConcentration.blockers, ...taxonomyConcentration.blockers];
+
   if (!upstream) blockers.push('CURRENT_UPSTREAM_ATTRIBUTION_REQUIRED');
   else if (upstream.manualWeightReviewCandidate !== true) blockers.push('UPSTREAM_ATTRIBUTION_MANUAL_REVIEW_GATE_NOT_READY');
   if (matured.length < minimumMatured) blockers.push('GOVERNANCE_MATURED_OOS_SAMPLE_TOO_SMALL');
@@ -243,9 +274,13 @@ function evaluateDomain(input, records, group, domain, options = {}) {
   if (invalidMaturedOutcomeCount) blockers.push('INVALID_MATURED_BINARY_OUTCOME_RECORDS_EXCLUDED');
 
   let direction = null;
-  if (Number.isFinite(auc) && auc >= increaseAuc && Number(spread.positiveRateSpread) >= minimumSpread && Number(spread.realisedReturnSpreadPct) > 0) direction = 'INCREASE_REVIEW';
-  else if (Number.isFinite(auc) && auc <= decreaseAuc && Number(spread.positiveRateSpread) <= -minimumSpread && Number(spread.realisedReturnSpreadPct) < 0) direction = 'DECREASE_REVIEW';
-  else blockers.push('GOVERNANCE_FULL_PERIOD_SIGNAL_NOT_STRONG_ENOUGH');
+  if (Number.isFinite(auc) && auc >= increaseAuc && Number(spread.positiveRateSpread) >= minimumSpread && Number(spread.realisedReturnSpreadPct) > 0) {
+    direction = 'INCREASE_REVIEW';
+  } else if (Number.isFinite(auc) && auc <= decreaseAuc && Number(spread.positiveRateSpread) <= -minimumSpread && Number(spread.realisedReturnSpreadPct) < 0) {
+    direction = 'DECREASE_REVIEW';
+  } else {
+    blockers.push('GOVERNANCE_FULL_PERIOD_SIGNAL_NOT_STRONG_ENOUGH');
+  }
   if (direction === 'DECREASE_REVIEW' && domain === 'RISK') blockers.push('RISK_WEIGHT_DECREASE_PROHIBITED');
 
   const stability = direction ? temporalDirectionStatus(matured, direction, options) : {
@@ -255,6 +290,7 @@ function evaluateDomain(input, records, group, domain, options = {}) {
     subperiods: [],
   };
   if (direction && stability.status !== 'STABILITY_READY') blockers.push('GOVERNANCE_DOMAIN_SIGNAL_NOT_TEMPORALLY_STABLE');
+
   const eligible = blockers.length === 0 && direction !== null;
   const weights = eligible ? proposedWeights(domain, direction, options.weightGovernanceProposalDelta || 0.02) : null;
   if (eligible && !weights) blockers.push('GOVERNANCE_WEIGHT_REBALANCE_FAILED');
@@ -271,6 +307,10 @@ function evaluateDomain(input, records, group, domain, options = {}) {
     invalidMaturedOutcomeCount,
     rocAuc: round(auc, 4),
     topBottom: spread,
+    sampleIndependence,
+    outcomeWindowIndependence,
+    instrumentConcentration,
+    taxonomyConcentration,
     upstreamAttributionStatus: upstream?.status || null,
     upstreamManualWeightReviewCandidate: upstream?.manualWeightReviewCandidate === true,
     proposedDirection: eligible && weights ? direction : null,
@@ -328,12 +368,20 @@ function buildProposal(group, evaluation) {
       firstForecastAt: subperiods[0]?.firstForecastAt || null,
       lastForecastAt: subperiods.at(-1)?.lastForecastAt || null,
       temporalSubperiods: subperiods,
+      sampleIndependence: evaluation.sampleIndependence,
+      outcomeWindowIndependence: evaluation.outcomeWindowIndependence,
+      instrumentConcentration: evaluation.instrumentConcentration,
+      taxonomyConcentration: evaluation.taxonomyConcentration,
     },
     rationaleCodes: [
       evaluation.proposedDirection === 'INCREASE_REVIEW'
         ? 'STRONG_STABLE_POSITIVE_DOMAIN_OOS_SIGNAL'
         : 'STRONG_STABLE_INVERTED_DOMAIN_OOS_SIGNAL',
       'CURRENT_MODEL_LINEAGE_ONLY',
+      'OOS_SAMPLE_INDEPENDENCE_GATE_PASSED',
+      'OOS_OUTCOME_WINDOW_INDEPENDENCE_GATE_PASSED',
+      'OOS_INSTRUMENT_CONCENTRATION_GATE_PASSED',
+      'OOS_TAXONOMY_NATIVE_CONCENTRATION_GATE_PASSED',
       'MANUAL_REVIEW_ONLY_NO_AUTOMATIC_APPLICATION',
     ],
     requiresNewPolicyVersionOnApproval: true,

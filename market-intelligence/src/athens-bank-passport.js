@@ -159,6 +159,33 @@ function findGroupFourColumnRow(pages, patterns, options = {}) {
   return null;
 }
 
+function findGroupPeriodFlowRow(pages, patterns, options = {}) {
+  const exclude = options.exclude || [];
+  for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
+    const page = String(pages[pageIndex] || '');
+    const pageValue = normalize(page);
+    if (!statementPage(page)) continue;
+    if (!/ενδιαμεση ενοποιημενη κατασταση αποτελεσματων|consolidated income statement|consolidated statement of profit/.test(pageValue)) continue;
+    if (!/ομιλος|\bgroup\b/.test(pageValue)) continue;
+    const lines = page.split(/\n/);
+    for (const line of lines) {
+      const value = normalize(line);
+      if (!matchesAny(value, patterns) || exclude.some((pattern) => pattern.test(value))) continue;
+      const numbers = amountTokens(line);
+      if (numbers.length < 2) continue;
+      return {
+        pageNumber: pageIndex + 1,
+        line,
+        scale: pageScale(page),
+        current: numbers[0].value,
+        previous: numbers[1].value,
+        columnPolicy: 'GROUP_PERIOD_CURRENT_COMPARATIVE_V1',
+      };
+    }
+  }
+  return null;
+}
+
 function dateNeedles(periodEnd) {
   const match = String(periodEnd || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return [];
@@ -345,14 +372,14 @@ export function buildAthensBankPassport(pagesInput, baseSnapshot = {}, company =
   const assetsRow = findGroupFourColumnRow(pages, [/^συνολο ενεργητικου(?:\s|$)/, /^total assets(?:\s|$)/]);
   const equityRow = findGroupFourColumnRow(pages, [/^συνολο ιδιων κεφαλαιων(?:\s|$)/, /^total equity(?:\s|$)/], { exclude: [/ιδιοκτητων μητρικης/, /owners of parent/] });
   const depositsRow = findGroupFourColumnRow(pages, [/^υποχρεωσεις προς πελατες(?:\s|$)/, /^customer deposits(?:\s|$)/, /^deposits from customers(?:\s|$)/]);
-  const profitRow = findGroupFourColumnRow(pages, [/^κερδη περιοδου μετα απο φορ/, /^κερδη περιοδου μετα φορ/, /^profit for the period after tax/, /^net profit for the period/]);
+  const profitRow = findGroupPeriodFlowRow(pages, [/^κερδη περιοδου μετα απο φορ/, /^κερδη περιοδου μετα φορ/, /^profit for the period after tax/, /^net profit for the period/]);
   const stage = findStage3GroupTable(pages, periodEnd);
   const sharesOutstanding = findSharesOutstanding(pages, periodEnd);
 
   const assets = assetsRow ? moneyFact('BankAssets', assetsRow.groupCurrent, assetsRow.pageNumber, assetsRow.line, assetsRow.scale) : null;
   const equity = equityRow ? moneyFact('BankEquity', equityRow.groupCurrent, equityRow.pageNumber, equityRow.line, equityRow.scale) : null;
   const deposits = depositsRow ? moneyFact('CustomerDeposits', depositsRow.groupCurrent, depositsRow.pageNumber, depositsRow.line, depositsRow.scale) : null;
-  const periodNetIncome = profitRow ? moneyFact('PeriodNetIncome', profitRow.groupCurrent, profitRow.pageNumber, profitRow.line, profitRow.scale) : null;
+  const periodNetIncome = profitRow ? moneyFact('PeriodNetIncome', profitRow.current, profitRow.pageNumber, profitRow.line, profitRow.scale, { provenance: { columnPolicy: profitRow.columnPolicy } }) : null;
   const grossLoans = stage ? moneyFact('GrossCustomerLoans', stage.gross.total, stage.pageNumber, stage.grossLine, stage.scale, { provenance: { tablePolicy: 'GROUP_STAGE_TOTAL_V1' } }) : null;
   const stage3GrossLoans = stage ? moneyFact('Stage3GrossCustomerLoans', stage.gross.stage3, stage.pageNumber, stage.grossLine, stage.scale, { provenance: { tablePolicy: 'GROUP_STAGE_TOTAL_V1' } }) : null;
   const allowanceForCreditLosses = stage ? moneyFact('AllowanceForCreditLosses', Math.abs(stage.allowance.total), stage.pageNumber, stage.allowanceLine, stage.scale, { provenance: { tablePolicy: 'GROUP_STAGE_TOTAL_V1' } }) : null;

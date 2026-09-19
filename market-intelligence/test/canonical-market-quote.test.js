@@ -186,3 +186,59 @@ test('registry publishes one canonical quote per app symbol', () => {
   assert.equal(registry['SPCE.US'].price, 2.82);
   assert.equal(registry['SPCE.US'].quoteContract.decisionEligible, true);
 });
+
+
+test('canonical quote fails closed when currency is missing even if source, price and timestamp are otherwise valid', () => {
+  const company = usCompany();
+  const quote = canonicalizeMarketSnapshot({
+    companyId: company.companyId,
+    symbol: 'TEST',
+    currency: null,
+    source: 'Finnhub Quote API',
+    sourceUrl: 'https://finnhub.io/api/v1/quote?symbol=TEST',
+    sourceQuality: 'PRIMARY_LICENSED',
+    generatedAt: '2026-08-10T15:02:00.000Z',
+    quoteAt: '2026-08-10T15:00:00.000Z',
+    quoteTimestampVerified: true,
+    quoteIdentityVerified: true,
+    currentPrice: 10,
+    previousClose: 9.8,
+    usable: true,
+    stale: false,
+  }, company, { generatedAt: '2026-08-10T15:02:00.000Z' });
+
+  assert.equal(quote.currency, null);
+  assert.equal(quote.usable, false);
+  assert.equal(quote.quoteContract.valuationEligible, false);
+  assert.equal(quote.quoteContract.analysisReferenceEligible, false);
+  assert.equal(quote.quoteContract.executionFreshnessEligible, false);
+  assert.equal(quote.quoteContract.decisionEligible, false);
+  assert.equal(quote.quoteContract.publicStatus, 'UNAVAILABLE');
+  assert.ok(quote.quoteContract.diagnosticCodes.includes('QUOTE_CURRENCY_MISSING'));
+});
+
+test('canonical quote fails closed when adapter explicitly marks identity unverified', () => {
+  const company = usCompany();
+  const quote = canonicalizeMarketSnapshot({
+    companyId: company.companyId,
+    symbol: 'TEST',
+    currency: 'USD',
+    source: 'Finnhub Quote API',
+    sourceUrl: 'https://finnhub.io/api/v1/quote?symbol=TEST',
+    sourceQuality: 'PRIMARY_LICENSED',
+    generatedAt: '2026-08-10T15:02:00.000Z',
+    quoteAt: '2026-08-10T15:00:00.000Z',
+    quoteTimestampVerified: true,
+    quoteIdentityVerified: false,
+    currentPrice: 10,
+    previousClose: 9.8,
+    usable: true,
+    stale: false,
+  }, company, { generatedAt: '2026-08-10T15:02:00.000Z' });
+
+  assert.equal(quote.usable, false);
+  assert.equal(quote.quoteContract.identityVerified, false);
+  assert.equal(quote.quoteContract.valuationEligible, false);
+  assert.equal(quote.quoteContract.decisionEligible, false);
+  assert.ok(quote.quoteContract.diagnosticCodes.includes('QUOTE_IDENTITY_NOT_VERIFIED'));
+});

@@ -1,10 +1,12 @@
 import { contentHash } from '../content-hash.js';
+import { fetchAthensIcbClassificationSnapshot } from './euronext-athens-classification.js';
 
-export const ATHENS_DISCOVERY_VERSION = '2026-08-04.3';
+export const ATHENS_DISCOVERY_VERSION = '2026-08-11.1';
 export const ATHENS_ISSUERS_URL = 'https://athens.euronext.com/en/market-data/issuers?letter=X';
 export const ATHENS_ANNOUNCEMENTS_URL = 'https://athens.euronext.com/en/market-data/announcements';
 export const ATHENS_STOCKS_URL = 'https://athens.euronext.com/en/market-data/instruments/stocks';
 export const ATHENS_SEARCH_URL = 'https://athens.euronext.com/en/search';
+export const ATHENS_TRADING_ISSUERS_URL = 'https://athens.euronext.com/en/trade/trading-products/trading-issuers?letter=All';
 
 function decodeHtml(value) {
   return String(value || '')
@@ -295,6 +297,90 @@ function bestIdentityCandidate(candidates, company) {
   return contextual || (candidates.length === 1 ? candidates[0] : null);
 }
 
+function validOasisSymbol(value) {
+  const symbol = plainText(value).toUpperCase();
+  if (!/^[A-Z0-9._-]{1,16}$/.test(symbol)) return null;
+  if (/^(ISSUER|ISIN|CODE|OASIS|MARKET|MIFID|PRODUCT|STOCK|SHARE|MAIN|ALTERNATIVE)$/.test(symbol)) return null;
+  if (/^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(symbol)) return null;
+  return symbol;
+}
+
+export function extractAthensTradingDirectory(html) {
+  const records = [];
+  const diagnostics = [];
+  const byName = new Map();
+
+  for (const row of tableRows(html)) {
+    const values = cells(row);
+    if (values.length < 3) continue;
+    const issuerName = values[0];
+    if (!issuerName || /^(issuer|company)$/i.test(issuerName)) continue;
+
+    const rowText = values.join(' ');
+    if (/bond|treasury bill|derivative|future|option|warrant|etf/i.test(rowText) && !/stock|share|common/i.test(rowText)) continue;
+
+    const isin = values.find((value) => /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(String(value).trim().toUpperCase())) || null;
+    const preferred = validOasisSymbol(values[2]);
+    const fallback = values.slice(1).map(validOasisSymbol).find(Boolean) || null;
+    const linked = bestIdentityCandidate(stockLinkCandidates(row), { displayName: issuerName, legalName: issuerName });
+    const symbol = linked?.symbol || preferred || fallback;
+    if (!symbol) continue;
+
+    const issuer = bestIdentityCandidate(issuerLinkCandidates(row), { displayName: issuerName, legalName: issuerName });
+    const record = {
+      issuerName,
+      normalizedIssuerName: normalizedName(issuerName),
+      symbol,
+      isin,
+      issuerId: issuer?.issuerId || null,
+      issuerUrl: issuer?.sourceUrl || null,
+      instrumentUrl: linked?.sourceUrl || null,
+      sourceName: 'Euronext Athens Trading Issuers',
+      sourceUrl: ATHENS_TRADING_ISSUERS_URL,
+    };
+
+    const existing = byName.get(record.normalizedIssuerName);
+    const score = (linked ? 4 : 0) + (/stock|share|common/i.test(rowText) ? 2 : 0) + (isin ? 1 : 0);
+    if (!existing || score > existing._score) {
+      const selected = { ...record, _score: score };
+      byName.set(record.normalizedIssuerName, selected);
+    }
+  }
+
+  for (const item of byName.values()) {
+    const { _score, ...record } = item;
+    records.push(record);
+  }
+  if (!records.length) diagnostics.push({ code: 'ATHENS_TRADING_DIRECTORY_EMPTY' });
+  return { records, diagnostics };
+}
+
+function matchTradingDirectory(company, directory) {
+  const records = Array.isArray(directory?.records) ? directory.records : [];
+  const target = normalizedName(company?.displayName || company?.legalName);
+  if (!target) return null;
+  const exact = records.find((item) => item.normalizedIssuerName === target);
+  if (exact) return exact;
+  const candidates = records.filter((item) => item.normalizedIssuerName
+    && (item.normalizedIssuerName.includes(target) || target.includes(item.normalizedIssuerName)));
+  return candidates.length === 1 ? candidates[0] : null;
+}
+
+function applyTradingDirectoryIdentity(company, directory) {
+  const match = matchTradingDirectory(company, directory);
+  if (!match?.symbol) return company;
+  return {
+    ...company,
+    issuerId: match.issuerId || company.issuerId || null,
+    investorRelationsUrl: match.issuerUrl || company.investorRelationsUrl || null,
+    primaryListing: { ...company.primaryListing, symbol: match.symbol },
+    aliases: [...new Set([...(company.aliases || []), match.symbol])],
+    instrumentUrl: match.instrumentUrl || company.instrumentUrl || null,
+    isin: match.isin || company.isin || null,
+    identitySource: 'EURONEXT_ATHENS_TRADING_ISSUERS',
+  };
+}
+
 export function extractAthensRelatedInstrument(html, company) {
   const source = String(html || '');
   const text = plainText(source);
@@ -365,8 +451,68 @@ async function resolveCompanyIdentity(fetchImpl, company, options, diagnostics) 
   return resolved;
 }
 
+const ATHENS_VERIFIED_SYMBOL_IDENTITIES = new Map([
+  ['ADMIE IPTO', { symbol: 'ADMIE', instrumentUrl: 'https://athens.euronext.com/en/market-data/instruments/stocks/ADMIE' }],
+]);
+
+function applyVerifiedSymbolIdentity(company) {
+  const key = normalizedName(company?.displayName || company?.legalName);
+  const verified = ATHENS_VERIFIED_SYMBOL_IDENTITIES.get(key)
+    || [...ATHENS_VERIFIED_SYMBOL_IDENTITIES.entries()].find(([name]) => key.startsWith(name + ' '))?.[1];
+  if (!verified) return company;
+  return {
+    ...company,
+    primaryListing: { ...company.primaryListing, symbol: verified.symbol },
+    aliases: [...new Set([...(company.aliases || []), verified.symbol])],
+    instrumentUrl: verified.instrumentUrl,
+  };
+}
+
+function issuerDirectoryLetter(company) {
+  const normalized = normalizedName(company?.displayName || company?.legalName);
+  const first = normalized.match(/[A-Z0-9]/)?.[0] || null;
+  return first;
+}
+
+async function fetchAthensLetterDirectory(fetchImpl, company, options = {}, diagnostics = []) {
+  const letter = issuerDirectoryLetter(company);
+  if (!letter) return null;
+  const cache = options.letterDirectoryCache instanceof Map
+    ? options.letterDirectoryCache
+    : new Map();
+  options.letterDirectoryCache = cache;
+  if (!cache.has(letter)) {
+    cache.set(letter, (async () => {
+      try {
+        const base = ATHENS_TRADING_ISSUERS_URL.split('?')[0];
+        const html = await fetchText(fetchImpl, base + '?letter=' + encodeURIComponent(letter), options);
+        const parsed = extractAthensTradingDirectory(html);
+        if (!parsed.records.length) diagnostics.push({ code: 'ATHENS_LETTER_DIRECTORY_EMPTY', letter });
+        return parsed;
+      } catch (error) {
+        diagnostics.push({
+          code: 'ATHENS_LETTER_DIRECTORY_FETCH_FAILED',
+          letter,
+          errorClass: String(error?.message || error).startsWith('HTTP')
+            ? String(error.message)
+            : 'NETWORK_OR_PARSE_ERROR',
+        });
+        return { records: [], diagnostics: [] };
+      }
+    })());
+  }
+  const directory = await cache.get(letter);
+  const matched = applyTradingDirectoryIdentity(company, directory);
+  return matched.primaryListing?.symbol ? matched : null;
+}
+
 async function resolveCompanySymbol(fetchImpl, company, options, diagnostics) {
-  let resolved = await resolveCompanyIdentity(fetchImpl, company, options, diagnostics);
+  let resolved = applyVerifiedSymbolIdentity(applyTradingDirectoryIdentity(company, options.tradingDirectory));
+  if (!resolved.primaryListing?.symbol) {
+    const letterResolved = await fetchAthensLetterDirectory(fetchImpl, resolved, options, diagnostics);
+    if (letterResolved) resolved = letterResolved;
+  }
+  if (!resolved.primaryListing?.symbol) resolved = await resolveCompanyIdentity(fetchImpl, resolved, options, diagnostics);
   if (resolved.primaryListing?.symbol) return resolved;
   if (!resolved.issuerId) {
     diagnostics.push({ code: 'ATHENS_ISSUER_ID_NOT_RESOLVED', companyId: company.companyId, taxonomyTermId: company.taxonomyTermId || null });
@@ -395,6 +541,65 @@ async function resolveCompanySymbol(fetchImpl, company, options, diagnostics) {
   return resolved;
 }
 
+function tradingDirectoryLastPage(html) {
+  const decoded = decodeHtml(String(html || ''));
+  const pages = [...decoded.matchAll(/[?&]page=(\d+)/gi)]
+    .map((match) => Number(match[1]))
+    .filter(Number.isFinite);
+  return pages.length ? Math.max(...pages) : 0;
+}
+
+async function fetchCompleteAthensTradingDirectory(fetchImpl, firstPageHtml, options = {}) {
+  const publishedLastPage = tradingDirectoryLastPage(firstPageHtml);
+  const fallbackLastPage = Math.max(0, Number(options.tradingDirectoryFallbackLastPage ?? 20));
+  const configuredMaximum = Math.max(0, Number(options.tradingDirectoryMaxPage ?? 50));
+  const selectedLastPage = publishedLastPage > 0 ? publishedLastPage : fallbackLastPage;
+  const maxPage = Math.min(selectedLastPage, configuredMaximum);
+  const fallbackPaginationUsed = publishedLastPage === 0 && maxPage > 0;
+  const pages = [String(firstPageHtml || '')];
+  const diagnostics = [];
+  const batchSize = Math.max(1, Math.min(6, Number(options.tradingDirectoryConcurrency ?? 4)));
+
+  for (let start = 1; start <= maxPage; start += batchSize) {
+    const pageNumbers = Array.from({ length: Math.min(batchSize, maxPage - start + 1) }, (_, index) => start + index);
+    const results = await Promise.all(pageNumbers.map(async (page) => {
+      try {
+        const separator = ATHENS_TRADING_ISSUERS_URL.includes('?') ? '&' : '?';
+        const pageUrl = ATHENS_TRADING_ISSUERS_URL + separator + 'page=' + page;
+        const html = await fetchText(fetchImpl, pageUrl, options);
+        return { page, html };
+      } catch (error) {
+        return {
+          page,
+          html: '',
+          errorClass: String(error?.message || error).startsWith('HTTP')
+            ? String(error.message)
+            : 'NETWORK_OR_PARSE_ERROR',
+        };
+      }
+    }));
+    for (const result of results) {
+      if (result.html) pages.push(result.html);
+      else diagnostics.push({
+        code: 'ATHENS_TRADING_DIRECTORY_PAGE_FAILED',
+        page: result.page,
+        errorClass: result.errorClass,
+      });
+    }
+  }
+
+  return {
+    html: pages.join('\n'),
+    diagnostics,
+    publishedLastPage,
+    selectedLastPage: maxPage,
+    fallbackPaginationUsed,
+    requestedPageCount: maxPage + 1,
+    loadedPageCount: pages.length,
+    complete: diagnostics.length === 0 && pages.length === maxPage + 1,
+  };
+}
+
 export async function fetchAthensDiscovery(options = {}) {
   const fetchImpl = options.fetchImpl || globalThis.fetch;
   const generatedAt = new Date(options.generatedAt || Date.now()).toISOString();
@@ -402,18 +607,32 @@ export async function fetchAthensDiscovery(options = {}) {
     return { companies: [], records: [], diagnostics: [{ code: 'ATHENS_DISCOVERY_FETCH_UNAVAILABLE' }] };
   }
   try {
-    const [issuerHtml, announcementHtml] = await Promise.all([
+    const [issuerHtml, announcementHtml, tradingIssuersFirstPage] = await Promise.all([
       fetchText(fetchImpl, options.issuersUrl || ATHENS_ISSUERS_URL, options),
       fetchText(fetchImpl, options.announcementsUrl || ATHENS_ANNOUNCEMENTS_URL, options),
+      fetchText(fetchImpl, options.tradingIssuersUrl || ATHENS_TRADING_ISSUERS_URL, options).catch(() => ''),
     ]);
+    const tradingDirectoryFetch = await fetchCompleteAthensTradingDirectory(
+      fetchImpl,
+      tradingIssuersFirstPage,
+      options,
+    );
+    const tradingIssuersHtml = tradingDirectoryFetch.html;
     const universe = extractAthensIssuerUniverse(`${issuerHtml}\n${announcementHtml}`, { generatedAt });
     const announcements = extractAthensAnnouncements(announcementHtml, universe.companies, { retrievedAt: generatedAt });
+    const tradingDirectory = extractAthensTradingDirectory(tradingIssuersHtml);
     const companyPool = announcements.companies || universe.companies;
     const activeCompanyIds = [...new Set(announcements.records.map((record) => record.companyId))]
       .slice(0, Math.max(1, Number(options.identityResolutionLimit ?? 20)));
-    const diagnostics = [...universe.diagnostics, ...announcements.diagnostics]
-      .filter((item) => !(item.code === 'ATHENS_ISSUER_UNIVERSE_EMPTY' && companyPool.length));
+    const diagnostics = [
+      ...universe.diagnostics,
+      ...announcements.diagnostics,
+      ...tradingDirectoryFetch.diagnostics,
+      ...tradingDirectory.diagnostics,
+    ].filter((item) => !(item.code === 'ATHENS_ISSUER_UNIVERSE_EMPTY' && companyPool.length));
     const companies = [];
+    const classificationSnapshots = [];
+    const letterDirectoryCache = new Map();
 
     for (const companyId of activeCompanyIds) {
       const company = companyPool.find((item) => item.companyId === companyId);
@@ -421,25 +640,47 @@ export async function fetchAthensDiscovery(options = {}) {
         diagnostics.push({ code: 'ATHENS_COMPANY_RECORD_MISSING', companyId });
         continue;
       }
-      companies.push(await resolveCompanySymbol(fetchImpl, company, options, diagnostics));
+      const resolvedCompany = await resolveCompanySymbol(fetchImpl, company, { ...options, tradingDirectory, letterDirectoryCache }, diagnostics);
+      companies.push(resolvedCompany);
+      const classificationResult = await fetchAthensIcbClassificationSnapshot(resolvedCompany, {
+        fetchImpl,
+        capturedAt: generatedAt,
+        userAgent: options.userAgent || 'Investor-Control-Market-Intelligence/1.8',
+        signal: options.signal,
+      });
+      if (classificationResult.snapshot) classificationSnapshots.push(classificationResult.snapshot);
+      diagnostics.push(...(classificationResult.diagnostics || []));
     }
 
     return {
       format: 'investor-control-athens-discovery',
-      version: 3,
+      version: 7,
       policyVersion: ATHENS_DISCOVERY_VERSION,
       generatedAt,
       companies,
+      classificationSnapshotCount: classificationSnapshots.length,
+      classificationSnapshots,
       records: announcements.records,
+      tradingDirectoryHealth: {
+        publishedLastPage: tradingDirectoryFetch.publishedLastPage,
+        selectedLastPage: tradingDirectoryFetch.selectedLastPage,
+        fallbackPaginationUsed: tradingDirectoryFetch.fallbackPaginationUsed,
+        requestedPageCount: tradingDirectoryFetch.requestedPageCount,
+        loadedPageCount: tradingDirectoryFetch.loadedPageCount,
+        complete: tradingDirectoryFetch.complete,
+        instrumentCount: tradingDirectory.records.length,
+      },
       diagnostics,
     };
   } catch (error) {
     return {
       format: 'investor-control-athens-discovery',
-      version: 3,
+      version: 7,
       policyVersion: ATHENS_DISCOVERY_VERSION,
       generatedAt,
       companies: [],
+      classificationSnapshotCount: 0,
+      classificationSnapshots: [],
       records: [],
       diagnostics: [{
         code: 'ATHENS_DISCOVERY_FAILED',

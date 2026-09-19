@@ -1,8 +1,10 @@
 import { fetchFinnhubQuote } from './adapters/finnhub-quote.js';
 import { fetchFinnhubCandlesForSymbol, fetchFinnhubCompanyCandles } from './adapters/finnhub-candles.js';
 import { fetchYahooChartSeries } from './adapters/yahoo-chart.js';
+import { validateAndMergeRecentHistory } from './history-freshness-recovery.js';
 import { fetchEuronextAthensQuote } from './adapters/euronext-athens-quote.js';
 import { calculateMarketMetrics } from './market-metrics.js';
+import { canonicalizeMarketSnapshot } from './canonical-market-quote.js';
 
 function finite(value) {
   const number = Number(value);
@@ -93,17 +95,33 @@ function snapshotFromYahooSeries(company, series, generatedAt) {
   };
 }
 
+function finalizeSnapshotResult(result, company, options = {}) {
+  const snapshot = result?.snapshot
+    ? canonicalizeMarketSnapshot(result.snapshot, company, options)
+    : null;
+  const contractDiagnostics = (snapshot?.quoteContract?.diagnosticCodes || []).map((code) => ({
+    code,
+    companyId: company?.companyId || snapshot?.companyId || null,
+    symbol: snapshot?.appSymbol || snapshot?.symbol || company?.primaryListing?.symbol || null,
+  }));
+  return {
+    ...(result || {}),
+    snapshot,
+    diagnostics: [...(result?.diagnostics || []), ...contractDiagnostics],
+  };
+}
+
 export async function fetchProfessionalMarketSnapshot(company, options = {}) {
   const diagnostics = [];
   if (isAthensListing(company)) {
-    return fetchEuronextAthensQuote(company, options);
+    return finalizeSnapshotResult(await fetchEuronextAthensQuote(company, options), company, options);
   }
 
   if (company.country === 'US') {
     try {
       const primary = await fetchFinnhubQuote(company, options);
       diagnostics.push(...(primary.diagnostics || []));
-      if (primary.snapshot?.usable) return { snapshot: primary.snapshot, diagnostics };
+      if (primary.snapshot?.usable) return finalizeSnapshotResult({ snapshot: primary.snapshot, diagnostics }, company, options);
     } catch (error) {
       diagnostics.push({
         code: 'FINNHUB_QUOTE_FAILED',
@@ -126,15 +144,15 @@ export async function fetchProfessionalMarketSnapshot(company, options = {}) {
   });
   diagnostics.push(...(fallback.diagnostics || []));
   const snapshot = fallback.series ? snapshotFromYahooSeries(company, fallback.series, options.generatedAt) : null;
-  return {
+  return finalizeSnapshotResult({
     snapshot,
     diagnostics: snapshot?.usable
       ? [...diagnostics, { code: 'MARKET_QUOTE_FALLBACK_USED', companyId: company.companyId }]
       : [...diagnostics, { code: 'MARKET_QUOTE_UNAVAILABLE', companyId: company.companyId }],
-  };
+  }, company, options);
 }
 
-function validateHistoryAgainstSnapshot(series, snapshot, company, options = {}) {
+function validateHistoryAgainstSnapshot(series, snapshot, company, benchmarkSeries = null, options = {}) {
   const latest = series?.candles?.at(-1) || null;
   const rawClose = finite(latest?.rawClose) ?? finite(latest?.close);
   const currentPrice = finite(snapshot?.currentPrice);
@@ -146,11 +164,30 @@ function validateHistoryAgainstSnapshot(series, snapshot, company, options = {})
   const quoteTimestamp = new Date(snapshot.quoteAt || snapshot.generatedAt || 0).getTime();
   const quoteDate = Number.isFinite(quoteTimestamp) ? new Date(quoteTimestamp).toISOString().slice(0, 10) : null;
   const latestDate = dateKey(latest.timestamp);
+  const benchmarkLatest = benchmarkSeries?.candles?.at(-1) || null;
+  const benchmarkLatestDate = dateKey(benchmarkLatest?.timestamp);
+  const tolerancePct = Number(options.historyCrossCheckTolerancePct ?? (isAthensListing(company) ? 8 : 5));
+
+  if (latestDate && benchmarkLatestDate && latestDate !== benchmarkLatestDate) {
+    return {
+      ready: false,
+      reference: null,
+      rawClose,
+      deviationPct: null,
+      tolerancePct,
+      latestDate,
+      quoteDate,
+      benchmarkLatestDate,
+      reason: latestDate < benchmarkLatestDate
+        ? 'HISTORY_LAGS_BENCHMARK_SESSION'
+        : 'HISTORY_AHEAD_OF_BENCHMARK_SESSION',
+    };
+  }
+
   const reference = latestDate && quoteDate && latestDate === quoteDate
     ? currentPrice
     : previousClose ?? currentPrice;
   const deviationPct = reference > 0 ? Math.abs((rawClose / reference) - 1) * 100 : null;
-  const tolerancePct = Number(options.historyCrossCheckTolerancePct ?? (isAthensListing(company) ? 8 : 5));
   return {
     ready: deviationPct !== null && deviationPct <= tolerancePct,
     reference,
@@ -159,6 +196,7 @@ function validateHistoryAgainstSnapshot(series, snapshot, company, options = {})
     tolerancePct,
     latestDate,
     quoteDate,
+    benchmarkLatestDate,
     reason: deviationPct !== null && deviationPct <= tolerancePct ? 'MATCHED' : 'PRICE_DEVIATION_EXCEEDED',
   };
 }
@@ -226,6 +264,22 @@ async function waitForBenchmarkRetry(options, attempt) {
   const delayMs = Number.isFinite(configured) ? Math.max(0, Math.min(5_000, configured)) : 500;
   if (delayMs <= 0) return;
   await new Promise((resolve) => setTimeout(resolve, delayMs * Math.max(1, attempt)));
+}
+
+async function fetchRecentHistoryRecoverySeries(company, options, diagnostics) {
+  const yahooSymbols = companyYahooSymbols(company);
+  if (!yahooSymbols.length) return null;
+  const recent = await fetchYahooChartSeries(yahooSymbols[0], {
+    ...options,
+    symbol: company.primaryListing?.symbol,
+    alternateSymbols: yahooSymbols.slice(1),
+    currency: company.currency || company.listings?.[0]?.currency || null,
+    range: options.historyFreshnessRecoveryRange || '1mo',
+    interval: '1d',
+    excludeIncompleteSession: true,
+  });
+  diagnostics.push(...(recent.diagnostics || []).map((item) => ({ ...item, freshnessRecovery: true })));
+  return recent.series || null;
 }
 
 async function fetchBenchmarkSeries(company, options, diagnostics) {
@@ -347,7 +401,7 @@ async function fetchBenchmarkSeries(company, options, diagnostics) {
 
 export async function fetchProfessionalHistoricalMetrics(company, options = {}) {
   const diagnostics = [];
-  const series = await fetchCompanyHistorySeries(company, options, diagnostics);
+  let series = await fetchCompanyHistorySeries(company, options, diagnostics);
   if (!series?.usable) {
     return {
       series: series || null,
@@ -358,7 +412,65 @@ export async function fetchProfessionalHistoricalMetrics(company, options = {}) 
   }
 
   const benchmarkSeries = await fetchBenchmarkSeries(company, options, diagnostics);
-  const validation = validateHistoryAgainstSnapshot(series, options.marketSnapshot, company, options);
+  let validation = validateHistoryAgainstSnapshot(series, options.marketSnapshot, company, benchmarkSeries, options);
+
+  if (
+    options.historyFreshnessRecoveryEnabled !== false &&
+    validation.ready !== true &&
+    validation.reason === 'HISTORY_LAGS_BENCHMARK_SESSION' &&
+    series?.source === 'Yahoo Finance Chart' &&
+    series?.sourceQuality === 'SECONDARY_VALIDATED' &&
+    validation.benchmarkLatestDate
+  ) {
+    const staleLatestDate = validation.latestDate || null;
+    const recentSeries = await fetchRecentHistoryRecoverySeries(company, options, diagnostics);
+    const recovery = validateAndMergeRecentHistory(series, recentSeries, {
+      requiredLatestDate: validation.benchmarkLatestDate,
+      minimumOverlapCandles: options.historyFreshnessRecoveryMinimumOverlapCandles ?? 5,
+      maximumOverlapRawCloseDeviationPct: options.historyFreshnessRecoveryMaximumOverlapDeviationPct ?? 0.5,
+    });
+    if (recovery.ready && recovery.series) {
+      series = recovery.series;
+      validation = validateHistoryAgainstSnapshot(series, options.marketSnapshot, company, benchmarkSeries, options);
+      validation = {
+        ...validation,
+        freshnessRecovery: {
+          contract: recovery.contract,
+          policyVersion: recovery.policyVersion,
+          status: recovery.status,
+          baseLatestDate: recovery.baseLatestDate,
+          recoveredLatestDate: recovery.recentLatestDate,
+          requiredLatestDate: recovery.requiredLatestDate,
+          overlapCount: recovery.overlapCount,
+          maximumOverlapRawCloseDeviationPct: recovery.maximumOverlapRawCloseDeviationPct,
+          thresholds: recovery.thresholds,
+        },
+      };
+      diagnostics.push({
+        code: validation.ready ? 'MARKET_HISTORY_FRESHNESS_RECOVERED' : 'MARKET_HISTORY_FRESHNESS_RECOVERY_POST_MERGE_VALIDATION_FAILED',
+        companyId: company.companyId,
+        symbol: company.primaryListing?.symbol || null,
+        staleLatestDate,
+        recoveredLatestDate: recovery.recentLatestDate,
+        benchmarkLatestDate: recovery.requiredLatestDate,
+        overlapCount: recovery.overlapCount,
+        maximumOverlapRawCloseDeviationPct: recovery.maximumOverlapRawCloseDeviationPct,
+        finalValidationReason: validation.reason,
+      });
+    } else {
+      diagnostics.push({
+        code: 'MARKET_HISTORY_FRESHNESS_RECOVERY_REJECTED',
+        companyId: company.companyId,
+        symbol: company.primaryListing?.symbol || null,
+        staleLatestDate,
+        recentLatestDate: recovery.recentLatestDate,
+        benchmarkLatestDate: recovery.requiredLatestDate,
+        overlapCount: recovery.overlapCount,
+        maximumOverlapRawCloseDeviationPct: recovery.maximumOverlapRawCloseDeviationPct,
+        blockers: recovery.blockers,
+      });
+    }
+  }
   const sourceReady = series.sourceQuality === 'PRIMARY_LICENSED'
     || (series.sourceQuality === 'SECONDARY_VALIDATED' && validation.ready);
   const benchmarkReady = Boolean(benchmarkSeries?.usable);
@@ -384,6 +496,9 @@ export async function fetchProfessionalHistoricalMetrics(company, options = {}) 
       symbol: company.primaryListing?.symbol || null,
       deviationPct: validation.deviationPct,
       tolerancePct: validation.tolerancePct,
+      latestDate: validation.latestDate || null,
+      quoteDate: validation.quoteDate || null,
+      benchmarkLatestDate: validation.benchmarkLatestDate || null,
       reason: validation.reason,
     });
   }

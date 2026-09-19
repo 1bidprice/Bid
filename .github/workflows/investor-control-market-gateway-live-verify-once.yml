@@ -1,0 +1,31 @@
+name: Investor Control Corrected Gateway Live Verify Once
+
+on:
+  push:
+    branches:
+      - investor-control-core-stabilization-v174
+    paths:
+      - .github/workflows/investor-control-market-gateway-live-verify-once.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify health, US, Athens and ECB contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://investor-control-market-gateway.bidprice-alerts.workers.dev'
+          CLIENT_ID="github_live_verify_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 "$URL/health" > health.json
+          node -e "const p=require('./health.json'); if(p.status!=='ok'||p.providers?.us!=='configured'||p.providers?.athens!=='official_delayed_15m'||p.providers?.fx!=='ecb_official_daily_reference') process.exit(1)"
+          for symbol in SPCE.US ALWN.GR CREDIA.GR; do
+            curl --fail --silent --show-error --retry 5 --retry-delay 10 -H "X-Investor-Control-Client: $CLIENT_ID" "$URL/v1/quote?symbol=$symbol" > quote.json
+            SYMBOL="$symbol" node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('quote.json','utf8')); const q=p.quote; const s=process.env.SYMBOL; if(p.requestedSymbol!==s||q?.appSymbol!==s||q?.quoteContract?.sourceApproved!==true) process.exit(1); if(s.endsWith('.GR') && (q.currency!=='EUR'||Number(q.quoteContract?.advertisedDelayMinutes)!==15||q.quoteContract?.decisionEligible!==false)) process.exit(1); if(s==='SPCE.US' && (q.currency!=='USD'||q.quoteContract?.identityVerified!==true)) process.exit(1); console.log(s+' OK');"
+          done
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 -H "X-Investor-Control-Client: $CLIENT_ID" "$URL/v1/fx?pair=EURUSD" > fx.json
+          node -e "const p=require('./fx.json'); const r=p.reference; if(r?.pair!=='EURUSD'||r?.sourceQuality!=='OFFICIAL_DAILY_REFERENCE'||!(Number(r?.rate)>0)||r?.valuationReferenceEligible!==true||r?.transactionEligible!==false||r?.decisionEligible!==false) process.exit(1); console.log('EURUSD OK')"

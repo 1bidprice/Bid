@@ -1,0 +1,94 @@
+name: Investor Control Canonical Live Source Shadow
+
+on:
+  push:
+    branches:
+      - investor-control-core-stabilization-v174
+    paths:
+      - market-intelligence/**
+      - .github/workflows/investor-control-canonical-live-source-shadow.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-canonical-live-source-shadow-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-canonical-live-sources:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - name: Checkout exact canonical branch head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install PDF extraction runtime
+        run: |
+          set -euo pipefail
+          if ! command -v pdftotext >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y poppler-utils
+          fi
+
+      - name: Require canonical server-side provider credentials
+        env:
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$FINNHUB_TOKEN" || { echo 'FINNHUB_TOKEN is not configured server-side' >&2; exit 1; }
+          echo 'Canonical US provider credential is configured server-side.'
+
+      - name: Run canonical deterministic contracts
+        working-directory: market-intelligence
+        run: npm test
+
+      - name: Build fresh canonical live intelligence
+        working-directory: market-intelligence
+        env:
+          SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          success=0
+          for attempt in 1 2 3; do
+            echo "Canonical live-source attempt ${attempt}/3"
+            rm -f out/autonomous-intelligence.json out/mobile-intelligence-feed.json
+            if node src/run-autonomous-intelligence.js out/autonomous-intelligence.json \
+              && node src/build-mobile-feed.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json; then
+              success=1
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then sleep $((attempt * 4)); fi
+          done
+          test "$success" -eq 1 || { echo 'Canonical live-source build failed after bounded retries.' >&2; exit 1; }
+
+      - name: Verify canonical production safety
+        working-directory: market-intelligence
+        run: node scripts/verify-production-output.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json
+
+      - name: Verify authoritative source connectivity and provenance
+        working-directory: market-intelligence
+        env:
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+        run: node scripts/verify-canonical-live-source-connectivity.js out/mobile-intelligence-feed.json out/source-connectivity-audit.json
+
+      - name: Upload shadow verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-canonical-live-source-shadow-${{ github.run_id }}
+          path: |
+            market-intelligence/out/autonomous-intelligence.json
+            market-intelligence/out/mobile-intelligence-feed.json
+            market-intelligence/out/source-connectivity-audit.json
+          if-no-files-found: warn
+          retention-days: 14

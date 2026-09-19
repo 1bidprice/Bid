@@ -7,6 +7,62 @@ function round(value, digits = 4) {
   return Number.isFinite(value) ? Number(value.toFixed(digits)) : null;
 }
 
+function normalizeCurrency(value) {
+  const currency = String(value || '').trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(currency) ? currency : null;
+}
+
+function companyCurrency(company = {}) {
+  return normalizeCurrency(
+    company.currency
+      || company.primaryListing?.currency
+      || company.listings?.[0]?.currency
+      || null,
+  );
+}
+
+export function normalizeFinnhubCompanyProfile(payload, options = {}) {
+  const requestedSymbol = String(options.requestedSymbol || '').trim().toUpperCase();
+  const ticker = String(payload?.ticker || '').trim().toUpperCase();
+  const currency = normalizeCurrency(payload?.currency);
+  const tickerMatches = Boolean(requestedSymbol && ticker && ticker === requestedSymbol);
+  const checkedAt = new Date(options.checkedAt || Date.now()).toISOString();
+
+  return {
+    requestedSymbol: requestedSymbol || null,
+    ticker: ticker || null,
+    currency,
+    exchange: String(payload?.exchange || '').trim() || null,
+    country: String(payload?.country || '').trim() || null,
+    name: String(payload?.name || '').trim() || null,
+    tickerMatches,
+    verified: tickerMatches && Boolean(currency),
+    source: 'Finnhub Company Profile 2',
+    sourceUrl: requestedSymbol
+      ? `https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(requestedSymbol)}`
+      : null,
+    checkedAt,
+  };
+}
+
+async function fetchFinnhubCompanyProfile(symbol, options = {}) {
+  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  const token = String(options.token || '').trim();
+  const url = `https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(symbol)}`;
+  const response = await fetchImpl(url, {
+    headers: {
+      Accept: 'application/json',
+      'X-Finnhub-Token': token,
+    },
+  });
+  if (!response.ok) throw new Error(`Finnhub company profile request failed: ${response.status}`);
+  const payload = await response.json();
+  return normalizeFinnhubCompanyProfile(payload, {
+    requestedSymbol: symbol,
+    checkedAt: options.generatedAt,
+  });
+}
+
 export function normalizeFinnhubQuote(payload, company, options = {}) {
   const currentPrice = numeric(payload?.c);
   const previousClose = numeric(payload?.pc);
@@ -19,7 +75,24 @@ export function normalizeFinnhubQuote(payload, company, options = {}) {
     ? (generatedAt.getTime() - quoteAt.getTime()) / 3_600_000
     : null;
   const staleAfterHours = Number(options.staleAfterHours ?? 72);
-  const usable = currentPrice !== null && currentPrice > 0 && previousClose !== null && previousClose > 0 && quoteAt;
+  const currency = companyCurrency(company);
+  const symbol = String(company.primaryListing?.symbol || '').trim().toUpperCase();
+  const defaultIdentityEvidence = {
+    verificationMode: 'CANONICAL_LISTING_BINDING',
+    requestedSymbol: symbol || null,
+    ticker: symbol || null,
+    currency,
+    verified: Boolean(symbol && currency),
+  };
+  const identityEvidence = options.identityEvidence || defaultIdentityEvidence;
+  const quoteIdentityVerified = identityEvidence?.verified === true;
+  const usable = currentPrice !== null
+    && currentPrice > 0
+    && previousClose !== null
+    && previousClose > 0
+    && Boolean(quoteAt)
+    && Boolean(currency)
+    && quoteIdentityVerified;
   const dailyChange = numeric(payload?.d) ?? (usable ? currentPrice - previousClose : null);
   const dailyChangePct = numeric(payload?.dp) ?? (
     usable && previousClose !== 0 ? ((currentPrice - previousClose) / previousClose) * 100 : null
@@ -32,11 +105,15 @@ export function normalizeFinnhubQuote(payload, company, options = {}) {
     companyName: company.displayName || company.legalName,
     listing: company.primaryListing,
     symbol: company.primaryListing?.symbol || null,
-    currency: company.currency || company.listings?.[0]?.currency || null,
+    currency,
     source: 'Finnhub Quote API',
     sourceUrl: `https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(company.primaryListing?.symbol || '')}`,
+    sourceQuality: 'PRIMARY_LICENSED',
     generatedAt: generatedAt.toISOString(),
     quoteAt: quoteAt ? quoteAt.toISOString() : null,
+    quoteTimestampVerified: Boolean(quoteAt),
+    quoteIdentityVerified,
+    identityEvidence,
     ageHours: ageHours === null ? null : round(ageHours, 2),
     stale: ageHours === null ? true : ageHours > staleAfterHours,
     usable: Boolean(usable),
@@ -72,11 +149,66 @@ export async function fetchFinnhubQuote(company, options = {}) {
     };
   }
 
-  const symbol = String(company.primaryListing?.symbol || '').trim();
+  const symbol = String(company.primaryListing?.symbol || '').trim().toUpperCase();
   if (!symbol) {
     return {
       snapshot: null,
       diagnostics: [{ code: 'MARKET_SYMBOL_MISSING', companyId: company.companyId }],
+    };
+  }
+
+  let currency = companyCurrency(company);
+  let identityEvidence = null;
+  if (!currency) {
+    try {
+      identityEvidence = await fetchFinnhubCompanyProfile(symbol, {
+        fetchImpl,
+        token,
+        generatedAt: options.generatedAt,
+      });
+    } catch (error) {
+      return {
+        snapshot: null,
+        diagnostics: [{
+          code: 'FINNHUB_IDENTITY_LOOKUP_FAILED',
+          companyId: company.companyId,
+          symbol,
+          message: error instanceof Error ? error.message : String(error),
+        }],
+      };
+    }
+
+    if (!identityEvidence.tickerMatches) {
+      return {
+        snapshot: null,
+        diagnostics: [{
+          code: 'FINNHUB_IDENTITY_MISMATCH',
+          companyId: company.companyId,
+          symbol,
+          providerTicker: identityEvidence.ticker,
+        }],
+      };
+    }
+    if (!identityEvidence.currency) {
+      return {
+        snapshot: null,
+        diagnostics: [{ code: 'FINNHUB_CURRENCY_UNVERIFIED', companyId: company.companyId, symbol }],
+      };
+    }
+    currency = identityEvidence.currency;
+  }
+
+  const effectiveCompany = {
+    ...company,
+    currency,
+  };
+  if (!identityEvidence) {
+    identityEvidence = {
+      verificationMode: 'CANONICAL_LISTING_BINDING',
+      requestedSymbol: symbol,
+      ticker: symbol,
+      currency,
+      verified: true,
     };
   }
 
@@ -90,9 +222,10 @@ export async function fetchFinnhubQuote(company, options = {}) {
   if (!response.ok) throw new Error(`Finnhub quote request failed: ${response.status}`);
 
   const payload = await response.json();
-  const snapshot = normalizeFinnhubQuote(payload, company, {
+  const snapshot = normalizeFinnhubQuote(payload, effectiveCompany, {
     generatedAt: options.generatedAt,
     staleAfterHours: options.staleAfterHours,
+    identityEvidence,
   });
 
   return {

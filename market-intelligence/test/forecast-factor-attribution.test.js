@@ -3,8 +3,59 @@ import assert from 'node:assert/strict';
 import { buildForecastFactorAttributionStatus } from '../src/forecast-factor-attribution.js';
 import { createLiveShadowForecastRecords } from '../src/forecast-outcome-ledger.js';
 
-const LEVELS=[-.9,-.6,-.3,.1,.4,.8];
-function rec(i,o={}){const value=o.value??LEVELS[i%LEVELS.length],positive=o.invert?value<0:value>0,at=new Date(Date.UTC(2026,0,1+i)).toISOString();return{forecastId:`attr:${o.vectorVersion||'fv-v1'}:${i}`,validationMode:'LIVE_SHADOW_OOS',factorFeatureVectorPolicyVersion:o.noSnapshotVersion?null:o.vectorVersion||'fv-v1',factorScorePolicyVersion:'score-v1',assetClass:'EQUITY',horizon:'month1',forecastAt:at,forecastSampleDate:at.slice(0,10),factorDomainSnapshot:o.noSnapshot?[]:[{domain:'MOMENTUM',value,weight:.16,verifiedDriverCount:1},{domain:'QUALITY',value:value*.8,weight:.12,verifiedDriverCount:1}],status:o.open?'OPEN':'MATURED',positiveOutcome:o.open?null:positive?1:0,realisedOutcome:o.open?null:{realisedReturnPct:o.invert?-value*8:value*8}};}
+const LEVELS = [-.9, -.6, -.3, .1, .4, .8];
+function classificationSnapshot(index, companyId, instrumentId, forecastAt) {
+  const majorGroups = ['10', '20', '30', '40', '50', '60'];
+  const code = majorGroups[index % majorGroups.length] + '00';
+  const cik = String((index % 20) + 1).padStart(10, '0');
+  return {
+    contract: 'FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1',
+    policyVersion: '2026-08-11.1',
+    companyId,
+    instrumentId,
+    sourceAuthority: 'SEC_EDGAR_SUBMISSIONS',
+    sourceUrl: 'https://data.sec.gov/submissions/CIK' + cik + '.json',
+    sourceDocumentId: 'CIK' + cik,
+    capturedAt: forecastAt,
+    taxonomy: 'SEC_SIC',
+    code,
+    description: 'Synthetic SIC ' + code,
+    inferenceUsed: false,
+    decisionImpact: 'NONE',
+  };
+}
+
+function rec(i, o = {}) {
+  const value = o.value ?? LEVELS[i % LEVELS.length];
+  const positive = o.invert ? value < 0 : value > 0;
+  const at = new Date(Date.UTC(2000, 0, 1) + i * 30 * 86_400_000).toISOString();
+  const tradingDays = Number(o.tradingDays || 21);
+  const outcomeAt = new Date(new Date(at).getTime() + tradingDays * 86_400_000).toISOString();
+  const companyId = 'company:' + (i % 20);
+  const instrumentId = 'instrument:' + (i % 20);
+  return {
+    forecastId: 'attr:' + (o.vectorVersion || 'fv-v1') + ':' + i,
+    validationMode: 'LIVE_SHADOW_OOS',
+    companyId,
+    instrumentId,
+    classificationSnapshot: classificationSnapshot(i, companyId, instrumentId, at),
+    factorFeatureVectorPolicyVersion: o.noSnapshotVersion ? null : o.vectorVersion || 'fv-v1',
+    factorScorePolicyVersion: 'score-v1',
+    assetClass: 'EQUITY',
+    horizon: 'month1',
+    forecastAt: at,
+    forecastSampleDate: at.slice(0, 10),
+    tradingDays,
+    referencePrice: { timestamp: at },
+    factorDomainSnapshot: o.noSnapshot ? [] : [
+      { domain: 'MOMENTUM', value, weight: .16, verifiedDriverCount: 1 },
+      { domain: 'QUALITY', value: value * .8, weight: .12, verifiedDriverCount: 1 },
+    ],
+    status: o.open ? 'OPEN' : 'MATURED',
+    positiveOutcome: o.open ? null : positive ? 1 : 0,
+    realisedOutcome: o.open ? null : { timestamp: outcomeAt, realisedReturnPct: o.invert ? -value * 8 : value * 8 },
+  };
+}
 
 test('new record persists compact factor-domain snapshot',()=>{const at='2026-08-12T20:00:00.000Z',shadow={policyVersion:'shadow-v2',generatedAt:at,companyId:'company:ABC',instrumentId:'company:ABC',displayName:'ABC',symbol:'ABC',assetClass:'EQUITY',mode:'SHADOW_ONLY',decisionImpact:'NONE',historicalPatternForecast:{policyVersion:'pattern-v2',asOf:at,currentPattern:{regime:'BULL'},horizons:{month1:{tradingDays:21,rawProbabilityPositive:.6,expectedReturnPct:3}}},forecast:{horizons:{month1:{probabilityPositive:null,evidenceQualityScore:80}}},multiFactorResearch:{horizons:{month1:{factorScore:{policyVersion:'score-v1',status:'LATENT_SCORE_READY',latentScore:.4,rawLatentScore:.4},featureVector:{policyVersion:'fv-v1',availableDomainCount:2,availableWeight:.28,features:[{domain:'MOMENTUM',available:true,value:.6,weight:.16,verifiedDriverCount:1,evidenceIds:['not-for-ledger']},{domain:'QUALITY',available:true,value:.3,weight:.12,verifiedDriverCount:2},{domain:'GROWTH',available:false,value:null,weight:.1,verifiedDriverCount:0}]}}}}};const[r]=createLiveShadowForecastRecords([shadow],[{companyId:'company:ABC',listing:{symbol:'ABC',mic:'XNAS',currency:'USD'},referencePrice:{value:100,timestamp:at,currency:'USD',source:'test'}}]);assert.equal(r.factorFeatureVectorPolicyVersion,'fv-v1');assert.deepEqual(r.factorDomainSnapshot.map(x=>x.domain),['MOMENTUM','QUALITY']);assert.equal(JSON.stringify(r.factorDomainSnapshot).includes('not-for-ledger'),false);});
 test('pre-snapshot records do not enter attribution lineage',()=>{const s=buildForecastFactorAttributionStatus({records:Array.from({length:150},(_,i)=>rec(i,{noSnapshotVersion:true}))});assert.equal(s.lineageRecordCount,0);});

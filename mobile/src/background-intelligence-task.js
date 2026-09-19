@@ -2,6 +2,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as BackgroundTask from 'expo-background-task';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
+import { finalActionIsCurrent } from './decision-validity';
+import {
+  NOTIFICATION_POLICY_VERSION,
+  buildDecisionChangeEvents,
+  buildDecisionSnapshot,
+  buildNotificationPayload,
+  mergeActionSnapshots,
+} from './intelligence-notification-policy';
+import { buildOpenPositionLedger } from './portfolio-engine';
+import { PORTFOLIO_STATE_STORAGE_KEY } from './portfolio-state-storage';
 
 export const BACKGROUND_INTELLIGENCE_TASK = 'investor-control-background-intelligence-v1';
 export const INTELLIGENCE_FEED_STORAGE_KEY = 'investor-control.intelligence-feed.v1';
@@ -10,10 +20,7 @@ export const INTELLIGENCE_FEED_URL = 'https://raw.githubusercontent.com/1bidpric
 
 const SUPPORTED_VERSIONS = new Set([1, 2]);
 const MAX_FEED_BYTES = 2_000_000;
-
-function safeArray(value) {
-  return Array.isArray(value) ? value : [];
-}
+const FRESH_NOTIFICATION_MAX_AGE_MS = 4 * 3_600_000;
 
 function validateFeed(payload) {
   if (payload?.format !== 'investor-control-mobile-intelligence-feed' || !SUPPORTED_VERSIONS.has(Number(payload?.version))) {
@@ -24,35 +31,36 @@ function validateFeed(payload) {
   return { ...payload, generatedAt: generatedAt.toISOString() };
 }
 
-function finalEvents(feed) {
-  return safeArray(feed.decisions)
-    .filter((item) => item?.finalAction?.status === 'FINAL' && item.finalAction.marketAction !== 'WATCH')
-    .map((item) => ({
-      type: 'FINAL_ACTION',
-      fingerprint: `final|${item.companyId}|${item.finalAction.marketAction}|${item.finalAction.validUntil || feed.generatedAt}`,
-      title: 'Νέο επενδυτικό συμπέρασμα',
-      body: `${item.companyName || item.symbol}: ${item.finalAction.marketActionLabel || item.finalAction.marketAction}`,
-    }));
-}
-
-function discoveryEvents(feed) {
-  return safeArray(feed.discoveryRadar)
-    .filter((item) => Number(item?.discoveryScore || 0) >= 80)
-    .map((item) => ({
-      type: 'DISCOVERY',
-      fingerprint: `discovery|${item.companyId}|${item.latestEventAt || feed.generatedAt}`,
-      title: 'Νέα μετοχή στο ραντάρ',
-      body: `${item.companyName || item.symbol} · σήμα ${Math.round(Number(item.discoveryScore || 0))}/100 — περνά σε πλήρη έρευνα.`,
-    }));
-}
-
 async function loadNotificationState() {
   try {
     const raw = await AsyncStorage.getItem(INTELLIGENCE_NOTIFICATION_STATE_KEY);
     const parsed = raw ? JSON.parse(raw) : null;
-    return parsed && typeof parsed === 'object' ? parsed : { initialized: false, fingerprints: [] };
+    return parsed && typeof parsed === 'object'
+      ? parsed
+      : { policyVersion: null, lastActions: {} };
   } catch {
-    return { initialized: false, fingerprints: [] };
+    return { policyVersion: null, lastActions: {} };
+  }
+}
+
+async function saveNotificationState(feed, lastActions) {
+  await AsyncStorage.setItem(INTELLIGENCE_NOTIFICATION_STATE_KEY, JSON.stringify({
+    policyVersion: NOTIFICATION_POLICY_VERSION,
+    feedGeneratedAt: feed.generatedAt,
+    lastActions,
+  }));
+}
+
+async function loadPortfolioPositions() {
+  try {
+    const raw = await AsyncStorage.getItem(PORTFOLIO_STATE_STORAGE_KEY);
+    if (!raw) return { available: true, positions: [] };
+    const parsed = JSON.parse(raw);
+    const transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
+    return { available: true, positions: buildOpenPositionLedger(transactions) };
+  } catch (error) {
+    console.warn('Investor Control notification ownership state unavailable', error);
+    return { available: false, positions: [] };
   }
 }
 
@@ -61,41 +69,59 @@ async function notificationsAllowed() {
   return permissions.status === 'granted';
 }
 
-async function notifyChanges(feed) {
-  const state = await loadNotificationState();
-  const events = [...finalEvents(feed), ...discoveryEvents(feed)];
-  const currentFingerprints = events.map((event) => event.fingerprint);
+function notificationDecisionOptions(feed, nowMs = Date.now()) {
+  const generatedAtMs = new Date(feed?.generatedAt || '').getTime();
+  const ageMs = Number.isFinite(generatedAtMs) ? Math.max(0, nowMs - generatedAtMs) : Number.POSITIVE_INFINITY;
+  const feedFresh = ageMs <= FRESH_NOTIFICATION_MAX_AGE_MS;
+  const systemReady = feed?.operationalHealth?.status === 'OPERATIONAL';
+  return {
+    isCurrentDecision: (finalAction) => finalActionIsCurrent(finalAction, {
+      now: nowMs,
+      feedFresh,
+      systemReady,
+    }),
+  };
+}
 
-  if (!state.initialized) {
-    await AsyncStorage.setItem(INTELLIGENCE_NOTIFICATION_STATE_KEY, JSON.stringify({
-      initialized: true,
-      feedGeneratedAt: feed.generatedAt,
-      fingerprints: currentFingerprints.slice(0, 200),
-    }));
+async function notifyChanges(feed, openPositions) {
+  const state = await loadNotificationState();
+  const options = notificationDecisionOptions(feed);
+  const currentSnapshot = buildDecisionSnapshot(feed, openPositions, options);
+
+  // A notification policy migration establishes a clean baseline without
+  // replaying older research conclusions as if they were newly actionable.
+  if (state.policyVersion !== NOTIFICATION_POLICY_VERSION) {
+    await saveNotificationState(feed, currentSnapshot);
     return 0;
   }
 
-  const seen = new Set(safeArray(state.fingerprints));
-  const fresh = events.filter((event) => !seen.has(event.fingerprint)).slice(0, 3);
-  if (fresh.length && await notificationsAllowed()) {
+  const { events } = buildDecisionChangeEvents(
+    feed,
+    openPositions,
+    state.lastActions && typeof state.lastActions === 'object' ? state.lastActions : {},
+    options,
+  );
+  const payload = buildNotificationPayload(events);
+
+  if (payload && await notificationsAllowed()) {
     await Notifications.setNotificationChannelAsync('market-intelligence', {
       name: 'Market Intelligence',
       importance: Notifications.AndroidImportance.HIGH,
     });
-    for (const event of fresh) {
-      await Notifications.scheduleNotificationAsync({
-        content: { title: event.title, body: event.body, data: { type: event.type } },
-        trigger: null,
-      });
-    }
+    await Notifications.scheduleNotificationAsync({
+      content: { title: payload.title, body: payload.body, data: payload.data },
+      trigger: null,
+    });
   }
 
-  await AsyncStorage.setItem(INTELLIGENCE_NOTIFICATION_STATE_KEY, JSON.stringify({
-    initialized: true,
-    feedGeneratedAt: feed.generatedAt,
-    fingerprints: [...currentFingerprints, ...safeArray(state.fingerprints)].slice(0, 300),
-  }));
-  return fresh.length;
+  await saveNotificationState(
+    feed,
+    mergeActionSnapshots(
+      state.lastActions && typeof state.lastActions === 'object' ? state.lastActions : {},
+      currentSnapshot,
+    ),
+  );
+  return payload ? 1 : 0;
 }
 
 async function fetchFeed() {
@@ -127,7 +153,10 @@ TaskManager.defineTask(BACKGROUND_INTELLIGENCE_TASK, async () => {
     const cachedTime = cached ? new Date(cached.generatedAt).getTime() : 0;
     if (incomingTime >= cachedTime) {
       await AsyncStorage.setItem(INTELLIGENCE_FEED_STORAGE_KEY, JSON.stringify(incoming));
-      await notifyChanges(incoming);
+      const portfolio = await loadPortfolioPositions();
+      if (portfolio.available) {
+        await notifyChanges(incoming, portfolio.positions);
+      }
     }
     return BackgroundTask.BackgroundTaskResult.Success;
   } catch (error) {
