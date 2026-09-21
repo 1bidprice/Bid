@@ -1,3 +1,5 @@
+import { buildMinbeisDecision } from './minbeis-decision-layer.js';
+
 function categoryLabel(category, status) {
   if (status === 'DRAFT_RESEARCH' && ['EVENT_DRIVEN', 'SPECULATIVE_CATALYST'].includes(category)) {
     return 'Υπόθεση καταλύτη υπό έλεγχο';
@@ -306,7 +308,26 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
   const avoidDecisions = decisions.filter((item) => item.finalAction?.marketAction === 'AVOID');
   const urgent = dossiers.filter((item) => item.finalAction?.urgency === 'IMMEDIATE' || ['EVENT_RISK', 'DETERIORATION'].includes(item.category)).slice(0, 5);
   const discoveryRadar = (report.discovery?.shortlist || []).filter((item) => !item.isExistingFocusCompany).map(compactDiscovery).slice(0, 12);
-  const opportunityPurchaseDecisions = (report.opportunityPurchaseReconciliation?.decisions || []).map(compactOpportunityPurchaseDecision);
+  const dossierByKey = new Map();
+  for (const dossier of dossiers) {
+    if (dossier.id) dossierByKey.set(`DOSSIER:${dossier.id}`, dossier);
+    if (dossier.companyId) dossierByKey.set(`COMPANY:${dossier.companyId}`, dossier);
+  }
+  const opportunityPurchaseDecisions = (report.opportunityPurchaseReconciliation?.decisions || [])
+    .map(compactOpportunityPurchaseDecision)
+    .map((item) => {
+      const dossier = (item.dossierId && dossierByKey.get(`DOSSIER:${item.dossierId}`))
+        || (item.companyId && dossierByKey.get(`COMPANY:${item.companyId}`))
+        || null;
+      return {
+        ...item,
+        minbeisDecision: buildMinbeisDecision({
+          finalAction: dossier?.finalAction || null,
+          opportunityPurchase: item,
+          hasPosition: false,
+        }),
+      };
+    });
   const confirmedBuyOpportunities = opportunityPurchaseDecisions.filter((item) => item.status === 'BUY_CONFIRMED');
   const waitingEntryOpportunities = opportunityPurchaseDecisions.filter((item) => item.status === 'WAIT_FOR_ENTRY_CONFIRMATION');
   const rejectedOpportunities = opportunityPurchaseDecisions.filter((item) => item.status === 'REJECTED');
@@ -354,6 +375,8 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
       waitingEntryOpportunityCount: waitingEntryOpportunities.length,
       rejectedOpportunityCount: rejectedOpportunities.length,
       blockedOpportunityCount: blockedOpportunities.length,
+      minbeisProbeCount: opportunityPurchaseDecisions.filter((item) => item.minbeisDecision?.action === 'BUY_PROBE').length,
+      minbeisStarterCount: opportunityPurchaseDecisions.filter((item) => item.minbeisDecision?.action === 'BUY_STARTER').length,
       unresolvedDiagnosticCount: Array.isArray(report.diagnostics) ? report.diagnostics.length : 0,
       ...actionCounts,
     },
@@ -399,6 +422,7 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
       whyNotBuyNow: item.whyNotBuyNow,
       nextGate: item.nextGate,
       strictAction: item.strictAction,
+      minbeisDecision: item.minbeisDecision,
     })),
     assistantContext: dossiers.map((item) => ({
       companyId: item.companyId,
@@ -416,6 +440,6 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
       nextStep: item.nextStep,
       reviewDate: item.reviewDate,
     })),
-    disclosure: 'Ο Opportunity Hunter σαρώνει ευρύ επενδυτικό universe και προτεραιοποιεί υποψήφιες ευκαιρίες. High/Super Opportunity δεν σημαίνει αγορά. Μόνο η δεύτερη αυστηρή αξιολόγηση BUY, με πλήρη έλεγχο πηγών, θεμελιωδών, αγοράς, ρευστότητας, φρεσκότητας, τάσης, ρίσκου και αντιφάσεων, μπορεί να εμφανίσει ΑΓΟΡΑ ΕΠΙΒΕΒΑΙΩΘΗΚΕ. Δεν εκτελούνται συναλλαγές.',
+    disclosure: 'Ο Opportunity Hunter σαρώνει ευρύ επενδυτικό universe και προτεραιοποιεί υποψήφιες ευκαιρίες. High/Super Opportunity δεν σημαίνει αγορά. Μόνο η δεύτερη αυστηρή αξιολόγηση BUY, με πλήρη έλεγχο πηγών, θεμελιωδών, αγοράς, ρευστότητας, φρεσκότητας, τάσης, ρίσκου και αντιφάσεων, μπορεί να εμφανίσει ΑΓΟΡΑ ΕΠΙΒΕΒΑΙΩΘΗΚΕ. Το MINBEIS μεταφράζει μόνο αυτή την canonical απόφαση σε πλάνο θέσης και δεν αποτελεί δεύτερο ανεξάρτητο scoring engine. Δεν εκτελούνται συναλλαγές.',
   };
 }
