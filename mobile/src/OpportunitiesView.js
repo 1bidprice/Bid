@@ -143,6 +143,24 @@ function DiscoveryRadarCard({ item }) {
   return <View style={styles.discoveryCard}><View style={styles.rowTop}><View style={styles.grow}><Text style={styles.company}>{item.companyName}</Text><Text style={styles.symbol}>{item.symbol || '—'} · {item.exchange || '—'}</Text></View><View style={styles.discoveryScore}><Text style={styles.discoveryScoreValue}>{Math.round(Number(item.discoveryScore || 0))}</Text><Text style={styles.discoveryScoreLabel}>προτερ.</Text></View></View><Text style={styles.discoveryStatus}>ΑΥΤΟΜΑΤΗ ΑΝΑΚΑΛΥΨΗ · ΟΧΙ ΑΚΟΜΗ ΠΡΟΤΑΣΗ ΑΓΟΡΑΣ</Text><Text style={styles.discoveryDisclaimer}>Βαθμός προτεραιότητας διερεύνησης — όχι επενδυτική βαθμολογία.</Text>{(item.reasons || []).slice(0, 3).map((reason, index) => <Text key={index} style={styles.discoveryReason}>• {reason}</Text>)}<Text style={styles.discoveryTime}>Νεότερο γεγονός: {when(item.latestEventAt)}</Text></View>;
 }
 
+function minbeisActionLabel(action) {
+  return {
+    NO_BUY: 'NO BUY',
+    WATCH: 'WATCH',
+    HOLD: 'HOLD',
+    REDUCE: 'REDUCE',
+    BUY_PROBE: 'BUY PROBE',
+    BUY_STARTER: 'BUY STARTER',
+    BUY_CORE: 'BUY CORE',
+  }[action] || action || '—';
+}
+
+function minbeisAllocationText(decision) {
+  const value = Number(decision?.allocationPct);
+  if (!Number.isFinite(value) || value <= 0) return '0%';
+  return `${value.toLocaleString('el-GR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}% χαρτοφυλακίου`;
+}
+
 function purchaseReasonLabel(reason) {
   return {
     FULL_DEEP_DOSSIER_REQUIRED: 'Απαιτείται πλήρης βαθιά ανάλυση πριν εξεταστεί αγορά.',
@@ -202,6 +220,13 @@ function OpportunityPurchaseCard({ item }) {
         <View style={styles.blockers}>
           <Text style={styles.blockerTitle}>Γιατί δεν είναι αγορά τώρα</Text>
           {item.whyNotBuyNow.slice(0, 5).map((reason, index) => <Text key={`purchase-reason-${index}`} style={styles.blockerText}>• {purchaseReasonLabel(reason)}</Text>)}
+        </View>
+      ) : null}
+      {item.minbeisDecision ? (
+        <View style={styles.nextBox}>
+          <Text style={styles.nextLabel}>MINBEIS</Text>
+          <Text style={styles.nextText}>{minbeisActionLabel(item.minbeisDecision.action)} · {minbeisAllocationText(item.minbeisDecision)}</Text>
+          <Text style={styles.ageText}>Απαιτείται ανθρώπινη έγκριση · καμία αυτόματη εντολή broker</Text>
         </View>
       ) : null}
       <View style={styles.nextBox}>
