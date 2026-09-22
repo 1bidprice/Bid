@@ -63,4 +63,16 @@ assert.equal(result.portfolioSizingStatus, 'PASS_ADVISORY');
 assert.equal(result.portfolioAdjustedAllocationPct, 0.5);
 assert.equal(result.concentrationBand, 'EXTREME');
 
-console.log('MINBEIS portfolio policy PASS: concentration is advisory by default, user caps are optional, NO_LIMIT permits concentrated strategies, and incomplete valuation does not erase the base MINBEIS decision.');
+result = applyMinbeisPortfolioSizing(probe, [
+  { symbol: 'STM.US', eurValue: 9950 },
+  { symbol: 'ALPHA.GR', eurValue: 50 },
+], {
+  symbol: 'STM',
+  concentrationPolicyMode: CONCENTRATION_POLICY_MODES.NO_LIMIT,
+});
+assert.equal(result.portfolioSizingStatus, 'PASS_USER_NO_LIMIT');
+assert.equal(result.portfolioAdjustedAllocationPct, 0.5);
+assert.equal(result.projectedPositionWeightPct, 100);
+assert.equal(result.concentrationBand, 'EXTREME');
+
+console.log('MINBEIS portfolio policy PASS: concentration is advisory by default, user caps are optional, NO_LIMIT permits concentrated strategies including 100% projected concentration, and incomplete valuation does not erase the base MINBEIS decision.');
