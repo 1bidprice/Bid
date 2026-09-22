@@ -67,12 +67,32 @@ const TERMS_URL = 'https://1bidprice.github.io/Bid/terms.html';
 const SUPPORT_EMAIL = 'xrimapp@gmail.com';
 const LEGAL_ACCEPTANCE_KEY = 'investor-control.legal-acceptance.v1';
 const MARKET_GATEWAY_CONFIGURED = isMarketGatewayConfigured();
+const DEFAULT_MINBEIS_POLICY = {
+  concentrationPolicyMode: 'INFORM_ONLY',
+  maxSinglePositionPct: 10,
+  concentrationAlertsEnabled: false,
+};
+
+function normalizeMinbeisPolicy(value) {
+  const allowedModes = new Set(['INFORM_ONLY', 'USER_LIMIT', 'NO_LIMIT']);
+  const mode = allowedModes.has(value?.concentrationPolicyMode)
+    ? value.concentrationPolicyMode
+    : DEFAULT_MINBEIS_POLICY.concentrationPolicyMode;
+  const rawLimit = Number(value?.maxSinglePositionPct);
+  return {
+    concentrationPolicyMode: mode,
+    maxSinglePositionPct: Number.isFinite(rawLimit) ? Math.max(0.5, Math.min(100, rawLimit)) : DEFAULT_MINBEIS_POLICY.maxSinglePositionPct,
+    concentrationAlertsEnabled: value?.concentrationAlertsEnabled === true,
+  };
+}
+
 const EMPTY_STATE = {
   schemaVersion: 5,
   transactions: [],
   prices: {},
   meta: { lastCheckedAt: null, errors: [], accountingVersion: 2 },
   alerts: normalizeAlerts(null),
+  minbeisPolicy: DEFAULT_MINBEIS_POLICY,
 };
 
 const valid = (value) => value !== null && value !== undefined && Number.isFinite(Number(value));
@@ -140,6 +160,7 @@ function normalizeState(raw) {
       accountingVersion: 2,
     },
     alerts: normalizeAlerts(raw.alerts),
+    minbeisPolicy: normalizeMinbeisPolicy(raw.minbeisPolicy),
   };
 }
 
@@ -737,9 +758,34 @@ function MainApp({ onOpenDecisionGate }) {
           <View style={styles.sectionRow}><Text style={styles.subsection}>Ιστορικό</Text>{state.alerts.history.length ? <Pressable onPress={() => persist({ ...stateRef.current, alerts: { ...stateRef.current.alerts, history: [] } })}><Text style={styles.link}>Καθαρισμός</Text></Pressable> : null}</View>
           {state.alerts.history.length ? state.alerts.history.map((event) => <View key={event.id} style={styles.historyItem}><Text style={styles.statusStrong}>{event.symbol}</Text><Text style={styles.note}>{event.message}</Text><Text style={styles.source}>{when(event.triggeredAt)}</Text></View>) : <View style={styles.emptyCard}><Text style={styles.emptyTitle}>Καμία ενεργοποίηση.</Text><Text style={styles.note}>Οι ειδοποιήσεις που πυροδοτούνται θα καταγράφονται εδώ.</Text></View>}
         </> : null}
-        {tab === 'opportunities' ? <OpportunitiesView portfolioPositions={positions} /> : null}
+        {tab === 'opportunities' ? <OpportunitiesView portfolioPositions={positions} portfolioPolicy={state.minbeisPolicy} /> : null}
         {tab === 'settings' ? <>
           <Text style={styles.section}>Ρυθμίσεις</Text>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Στρατηγική συγκέντρωσης MINBEIS</Text>
+            <Text style={styles.note}>Η εφαρμογή δεν επιβάλλει δική της φιλοσοφία κατανομής. Επίλεξε πώς θέλεις να χρησιμοποιείται ο κίνδυνος συγκέντρωσης στις προτάσεις θέσης.</Text>
+            <View style={styles.segmentRow}>
+              <Segment value="INFORM_ONLY" current={state.minbeisPolicy.concentrationPolicyMode} label="Ενημέρωση μόνο" onPress={() => persist({ ...stateRef.current, minbeisPolicy: { ...stateRef.current.minbeisPolicy, concentrationPolicyMode: 'INFORM_ONLY' } })} />
+              <Segment value="USER_LIMIT" current={state.minbeisPolicy.concentrationPolicyMode} label="Δικό μου όριο" onPress={() => persist({ ...stateRef.current, minbeisPolicy: { ...stateRef.current.minbeisPolicy, concentrationPolicyMode: 'USER_LIMIT' } })} />
+              <Segment value="NO_LIMIT" current={state.minbeisPolicy.concentrationPolicyMode} label="Χωρίς όριο" onPress={() => persist({ ...stateRef.current, minbeisPolicy: { ...stateRef.current.minbeisPolicy, concentrationPolicyMode: 'NO_LIMIT' } })} />
+            </View>
+            {state.minbeisPolicy.concentrationPolicyMode === 'USER_LIMIT' ? (
+              <Field
+                label="Μέγιστο ποσοστό σε μία μετοχή (%)"
+                helper="Το όριο είναι δικό σου και μπορεί να είναι από 0,5% έως 100%."
+                value={String(state.minbeisPolicy.maxSinglePositionPct)}
+                onChangeText={(value) => {
+                  const numeric = Number(String(value).replace(',', '.'));
+                  if (!Number.isFinite(numeric)) return;
+                  persist({ ...stateRef.current, minbeisPolicy: { ...stateRef.current.minbeisPolicy, maxSinglePositionPct: numeric } });
+                }}
+                keyboardType="decimal-pad"
+                placeholder="10"
+              />
+            ) : null}
+            <ReviewLine label="Push για συγκέντρωση" value="Ανενεργά από προεπιλογή" />
+            <Text style={styles.privacyNotice}>Ακόμη και στο «Χωρίς όριο», το app μπορεί να δείξει ότι μια θέση είναι πολύ συγκεντρωμένη, αλλά δεν θα μειώνει ή θα μπλοκάρει τη δική σου επιλογή.</Text>
+          </View>
           <View style={styles.card}><Text style={styles.cardTitle}>Ιδιωτικότητα δεδομένων</Text><Text style={styles.note}>Συναλλαγές, όρια και ιστορικό αποθηκεύονται μόνο στη συγκεκριμένη συσκευή. Δεν υπάρχει κοινός λογαριασμός ή πρόσβαση διαχειριστή.</Text><ReviewLine label="Αποθήκευση" value="Μόνο στη συσκευή" /><ReviewLine label="Cloud συγχρονισμός" value="Ανενεργός" /></View>
           <View style={styles.card}><Text style={styles.cardTitle}>Ακρίβεια συναλλαγών</Text><Text style={styles.note}>Κάθε συναλλαγή κρατά χωριστά τιμή εντολής, μέση τιμή εκτέλεσης, αξία συναλλαγής, αναλυτικά έξοδα και τελικό κόστος.</Text><ReviewLine label="Λογιστικό μοντέλο" value="v2 ενεργό" /><ReviewLine label="Σχήμα δεδομένων" value="v5" /></View>
           <View style={styles.card}><Text style={styles.cardTitle}>Αντίγραφο ασφαλείας</Text><Text style={styles.note}>Το JSON περιλαμβάνει συναλλαγές και όρια. Δεν περιλαμβάνει το Finnhub token.</Text><Pressable style={styles.primary} onPress={exportBackup}><Text style={styles.whiteStrong}>Εξαγωγή αντιγράφου JSON</Text></Pressable><Pressable style={styles.secondaryActionFull} onPress={importBackup}><Text style={styles.secondaryStrong}>Επαναφορά από JSON</Text></Pressable></View>
