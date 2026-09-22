@@ -188,8 +188,8 @@ function purchaseNextGateLabel(gate) {
   }[gate] || 'Παρακολούθηση μέχρι τον επόμενο αυστηρό έλεγχο.';
 }
 
-function OpportunityPurchaseCard({ item, portfolioPositions = [] }) {
-  const personalizedMinbeisDecision = item.minbeisDecision ? applyMinbeisPortfolioSizing(item.minbeisDecision, portfolioPositions, { symbol: item.symbol }) : null;
+function OpportunityPurchaseCard({ item, portfolioPositions = [], portfolioPolicy = {} }) {
+  const personalizedMinbeisDecision = item.minbeisDecision ? applyMinbeisPortfolioSizing(item.minbeisDecision, portfolioPositions, { symbol: item.symbol, concentrationPolicyMode: portfolioPolicy.concentrationPolicyMode, maxSinglePositionPct: portfolioPolicy.maxSinglePositionPct }) : null;
   const confirmed = item.status === 'BUY_CONFIRMED' && item.buyNowEligible === true;
   const waiting = item.status === 'WAIT_FOR_ENTRY_CONFIRMATION';
   const rejected = item.status === 'REJECTED';
@@ -230,7 +230,8 @@ function OpportunityPurchaseCard({ item, portfolioPositions = [] }) {
         <View style={styles.nextBox}>
           <Text style={styles.nextLabel}>MINBEIS · ΠΡΟΣΑΡΜΟΣΜΕΝΟ ΣΤΟ ΧΑΡΤΟΦΥΛΑΚΙΟ</Text>
           <Text style={styles.nextText}>{minbeisActionLabel(personalizedMinbeisDecision.action)} · {minbeisAllocationText(personalizedMinbeisDecision)}</Text>
-          {personalizedMinbeisDecision.portfolioSizingStatus === 'BLOCKED' ? <Text style={styles.warning}>Η νέα θέση μπλοκάρεται από τα προσωπικά όρια χαρτοφυλακίου ή από ελλιπή αποτίμηση.</Text> : null}
+          {personalizedMinbeisDecision.portfolioSizingStatus === 'BLOCKED_BY_USER_POLICY' ? <Text style={styles.warning}>Η νέα θέση μπλοκάρεται μόνο επειδή παραβιάζει το όριο συγκέντρωσης που όρισες εσύ.</Text> : null}
+          {personalizedMinbeisDecision.portfolioSizingStatus === 'PERSONALIZATION_UNAVAILABLE' ? <Text style={styles.warning}>Η βασική πρόταση παραμένει διαθέσιμη, αλλά δεν μπορεί να γίνει προσωπική προσαρμογή συγκέντρωσης μέχρι να είναι πλήρης η αποτίμηση του χαρτοφυλακίου.</Text> : null}
           {personalizedMinbeisDecision.portfolioSizingNote ? <Text style={styles.ageText}>{personalizedMinbeisDecision.portfolioSizingNote}</Text> : null}
           <Text style={styles.ageText}>Απαιτείται ανθρώπινη έγκριση · καμία αυτόματη εντολή broker</Text>
         </View>
@@ -243,13 +244,13 @@ function OpportunityPurchaseCard({ item, portfolioPositions = [] }) {
   );
 }
 
-function PurchaseSection({ title, subtitle, items, portfolioPositions = [] }) {
+function PurchaseSection({ title, subtitle, items, portfolioPositions = [], portfolioPolicy = {} }) {
   if (!items.length) return null;
   return (
     <View style={styles.sectionBlock}>
       <Text style={styles.sectionTitle}>{title}</Text>
       {subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
-      {items.map((item, index) => <OpportunityPurchaseCard key={item.instrumentId || item.companyId || `purchase-${index}`} item={item} portfolioPositions={portfolioPositions} />)}
+      {items.map((item, index) => <OpportunityPurchaseCard key={item.instrumentId || item.companyId || `purchase-${index}`} item={item} portfolioPositions={portfolioPositions} portfolioPolicy={portfolioPolicy} />)}
     </View>
   );
 }
@@ -259,7 +260,7 @@ function Section({ title, subtitle, items, decisionContext }) {
   return <View style={styles.sectionBlock}><Text style={styles.sectionTitle}>{title}</Text>{subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}{items.map((item) => <IntelligenceCard key={item.id} item={item} decisionContext={decisionContext} />)}</View>;
 }
 
-export default function OpportunitiesView({ portfolioPositions = [] }) {
+export default function OpportunitiesView({ portfolioPositions = [], portfolioPolicy = {} }) {
   const [feed, setFeed] = useState(null);
   const [syncState, setSyncState] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -440,10 +441,10 @@ export default function OpportunitiesView({ portfolioPositions = [] }) {
           </View>
 
           {feed.discoveryRadar?.length ? <View style={styles.sectionBlock}><Text style={styles.sectionTitle}>Ραντάρ νέων μετοχών</Text><Text style={styles.sectionSubtitle}>Το σύστημα σαρώνει αυτόματα επίσημα γεγονότα της αγοράς, κατατάσσει νέες εταιρείες και περνά τις ισχυρότερες σε πλήρη ανάλυση.</Text>{feed.discoveryRadar.map((item) => <DiscoveryRadarCard key={item.discoveryId} item={item} />)}</View> : null}
-          <PurchaseSection title="ΑΓΟΡΑ ΕΠΙΒΕΒΑΙΩΘΗΚΕ" subtitle="Μόνο ευκαιρίες που πέρασαν και τη δεύτερη αυστηρή πολιτική BUY_NOW. Καμία αυτόματη συναλλαγή." items={decisionContext.feedFresh && decisionContext.systemReady ? (feed.confirmedBuyOpportunities || []) : []} portfolioPositions={portfolioPositions} />
-          <PurchaseSection title="Ισχυρές ευκαιρίες — αναμονή εισόδου" subtitle="Υψηλή κατάταξη Opportunity Hunter, αλλά δεν έχουν επιβεβαιωθεί ακόμη όλα τα strict BUY gates." items={feed.waitingEntryOpportunities || []} portfolioPositions={portfolioPositions} />
-          <PurchaseSection title="Απορρίφθηκαν για αγορά" subtitle="Ο Opportunity Hunter τις εντόπισε, αλλά ο αυστηρός τελικός έλεγχος απέρριψε αγορά με τα τωρινά δεδομένα." items={feed.rejectedOpportunities || []} portfolioPositions={portfolioPositions} />
-          <PurchaseSection title="Μπλοκαρισμένες ευκαιρίες" subtitle="Χρειάζονται πλήρη ανάλυση ή υποχρεωτικούς ελέγχους πριν μπορούν να αξιολογηθούν για αγορά." items={feed.blockedOpportunities || []} portfolioPositions={portfolioPositions} />
+          <PurchaseSection title="ΑΓΟΡΑ ΕΠΙΒΕΒΑΙΩΘΗΚΕ" subtitle="Μόνο ευκαιρίες που πέρασαν και τη δεύτερη αυστηρή πολιτική BUY_NOW. Καμία αυτόματη συναλλαγή." items={decisionContext.feedFresh && decisionContext.systemReady ? (feed.confirmedBuyOpportunities || []) : []} portfolioPositions={portfolioPositions} portfolioPolicy={portfolioPolicy} />
+          <PurchaseSection title="Ισχυρές ευκαιρίες — αναμονή εισόδου" subtitle="Υψηλή κατάταξη Opportunity Hunter, αλλά δεν έχουν επιβεβαιωθεί ακόμη όλα τα strict BUY gates." items={feed.waitingEntryOpportunities || []} portfolioPositions={portfolioPositions} portfolioPolicy={portfolioPolicy} />
+          <PurchaseSection title="Απορρίφθηκαν για αγορά" subtitle="Ο Opportunity Hunter τις εντόπισε, αλλά ο αυστηρός τελικός έλεγχος απέρριψε αγορά με τα τωρινά δεδομένα." items={feed.rejectedOpportunities || []} portfolioPositions={portfolioPositions} portfolioPolicy={portfolioPolicy} />
+          <PurchaseSection title="Μπλοκαρισμένες ευκαιρίες" subtitle="Χρειάζονται πλήρη ανάλυση ή υποχρεωτικούς ελέγχους πριν μπορούν να αξιολογηθούν για αγορά." items={feed.blockedOpportunities || []} portfolioPositions={portfolioPositions} portfolioPolicy={portfolioPolicy} />
 
           <Section title="Αυξημένη προτεραιότητα" subtitle="Κίνδυνοι ή εξελίξεις που χρειάζονται πρώτα προσοχή" items={feed.urgent || []} decisionContext={decisionContext} />
           <Section title="Δημοσιευμένες ευκαιρίες" subtitle="Φάκελοι που πέρασαν όλους τους ελέγχους και τη διαδικασία δημοσίευσης" items={feed.published || []} decisionContext={decisionContext} />
