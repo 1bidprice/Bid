@@ -66,6 +66,8 @@ async function importPureModule(relativePath) {
   assert.equal(buy.events[0].kind, 'NEW_BUY');
   assert.equal(buy.events[0].owned, false);
   assert.equal(buy.events[0].action, 'BUY_NOW');
+  const repeatedBuy = policy.buildDecisionChangeEvents(buyFeed, held, buy.currentSnapshot, alwaysCurrent);
+  assert.equal(repeatedBuy.events.length, 0, 'unchanged buy signal must not spam repeated pushes');
 
   const sellFeed = {
     decisions: [{
