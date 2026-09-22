@@ -62,7 +62,7 @@ parser.parse(opportunities, { sourceType: 'module', plugins: ['jsx'] });
 parser.parse(portfolio, { sourceType: 'module', plugins: ['jsx'] });
 
 assert(finalCard.includes('canonicalPositionSymbol(position.symbol) === canonicalPositionSymbol(item?.symbol)'), 'FinalDecisionCard canonical holder match missing');
-assert(portfolio.includes('<OpportunitiesView portfolioPositions={positions} />'), 'portfolio positions are not bridged to OpportunitiesView');
+assert(portfolio.includes('<OpportunitiesView portfolioPositions={positions} portfolioPolicy={state.minbeisPolicy} />'), 'portfolio positions and MINBEIS portfolio policy are not bridged to OpportunitiesView');
 assert(opportunities.includes('personalizedDecisionCounts(feed, portfolioPositions, decisionContext)'), 'personalized decision counter with validity context missing');
 assert(opportunities.includes("import { finalActionIsCurrent } from './decision-validity';"), 'personalized counters must fail closed through decision validity');
 assert(opportunities.includes('inferredReferenceCurrency(referencePrice, item)'), 'safe currency inference missing');
