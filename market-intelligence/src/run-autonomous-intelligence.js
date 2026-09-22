@@ -36,6 +36,8 @@ import { selectBroadFundamentalCandidates } from './broad-equity-fundamental-sel
 import { screenBroadEquityMarketCandidates } from './broad-equity-market-screen.js';
 import { reconcileOpportunityPurchaseDecisions } from './opportunity-purchase-reconciliation.js';
 import { buildOperationalHealth } from './operational-health.js';
+import { buildMinbeisDecision } from './minbeis-decision-layer.js';
+import { createMinbeisDecisionOutcomeRecord, evaluateMinbeisDecisionOutcome, mergeMinbeisDecisionOutcomeLedger, summarizeMinbeisDecisionOutcomes } from './minbeis-decision-outcome-ledger.js';
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_UNIVERSE_PATH = path.resolve(MODULE_DIR, '../config/universe.seed.json');
@@ -124,6 +126,58 @@ function annotateDiscovery(dossiers, discovery, broadOpportunityScan, seedUniver
 
 function byCompanyId(items = []) {
   return new Map(items.filter((item) => item?.companyId).map((item) => [item.companyId, item]));
+}
+
+function createCurrentMinbeisOutcomeRecords(purchaseReconciliation, dossiers, generatedAt) {
+  const byDossierId = new Map((Array.isArray(dossiers) ? dossiers : []).filter((item) => item?.dossierId).map((item) => [item.dossierId, item]));
+  const byCompany = dossierMap(Array.isArray(dossiers) ? dossiers : []);
+  const records = [];
+  for (const purchase of purchaseReconciliation?.decisions || []) {
+    const dossier = (purchase?.dossierId && byDossierId.get(purchase.dossierId)) || byCompany.get(purchase?.companyId || purchase?.instrumentId) || null;
+    if (!dossier) continue;
+    const decision = buildMinbeisDecision({
+      finalAction: dossier.finalAction || null,
+      opportunityPurchase: purchase,
+      hasPosition: false,
+    });
+    if (!['BUY_PROBE', 'BUY_STARTER', 'BUY_CORE'].includes(decision.action)) continue;
+    const referencePrice = Number(dossier?.referencePrice?.value);
+    if (!Number.isFinite(referencePrice) || referencePrice <= 0) continue;
+    records.push(createMinbeisDecisionOutcomeRecord({
+      instrumentId: purchase.instrumentId || purchase.companyId || dossier.companyId,
+      companyId: purchase.companyId || dossier.companyId || null,
+      symbol: purchase.symbol || dossier?.listing?.symbol || dossier?.symbol || null,
+      action: decision.action,
+      allocationPct: decision.allocationPct,
+      decisionAt: finalActionDecisionTimestamp(dossier.finalAction, generatedAt),
+      referencePrice,
+      currency: dossier?.referencePrice?.currency || dossier?.listing?.currency || null,
+      benchmarkSymbol: dossier?.metrics?.market?.benchmarkSymbol || null,
+      confidenceScore: decision.confidenceScore,
+      dataQualityScore: decision.dataQualityScore,
+    }));
+  }
+  return records;
+}
+
+function finalActionDecisionTimestamp(finalAction, fallback) {
+  const value = finalAction?.generatedAt || fallback;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? new Date(fallback).toISOString() : date.toISOString();
+}
+
+function evaluateCurrentMinbeisOutcomeLedger(records, historicalSeriesCollector, benchmarkSeriesCollector, generatedAt) {
+  return mergeMinbeisDecisionOutcomeLedger([], records.map((record) => {
+    const marketSeries = historicalSeriesCollector.get(record.companyId) || null;
+    if (!marketSeries?.usable || !Array.isArray(marketSeries?.candles) || !marketSeries.candles.length) return record;
+    const benchmarkSeries = benchmarkSeriesCollector.get(record.companyId) || null;
+    return evaluateMinbeisDecisionOutcome(
+      record,
+      marketSeries.candles,
+      benchmarkSeries?.usable && Array.isArray(benchmarkSeries?.candles) ? benchmarkSeries.candles : [],
+      { evaluatedAt: generatedAt },
+    );
+  }));
 }
 
 function dossierMap(items = []) {
@@ -385,6 +439,19 @@ export async function runAutonomousIntelligence(options = {}) {
     immediatePriceAgeHours: options.immediatePriceAgeHours,
     minimumImmediateLiquidityScore: options.minimumImmediateLiquidityScore,
   });
+  const currentMinbeisOutcomeRecords = createCurrentMinbeisOutcomeRecords(opportunityPurchaseReconciliation, researchDossiers, generatedAt);
+  const mergedMinbeisOutcomeRecords = mergeMinbeisDecisionOutcomeLedger(options.minbeisDecisionOutcomeRecords || [], currentMinbeisOutcomeRecords);
+  const minbeisDecisionOutcomeRecords = evaluateCurrentMinbeisOutcomeLedger(mergedMinbeisOutcomeRecords, historicalSeriesCollector, benchmarkSeriesCollector, generatedAt);
+  const minbeisDecisionOutcomeSummary = summarizeMinbeisDecisionOutcomes(minbeisDecisionOutcomeRecords);
+  if (typeof options.minbeisDecisionOutcomeLedgerSink === 'function') {
+    await options.minbeisDecisionOutcomeLedgerSink({
+      format: 'investor-control-minbeis-decision-outcome-archive',
+      version: 1,
+      updatedAt: generatedAt,
+      records: minbeisDecisionOutcomeRecords,
+      summary: minbeisDecisionOutcomeSummary,
+    });
+  }
   const longHistoryResearch = await collectLongHistoryResearch({
     universe: expandedUniverse,
     researchDossiers,
@@ -570,7 +637,12 @@ async function main() {
     ? path.resolve(process.cwd(), process.env.FORECAST_OUTCOME_LEDGER_PATH)
     : null;
   const ledgerOutputPath = path.resolve(process.cwd(), process.env.FORECAST_OUTCOME_LEDGER_OUTPUT || 'out/forecast-outcome-ledger.json');
+  const minbeisLedgerInputPath = process.env.MINBEIS_DECISION_OUTCOME_LEDGER_PATH
+    ? path.resolve(process.cwd(), process.env.MINBEIS_DECISION_OUTCOME_LEDGER_PATH)
+    : null;
+  const minbeisLedgerOutputPath = path.resolve(process.cwd(), process.env.MINBEIS_DECISION_OUTCOME_LEDGER_OUTPUT || 'out/minbeis-decision-outcome-ledger.json');
   let forecastOutcomeLedgerRecords = [];
+  let minbeisDecisionOutcomeRecords = [];
   if (ledgerInputPath) {
     try {
       const existingArchive = JSON.parse(await readFile(ledgerInputPath, 'utf8'));
@@ -579,16 +651,30 @@ async function main() {
       if (error?.code !== 'ENOENT') throw error;
     }
   }
+  if (minbeisLedgerInputPath) {
+    try {
+      const existingMinbeisArchive = JSON.parse(await readFile(minbeisLedgerInputPath, 'utf8'));
+      minbeisDecisionOutcomeRecords = Array.isArray(existingMinbeisArchive?.records) ? existingMinbeisArchive.records : [];
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+  }
   let persistedForecastOutcomeArchive = null;
+  let persistedMinbeisDecisionOutcomeArchive = null;
   const report = await runAutonomousIntelligence({
     forecastOutcomeLedgerRecords,
     forecastOutcomeLedgerSink: (archive) => { persistedForecastOutcomeArchive = archive; },
+    minbeisDecisionOutcomeRecords,
+    minbeisDecisionOutcomeLedgerSink: (archive) => { persistedMinbeisDecisionOutcomeArchive = archive; },
   });
   if (!persistedForecastOutcomeArchive) throw new Error('Forecast outcome archive cycle did not produce a persistence payload');
+  if (!persistedMinbeisDecisionOutcomeArchive) throw new Error('MINBEIS decision outcome archive cycle did not produce a persistence payload');
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   await mkdir(path.dirname(ledgerOutputPath), { recursive: true });
   await writeFile(ledgerOutputPath, `${JSON.stringify(persistedForecastOutcomeArchive, null, 2)}\n`, 'utf8');
+  await mkdir(path.dirname(minbeisLedgerOutputPath), { recursive: true });
+  await writeFile(minbeisLedgerOutputPath, `${JSON.stringify(persistedMinbeisDecisionOutcomeArchive, null, 2)}\n`, 'utf8');
   console.log(`Wrote autonomous intelligence report to ${outputPath}`);
   console.log(`Event discovery: ${report.discovery.candidateCount} candidates, ${report.discovery.deepAnalysisCompanyCount} additions`);
   console.log(`Broad opportunity screen: ${report.broadOpportunityScan.directoryEligibleCount || 0} eligible, ${report.broadOpportunityScan.candidates?.length || 0} deep-analysis additions`);
@@ -596,6 +682,7 @@ async function main() {
   console.log(`Deep verification queue: ${report.opportunityDeepVerificationQueue.length}`);
   console.log(`Final actions: ${JSON.stringify(report.finalActionCounts)}`);
   console.log(`Automatically published dossiers: ${report.autonomousPublicationCount}`);
+  console.log(`MINBEIS decision outcomes: ${report.minbeisDecisionOutcomeRecordCount || 0} tracked records`);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : '';
