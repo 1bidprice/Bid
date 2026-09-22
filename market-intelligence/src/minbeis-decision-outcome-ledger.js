@@ -87,3 +87,22 @@ export function summarizeMinbeisDecisionOutcomes(records = []) {
   }
   return { format: 'investor-control-minbeis-decision-outcome-summary', version: 1, policyVersion: MINBEIS_DECISION_OUTCOME_LEDGER_VERSION, recordCount: rows.length, horizons: summary, caution: 'Outcome statistics describe historical observed decisions and are not a promise of future performance.' };
 }
+
+export function mergeMinbeisDecisionOutcomeLedger(existing = [], incoming = []) {
+  const map = new Map();
+  for (const record of [...(Array.isArray(existing) ? existing : []), ...(Array.isArray(incoming) ? incoming : [])]) {
+    if (!record?.decisionId) continue;
+    const current = map.get(record.decisionId);
+    if (!current) {
+      map.set(record.decisionId, record);
+      continue;
+    }
+    const mergedHorizons = { ...(current.horizons || {}) };
+    for (const [key, value] of Object.entries(record.horizons || {})) {
+      const currentValue = mergedHorizons[key];
+      mergedHorizons[key] = currentValue?.status === 'MATURED' ? currentValue : value;
+    }
+    map.set(record.decisionId, { ...current, ...record, horizons: mergedHorizons });
+  }
+  return [...map.values()].sort((a, b) => String(a.decisionAt).localeCompare(String(b.decisionAt)) || String(a.decisionId).localeCompare(String(b.decisionId)));
+}
