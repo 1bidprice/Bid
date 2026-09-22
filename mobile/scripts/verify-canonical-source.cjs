@@ -30,7 +30,7 @@ assert.ok(portfolio.includes("const VERSION = '1.7.3';"), 'PortfolioApp must be 
 assert.ok(decision.includes("const VERSION = '1.7.3';"), 'DecisionOverlay must be canonical v1.7.3 source');
 
 assert.ok(portfolio.includes('function quoteHeadlineLabel(quote)'), 'quote timing UI must be materialized in canonical source');
-assert.ok(portfolio.includes('<OpportunitiesView portfolioPositions={positions} />'), 'portfolio-aware decision bridge must be canonical source');
+assert.ok(portfolio.includes('<OpportunitiesView portfolioPositions={positions} portfolioPolicy={state.minbeisPolicy} />'), 'portfolio-aware MINBEIS policy bridge must be canonical source');
 assert.ok(portfolio.includes("maxWidth: '48%', flexShrink: 1"), 'mobile quote badge regression fix must be canonical source');
 
 assert.ok(portfolio.includes("import { buildPortfolioSnapshot } from './src/portfolio-engine';"), 'PortfolioApp must consume canonical portfolio engine');
