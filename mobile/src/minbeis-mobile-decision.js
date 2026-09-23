@@ -100,6 +100,7 @@ export function buildPersonalizedMinbeisDashboard(feed, portfolioPositions = [],
       dataQualityScore: Number.isFinite(Number(finalAction?.dataQualityScore)) ? Number(finalAction.dataQualityScore) : null,
       finalAction,
       minbeisAssessment: item?.minbeisAssessment || null,
+      historicalContext: item?.historicalContext || null,
       purchase: purchase || null,
     });
   }
