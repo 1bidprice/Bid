@@ -48,6 +48,8 @@ import {
 } from './src/background-alert-task';
 import { exportBackupAsync, pickBackupAsync } from './src/backup';
 import OpportunitiesView from './src/OpportunitiesView';
+import { buildMinbeisHomeSummary } from './src/minbeis-home-summary';
+import { loadCachedIntelligenceFeed, syncIntelligenceFeedAsync } from './src/intelligence-feed-store';
 import {
   canonicalInstrumentSymbol,
   instrumentCurrency,
@@ -717,6 +719,8 @@ function MainApp({ onOpenDecisionGate }) {
   const [notificationStatus, setNotificationStatus] = useState('unknown');
   const [backgroundRegistered, setBackgroundRegistered] = useState(false);
   const [legalAccepted, setLegalAccepted] = useState(null);
+  const [minbeisHomeFeed, setMinbeisHomeFeed] = useState(null);
+  const [minbeisHomeSyncing, setMinbeisHomeSyncing] = useState(false);
   const tokenRef = useRef('');
   const appState = useRef(AppState.currentState);
   const onboardingAttemptedRef = useRef(new Set());
@@ -731,6 +735,28 @@ function MainApp({ onOpenDecisionGate }) {
     await AsyncStorage.setItem(LEGAL_ACCEPTANCE_KEY, 'accepted');
     setLegalAccepted(true);
   }, []);
+
+  const refreshMinbeisHomeFeed = useCallback(async () => {
+    if (minbeisHomeSyncing) return;
+    setMinbeisHomeSyncing(true);
+    try {
+      const cached = await loadCachedIntelligenceFeed();
+      if (cached) setMinbeisHomeFeed(cached);
+      const synced = await syncIntelligenceFeedAsync();
+      if (synced?.feed) setMinbeisHomeFeed(synced.feed);
+    } catch {
+      // Home intelligence is additive. Portfolio accounting must remain usable offline.
+    } finally {
+      setMinbeisHomeSyncing(false);
+    }
+  }, [minbeisHomeSyncing]);
+
+  useEffect(() => {
+    if (loading) return;
+    refreshMinbeisHomeFeed();
+    const interval = setInterval(() => { refreshMinbeisHomeFeed(); }, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [loading, refreshMinbeisHomeFeed]);
 
   const persist = useCallback(async (nextInput) => {
     const normalized = normalizeState(nextInput);
@@ -801,6 +827,11 @@ function MainApp({ onOpenDecisionGate }) {
     valuationCoverage,
     missingValuationSymbols,
   } = portfolioSnapshot.summary;
+  const minbeisHomeSummary = useMemo(
+    () => buildMinbeisHomeSummary(minbeisHomeFeed, positions),
+    [minbeisHomeFeed, positions],
+  );
+
 
   const liveUsProviderSymbols = useMemo(
     () => [...new Set(positions
@@ -968,6 +999,33 @@ function MainApp({ onOpenDecisionGate }) {
           {state.meta.errors?.length ? <Text style={styles.warning}>{state.meta.errors.join('\n')}</Text> : null}
           <View style={styles.grid}><Metric compact={compactMetrics} label={valuesReady ? 'Αξία χαρτοφυλακίου' : 'Επιβεβ. αξία'} value={cash(totalValue)} /><Metric compact={compactMetrics} label={costsReady ? 'Καθαρό κόστος' : 'Επιβεβ. κόστος'} value={cash(totalCost)} /><Metric compact={compactMetrics} label={valuesReady ? 'Κέρδος / Ζημία' : 'Επιβεβ. αποτέλεσμα'} value={cash(totalPnl)} negative={totalPnl < 0} positiveValue={totalPnl > 0} /><Metric compact={compactMetrics} label="Κάλυψη τιμών" value={valuationCoverage} /></View>
           {!valuesReady ? <Text style={styles.warning}>Μερική αποτίμηση {valuationCoverage}. Εξαιρούνται από την αξία και το αποτέλεσμα μόνο οι θέσεις χωρίς χρησιμοποιήσιμη τιμή ή ισοτιμία: {missingValuationSymbols.join(', ') || '—'}.</Text> : null}
+          <Pressable style={[styles.minbeisHomeCard, minbeisHomeSummary.state === 'ATTENTION' && styles.minbeisHomeCardAttention]} onPress={() => setTab('opportunities')}>
+            <View style={styles.minbeisHomeTop}>
+              <View style={styles.grow}>
+                <Text style={styles.minbeisHomeEyebrow}>MINBEIS · ΧΑΡΤΟΦΥΛΑΚΙΟ ΣΗΜΕΡΑ</Text>
+                <Text style={styles.minbeisHomeTitle}>
+                  {minbeisHomeSummary.state === 'ATTENTION'
+                    ? `${minbeisHomeSummary.attentionCount} θέση${minbeisHomeSummary.attentionCount === 1 ? '' : 'εις'} χρειάζονται προσοχή`
+                    : minbeisHomeSummary.state === 'PENDING'
+                      ? 'Υπάρχουν θέσεις που περιμένουν πλήρη ανάλυση'
+                      : minbeisHomeSummary.state === 'CLEAR'
+                        ? 'Καμία θέση δεν απαιτεί άμεση προσοχή'
+                        : minbeisHomeSummary.state === 'STALE'
+                          ? 'Η MINBEIS ροή χρειάζεται ανανέωση'
+                          : minbeisHomeSummary.state === 'SYSTEM_LIMITED'
+                            ? 'Η ανάλυση είναι προσωρινά περιορισμένη'
+                            : 'Φόρτωση MINBEIS ανάλυσης'}
+                </Text>
+              </View>
+              <Text style={styles.minbeisHomeArrow}>›</Text>
+            </View>
+            {minbeisHomeSummary.attentionSymbols.length ? <Text style={styles.minbeisHomeAttention}>Προσοχή: {minbeisHomeSummary.attentionSymbols.join(', ')}</Text> : null}
+            <View style={styles.minbeisHomeStats}>
+              <Text style={styles.minbeisHomeStat}>Κάλυψη {minbeisHomeSummary.coveredPositionCount}/{minbeisHomeSummary.portfolioPositionCount}</Text>
+              <Text style={styles.minbeisHomeStat}>Εκκρεμούν {minbeisHomeSummary.pendingPositionCount}</Text>
+              <Text style={styles.minbeisHomeStat}>{minbeisHomeSyncing ? 'Ανανέωση…' : minbeisHomeSummary.feedFresh ? 'Live feed' : 'Έλεγχος feed'}</Text>
+            </View>
+          </Pressable>
           <Pressable style={styles.decisionEntry} onPress={onOpenDecisionGate} accessibilityLabel="Άνοιγμα Decision Gate">
             <View style={styles.decisionEntryIcon}><Text style={styles.decisionEntryCheck}>✓</Text></View>
             <View style={styles.grow}><Text style={styles.decisionEntryTitle}>Decision Gate</Text><Text style={styles.decisionEntryText}>Έλεγχος πειθαρχίας πριν από αγορά ή ενίσχυση θέσης</Text></View>
@@ -1046,7 +1104,17 @@ const styles = StyleSheet.create({
   plus: { width: 58, height: 58, borderRadius: 20, borderWidth: 1, borderColor: '#cfdae9', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' }, plusText: { color: '#16345f', fontSize: 42, lineHeight: 46, fontWeight: '300' },
   refreshCard: { marginTop: 24, backgroundColor: '#fff', borderRadius: 24, borderWidth: 1, borderColor: '#d5dfec', padding: 18, flexDirection: 'row', alignItems: 'center', gap: 14 }, checked: { color: '#16345f', fontWeight: '900', fontSize: 20, marginTop: 4 }, muted: { color: '#7b889d', fontSize: 15, lineHeight: 22 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10, marginTop: 12 }, metric: { width: '48.5%', minHeight: 102, borderRadius: 20, borderWidth: 1, borderColor: '#d5dfec', backgroundColor: '#fff', padding: 14, justifyContent: 'space-between' }, metricCompact: { paddingHorizontal: 11 }, metricValue: { color: '#16345f', fontSize: 21, lineHeight: 26, fontWeight: '900', marginTop: 9 }, red: { color: '#d83b4d' }, green: { color: '#078548' },
-  warning: { color: '#a66700', backgroundColor: '#fff6df', borderRadius: 14, padding: 12, marginTop: 12, lineHeight: 21, fontWeight: '700' }, decisionEntry: { minHeight: 76, borderRadius: 21, backgroundColor: '#07163E', flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 15, paddingVertical: 12, marginTop: 16 }, decisionEntryIcon: { width: 44, height: 44, borderRadius: 15, backgroundColor: '#0B66FF', alignItems: 'center', justifyContent: 'center' }, decisionEntryCheck: { color: '#fff', fontSize: 28, lineHeight: 32, fontWeight: '900' }, decisionEntryTitle: { color: '#fff', fontSize: 17, fontWeight: '900' }, decisionEntryText: { color: '#b8c9e8', fontSize: 12, lineHeight: 17, marginTop: 2 }, decisionEntryArrow: { color: '#8eb8ff', fontSize: 34, lineHeight: 36, fontWeight: '500' }, quickActions: { flexDirection: 'row', gap: 12, marginTop: 18 }, primaryQuick: { flex: 1.35, minHeight: 54, backgroundColor: '#0B66FF', borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 }, secondaryQuick: { flex: 0.75, minHeight: 54, backgroundColor: '#fff', borderRadius: 17, borderWidth: 1, borderColor: '#d3deeb', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  warning: { color: '#a66700', backgroundColor: '#fff6df', borderRadius: 14, padding: 12, marginTop: 12, lineHeight: 21, fontWeight: '700' },
+  minbeisHomeCard: { marginTop: 16, borderRadius: 21, borderWidth: 1, borderColor: '#bfd3ef', backgroundColor: '#f8fbff', padding: 15 },
+  minbeisHomeCardAttention: { borderColor: '#e8b562', backgroundColor: '#fff8e8' },
+  minbeisHomeTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  minbeisHomeEyebrow: { color: '#0B66FF', fontSize: 10, fontWeight: '900', letterSpacing: 0.7 },
+  minbeisHomeTitle: { color: '#16345f', fontSize: 18, lineHeight: 24, fontWeight: '900', marginTop: 4 },
+  minbeisHomeArrow: { color: '#0B66FF', fontSize: 34, lineHeight: 36, fontWeight: '500' },
+  minbeisHomeAttention: { color: '#9a6500', fontSize: 11, lineHeight: 16, fontWeight: '900', marginTop: 9 },
+  minbeisHomeStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
+  minbeisHomeStat: { color: '#60728b', fontSize: 9, fontWeight: '800', backgroundColor: '#edf3fb', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 5 },
+  decisionEntry: { minHeight: 76, borderRadius: 21, backgroundColor: '#07163E', flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 15, paddingVertical: 12, marginTop: 16 }, decisionEntryIcon: { width: 44, height: 44, borderRadius: 15, backgroundColor: '#0B66FF', alignItems: 'center', justifyContent: 'center' }, decisionEntryCheck: { color: '#fff', fontSize: 28, lineHeight: 32, fontWeight: '900' }, decisionEntryTitle: { color: '#fff', fontSize: 17, fontWeight: '900' }, decisionEntryText: { color: '#b8c9e8', fontSize: 12, lineHeight: 17, marginTop: 2 }, decisionEntryArrow: { color: '#8eb8ff', fontSize: 34, lineHeight: 36, fontWeight: '500' }, quickActions: { flexDirection: 'row', gap: 12, marginTop: 18 }, primaryQuick: { flex: 1.35, minHeight: 54, backgroundColor: '#0B66FF', borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 }, secondaryQuick: { flex: 0.75, minHeight: 54, backgroundColor: '#fff', borderRadius: 17, borderWidth: 1, borderColor: '#d3deeb', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   sectionRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10, marginTop: 22, marginBottom: 12 }, section: { color: '#16345f', fontSize: 28, lineHeight: 34, fontWeight: '900', marginTop: 22, marginBottom: 12 }, subsection: { color: '#16345f', fontSize: 22, fontWeight: '900', marginTop: 20, marginBottom: 10 },
   card: { backgroundColor: '#fff', borderRadius: 22, borderWidth: 1, borderColor: '#d4deeb', padding: 17, marginBottom: 12 }, cardTitle: { color: '#16345f', fontSize: 21, lineHeight: 26, fontWeight: '900' }, badge: { backgroundColor: '#edf4ff', paddingHorizontal: 13, paddingVertical: 9, borderRadius: 18, maxWidth: '48%', flexShrink: 1 }, badgeText: { color: '#0B66FF', fontWeight: '900', fontSize: 13 }, badgeBad: { backgroundColor: '#fff0f2' }, badgeBadText: { color: '#d83b4d' },
   priceRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 18, gap: 10 }, big: { color: '#16345f', fontSize: 39, lineHeight: 45, fontWeight: '900', marginTop: 2 }, performanceStack: { width: '100%', borderRadius: 16, borderWidth: 1, borderColor: '#d8e2ee', backgroundColor: '#f8fbff', paddingHorizontal: 13, paddingVertical: 10, marginTop: 12 }, performanceLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 7 }, performanceLabel: { color: '#617087', fontSize: 13, lineHeight: 18, fontWeight: '800', flex: 1 }, performanceValue: { fontSize: 17, lineHeight: 21, fontWeight: '900', textAlign: 'right' }, performanceValuePrimary: { fontSize: 18, lineHeight: 22 }, performanceDivider: { height: 1, backgroundColor: '#e4ebf4', marginVertical: 7 }, quoteTransparency: { backgroundColor: '#f3f7fc', borderRadius: 14, padding: 11, marginTop: 10 }, quoteTransparencyTitle: { color: '#16345f', fontSize: 12, fontWeight: '900', marginBottom: 3 }, quoteTransparencyText: { color: '#718096', fontSize: 11, lineHeight: 16 }, quoteTransparencyWarning: { color: '#9a6500', fontSize: 11, lineHeight: 16, fontWeight: '800', marginTop: 5 }, quoteHeadlineWarning: { color: '#9a6500', fontSize: 9, lineHeight: 13, fontWeight: '800', marginTop: 3 }, quoteContractText: { color: '#40536f', fontSize: 10, lineHeight: 15, fontWeight: '700', marginTop: 5 }, note: { color: '#67768c', fontSize: 15, lineHeight: 23, marginTop: 10 }, source: { color: '#8591a3', fontSize: 13, lineHeight: 20, marginTop: 10 }, tapHint: { color: '#0B66FF', fontWeight: '800', marginTop: 15, fontSize: 13 }, detailPanel: { borderTopWidth: 1, borderTopColor: '#e5ebf3', marginTop: 16, paddingTop: 14 }, lotsSection: { marginTop: 14 }, lotsHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 }, lotsTitle: { color: '#16345f', fontSize: 18, fontWeight: '900' }, lotsSubtitle: { color: '#7b889d', fontSize: 12, lineHeight: 17, marginTop: 2 }, lotsCountBadge: { minWidth: 34, height: 34, borderRadius: 17, backgroundColor: '#edf4ff', alignItems: 'center', justifyContent: 'center' }, lotsCountText: { color: '#0B66FF', fontWeight: '900' }, lotCard: { borderRadius: 17, borderWidth: 1, borderColor: '#d7e1ed', backgroundColor: '#f9fbfe', padding: 13, marginBottom: 9 }, lotTitle: { color: '#16345f', fontSize: 16, fontWeight: '900' }, lotDate: { color: '#8490a2', fontSize: 11, lineHeight: 16, marginTop: 2 }, lotPerformance: { fontSize: 17, fontWeight: '900' }, lotMeta: { color: '#62738a', fontSize: 12, lineHeight: 18, marginTop: 8 }, lotResultRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 9, paddingTop: 9, borderTopWidth: 1, borderTopColor: '#e3eaf3' }, lotResultLabel: { color: '#7b889d', fontSize: 11, flex: 1 }, lotResultValue: { fontSize: 14, fontWeight: '900', textAlign: 'right' }, lotMethodNote: { color: '#6d7b8e', backgroundColor: '#f1f5fa', borderRadius: 13, padding: 10, fontSize: 11, lineHeight: 16, marginTop: 2 },
