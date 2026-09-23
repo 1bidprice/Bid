@@ -18,6 +18,7 @@ import {
 } from './intelligence-feed-store';
 import FinalDecisionCard from './FinalDecisionCard';
 import { finalActionIsCurrent } from './decision-validity';
+import { intelligenceSystemReady } from './intelligence-readiness';
 import { applyMinbeisPortfolioSizing } from './minbeis-portfolio-sizing';
 import { buildPersonalizedMinbeisDashboard } from './minbeis-mobile-decision';
 import { recordLocalMinbeisClarityFeedback, startLocalMinbeisProductSession } from './minbeis-product-metrics';
