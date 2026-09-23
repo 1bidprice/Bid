@@ -19,6 +19,7 @@ import {
 import FinalDecisionCard from './FinalDecisionCard';
 import { finalActionIsCurrent } from './decision-validity';
 import { applyMinbeisPortfolioSizing } from './minbeis-portfolio-sizing';
+import { buildPersonalizedMinbeisDashboard } from './minbeis-mobile-decision';
 
 function money(referencePrice, item) {
   const value = Number(referencePrice?.value);
@@ -162,6 +163,64 @@ function minbeisAllocationText(decision) {
   const value = Number.isFinite(adjusted) ? adjusted : base;
   if (!Number.isFinite(value) || value <= 0) return '0%';
   return `${value.toLocaleString('el-GR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}% χαρτοφυλακίου`;
+}
+
+function minbeisReasonText(row) {
+  return {
+    HOLDER_SELL_NOW: 'Η θέση σου έχει ενεργό σήμα μείωσης/πώλησης από τον canonical decision engine.',
+    HOLDER_HOLD: 'Η θέση σου παραμένει σε διακράτηση με τα τρέχοντα επαληθευμένα δεδομένα.',
+    HOLDER_WATCH: 'Δεν υπάρχει ενεργή εντολή μείωσης ή ενίσχυσης για τη θέση σου.',
+    STRICT_PURCHASE_CONFIRMED: 'Η νέα αγορά πέρασε και το strict purchase reconciliation.',
+    BUY_REQUIRES_STRICT_PURCHASE_CONFIRMATION: 'Υπάρχει θετική κατεύθυνση, αλλά δεν έχει περάσει ακόμη το strict purchase reconciliation.',
+    NON_HOLDER_BLOCKED: 'Η τρέχουσα canonical απόφαση δεν επιτρέπει νέα αγορά.',
+    NON_HOLDER_WATCH: 'Δεν υπάρχει επιβεβαιωμένη αγορά τώρα· παραμένει σε παρακολούθηση.',
+  }[row?.reason] || 'Η απόφαση προκύπτει από τον canonical Investor Control engine.';
+}
+
+function MinbeisDashboard({ dashboard, sourceDecisionCount = 0, decisionContext }) {
+  const rows = Array.isArray(dashboard?.rows) ? dashboard.rows : [];
+  const counts = dashboard?.counts || {};
+  const actionable = Number(dashboard?.actionableCount || 0);
+  const headline = actionable > 0
+    ? `${actionable} ουσιαστική αλλαγή${actionable === 1 ? '' : 'ές'} απαιτεί προσοχή`
+    : rows.length
+      ? 'Καμία επιβεβαιωμένη αγορά ή μείωση τώρα'
+      : sourceDecisionCount > 0
+        ? 'Υπάρχουν αναλύσεις, αλλά καμία ενεργή απόφαση δεν περνά τώρα τους κανόνες φρεσκότητας'
+        : 'Δεν υπάρχουν ακόμη τελικές αποφάσεις MINBEIS';
+
+  return (
+    <View style={styles.minbeisShell}>
+      <View style={styles.minbeisHero}>
+        <Text style={styles.minbeisEyebrow}>MINBEIS TODAY</Text>
+        <Text style={styles.minbeisHeroTitle}>{headline}</Text>
+        <Text style={styles.minbeisHeroText}>Ο MINBEIS χρησιμοποιεί τις canonical αποφάσεις του Investor Control και το πραγματικό χαρτοφυλάκιό σου. Δεν εκτελεί συναλλαγές.</Text>
+        <View style={styles.minbeisCountRow}>
+          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{Number(counts.BUY_PROBE || 0) + Number(counts.BUY_STARTER || 0)}</Text><Text style={styles.minbeisCountLabel}>BUY</Text></View>
+          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{counts.REDUCE || 0}</Text><Text style={styles.minbeisCountLabel}>REDUCE</Text></View>
+          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{counts.HOLD || 0}</Text><Text style={styles.minbeisCountLabel}>HOLD</Text></View>
+          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{counts.WATCH || 0}</Text><Text style={styles.minbeisCountLabel}>WATCH</Text></View>
+        </View>
+        {!decisionContext?.feedFresh ? <Text style={styles.minbeisCaution}>Οι ενεργές πράξεις απενεργοποιούνται όταν η ροή δεν είναι αρκετά πρόσφατη.</Text> : null}
+      </View>
+
+      {rows.slice(0, 10).map((row) => (
+        <View key={row.id} style={styles.minbeisDecisionCard}>
+          <View style={styles.rowTop}>
+            <View style={styles.grow}>
+              <Text style={styles.company}>{row.companyName}</Text>
+              <Text style={styles.symbol}>{row.symbol || '—'} · {row.owned ? 'ΘΕΣΗ ΣΟΥ' : 'ΝΕΑ ΙΔΕΑ'}</Text>
+            </View>
+            <View style={styles.minbeisActionBadge}>
+              <Text style={styles.minbeisActionText}>{minbeisActionLabel(row.action)}</Text>
+            </View>
+          </View>
+          <Text style={styles.minbeisDecisionReason}>{minbeisReasonText(row)}</Text>
+          <Text style={styles.ageText}>Confidence: {Number.isFinite(Number(row.confidenceScore)) ? Number(row.confidenceScore).toFixed(0) : '—'} · Data quality: {Number.isFinite(Number(row.dataQualityScore)) ? Number(row.dataQualityScore).toFixed(0) : '—'}</Text>
+        </View>
+      ))}
+    </View>
+  );
 }
 
 function purchaseReasonLabel(reason) {
@@ -340,6 +399,12 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
     () => personalizedDecisionCounts(feed, portfolioPositions, decisionContext),
     [feed, portfolioPositions, decisionContext],
   );
+  const minbeisDashboard = useMemo(
+    () => buildPersonalizedMinbeisDashboard(feed, portfolioPositions, {
+      isCurrentDecision: (finalAction) => finalActionIsCurrent(finalAction, decisionContext),
+    }),
+    [feed, portfolioPositions, decisionContext],
+  );
 
   const importFeed = async () => {
     setImporting(true);
@@ -382,8 +447,8 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
     <View>
       <View style={styles.headerRow}>
         <View style={styles.grow}>
-          <Text style={styles.title}>Ευκαιρίες</Text>
-          <Text style={styles.subtitle}>Αυτόνομα συμπεράσματα με διασταύρωση, φρεσκότητα και έλεγχο κινδύνου</Text>
+          <Text style={styles.title}>MINBEIS</Text>
+          <Text style={styles.subtitle}>Ο επενδυτικός εγκέφαλος του Investor Control · αποφάσεις, ρίσκο και επόμενη πράξη</Text>
         </View>
         <Pressable style={[styles.syncSmall, syncing && styles.disabled]} onPress={() => sync({ manual: true })} disabled={syncing}>
           {syncing ? <ActivityIndicator color="#fff" /> : <Text style={styles.syncSmallText}>Ανανέωση</Text>}
@@ -430,13 +495,14 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
         </View>
       ) : (
         <>
+          <MinbeisDashboard dashboard={minbeisDashboard} sourceDecisionCount={(feed.decisions || []).length} decisionContext={decisionContext} />
           <View style={styles.summaryCard}>
             <Text style={styles.summaryHeadline}>{feed.today?.headline || 'Ημερήσια σύνοψη'}</Text>
             <Text style={styles.updated}>Έγκυρη ροή: {when(feed.generatedAt)}</Text>
             <View style={styles.countRow}>
-              <View style={styles.countBox}><Text style={styles.countValue}>{personalizedCounts.buyNowCount || 0}</Text><Text style={styles.countLabel}>Αγορά τώρα</Text></View>
-              <View style={styles.countBox}><Text style={styles.countValue}>{personalizedCounts.sellNowCount || 0}</Text><Text style={styles.countLabel}>Πώληση τώρα</Text></View>
-              <View style={styles.countBox}><Text style={styles.countValue}>{counts.finalActionCount || 0}</Text><Text style={styles.countLabel}>Τελικά σήματα</Text></View>
+              <View style={styles.countBox}><Text style={styles.countValue}>{personalizedCounts.buyNowCount || 0}</Text><Text style={styles.countLabel}>Canonical BUY</Text></View>
+              <View style={styles.countBox}><Text style={styles.countValue}>{personalizedCounts.sellNowCount || 0}</Text><Text style={styles.countLabel}>Canonical SELL</Text></View>
+              <View style={styles.countBox}><Text style={styles.countValue}>{counts.finalActionCount || 0}</Text><Text style={styles.countLabel}>Τελικές αναλύσεις</Text></View>
             </View>
           </View>
 
@@ -488,6 +554,20 @@ const styles = StyleSheet.create({
   primary: { minHeight: 56, borderRadius: 18, backgroundColor: '#0B66FF', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, marginTop: 18 },
   primaryText: { color: '#fff', fontWeight: '900', textAlign: 'center' },
   privacy: { color: '#718096', fontSize: 12, lineHeight: 18, marginTop: 13 },
+  minbeisShell: { marginBottom: 20 },
+  minbeisHero: { backgroundColor: '#081d3d', borderRadius: 24, padding: 18, marginBottom: 10 },
+  minbeisEyebrow: { color: '#8fbaff', fontSize: 11, fontWeight: '900', letterSpacing: 1.1 },
+  minbeisHeroTitle: { color: '#fff', fontSize: 22, lineHeight: 29, fontWeight: '900', marginTop: 7 },
+  minbeisHeroText: { color: '#c8d9f5', fontSize: 12, lineHeight: 18, marginTop: 7 },
+  minbeisCountRow: { flexDirection: 'row', gap: 7, marginTop: 15 },
+  minbeisCountBox: { flex: 1, backgroundColor: 'rgba(255,255,255,0.10)', borderRadius: 13, paddingVertical: 9, alignItems: 'center' },
+  minbeisCountValue: { color: '#fff', fontSize: 19, fontWeight: '900' },
+  minbeisCountLabel: { color: '#c8d9f5', fontSize: 8, fontWeight: '900', marginTop: 2 },
+  minbeisCaution: { color: '#ffd98a', fontSize: 11, lineHeight: 16, marginTop: 12, fontWeight: '800' },
+  minbeisDecisionCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#bfd3ef', borderRadius: 18, padding: 14, marginBottom: 8 },
+  minbeisActionBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#eaf2ff' },
+  minbeisActionText: { color: '#0B66FF', fontSize: 10, fontWeight: '900' },
+  minbeisDecisionReason: { color: '#40536f', fontSize: 12, lineHeight: 18, marginTop: 9 },
   summaryCard: { backgroundColor: '#0b2d61', borderRadius: 23, padding: 18, marginBottom: 20 },
   summaryHeadline: { color: '#fff', fontSize: 20, lineHeight: 27, fontWeight: '900' },
   updated: { color: '#c8dcff', fontSize: 12, marginTop: 5 },
