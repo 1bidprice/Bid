@@ -25,6 +25,7 @@ export function normalizeGatewayClientId(value) {
 }
 
 export function gatewayCacheTtlSeconds(resourceKey) {
+  if (String(resourceKey || '').startsWith('instrument:')) return 300;
   if (String(resourceKey || '').endsWith('.US')) return 30;
   if (String(resourceKey || '').endsWith('.GR')) return 60;
   if (String(resourceKey || '') === 'EURUSD') return 900;
@@ -36,6 +37,11 @@ function protectedResource(url) {
     const parsed = parseGatewaySymbol(url.searchParams.get('symbol'));
     if (!parsed) return null;
     return { resourceKey: parsed.appSymbol, upstreamKey: parsed.market, paramName: 'symbol', paramValue: parsed.appSymbol, pathname: '/v1/quote' };
+  }
+  if (url.pathname === '/v1/instrument') {
+    const parsed = parseGatewaySymbol(url.searchParams.get('symbol'));
+    if (!parsed) return null;
+    return { resourceKey: `instrument:${parsed.appSymbol}`, upstreamKey: parsed.market, paramName: 'symbol', paramValue: parsed.appSymbol, pathname: '/v1/instrument' };
   }
   if (url.pathname === '/v1/fx' && String(url.searchParams.get('pair') || '').trim().toUpperCase() === 'EURUSD') {
     return { resourceKey: 'EURUSD', upstreamKey: 'FX', paramName: 'pair', paramValue: 'EURUSD', pathname: '/v1/fx' };
