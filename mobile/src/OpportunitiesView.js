@@ -113,6 +113,7 @@ function IntelligenceCard({ item, decisionContext }) {
         </View>
         <Text style={[styles.category, risk && styles.riskText]}>{item.categoryLabel}</Text>
         <MinbeisAssessmentStrip assessment={item.minbeisAssessment} />
+        <HistoricalContextCard context={item.historicalContext} />
         <FinalDecisionCard item={item} decisionContext={decisionContext} />
         <View style={styles.actionRow}>
           <View style={styles.actionBox}><Text style={styles.muted}>Γενική ερευνητική ένδειξη</Text><Text style={[styles.action, risk && styles.riskText]}>{item.actionLabel}</Text><Text style={styles.ageText}>Δεν είναι η προσωπική σου πράξη</Text></View>
@@ -144,6 +145,36 @@ function IntelligenceCard({ item, decisionContext }) {
 
 function DiscoveryRadarCard({ item }) {
   return <View style={styles.discoveryCard}><View style={styles.rowTop}><View style={styles.grow}><Text style={styles.company}>{item.companyName}</Text><Text style={styles.symbol}>{item.symbol || '—'} · {item.exchange || '—'}</Text></View><View style={styles.discoveryScore}><Text style={styles.discoveryScoreValue}>{Math.round(Number(item.discoveryScore || 0))}</Text><Text style={styles.discoveryScoreLabel}>προτερ.</Text></View></View><Text style={styles.discoveryStatus}>ΑΥΤΟΜΑΤΗ ΑΝΑΚΑΛΥΨΗ · ΟΧΙ ΑΚΟΜΗ ΠΡΟΤΑΣΗ ΑΓΟΡΑΣ</Text><Text style={styles.discoveryDisclaimer}>Βαθμός προτεραιότητας διερεύνησης — όχι επενδυτική βαθμολογία.</Text>{(item.reasons || []).slice(0, 3).map((reason, index) => <Text key={index} style={styles.discoveryReason}>• {reason}</Text>)}<Text style={styles.discoveryTime}>Νεότερο γεγονός: {when(item.latestEventAt)}</Text></View>;
+}
+
+function historicalHorizonLabel(key) {
+  return {
+    week1: '1 εβδομάδα',
+    month1: '1 μήνας',
+    month3: '3 μήνες',
+  }[key] || key;
+}
+
+function HistoricalContextCard({ context }) {
+  if (!context || context.status !== 'RESEARCH_READY_UNCALIBRATED') return null;
+  const rows = Object.entries(context.horizons || {}).filter(([, item]) => item?.status === 'RESEARCH_READY_UNCALIBRATED');
+  if (!rows.length) return null;
+  return (
+    <View style={styles.historicalCard}>
+      <Text style={styles.historicalTitle}>Ιστορικά ανάλογα · research only</Text>
+      {context.regime ? <Text style={styles.historicalMeta}>Regime: {String(context.regime).replace(/_/g, ' ')}</Text> : null}
+      {rows.map(([key, item]) => (
+        <View key={key} style={styles.historicalRow}>
+          <Text style={styles.historicalHorizon}>{historicalHorizonLabel(key)}</Text>
+          <Text style={styles.historicalValue}>
+            {Number.isFinite(Number(item.historicalPositiveFrequencyPct)) ? `${Number(item.historicalPositiveFrequencyPct).toFixed(0)}% θετικές ιστορικές εκβάσεις` : 'χωρίς επαρκή συχνότητα'}
+          </Text>
+          <Text style={styles.historicalMeta}>{item.selectedAnalogCount || 0} ανεξάρτητα ανάλογα · effective sample {Number.isFinite(Number(item.effectiveSampleSize)) ? Number(item.effectiveSampleSize).toFixed(1) : '—'}</Text>
+        </View>
+      ))}
+      <Text style={styles.historicalCaution}>{context.caution}</Text>
+    </View>
+  );
 }
 
 function minbeisAssessmentLabel(classification) {
@@ -274,6 +305,7 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = nu
         const row = rowBySymbol.get(symbol) || null;
         const blockedDossier = blockedBySymbol.get(symbol) || null;
         const assessment = row?.minbeisAssessment || blockedDossier?.minbeisAssessment || null;
+        const historicalContext = row?.historicalContext || blockedDossier?.historicalContext || null;
         const capability = instrumentCapabilities?.[String(position?.symbol || '').trim().toUpperCase()] || null;
         const interimPlan = blockedDossier?.finalAction?.controlledPlan?.status === 'AVAILABLE'
           ? blockedDossier.finalAction.controlledPlan
@@ -297,6 +329,7 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = nu
               </View>
             </View>
             <MinbeisAssessmentStrip assessment={assessment} />
+            <HistoricalContextCard context={historicalContext} />
             {interimPlan ? (
               <View style={styles.interimPlanBox}>
                 <Text style={styles.interimPlanEyebrow}>ΠΡΟΣΩΡΙΝΟ RISK-CONTROL · ΟΧΙ ΤΕΛΙΚΗ ΑΠΟΦΑΣΗ</Text>
@@ -365,6 +398,7 @@ function MinbeisDashboard({ dashboard, sourceDecisionCount = 0, decisionContext 
             </View>
           </View>
           <MinbeisAssessmentStrip assessment={row.minbeisAssessment} />
+          <HistoricalContextCard context={row.historicalContext} />
           <Text style={styles.minbeisDecisionReason}>{minbeisReasonText(row)}</Text>
           <Text style={styles.ageText}>Confidence: {Number.isFinite(Number(row.confidenceScore)) ? Number(row.confidenceScore).toFixed(0) : '—'} · Data quality: {Number.isFinite(Number(row.dataQualityScore)) ? Number(row.dataQualityScore).toFixed(0) : '—'}</Text>
         </View>
@@ -721,6 +755,13 @@ const styles = StyleSheet.create({
   interimPlanAction: { color: '#16345f', fontSize: 16, lineHeight: 21, fontWeight: '900', marginTop: 5 },
   systemDetailsToggle: { marginTop: 10, minHeight: 42, borderRadius: 13, borderWidth: 1, borderColor: '#bdd9ff', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   systemDetailsToggleText: { color: '#0B66FF', fontSize: 11, fontWeight: '900' },
+  historicalCard: { backgroundColor: '#f7f5ff', borderWidth: 1, borderColor: '#d8cff3', borderRadius: 14, padding: 11, marginBottom: 8 },
+  historicalTitle: { color: '#44366e', fontSize: 11, fontWeight: '900' },
+  historicalRow: { borderTopWidth: 1, borderTopColor: '#e6e0f4', paddingTop: 7, marginTop: 7 },
+  historicalHorizon: { color: '#5b4b82', fontSize: 10, fontWeight: '900' },
+  historicalValue: { color: '#263c5e', fontSize: 12, fontWeight: '800', marginTop: 2 },
+  historicalMeta: { color: '#77849a', fontSize: 9, lineHeight: 13, marginTop: 2 },
+  historicalCaution: { color: '#6d6482', fontSize: 9, lineHeight: 14, marginTop: 8, fontStyle: 'italic' },
   assessmentStrip: { backgroundColor: '#f3f7fd', borderWidth: 1, borderColor: '#cbd9ec', borderRadius: 14, padding: 11, marginTop: 10, marginBottom: 8 },
   assessmentTrap: { backgroundColor: '#fff1f1', borderColor: '#f1b9b9' },
   assessmentSetup: { backgroundColor: '#eefaf3', borderColor: '#b8dfc8' },
