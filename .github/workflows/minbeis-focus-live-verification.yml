@@ -1,0 +1,59 @@
+name: MINBEIS Focus Live Verification
+
+on:
+  push:
+    branches:
+      - investor-control-minbeis-integration-v1
+    paths:
+      - market-intelligence/**
+      - .github/workflows/minbeis-focus-live-verification.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: minbeis-focus-live-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-focus-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install PDF extraction runtime
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y poppler-utils
+
+      - name: Run canonical tests
+        working-directory: market-intelligence
+        run: npm test
+
+      - name: Verify live focus universe without publication
+        working-directory: market-intelligence
+        env:
+          SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$SEC_USER_AGENT" || { echo 'SEC_USER_AGENT missing' >&2; exit 1; }
+          test -n "$FINNHUB_TOKEN" || { echo 'FINNHUB_TOKEN missing' >&2; exit 1; }
+          node scripts/verify-minbeis-focus-live.js out/minbeis-focus-live.json
+
+      - name: Upload focus evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: minbeis-focus-live-${{ github.run_id }}
+          path: market-intelligence/out/minbeis-focus-live.json
+          if-no-files-found: warn
+          retention-days: 14
