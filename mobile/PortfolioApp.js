@@ -760,6 +760,23 @@ function MainApp({ onOpenDecisionGate }) {
     }
   }, [persist]);
 
+  const missingOnboardingSymbols = useMemo(
+    () => positions
+      .map((position) => String(position?.symbol || '').trim().toUpperCase())
+      .filter((symbol) => /^([A-Z0-9][A-Z0-9.-]{0,19})\.(US|GR)$/.test(symbol))
+      .filter((symbol) => !state.minbeisOnboarding?.[symbol])
+      .sort(),
+    [positions, state.minbeisOnboarding],
+  );
+  const missingOnboardingKey = missingOnboardingSymbols.join('|');
+
+  useEffect(() => {
+    if (loading || !missingOnboardingSymbols.length) return;
+    missingOnboardingSymbols.forEach((symbol) => {
+      syncMinbeisOnboarding(symbol);
+    });
+  }, [loading, missingOnboardingKey, syncMinbeisOnboarding]);
+
   const openNewTransaction = () => { setEditingTransaction(null); setTransactionModal(true); };
 
   const saveTransaction = async (transaction) => {
