@@ -75,4 +75,12 @@ assert(pkg.version === app.expo.version, `package/app version mismatch: ${pkg.ve
 assert(portfolio.includes(`const VERSION = '${app.expo.version}';`), `PortfolioApp runtime version mismatch: ${app.expo.version}`);
 assert(decision.includes(`const VERSION = '${app.expo.version}';`), `DecisionOverlay runtime version mismatch: ${app.expo.version}`);
 
+
+// 30-second clarity UX must remain visible for both holdings and new ideas.
+assert(opportunities.includes("function PositionClarityCard"), '30-second clarity UX component missing');
+assert(opportunities.includes(">ΤΩΡΑ<"), 'MINBEIS clarity NOW label missing');
+assert(opportunities.includes(">ΓΙΑΤΙ<"), 'MINBEIS clarity WHY label missing');
+assert(opportunities.includes("ΤΙ ΘΑ ΑΛΛΑΞΕΙ ΤΗΝ ΕΙΚΟΝΑ"), 'MINBEIS clarity change-condition label missing');
+assert(opportunities.includes("ΣΤΗΝ ΟΥΡΑ ΕΡΕΥΝΑΣ"), 'MINBEIS research queue status missing from portfolio UX');
+assert(opportunities.includes("Research queue:"), 'MINBEIS portfolio research queue summary missing');
 console.log(`PASS v1.7.1+ portfolio-aware holder/non-holder decisions, validity-gated personalized counters, safe currency inference, JSX parse and consistent release identity ${app.expo.version} build ${app.expo.android.versionCode}.`);
