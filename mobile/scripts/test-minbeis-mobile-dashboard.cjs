@@ -39,3 +39,13 @@ const stale = buildPersonalizedMinbeisDashboard(feed, positions, { isCurrentDeci
 assert.equal(stale.rows.length, 0);
 
 console.log('PASS MINBEIS dashboard: holder/non-holder personalization, strict BUY gate and fail-closed freshness.');
+
+
+{
+  const mixed = buildPersonalizedMinbeisDashboard(feed, positions, { isCurrentDecision: () => true });
+  const ownedRows = mixed.rows.filter((row) => row.owned);
+  const newIdeaRows = mixed.rows.filter((row) => !row.owned);
+  assert.equal(ownedRows.length, 2, 'owned positions remain distinguishable from new ideas');
+  assert.equal(newIdeaRows.length, 2, 'new ideas remain separate from owned positions');
+  assert.ok(ownedRows.every((row) => ['HOLD', 'REDUCE', 'WATCH'].includes(row.action)));
+}
