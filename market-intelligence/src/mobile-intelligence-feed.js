@@ -1,4 +1,5 @@
 import { buildMinbeisDecision } from './minbeis-decision-layer.js';
+import { buildMinbeisAssessment } from './minbeis-assessment.js';
 
 function categoryLabel(category, status) {
   if (status === 'DRAFT_RESEARCH' && ['EVENT_DRIVEN', 'SPECULATIVE_CATALYST'].includes(category)) {
@@ -151,7 +152,7 @@ function metricNotes(dossier) {
   return notes;
 }
 
-function compactDossier(dossier, generatedAt) {
+function compactDossier(dossier, generatedAt, purchase = null) {
   const readinessBlockers = Array.isArray(dossier?.readiness?.blockers) ? dossier.readiness.blockers : [];
   const finalBlockers = Array.isArray(dossier?.finalAction?.blockers) ? dossier.finalAction.blockers : [];
   const blockers = [...new Set([...readinessBlockers, ...finalBlockers])];
@@ -208,6 +209,7 @@ function compactDossier(dossier, generatedAt) {
     generatedAt: dossier.generatedAt,
     publicationMode: dossier.publicationMode || null,
     finalAction: dossier.finalAction || null,
+    minbeisAssessment: buildMinbeisAssessment(dossier, purchase),
   };
 }
 
@@ -297,7 +299,17 @@ function countFinalActions(items) {
 
 export function buildMobileIntelligenceFeed(report = {}, options = {}) {
   const generatedAt = new Date(options.generatedAt || report.generatedAt || Date.now()).toISOString();
-  const dossiers = (Array.isArray(report.researchDossiers) ? report.researchDossiers : []).map((item) => compactDossier(item, generatedAt));
+  const rawPurchaseByDossier = new Map();
+  const rawPurchaseByCompany = new Map();
+  for (const item of report.opportunityPurchaseReconciliation?.decisions || []) {
+    if (item?.dossierId) rawPurchaseByDossier.set(item.dossierId, item);
+    if (item?.companyId || item?.instrumentId) rawPurchaseByCompany.set(item.companyId || item.instrumentId, item);
+  }
+  const dossiers = (Array.isArray(report.researchDossiers) ? report.researchDossiers : []).map((item) => compactDossier(
+    item,
+    generatedAt,
+    rawPurchaseByDossier.get(item?.dossierId) || rawPurchaseByCompany.get(item?.companyId) || null,
+  ));
   dossiers.sort((a, b) => priority(b) - priority(a) || String(b.generatedAt).localeCompare(String(a.generatedAt)));
   const published = dossiers.filter((item) => item.status === 'PUBLISHED');
   const reviewReady = dossiers.filter((item) => item.status === 'REVIEW_READY');
@@ -377,6 +389,10 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
       blockedOpportunityCount: blockedOpportunities.length,
       minbeisProbeCount: opportunityPurchaseDecisions.filter((item) => item.minbeisDecision?.action === 'BUY_PROBE').length,
       minbeisStarterCount: opportunityPurchaseDecisions.filter((item) => item.minbeisDecision?.action === 'BUY_STARTER').length,
+      minbeisSetupCount: dossiers.filter((item) => item.minbeisAssessment?.classification === 'SETUP').length,
+      minbeisTrapCount: dossiers.filter((item) => item.minbeisAssessment?.classification === 'TRAP').length,
+      minbeisNoTradeCount: dossiers.filter((item) => item.minbeisAssessment?.classification === 'NO_TRADE').length,
+      minbeisConfirmationRequiredCount: dossiers.filter((item) => item.minbeisAssessment?.classification === 'CONFIRMATION_REQUIRED').length,
       unresolvedDiagnosticCount: Array.isArray(report.diagnostics) ? report.diagnostics.length : 0,
       ...actionCounts,
     },
@@ -435,6 +451,7 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
       category: item.category,
       action: item.action,
       finalAction: item.finalAction,
+      minbeisAssessment: item.minbeisAssessment,
       thesis: item.thesis,
       blockers: item.blockers,
       nextStep: item.nextStep,
