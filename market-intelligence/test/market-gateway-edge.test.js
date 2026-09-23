@@ -206,6 +206,7 @@ test('research queue POST requires client rate limit but never upstream quota', 
     MARKET_GATEWAY_UPSTREAM_RATE_LIMITER: limiter(true, upstreamCalls),
   };
   const fetchImpl = async (url) => {
+    if (String(url).includes('/stock/profile2')) return jsonResponse({ ticker: 'NVDA', currency: 'USD', exchange: 'NASDAQ', country: 'US', name: 'NVIDIA Corp' });
     if (String(url).includes('/quote')) return jsonResponse({ c: 120.5, pc: 119.5, o: 120, h: 122, l: 118, d: 1, dp: 0.8368, t: 1789052340 });
     throw new Error('Unexpected URL: ' + url);
   };
