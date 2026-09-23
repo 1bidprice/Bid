@@ -193,6 +193,73 @@ export async function resolveCanonicalGatewayQuote(appSymbol, env = {}, options 
   };
 }
 
+
+export async function resolveInstrumentCapability(appSymbol, env = {}, options = {}) {
+  const parsed = parseGatewaySymbol(appSymbol);
+  if (!parsed) {
+    return { status: 400, error: { code: 'SYMBOL_INVALID', message: 'Use canonical symbols such as SPCE.US or ALWN.GR.' } };
+  }
+
+  const canonicalFocus = parsed.market === 'US'
+    ? CANONICAL_US_COMPANIES[parsed.symbol] || null
+    : ATHENS_COMPANIES[parsed.symbol] || null;
+
+  let quoteResult = null;
+  try {
+    quoteResult = await resolveCanonicalGatewayQuote(parsed.appSymbol, env, options);
+  } catch (error) {
+    quoteResult = {
+      status: 502,
+      error: {
+        code: 'QUOTE_CAPABILITY_CHECK_FAILED',
+        message: error instanceof Error ? error.message : String(error),
+      },
+    };
+  }
+
+  const quoteSupported = quoteResult?.status === 200;
+  const quote = quoteSupported ? quoteResult.body.quote : null;
+  const identityVerified = quote?.quoteContract?.identityVerified === true
+    || (parsed.market === 'GR' && quote?.quoteContract?.sourceRole === 'PRIMARY_EXCHANGE');
+
+  const analysisSupported = Boolean(canonicalFocus);
+  const onboardingStatus = analysisSupported
+    ? 'READY'
+    : identityVerified
+      ? 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED'
+      : 'IDENTITY_NOT_VERIFIED';
+
+  return {
+    status: 200,
+    body: {
+      format: 'investor-control-instrument-capability',
+      version: 1,
+      servedAt: new Date(options.now || Date.now()).toISOString(),
+      requestedSymbol: parsed.appSymbol,
+      market: parsed.market,
+      identityVerified,
+      quoteSupported,
+      analysisSupported,
+      onboardingStatus,
+      canonicalCompanyId: canonicalFocus?.companyId || quote?.companyId || null,
+      displayName: canonicalFocus?.displayName || quote?.companyName || parsed.symbol,
+      currency: quote?.currency || canonicalFocus?.currency || null,
+      quoteContract: quote?.quoteContract || null,
+      limitations: analysisSupported
+        ? []
+        : identityVerified
+          ? ['FULL_MINBEIS_RESEARCH_NOT_YET_CANONICAL']
+          : ['CANONICAL_INSTRUMENT_IDENTITY_REQUIRED'],
+      privacy: {
+        acceptedInputs: ['symbol'],
+        portfolioQuantityRequired: false,
+        portfolioCostRequired: false,
+        pnlRequired: false,
+      },
+    },
+  };
+}
+
 export async function resolveCanonicalGatewayFx(pair, options = {}) {
   const normalizedPair = String(pair || '').trim().toUpperCase();
   if (normalizedPair !== 'EURUSD') {
@@ -244,6 +311,11 @@ export async function handleMarketGatewayRequest(request, env = {}, options = {}
         fx: 'ecb_official_daily_reference',
       },
     });
+  }
+  if (url.pathname === '/v1/instrument') {
+    const result = await resolveInstrumentCapability(url.searchParams.get('symbol'), env, options);
+    if (result.status !== 200) return gatewayError(result.status, result.error.code, result.error.message, result.error.details);
+    return json(result.body, 200);
   }
   if (url.pathname === '/v1/fx') {
     const result = await resolveCanonicalGatewayFx(url.searchParams.get('pair'), options);
