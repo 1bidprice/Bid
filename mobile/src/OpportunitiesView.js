@@ -268,27 +268,30 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = nu
 
 function MinbeisDashboard({ dashboard, sourceDecisionCount = 0, decisionContext }) {
   const rows = (Array.isArray(dashboard?.rows) ? dashboard.rows : []).filter((row) => !row.owned);
-  const counts = dashboard?.counts || {};
-  const actionable = Number(dashboard?.actionableCount || 0);
-  const headline = actionable > 0
-    ? `${actionable} ουσιαστική αλλαγή${actionable === 1 ? '' : 'ές'} απαιτεί προσοχή`
+  const marketCounts = rows.reduce((acc, row) => {
+    acc[row.action] = (acc[row.action] || 0) + 1;
+    return acc;
+  }, {});
+  const buyCount = Number(marketCounts.BUY_PROBE || 0) + Number(marketCounts.BUY_STARTER || 0);
+  const headline = buyCount > 0
+    ? `${buyCount} επιβεβαιωμένη νέα αγορά${buyCount === 1 ? '' : 'ές'} τώρα`
     : rows.length
-      ? 'Καμία επιβεβαιωμένη αγορά ή μείωση τώρα'
+      ? 'Καμία επιβεβαιωμένη νέα αγορά τώρα'
       : sourceDecisionCount > 0
-        ? 'Υπάρχουν αναλύσεις, αλλά καμία ενεργή απόφαση δεν περνά τώρα τους κανόνες φρεσκότητας'
-        : 'Δεν υπάρχουν ακόμη τελικές αποφάσεις MINBEIS';
+        ? 'Υπάρχουν αναλύσεις, αλλά καμία νέα ιδέα δεν περνά τώρα τους ενεργούς κανόνες'
+        : 'Δεν υπάρχουν ακόμη τελικές αναλύσεις αγοράς';
 
   return (
     <View style={styles.minbeisShell}>
       <View style={styles.minbeisHero}>
-        <Text style={styles.minbeisEyebrow}>MINBEIS TODAY</Text>
+        <Text style={styles.minbeisEyebrow}>MINBEIS · MARKET SCAN TODAY</Text>
         <Text style={styles.minbeisHeroTitle}>{headline}</Text>
-        <Text style={styles.minbeisHeroText}>Ο MINBEIS χρησιμοποιεί τις canonical αποφάσεις του Investor Control και το πραγματικό χαρτοφυλάκιό σου. Δεν εκτελεί συναλλαγές.</Text>
+        <Text style={styles.minbeisHeroText}>Αυτή η ενότητα αφορά νέες ιδέες εκτός του χαρτοφυλακίου σου. Οι δικές σου θέσεις εμφανίζονται ξεχωριστά παραπάνω. Δεν εκτελούνται συναλλαγές.</Text>
         <View style={styles.minbeisCountRow}>
-          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{Number(counts.BUY_PROBE || 0) + Number(counts.BUY_STARTER || 0)}</Text><Text style={styles.minbeisCountLabel}>BUY</Text></View>
-          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{counts.REDUCE || 0}</Text><Text style={styles.minbeisCountLabel}>REDUCE</Text></View>
-          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{counts.HOLD || 0}</Text><Text style={styles.minbeisCountLabel}>HOLD</Text></View>
-          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{counts.WATCH || 0}</Text><Text style={styles.minbeisCountLabel}>WATCH</Text></View>
+          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{buyCount}</Text><Text style={styles.minbeisCountLabel}>BUY</Text></View>
+          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{marketCounts.WATCH || 0}</Text><Text style={styles.minbeisCountLabel}>WATCH</Text></View>
+          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{marketCounts.NO_BUY || 0}</Text><Text style={styles.minbeisCountLabel}>NO BUY</Text></View>
+          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{rows.length}</Text><Text style={styles.minbeisCountLabel}>ΑΝΑΛΥΘΗΚΑΝ</Text></View>
         </View>
         {!decisionContext?.feedFresh ? <Text style={styles.minbeisCaution}>Οι ενεργές πράξεις απενεργοποιούνται όταν η ροή δεν είναι αρκετά πρόσφατη.</Text> : null}
       </View>
