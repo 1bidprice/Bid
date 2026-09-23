@@ -142,6 +142,44 @@ function buildQuoteRegistry(snapshots = []) {
   return registry;
 }
 
+function compactHistoricalContext(shadow) {
+  const pattern = shadow?.historicalPatternForecast || null;
+  if (!pattern) return null;
+  const preferredKeys = ['week1', 'month1', 'month3'];
+  const horizons = {};
+  for (const key of preferredKeys) {
+    const item = pattern?.horizons?.[key];
+    if (!item) continue;
+    horizons[key] = {
+      tradingDays: item.tradingDays,
+      status: item.status,
+      historicalPositiveFrequencyPct: Number.isFinite(Number(item.rawProbabilityPositive))
+        ? Number((Number(item.rawProbabilityPositive) * 100).toFixed(2))
+        : null,
+      historicalAverageReturnPct: Number.isFinite(Number(item.expectedReturnPct))
+        ? Number(item.expectedReturnPct)
+        : null,
+      selectedAnalogCount: Number(item?.sample?.selectedAnalogCount || 0),
+      effectiveSampleSize: Number.isFinite(Number(item?.sample?.effectiveSampleSize))
+        ? Number(item.sample.effectiveSampleSize)
+        : null,
+      blockers: Array.isArray(item?.blockers) ? item.blockers : [],
+    };
+  }
+  return {
+    format: 'minbeis-historical-context',
+    version: 1,
+    status: pattern.status,
+    asOf: pattern.asOf || null,
+    regime: pattern?.currentPattern?.regime || null,
+    calibrationStatus: pattern.calibrationStatus || 'NOT_CALIBRATED',
+    finalActionEligible: false,
+    decisionImpact: 'NONE',
+    horizons,
+    caution: 'Ιστορικά ανάλογα για έρευνα. Δεν αποτελούν πρόβλεψη και δεν επηρεάζουν την τελική canonical απόφαση.',
+  };
+}
+
 function metricNotes(dossier) {
   const notes = [];
   const metrics = dossier?.metrics?.fundamentals?.metrics || dossier?.metrics?.fundamentals || {};
@@ -152,7 +190,7 @@ function metricNotes(dossier) {
   return notes;
 }
 
-function compactDossier(dossier, generatedAt, purchase = null) {
+function compactDossier(dossier, generatedAt, purchase = null, historicalContext = null) {
   const readinessBlockers = Array.isArray(dossier?.readiness?.blockers) ? dossier.readiness.blockers : [];
   const finalBlockers = Array.isArray(dossier?.finalAction?.blockers) ? dossier.finalAction.blockers : [];
   const blockers = [...new Set([...readinessBlockers, ...finalBlockers])];
@@ -206,6 +244,7 @@ function compactDossier(dossier, generatedAt, purchase = null) {
           : nextStep(blockers),
     sources: compactSources(dossier.evidence),
     metricNotes: metricNotes(dossier),
+    historicalContext,
     generatedAt: dossier.generatedAt,
     publicationMode: dossier.publicationMode || null,
     finalAction: dossier.finalAction || null,
@@ -305,10 +344,16 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
     if (item?.dossierId) rawPurchaseByDossier.set(item.dossierId, item);
     if (item?.companyId || item?.instrumentId) rawPurchaseByCompany.set(item.companyId || item.instrumentId, item);
   }
+  const shadowByCompany = new Map(
+    (Array.isArray(report.shadowForecasts) ? report.shadowForecasts : [])
+      .filter((item) => item?.companyId)
+      .map((item) => [item.companyId, item]),
+  );
   const dossiers = (Array.isArray(report.researchDossiers) ? report.researchDossiers : []).map((item) => compactDossier(
     item,
     generatedAt,
     rawPurchaseByDossier.get(item?.dossierId) || rawPurchaseByCompany.get(item?.companyId) || null,
+    compactHistoricalContext(shadowByCompany.get(item?.companyId) || null),
   ));
   dossiers.sort((a, b) => priority(b) - priority(a) || String(b.generatedAt).localeCompare(String(a.generatedAt)));
   const published = dossiers.filter((item) => item.status === 'PUBLISHED');
@@ -452,6 +497,7 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
       action: item.action,
       finalAction: item.finalAction,
       minbeisAssessment: item.minbeisAssessment,
+      historicalContext: item.historicalContext,
       thesis: item.thesis,
       blockers: item.blockers,
       nextStep: item.nextStep,
