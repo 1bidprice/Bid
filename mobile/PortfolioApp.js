@@ -18,7 +18,7 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { isMarketGatewayConfigured } from './src/market-gateway-runtime';
+import { fetchConfiguredInstrumentCapability, isMarketGatewayConfigured } from './src/market-gateway-runtime';
 import * as SecureStore from 'expo-secure-store';
 import {
   SafeAreaProvider,
@@ -73,6 +73,28 @@ const DEFAULT_MINBEIS_POLICY = {
   concentrationAlertsEnabled: false,
 };
 
+function normalizeMinbeisOnboarding(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const allowed = new Set(['READY', 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED', 'IDENTITY_NOT_VERIFIED', 'GATEWAY_NOT_CONFIGURED', 'CHECK_FAILED']);
+  return Object.fromEntries(Object.entries(value).map(([symbol, item]) => {
+    const key = String(symbol || '').trim().toUpperCase();
+    if (!/^([A-Z0-9][A-Z0-9.-]{0,19})\.(US|GR)$/.test(key)) return null;
+    const status = allowed.has(item?.onboardingStatus) ? item.onboardingStatus : 'CHECK_FAILED';
+    return [key, {
+      requestedSymbol: key,
+      onboardingStatus: status,
+      identityVerified: item?.identityVerified === true,
+      quoteSupported: item?.quoteSupported === true,
+      analysisSupported: item?.analysisSupported === true,
+      canonicalCompanyId: item?.canonicalCompanyId || null,
+      displayName: item?.displayName || null,
+      currency: item?.currency || null,
+      checkedAt: item?.checkedAt || null,
+      error: item?.error || null,
+    }];
+  }).filter(Boolean));
+}
+
 function normalizeMinbeisPolicy(value) {
   const allowedModes = new Set(['INFORM_ONLY', 'USER_LIMIT', 'NO_LIMIT']);
   const mode = allowedModes.has(value?.concentrationPolicyMode)
@@ -93,6 +115,7 @@ const EMPTY_STATE = {
   meta: { lastCheckedAt: null, errors: [], accountingVersion: 2 },
   alerts: normalizeAlerts(null),
   minbeisPolicy: DEFAULT_MINBEIS_POLICY,
+  minbeisOnboarding: {},
 };
 
 const valid = (value) => value !== null && value !== undefined && Number.isFinite(Number(value));
@@ -161,6 +184,7 @@ function normalizeState(raw) {
     },
     alerts: normalizeAlerts(raw.alerts),
     minbeisPolicy: normalizeMinbeisPolicy(raw.minbeisPolicy),
+    minbeisOnboarding: normalizeMinbeisOnboarding(raw.minbeisOnboarding),
   };
 }
 
@@ -691,6 +715,51 @@ function MainApp({ onOpenDecisionGate }) {
       );
     });
   }, [applyQuotes, liveUsProviderSymbolsKey, loading, token]);
+  const syncMinbeisOnboarding = useCallback(async (symbol) => {
+    const clean = String(symbol || '').trim().toUpperCase();
+    if (!/^([A-Z0-9][A-Z0-9.-]{0,19})\.(US|GR)$/.test(clean)) return null;
+    try {
+      const capability = await fetchConfiguredInstrumentCapability(clean);
+      const current = stateRef.current;
+      const entry = {
+        requestedSymbol: clean,
+        onboardingStatus: capability.onboardingStatus,
+        identityVerified: capability.identityVerified === true,
+        quoteSupported: capability.quoteSupported === true,
+        analysisSupported: capability.analysisSupported === true,
+        canonicalCompanyId: capability.canonicalCompanyId || null,
+        displayName: capability.displayName || null,
+        currency: capability.currency || null,
+        checkedAt: new Date().toISOString(),
+        error: null,
+      };
+      await persist({
+        ...current,
+        minbeisOnboarding: { ...(current.minbeisOnboarding || {}), [clean]: entry },
+      });
+      return entry;
+    } catch (error) {
+      const current = stateRef.current;
+      const entry = {
+        requestedSymbol: clean,
+        onboardingStatus: 'CHECK_FAILED',
+        identityVerified: false,
+        quoteSupported: false,
+        analysisSupported: false,
+        canonicalCompanyId: null,
+        displayName: null,
+        currency: null,
+        checkedAt: new Date().toISOString(),
+        error: String(error?.message || 'MINBEIS_ONBOARDING_CHECK_FAILED'),
+      };
+      await persist({
+        ...current,
+        minbeisOnboarding: { ...(current.minbeisOnboarding || {}), [clean]: entry },
+      });
+      return entry;
+    }
+  }, [persist]);
+
   const openNewTransaction = () => { setEditingTransaction(null); setTransactionModal(true); };
 
   const saveTransaction = async (transaction) => {
@@ -704,6 +773,9 @@ function MainApp({ onOpenDecisionGate }) {
     const transactions = editingTransaction ? current.transactions.map((item) => item.id === editingTransaction.id ? transaction : item) : [...current.transactions, transaction];
     await persist({ ...current, transactions });
     setTransactionModal(false); setEditingTransaction(null); setExpandedTransaction(transaction.id); refresh({ silent: true });
+    if (transaction.type === 'buy') {
+      syncMinbeisOnboarding(transaction.symbol);
+    }
   };
 
   const deleteTransaction = (transaction) => Alert.alert('Διαγραφή συναλλαγής', `Να διαγραφεί η συναλλαγή ${transaction.company};`, [{ text: 'Άκυρο', style: 'cancel' }, { text: 'Διαγραφή', style: 'destructive', onPress: async () => { await persist({ ...stateRef.current, transactions: stateRef.current.transactions.filter((item) => item.id !== transaction.id) }); setExpandedTransaction(null); refresh({ silent: true }); } }]);
@@ -758,7 +830,7 @@ function MainApp({ onOpenDecisionGate }) {
           <View style={styles.sectionRow}><Text style={styles.subsection}>Ιστορικό</Text>{state.alerts.history.length ? <Pressable onPress={() => persist({ ...stateRef.current, alerts: { ...stateRef.current.alerts, history: [] } })}><Text style={styles.link}>Καθαρισμός</Text></Pressable> : null}</View>
           {state.alerts.history.length ? state.alerts.history.map((event) => <View key={event.id} style={styles.historyItem}><Text style={styles.statusStrong}>{event.symbol}</Text><Text style={styles.note}>{event.message}</Text><Text style={styles.source}>{when(event.triggeredAt)}</Text></View>) : <View style={styles.emptyCard}><Text style={styles.emptyTitle}>Καμία ενεργοποίηση.</Text><Text style={styles.note}>Οι ειδοποιήσεις που πυροδοτούνται θα καταγράφονται εδώ.</Text></View>}
         </> : null}
-        {tab === 'opportunities' ? <OpportunitiesView portfolioPositions={positions} portfolioPolicy={state.minbeisPolicy} /> : null}
+        {tab === 'opportunities' ? <OpportunitiesView portfolioPositions={positions} portfolioPolicy={state.minbeisPolicy} instrumentCapabilities={state.minbeisOnboarding} /> : null}
         {tab === 'settings' ? <>
           <Text style={styles.section}>Ρυθμίσεις</Text>
           <View style={styles.card}>
