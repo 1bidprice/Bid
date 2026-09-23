@@ -208,3 +208,77 @@ test('today primary item follows a final BUY headline before an unrelated Hunter
   assert.equal(feed.today.primaryItem.finalAction.marketAction, 'BUY_NOW');
   assert.notEqual(feed.today.primaryItem.companyId, 'company:wait');
 });
+
+
+test('mobile feed exposes MINBEIS SETUP/TRAP/NO_TRADE/CONFIRMATION_REQUIRED without decision authority', () => {
+  const setupDossier = finalDossier({
+    dossierId: 'dossier:setup',
+    companyId: 'company:setup',
+    companyName: 'Setup Co',
+    listing: { symbol: 'SETUP', exchange: 'NYSE' },
+    finalAction: strictAction('BUY_NOW', 'BUY_NOW'),
+  });
+  const trapDossier = finalDossier({
+    dossierId: 'dossier:trap',
+    companyId: 'company:trap',
+    companyName: 'Trap Co',
+    listing: { symbol: 'TRAP', exchange: 'NYSE' },
+    proposedAction: 'AVOID',
+    finalAction: {
+      ...strictAction('AVOID', 'AVOID'),
+      reasons: ['SEVERE_RISK_CONFIGURATION'],
+      risk: { fundamentalFlags: ['SEVERE_DILUTION'], marketFlags: [] },
+    },
+  });
+  const noTradeDossier = finalDossier({
+    dossierId: 'dossier:no-trade',
+    companyId: 'company:no-trade',
+    companyName: 'No Trade Co',
+    listing: { symbol: 'NOTRADE', exchange: 'NYSE' },
+    proposedAction: 'HOLD',
+    finalAction: strictAction('HOLD', 'WATCH'),
+  });
+  const blockedDossier = finalDossier({
+    dossierId: 'dossier:blocked',
+    companyId: 'company:blocked',
+    companyName: 'Blocked Co',
+    listing: { symbol: 'BLOCK', exchange: 'NYSE' },
+    status: 'REVIEW_READY',
+    finalAction: {
+      ...strictAction('WATCH', 'WATCH'),
+      status: 'BLOCKED',
+      blockers: ['REFERENCE_PRICE_TIMESTAMP_NOT_VERIFIED'],
+    },
+  });
+  const setupPurchase = purchaseDecision({
+    instrumentId: 'company:setup',
+    companyId: 'company:setup',
+    dossierId: 'dossier:setup',
+    displayName: 'Setup Co',
+    symbol: 'SETUP',
+  });
+
+  const feed = buildMobileIntelligenceFeed(
+    report([setupPurchase], [setupDossier, trapDossier, noTradeDossier, blockedDossier]),
+    { generatedAt },
+  );
+
+  const byCompany = new Map(
+    [...feed.published, ...feed.reviewReady, ...feed.research].map((item) => [item.companyId, item]),
+  );
+  assert.equal(byCompany.get('company:setup').minbeisAssessment.classification, 'SETUP');
+  assert.equal(byCompany.get('company:trap').minbeisAssessment.classification, 'TRAP');
+  assert.equal(byCompany.get('company:no-trade').minbeisAssessment.classification, 'NO_TRADE');
+  assert.equal(byCompany.get('company:blocked').minbeisAssessment.classification, 'CONFIRMATION_REQUIRED');
+
+  for (const item of byCompany.values()) {
+    assert.equal(item.minbeisAssessment.decisionImpact, 'NONE');
+    assert.equal(item.minbeisAssessment.finalActionEligible, false);
+    assert.ok(item.minbeisAssessment.explanation?.summary);
+  }
+
+  assert.equal(feed.summary.minbeisSetupCount, 1);
+  assert.equal(feed.summary.minbeisTrapCount, 1);
+  assert.equal(feed.summary.minbeisNoTradeCount, 1);
+  assert.equal(feed.summary.minbeisConfirmationRequiredCount, 1);
+});
