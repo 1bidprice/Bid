@@ -2,19 +2,39 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { runDailyIntelligence } from '../src/run-daily-intelligence.js';
 import { applyAutonomousPublicationPolicy } from '../src/final-action-policy.js';
+import { resolveQueuedResearchUniverse } from '../src/research-queue-onboarding.js';
 
 const now = new Date().toISOString();
 const universe = JSON.parse(await readFile(new URL('../config/universe.seed.json', import.meta.url), 'utf8'));
+const queueResolution = await resolveQueuedResearchUniverse([
+  {
+    symbol: 'NVDA.US',
+    status: 'QUEUED',
+    firstRequestedAt: now,
+    lastRequestedAt: now,
+  },
+], {
+  generatedAt: now,
+  secUserAgent: process.env.SEC_USER_AGENT || '',
+  fetchImpl: globalThis.fetch,
+});
+if (queueResolution.resolvedCount !== 1 || queueResolution.companies?.[0]?.primaryListing?.symbol !== 'NVDA') {
+  throw new Error('Synthetic queued NVDA.US did not resolve through canonical SEC identity');
+}
+const queuedUniverse = [
+  ...queueResolution.companies,
+  ...universe.filter((company) => !queueResolution.companies.some((queued) => queued.companyId === company.companyId)),
+];
 
 const base = await runDailyIntelligence({
   now,
-  universe,
+  universe: queuedUniverse,
   secUserAgent: process.env.SEC_USER_AGENT || '',
   finnhubToken: process.env.FINNHUB_TOKEN || '',
 });
 
 const dossiers = applyAutonomousPublicationPolicy(base.researchDossiers || [], { now });
-const wanted = new Set(['SPCE', 'CREDIA', 'ALWN']);
+const wanted = new Set(['SPCE', 'CREDIA', 'ALWN', 'NVDA']);
 const focus = dossiers
   .filter((item) => wanted.has(String(item?.listing?.symbol || '').toUpperCase()))
   .map((item) => ({
@@ -63,8 +83,15 @@ const output = {
   version: 1,
   generatedAt: now,
   noPublicationPerformed: true,
+  queueShadow: {
+    requestedCount: queueResolution.requestedCount,
+    resolvedCount: queueResolution.resolvedCount,
+    blockedCount: queueResolution.blockedCount,
+    results: queueResolution.results,
+    nvdaDossierProduced: focus.some((item) => item.symbol === 'NVDA'),
+  },
   focus,
-  invariant: 'Live verification only; no feed branch or broker write is performed.',
+  invariant: 'Live verification only; synthetic queue identity is resolved and analysed without feed publication, broker write or production queue mutation.',
 };
 
 const outputPath = path.resolve(process.cwd(), process.argv[2] || 'out/minbeis-focus-live.json');
