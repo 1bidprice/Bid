@@ -101,7 +101,7 @@ jobs:
           set -euo pipefail
           URL="${{ steps.deploy.outputs.deployment_url }}"
           curl --fail --silent --show-error --retry 3 --retry-delay 2 "$URL/health" > health.json
-          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('health.json','utf8')); if(p.status!=='ok'||p.providers?.us!=='configured'||p.providers?.athens!=='official_delayed_15m'||p.providers?.fx!=='ecb_official_daily_reference') { console.error('Production health contract failed'); process.exit(1); }"
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('health.json','utf8')); if(p.status!=='ok'||p.providers?.us!=='configured'||p.providers?.athens!=='official_delayed_15m'||p.providers?.fx!=='ecb_official_daily_reference'||p.providers?.researchQueue!=='configured') { console.error('Production health contract failed'); process.exit(1); }"
           rm -f health.json
 
       - name: Verify one authoritative US quote through deployed edge
