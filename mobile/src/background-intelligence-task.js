@@ -3,6 +3,7 @@ import * as BackgroundTask from 'expo-background-task';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
 import { finalActionIsCurrent } from './decision-validity';
+import { intelligenceSystemReady } from './intelligence-readiness';
 import {
   NOTIFICATION_POLICY_VERSION,
   buildDecisionChangeEvents,
@@ -73,11 +74,7 @@ function notificationDecisionOptions(feed, nowMs = Date.now()) {
   const generatedAtMs = new Date(feed?.generatedAt || '').getTime();
   const ageMs = Number.isFinite(generatedAtMs) ? Math.max(0, nowMs - generatedAtMs) : Number.POSITIVE_INFINITY;
   const feedFresh = ageMs <= FRESH_NOTIFICATION_MAX_AGE_MS;
-  const health = feed?.operationalHealth || {};
-  const systemReady = health.status === 'OPERATIONAL'
-    && health.marketDataStatus === 'OPERATIONAL'
-    && health.fundamentalsStatus === 'OPERATIONAL'
-    && health.decisionEngineStatus === 'READY';
+  const systemReady = intelligenceSystemReady(feed?.operationalHealth || {});
   return {
     isCurrentDecision: (finalAction) => finalActionIsCurrent(finalAction, {
       now: nowMs,
