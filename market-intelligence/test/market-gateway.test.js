@@ -206,3 +206,94 @@ test('unsupported Athens instrument fails closed instead of inventing canonical 
   assert.equal(body.analysisSupported, false);
   assert.equal(body.onboardingStatus, 'IDENTITY_NOT_VERIFIED');
 });
+
+
+function fakeKv() {
+  const map = new Map();
+  return {
+    async get(key) { return map.has(key) ? map.get(key) : null; },
+    async put(key, value) { map.set(key, value); },
+    map,
+  };
+}
+
+test('verified new US instrument enters research queue only with persistent storage', async () => {
+  const kv = fakeKv();
+  const fetchImpl = async (url) => {
+    if (String(url).includes('/quote')) return jsonResponse({ c: 120.5, pc: 119.5, o: 120, h: 122, l: 118, d: 1, dp: 0.8368, t: Math.floor(Date.parse('2026-09-10T14:59:00.000Z') / 1000) });
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const request = new Request('https://gateway.test/v1/research-queue', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ symbol: 'NVDA.US' }),
+  });
+  const response = await handleMarketGatewayRequest(
+    request,
+    { FINNHUB_TOKEN: 'secret', MINBEIS_RESEARCH_QUEUE: kv },
+    { fetchImpl, now: '2026-09-10T15:00:00.000Z' },
+  );
+  assert.equal(response.status, 202);
+  const body = await response.json();
+  assert.equal(body.requestedSymbol, 'NVDA.US');
+  assert.equal(body.queueStatus, 'QUEUED');
+  assert.equal(body.privacy.portfolioDataStored, false);
+  assert.equal(body.privacy.clientIdentityStored, false);
+  const stored = JSON.parse(await kv.get('research:NVDA.US'));
+  assert.deepEqual(Object.keys(stored.privacy).sort(), ['storesClientIdentity', 'storesPortfolioData', 'storesSymbolOnly']);
+  assert.equal(stored.privacy.storesPortfolioData, false);
+  assert.equal(stored.privacy.storesClientIdentity, false);
+});
+
+test('research queue fails closed when persistent storage is missing', async () => {
+  const fetchImpl = async (url) => {
+    if (String(url).includes('/quote')) return jsonResponse({ c: 120.5, pc: 119.5, o: 120, h: 122, l: 118, d: 1, dp: 0.8368, t: Math.floor(Date.parse('2026-09-10T14:59:00.000Z') / 1000) });
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const response = await handleMarketGatewayRequest(
+    new Request('https://gateway.test/v1/research-queue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol: 'NVDA.US' }),
+    }),
+    { FINNHUB_TOKEN: 'secret' },
+    { fetchImpl, now: '2026-09-10T15:00:00.000Z' },
+  );
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error.code, 'RESEARCH_QUEUE_NOT_CONFIGURED');
+});
+
+test('research queue rejects portfolio fields and accepts symbol only', async () => {
+  const response = await handleMarketGatewayRequest(
+    new Request('https://gateway.test/v1/research-queue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol: 'NVDA.US', quantity: 10, cost: 1000 }),
+    }),
+    { FINNHUB_TOKEN: 'secret', MINBEIS_RESEARCH_QUEUE: fakeKv() },
+    { fetchImpl: async () => { throw new Error('provider must not run'); } },
+  );
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'RESEARCH_QUEUE_PRIVACY_CONTRACT_INVALID');
+});
+
+test('already canonical MINBEIS instrument does not consume research queue storage', async () => {
+  const kv = fakeKv();
+  const fetchImpl = async (url) => {
+    if (String(url).includes('/quote')) return jsonResponse({ c: 3.21, pc: 3.10, o: 3.12, h: 3.25, l: 3.05, d: 0.11, dp: 3.5484, t: Math.floor(Date.parse('2026-09-10T14:59:00.000Z') / 1000) });
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const response = await handleMarketGatewayRequest(
+    new Request('https://gateway.test/v1/research-queue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol: 'SPCE.US' }),
+    }),
+    { FINNHUB_TOKEN: 'secret', MINBEIS_RESEARCH_QUEUE: kv },
+    { fetchImpl, now: '2026-09-10T15:00:00.000Z' },
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.queueStatus, 'ALREADY_SUPPORTED');
+  assert.equal(kv.map.size, 0);
+});
