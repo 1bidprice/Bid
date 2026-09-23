@@ -73,7 +73,11 @@ function notificationDecisionOptions(feed, nowMs = Date.now()) {
   const generatedAtMs = new Date(feed?.generatedAt || '').getTime();
   const ageMs = Number.isFinite(generatedAtMs) ? Math.max(0, nowMs - generatedAtMs) : Number.POSITIVE_INFINITY;
   const feedFresh = ageMs <= FRESH_NOTIFICATION_MAX_AGE_MS;
-  const systemReady = feed?.operationalHealth?.status === 'OPERATIONAL';
+  const health = feed?.operationalHealth || {};
+  const systemReady = health.status === 'OPERATIONAL'
+    && health.marketDataStatus === 'OPERATIONAL'
+    && health.fundamentalsStatus === 'OPERATIONAL'
+    && health.decisionEngineStatus === 'READY';
   return {
     isCurrentDecision: (finalAction) => finalActionIsCurrent(finalAction, {
       now: nowMs,
