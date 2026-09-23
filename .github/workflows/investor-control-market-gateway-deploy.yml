@@ -127,3 +127,31 @@ jobs:
             "$URL/v1/fx?pair=EURUSD" > fx.json
           node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('fx.json','utf8')); const r=p.reference; if(r?.pair!=='EURUSD'||r?.sourceQuality!=='OFFICIAL_DAILY_REFERENCE'||!(Number(r?.rate)>0)||r?.valuationReferenceEligible!==true||r?.transactionEligible!==false||r?.decisionEligible!==false) { console.error('Production ECB EURUSD reference contract failed'); process.exit(1); }"
           rm -f fx.json
+
+
+      - name: Preserve verified production deployment manifest
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="${{ steps.deploy.outputs.deployment_url }}"
+          cat > gateway-production-deployment.json <<EOF
+          {
+            "format": "investor-control-market-gateway-deployment",
+            "version": 1,
+            "sourceCommit": "$GITHUB_SHA",
+            "deploymentUrl": "$URL",
+            "researchQueueRequired": true,
+            "verified": true,
+            "deployedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+
+      - name: Upload verified production deployment manifest
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: investor-control-market-gateway-production-${{ github.sha }}
+          path: gateway-production-deployment.json
+          if-no-files-found: error
+          retention-days: 90
