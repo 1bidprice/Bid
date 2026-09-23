@@ -157,23 +157,32 @@ function historicalHorizonLabel(key) {
 }
 
 function HistoricalContextCard({ context }) {
+  const [expanded, setExpanded] = useState(false);
   if (!context || context.status !== 'RESEARCH_READY_UNCALIBRATED') return null;
   const rows = Object.entries(context.horizons || {}).filter(([, item]) => item?.status === 'RESEARCH_READY_UNCALIBRATED');
   if (!rows.length) return null;
   return (
     <View style={styles.historicalCard}>
-      <Text style={styles.historicalTitle}>Ιστορικά ανάλογα · research only</Text>
-      {context.regime ? <Text style={styles.historicalMeta}>Regime: {String(context.regime).replace(/_/g, ' ')}</Text> : null}
-      {rows.map(([key, item]) => (
-        <View key={key} style={styles.historicalRow}>
-          <Text style={styles.historicalHorizon}>{historicalHorizonLabel(key)}</Text>
-          <Text style={styles.historicalValue}>
-            {Number.isFinite(Number(item.historicalPositiveFrequencyPct)) ? `${Number(item.historicalPositiveFrequencyPct).toFixed(0)}% θετικές ιστορικές εκβάσεις` : 'χωρίς επαρκή συχνότητα'}
-          </Text>
-          <Text style={styles.historicalMeta}>{item.selectedAnalogCount || 0} ανεξάρτητα ανάλογα · effective sample {Number.isFinite(Number(item.effectiveSampleSize)) ? Number(item.effectiveSampleSize).toFixed(1) : '—'}</Text>
+      <Pressable onPress={() => setExpanded((value) => !value)} style={styles.historicalHeader}>
+        <View style={styles.grow}>
+          <Text style={styles.historicalTitle}>Ιστορικά ανάλογα</Text>
+          <Text style={styles.historicalMeta}>Research context · όχι πρόβλεψη</Text>
         </View>
-      ))}
-      <Text style={styles.historicalCaution}>{context.caution}</Text>
+        <Text style={styles.historicalToggle}>{expanded ? 'Απόκρυψη' : 'Προβολή'}</Text>
+      </Pressable>
+      {expanded ? <>
+        {context.regime ? <Text style={styles.historicalMeta}>Regime: {String(context.regime).replace(/_/g, ' ')}</Text> : null}
+        {rows.map(([key, item]) => (
+          <View key={key} style={styles.historicalRow}>
+            <Text style={styles.historicalHorizon}>{historicalHorizonLabel(key)}</Text>
+            <Text style={styles.historicalValue}>
+              {Number.isFinite(Number(item.historicalPositiveFrequencyPct)) ? `${Number(item.historicalPositiveFrequencyPct).toFixed(0)}% θετικές ιστορικές εκβάσεις` : 'χωρίς επαρκή συχνότητα'}
+            </Text>
+            <Text style={styles.historicalMeta}>{item.selectedAnalogCount || 0} ανεξάρτητα ανάλογα · effective sample {Number.isFinite(Number(item.effectiveSampleSize)) ? Number(item.effectiveSampleSize).toFixed(1) : '—'}</Text>
+          </View>
+        ))}
+        <Text style={styles.historicalCaution}>{context.caution}</Text>
+      </> : null}
     </View>
   );
 }
@@ -300,6 +309,22 @@ function capabilityText(capability) {
   }[capability?.onboardingStatus] || null;
 }
 
+function portfolioMinbeisPriority(position, rowBySymbol, blockedBySymbol, instrumentCapabilities) {
+  const symbol = canonicalDecisionSymbol(position?.symbol);
+  const row = rowBySymbol.get(symbol) || null;
+  const blocked = blockedBySymbol.get(symbol) || null;
+  const assessment = row?.minbeisAssessment || blocked?.minbeisAssessment || null;
+  const capability = instrumentCapabilities?.[String(position?.symbol || '').trim().toUpperCase()] || null;
+  if (row?.action === 'REDUCE') return 100;
+  if (assessment?.classification === 'TRAP') return 95;
+  if (blocked?.finalAction?.controlledPlan?.status === 'AVAILABLE') return 85;
+  if (blocked || assessment?.classification === 'CONFIRMATION_REQUIRED') return 80;
+  if (row?.action === 'HOLD') return 65;
+  if (capability?.queueStatus === 'QUEUED') return 45;
+  if (capability?.onboardingStatus === 'CHECK_FAILED' || capability?.queueStatus === 'QUEUE_FAILED') return 40;
+  return 20;
+}
+
 function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = null, instrumentCapabilities = {} }) {
   const rowBySymbol = new Map((dashboard?.rows || []).map((row) => [canonicalDecisionSymbol(row?.symbol), row]));
   const blockedBySymbol = blockedPortfolioDossierIndex(feed);
@@ -308,16 +333,28 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = nu
   if (!positions.length) return null;
 
   const coveredCount = positions.filter((position) => { const symbol = canonicalDecisionSymbol(position?.symbol); return rowBySymbol.has(symbol) || blockedBySymbol.has(symbol); }).length;
+  const attentionCount = positions.filter((position) => portfolioMinbeisPriority(position, rowBySymbol, blockedBySymbol, instrumentCapabilities) >= 80).length;
+  const queuedCount = positions.filter((position) => instrumentCapabilities?.[String(position?.symbol || '').trim().toUpperCase()]?.queueStatus === 'QUEUED').length;
+  const orderedPositions = [...positions].sort((a, b) => {
+    const priority = portfolioMinbeisPriority(b, rowBySymbol, blockedBySymbol, instrumentCapabilities)
+      - portfolioMinbeisPriority(a, rowBySymbol, blockedBySymbol, instrumentCapabilities);
+    return priority || String(a?.symbol || '').localeCompare(String(b?.symbol || ''));
+  });
 
   return (
     <View style={styles.portfolioMinbeisSection}>
       <View style={styles.portfolioMinbeisHeader}>
         <View style={styles.grow}>
           <Text style={styles.sectionTitle}>Οι θέσεις μου</Text>
-          <Text style={styles.sectionSubtitle}>Πρώτα ελέγχουμε το δικό σου χαρτοφυλάκιο. Κάλυψη σήμερα: {coveredCount}/{positions.length} θέσεις.</Text>
+          <Text style={styles.sectionSubtitle}>Πρώτα εμφανίζονται όσα χρειάζονται προσοχή.</Text>
+          <View style={styles.portfolioStatusRow}>
+            <Text style={styles.portfolioStatusText}>Προσοχή: {attentionCount}</Text>
+            <Text style={styles.portfolioStatusText}>Ανάλυση: {coveredCount}/{positions.length}</Text>
+            <Text style={styles.portfolioStatusText}>Research queue: {queuedCount}</Text>
+          </View>
         </View>
       </View>
-      {positions.map((position) => {
+      {orderedPositions.map((position) => {
         const symbol = canonicalDecisionSymbol(position?.symbol);
         const row = rowBySymbol.get(symbol) || null;
         const blockedDossier = blockedBySymbol.get(symbol) || null;
@@ -820,6 +857,8 @@ const styles = StyleSheet.create({
   privacy: { color: '#718096', fontSize: 12, lineHeight: 18, marginTop: 13 },
   portfolioMinbeisSection: { marginBottom: 20 },
   portfolioMinbeisHeader: { marginBottom: 8 },
+  portfolioStatusRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 7 },
+  portfolioStatusText: { color: '#60728b', fontSize: 9, fontWeight: '800', backgroundColor: '#edf3fb', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 5 },
   portfolioMinbeisCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#b9cce8', borderRadius: 18, padding: 14, marginBottom: 8 },
   pendingActionBadge: { backgroundColor: '#fff3d8' },
   pendingActionText: { color: '#976500' },
@@ -841,6 +880,8 @@ const styles = StyleSheet.create({
   productFeedbackPrivacy: { color: '#8793a6', fontSize: 9, lineHeight: 14, marginTop: 8 },
   productFeedbackMetric: { color: '#60728b', fontSize: 9, lineHeight: 14, marginTop: 5, fontWeight: '700' },
   historicalCard: { backgroundColor: '#f7f5ff', borderWidth: 1, borderColor: '#d8cff3', borderRadius: 14, padding: 11, marginBottom: 8 },
+  historicalHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  historicalToggle: { color: '#0B66FF', fontSize: 10, fontWeight: '900' },
   historicalTitle: { color: '#44366e', fontSize: 11, fontWeight: '900' },
   historicalRow: { borderTopWidth: 1, borderTopColor: '#e6e0f4', paddingTop: 7, marginTop: 7 },
   historicalHorizon: { color: '#5b4b82', fontSize: 10, fontWeight: '900' },
