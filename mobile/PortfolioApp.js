@@ -18,7 +18,7 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { fetchConfiguredInstrumentCapability, isMarketGatewayConfigured } from './src/market-gateway-runtime';
+import { fetchConfiguredInstrumentCapability, isMarketGatewayConfigured, requestConfiguredMinbeisResearch } from './src/market-gateway-runtime';
 import * as SecureStore from 'expo-secure-store';
 import {
   SafeAreaProvider,
@@ -80,9 +80,12 @@ function normalizeMinbeisOnboarding(value) {
     const key = String(symbol || '').trim().toUpperCase();
     if (!/^([A-Z0-9][A-Z0-9.-]{0,19})\.(US|GR)$/.test(key)) return null;
     const status = allowed.has(item?.onboardingStatus) ? item.onboardingStatus : 'CHECK_FAILED';
+    const allowedQueue = new Set(['QUEUED', 'COMPLETED', 'ALREADY_SUPPORTED', 'NOT_QUEUED', 'QUEUE_NOT_CONFIGURED', 'QUEUE_FAILED', 'GATEWAY_NOT_CONFIGURED']);
+    const queueStatus = allowedQueue.has(item?.queueStatus) ? item.queueStatus : null;
     return [key, {
       requestedSymbol: key,
       onboardingStatus: status,
+      queueStatus,
       identityVerified: item?.identityVerified === true,
       quoteSupported: item?.quoteSupported === true,
       analysisSupported: item?.analysisSupported === true,
@@ -90,6 +93,8 @@ function normalizeMinbeisOnboarding(value) {
       displayName: item?.displayName || null,
       currency: item?.currency || null,
       checkedAt: item?.checkedAt || null,
+      queuedAt: item?.queuedAt || null,
+      queueError: item?.queueError || null,
       error: item?.error || null,
     }];
   }).filter(Boolean));
@@ -611,6 +616,7 @@ function MainApp({ onOpenDecisionGate }) {
   const [legalAccepted, setLegalAccepted] = useState(null);
   const tokenRef = useRef('');
   const appState = useRef(AppState.currentState);
+  const onboardingAttemptedRef = useRef(new Set());
 
   useEffect(() => {
     AsyncStorage.getItem(LEGAL_ACCEPTANCE_KEY)
@@ -720,10 +726,27 @@ function MainApp({ onOpenDecisionGate }) {
     if (!/^([A-Z0-9][A-Z0-9.-]{0,19})\.(US|GR)$/.test(clean)) return null;
     try {
       const capability = await fetchConfiguredInstrumentCapability(clean);
+      let queueStatus = capability.analysisSupported === true ? 'ALREADY_SUPPORTED' : null;
+      let queuedAt = null;
+      let queueError = null;
+
+      if (capability.onboardingStatus === 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED') {
+        try {
+          const queued = await requestConfiguredMinbeisResearch(clean);
+          queueStatus = queued.queueStatus || (queued.queued ? 'QUEUED' : 'NOT_QUEUED');
+          queuedAt = queued.lastRequestedAt || queued.firstRequestedAt || new Date().toISOString();
+        } catch (queueFailure) {
+          const code = String(queueFailure?.gatewayCode || queueFailure?.message || 'MINBEIS_RESEARCH_QUEUE_FAILED');
+          queueStatus = code === 'RESEARCH_QUEUE_NOT_CONFIGURED' ? 'QUEUE_NOT_CONFIGURED' : 'QUEUE_FAILED';
+          queueError = code;
+        }
+      }
+
       const current = stateRef.current;
       const entry = {
         requestedSymbol: clean,
         onboardingStatus: capability.onboardingStatus,
+        queueStatus,
         identityVerified: capability.identityVerified === true,
         quoteSupported: capability.quoteSupported === true,
         analysisSupported: capability.analysisSupported === true,
@@ -731,6 +754,8 @@ function MainApp({ onOpenDecisionGate }) {
         displayName: capability.displayName || null,
         currency: capability.currency || null,
         checkedAt: new Date().toISOString(),
+        queuedAt,
+        queueError,
         error: null,
       };
       await persist({
@@ -740,17 +765,21 @@ function MainApp({ onOpenDecisionGate }) {
       return entry;
     } catch (error) {
       const current = stateRef.current;
+      const previous = current.minbeisOnboarding?.[clean] || {};
       const entry = {
         requestedSymbol: clean,
         onboardingStatus: 'CHECK_FAILED',
-        identityVerified: false,
-        quoteSupported: false,
-        analysisSupported: false,
-        canonicalCompanyId: null,
-        displayName: null,
-        currency: null,
+        queueStatus: previous.queueStatus || null,
+        identityVerified: previous.identityVerified === true,
+        quoteSupported: previous.quoteSupported === true,
+        analysisSupported: previous.analysisSupported === true,
+        canonicalCompanyId: previous.canonicalCompanyId || null,
+        displayName: previous.displayName || null,
+        currency: previous.currency || null,
         checkedAt: new Date().toISOString(),
-        error: String(error?.message || 'MINBEIS_ONBOARDING_CHECK_FAILED'),
+        queuedAt: previous.queuedAt || null,
+        queueError: previous.queueError || null,
+        error: String(error?.gatewayCode || error?.message || 'MINBEIS_ONBOARDING_CHECK_FAILED'),
       };
       await persist({
         ...current,
@@ -760,22 +789,35 @@ function MainApp({ onOpenDecisionGate }) {
     }
   }, [persist]);
 
-  const missingOnboardingSymbols = useMemo(
+  const onboardingSymbolsToCheck = useMemo(
     () => positions
       .map((position) => String(position?.symbol || '').trim().toUpperCase())
       .filter((symbol) => /^([A-Z0-9][A-Z0-9.-]{0,19})\.(US|GR)$/.test(symbol))
-      .filter((symbol) => !state.minbeisOnboarding?.[symbol])
+      .filter((symbol) => {
+        const entry = state.minbeisOnboarding?.[symbol];
+        if (!entry) return true;
+        if (entry.onboardingStatus === 'CHECK_FAILED') return true;
+        return entry.onboardingStatus === 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED'
+          && !['QUEUED', 'COMPLETED'].includes(entry.queueStatus);
+      })
+      .filter((symbol) => !onboardingAttemptedRef.current.has(symbol))
       .sort(),
     [positions, state.minbeisOnboarding],
   );
-  const missingOnboardingKey = missingOnboardingSymbols.join('|');
+  const onboardingSymbolsKey = onboardingSymbolsToCheck.join('|');
 
   useEffect(() => {
-    if (loading || !missingOnboardingSymbols.length) return;
-    missingOnboardingSymbols.forEach((symbol) => {
-      syncMinbeisOnboarding(symbol);
-    });
-  }, [loading, missingOnboardingKey, syncMinbeisOnboarding]);
+    if (loading || !onboardingSymbolsToCheck.length) return;
+    let cancelled = false;
+    (async () => {
+      for (const symbol of onboardingSymbolsToCheck) {
+        if (cancelled) break;
+        onboardingAttemptedRef.current.add(symbol);
+        await syncMinbeisOnboarding(symbol);
+      }
+    })().catch(() => {});
+    return () => { cancelled = true; };
+  }, [loading, onboardingSymbolsKey, syncMinbeisOnboarding]);
 
   const openNewTransaction = () => { setEditingTransaction(null); setTransactionModal(true); };
 
