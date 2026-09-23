@@ -83,4 +83,12 @@ assert(opportunities.includes(">ΓΙΑΤΙ<"), 'MINBEIS clarity WHY label missin
 assert(opportunities.includes("ΤΙ ΘΑ ΑΛΛΑΞΕΙ ΤΗΝ ΕΙΚΟΝΑ"), 'MINBEIS clarity change-condition label missing');
 assert(opportunities.includes("ΣΤΗΝ ΟΥΡΑ ΕΡΕΥΝΑΣ"), 'MINBEIS research queue status missing from portfolio UX');
 assert(opportunities.includes("Research queue:"), 'MINBEIS portfolio research queue summary missing');
+
+// User-friendly transaction entry must always persist the canonical market-qualified symbol.
+assert(portfolio.includes("const canonicalSymbol = canonicalInstrumentSymbol(form.symbol, form.market);"), 'canonical ticker transaction entry missing');
+assert(portfolio.includes("symbol: canonicalSymbol"), 'transaction save does not persist canonical ticker');
+assert(portfolio.includes("currency: instrumentCurrency(form.market)"), 'transaction currency is not derived from selected market');
+assert(portfolio.includes("value=\"GR\" current={form.market} label=\"Ελλάδα\""), 'Greek market selector missing');
+assert(portfolio.includes("value=\"US\" current={form.market} label=\"ΗΠΑ\""), 'US market selector missing');
+assert(portfolio.includes("onChangeText={setSymbolInput}"), 'ticker input does not use canonical-safe setter');
 console.log(`PASS v1.7.1+ portfolio-aware holder/non-holder decisions, validity-gated personalized counters, safe currency inference, JSX parse and consistent release identity ${app.expo.version} build ${app.expo.android.versionCode}.`);
