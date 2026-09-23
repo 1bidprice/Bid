@@ -10,7 +10,9 @@ const {
   normalizeGatewayBaseUrl,
   createOpaqueInstallationId,
   getOrCreateInstallationId,
+  validateInstrumentCapability,
   validateGatewayFx,
+  fetchInstrumentCapability,
   fetchCanonicalGatewayQuote,
   fetchCanonicalGatewayFx,
   fetchCanonicalGatewayQuotes,
@@ -95,6 +97,41 @@ async function main() {
   assert.equal(quoteCalls[0].headers[MARKET_GATEWAY_CLIENT_HEADER], firstId);
   assert.equal(quoteCalls[0].url, 'https://quotes.example.com/v1/quote?symbol=SPCE.US');
   assert.equal(/token=|finnhub/i.test(quoteCalls[0].url), false);
+
+  const capabilityPayload = {
+    format: 'investor-control-instrument-capability',
+    version: 1,
+    requestedSymbol: 'NVDA.US',
+    market: 'US',
+    identityVerified: true,
+    quoteSupported: true,
+    analysisSupported: false,
+    onboardingStatus: 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED',
+    canonicalCompanyId: 'gateway:us:NVDA',
+    displayName: 'NVIDIA Corp',
+    currency: 'USD',
+    limitations: ['FULL_MINBEIS_RESEARCH_NOT_YET_CANONICAL'],
+    privacy: {
+      acceptedInputs: ['symbol'],
+      portfolioQuantityRequired: false,
+      portfolioCostRequired: false,
+      pnlRequired: false,
+    },
+  };
+  assert.equal(validateInstrumentCapability('NVDA.US', capabilityPayload), null);
+  const capabilityCalls = [];
+  const capability = await fetchInstrumentCapability('NVDA.US', {
+    baseUrl: 'https://quotes.example.com',
+    clientId: firstId,
+    fetchImpl: async (url, init = {}) => {
+      capabilityCalls.push({ url: String(url), headers: init.headers || {} });
+      return new Response(JSON.stringify(capabilityPayload), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    },
+  });
+  assert.equal(capability.onboardingStatus, 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED');
+  assert.equal(capabilityCalls[0].url, 'https://quotes.example.com/v1/instrument?symbol=NVDA.US');
+  assert.equal(capabilityCalls[0].headers[MARKET_GATEWAY_CLIENT_HEADER], firstId);
+  assert.equal(JSON.stringify(capability).includes('quantity'), false);
 
   await assert.rejects(
     fetchCanonicalGatewayQuote('SPCE.US', {
