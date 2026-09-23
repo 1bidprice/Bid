@@ -20,6 +20,7 @@ import FinalDecisionCard from './FinalDecisionCard';
 import { finalActionIsCurrent } from './decision-validity';
 import { applyMinbeisPortfolioSizing } from './minbeis-portfolio-sizing';
 import { buildPersonalizedMinbeisDashboard } from './minbeis-mobile-decision';
+import { recordLocalMinbeisClarityFeedback, startLocalMinbeisProductSession } from './minbeis-product-metrics';
 
 function money(referencePrice, item) {
   const value = Number(referencePrice?.value);
@@ -407,6 +408,34 @@ function MinbeisDashboard({ dashboard, sourceDecisionCount = 0, decisionContext 
   );
 }
 
+function MinbeisProductFeedback({ feedback, summary, onFeedback }) {
+  const measurable = summary?.minimumEvidenceMet === true;
+  return (
+    <View style={styles.productFeedbackCard}>
+      <Text style={styles.productFeedbackTitle}>Σου ξεκαθάρισε τι χρειάζεται προσοχή;</Text>
+      <Text style={styles.productFeedbackText}>Μετράμε αν το MINBEIS πραγματικά μειώνει τη σύγχυση — όχι μόνο αν παράγει περισσότερα σήματα.</Text>
+      {feedback === null ? (
+        <View style={styles.productFeedbackActions}>
+          <Pressable style={styles.productFeedbackYes} onPress={() => onFeedback(true)}>
+            <Text style={styles.productFeedbackYesText}>Ναι, ξεκαθάρισε</Text>
+          </Pressable>
+          <Pressable style={styles.productFeedbackNo} onPress={() => onFeedback(false)}>
+            <Text style={styles.productFeedbackNoText}>Όχι ακόμη</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Text style={styles.productFeedbackThanks}>{feedback ? 'Καταγράφηκε ως χρήσιμη συνεδρία.' : 'Καταγράφηκε ότι χρειάζεται καλύτερη εξήγηση.'}</Text>
+      )}
+      <Text style={styles.productFeedbackPrivacy}>Μόνο στη συσκευή · χωρίς ticker, ποσότητες, κόστος, P/L ή επενδυτικές αποφάσεις.</Text>
+      {measurable ? (
+        <Text style={styles.productFeedbackMetric}>30 ημέρες · χρήσιμες ημέρες {summary.usefulDays}/{summary.activeDays} · median time-to-clarity {summary.medianTimeToClaritySec ?? '—'}″</Text>
+      ) : summary?.sessions > 0 ? (
+        <Text style={styles.productFeedbackMetric}>Ιδιωτικό alpha δείγμα: {summary.sessions} συνεδρία{summary.sessions === 1 ? '' : 'ες'} · δεν υπάρχει ακόμη αρκετό δείγμα για συμπέρασμα.</Text>
+      ) : null}
+    </View>
+  );
+}
+
 function purchaseReasonLabel(reason) {
   return {
     FULL_DEEP_DOSSIER_REQUIRED: 'Απαιτείται πλήρης βαθιά ανάλυση πριν εξεταστεί αγορά.',
@@ -511,6 +540,32 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
   const [importing, setImporting] = useState(false);
   const [syncError, setSyncError] = useState(null);
   const [showSystemDetails, setShowSystemDetails] = useState(false);
+  const [productSessionStartedAt, setProductSessionStartedAt] = useState(null);
+  const [productMetrics, setProductMetrics] = useState(null);
+  const [clarityFeedback, setClarityFeedback] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    startLocalMinbeisProductSession()
+      .then((result) => {
+        if (!active) return;
+        setProductSessionStartedAt(result.sessionStartedAt);
+        setProductMetrics(result.summary);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  const submitClarityFeedback = useCallback(async (useful) => {
+    if (!productSessionStartedAt || clarityFeedback !== null) return;
+    setClarityFeedback(useful);
+    try {
+      const summary = await recordLocalMinbeisClarityFeedback(productSessionStartedAt, useful);
+      setProductMetrics(summary);
+    } catch {
+      // Product-evaluation telemetry is optional and must never block MINBEIS.
+    }
+  }, [productSessionStartedAt, clarityFeedback]);
 
   const sync = useCallback(async ({ manual = false } = {}) => {
     setSyncing(true);
@@ -687,6 +742,7 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
         <>
           <PortfolioMinbeisSection dashboard={minbeisDashboard} portfolioPositions={portfolioPositions} feed={feed} instrumentCapabilities={instrumentCapabilities} />
           <MinbeisDashboard dashboard={minbeisDashboard} sourceDecisionCount={(feed.decisions || []).length} decisionContext={decisionContext} />
+          <MinbeisProductFeedback feedback={clarityFeedback} summary={productMetrics} onFeedback={submitClarityFeedback} />
           <View style={styles.summaryCard}>
             <Text style={styles.summaryHeadline}>{feed.today?.headline || 'Ημερήσια σύνοψη'}</Text>
             <Text style={styles.updated}>Έγκυρη ροή: {when(feed.generatedAt)}</Text>
@@ -755,6 +811,17 @@ const styles = StyleSheet.create({
   interimPlanAction: { color: '#16345f', fontSize: 16, lineHeight: 21, fontWeight: '900', marginTop: 5 },
   systemDetailsToggle: { marginTop: 10, minHeight: 42, borderRadius: 13, borderWidth: 1, borderColor: '#bdd9ff', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   systemDetailsToggleText: { color: '#0B66FF', fontSize: 11, fontWeight: '900' },
+  productFeedbackCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd9ec', borderRadius: 18, padding: 14, marginBottom: 16 },
+  productFeedbackTitle: { color: '#16345f', fontSize: 14, fontWeight: '900' },
+  productFeedbackText: { color: '#5f7088', fontSize: 11, lineHeight: 17, marginTop: 4 },
+  productFeedbackActions: { flexDirection: 'row', gap: 8, marginTop: 11 },
+  productFeedbackYes: { flex: 1, minHeight: 40, borderRadius: 12, backgroundColor: '#0B66FF', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
+  productFeedbackYesText: { color: '#fff', fontSize: 11, fontWeight: '900' },
+  productFeedbackNo: { flex: 1, minHeight: 40, borderRadius: 12, borderWidth: 1, borderColor: '#cbd9ec', backgroundColor: '#f8fbff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
+  productFeedbackNoText: { color: '#40536f', fontSize: 11, fontWeight: '900' },
+  productFeedbackThanks: { color: '#40536f', fontSize: 11, lineHeight: 16, marginTop: 10, fontWeight: '800' },
+  productFeedbackPrivacy: { color: '#8793a6', fontSize: 9, lineHeight: 14, marginTop: 8 },
+  productFeedbackMetric: { color: '#60728b', fontSize: 9, lineHeight: 14, marginTop: 5, fontWeight: '700' },
   historicalCard: { backgroundColor: '#f7f5ff', borderWidth: 1, borderColor: '#d8cff3', borderRadius: 14, padding: 11, marginBottom: 8 },
   historicalTitle: { color: '#44366e', fontSize: 11, fontWeight: '900' },
   historicalRow: { borderTopWidth: 1, borderTopColor: '#e6e0f4', paddingTop: 7, marginTop: 7 },
