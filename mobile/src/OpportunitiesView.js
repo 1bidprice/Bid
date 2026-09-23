@@ -112,6 +112,7 @@ function IntelligenceCard({ item, decisionContext }) {
           <StatusBadge item={item} />
         </View>
         <Text style={[styles.category, risk && styles.riskText]}>{item.categoryLabel}</Text>
+        <MinbeisAssessmentStrip assessment={item.minbeisAssessment} />
         <FinalDecisionCard item={item} decisionContext={decisionContext} />
         <View style={styles.actionRow}>
           <View style={styles.actionBox}><Text style={styles.muted}>Γενική ερευνητική ένδειξη</Text><Text style={[styles.action, risk && styles.riskText]}>{item.actionLabel}</Text><Text style={styles.ageText}>Δεν είναι η προσωπική σου πράξη</Text></View>
@@ -143,6 +144,32 @@ function IntelligenceCard({ item, decisionContext }) {
 
 function DiscoveryRadarCard({ item }) {
   return <View style={styles.discoveryCard}><View style={styles.rowTop}><View style={styles.grow}><Text style={styles.company}>{item.companyName}</Text><Text style={styles.symbol}>{item.symbol || '—'} · {item.exchange || '—'}</Text></View><View style={styles.discoveryScore}><Text style={styles.discoveryScoreValue}>{Math.round(Number(item.discoveryScore || 0))}</Text><Text style={styles.discoveryScoreLabel}>προτερ.</Text></View></View><Text style={styles.discoveryStatus}>ΑΥΤΟΜΑΤΗ ΑΝΑΚΑΛΥΨΗ · ΟΧΙ ΑΚΟΜΗ ΠΡΟΤΑΣΗ ΑΓΟΡΑΣ</Text><Text style={styles.discoveryDisclaimer}>Βαθμός προτεραιότητας διερεύνησης — όχι επενδυτική βαθμολογία.</Text>{(item.reasons || []).slice(0, 3).map((reason, index) => <Text key={index} style={styles.discoveryReason}>• {reason}</Text>)}<Text style={styles.discoveryTime}>Νεότερο γεγονός: {when(item.latestEventAt)}</Text></View>;
+}
+
+function minbeisAssessmentLabel(classification) {
+  return {
+    SETUP: 'SETUP',
+    TRAP: 'TRAP',
+    NO_TRADE: 'NO-TRADE',
+    CONFIRMATION_REQUIRED: 'ΧΡΕΙΑΖΕΤΑΙ ΕΠΙΒΕΒΑΙΩΣΗ',
+  }[classification] || classification || '—';
+}
+
+function MinbeisAssessmentStrip({ assessment }) {
+  if (!assessment) return null;
+  const classification = assessment.classification;
+  const risk = classification === 'TRAP';
+  const setup = classification === 'SETUP';
+  return (
+    <View style={[styles.assessmentStrip, risk && styles.assessmentTrap, setup && styles.assessmentSetup]}>
+      <View style={styles.rowTop}>
+        <Text style={[styles.assessmentLabel, risk && styles.riskText]}>{minbeisAssessmentLabel(classification)}</Text>
+        <Text style={styles.assessmentMeta}>MINBEIS</Text>
+      </View>
+      {assessment?.explanation?.summary ? <Text style={styles.assessmentSummary}>{assessment.explanation.summary}</Text> : null}
+      {assessment?.explanation?.whatWouldChange ? <Text style={styles.assessmentChange}>Τι θα άλλαζε την εικόνα: {assessment.explanation.whatWouldChange}</Text> : null}
+    </View>
+  );
 }
 
 function minbeisActionLabel(action) {
@@ -246,6 +273,7 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = nu
         const symbol = canonicalDecisionSymbol(position?.symbol);
         const row = rowBySymbol.get(symbol) || null;
         const blockedDossier = blockedBySymbol.get(symbol) || null;
+        const assessment = row?.minbeisAssessment || blockedDossier?.minbeisAssessment || null;
         const capability = instrumentCapabilities?.[String(position?.symbol || '').trim().toUpperCase()] || null;
         const interimPlan = blockedDossier?.finalAction?.controlledPlan?.status === 'AVAILABLE'
           ? blockedDossier.finalAction.controlledPlan
@@ -268,6 +296,7 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = nu
                 <Text style={[styles.minbeisActionText, !row && styles.pendingActionText]}>{badgeLabel}</Text>
               </View>
             </View>
+            <MinbeisAssessmentStrip assessment={assessment} />
             {interimPlan ? (
               <View style={styles.interimPlanBox}>
                 <Text style={styles.interimPlanEyebrow}>ΠΡΟΣΩΡΙΝΟ RISK-CONTROL · ΟΧΙ ΤΕΛΙΚΗ ΑΠΟΦΑΣΗ</Text>
@@ -289,18 +318,24 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = nu
 
 function MinbeisDashboard({ dashboard, sourceDecisionCount = 0, decisionContext }) {
   const rows = (Array.isArray(dashboard?.rows) ? dashboard.rows : []).filter((row) => !row.owned);
-  const marketCounts = rows.reduce((acc, row) => {
-    acc[row.action] = (acc[row.action] || 0) + 1;
+  const assessmentCounts = rows.reduce((acc, row) => {
+    const key = row?.minbeisAssessment?.classification || 'UNKNOWN';
+    acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {});
-  const buyCount = Number(marketCounts.BUY_PROBE || 0) + Number(marketCounts.BUY_STARTER || 0);
-  const headline = buyCount > 0
-    ? `${buyCount} επιβεβαιωμένη νέα αγορά${buyCount === 1 ? '' : 'ές'} τώρα`
-    : rows.length
-      ? 'Καμία επιβεβαιωμένη νέα αγορά τώρα'
-      : sourceDecisionCount > 0
-        ? 'Υπάρχουν αναλύσεις, αλλά καμία νέα ιδέα δεν περνά τώρα τους ενεργούς κανόνες'
-        : 'Δεν υπάρχουν ακόμη τελικές αναλύσεις αγοράς';
+  const setupCount = Number(assessmentCounts.SETUP || 0);
+  const trapCount = Number(assessmentCounts.TRAP || 0);
+  const noTradeCount = Number(assessmentCounts.NO_TRADE || 0);
+  const confirmCount = Number(assessmentCounts.CONFIRMATION_REQUIRED || 0);
+  const headline = setupCount > 0
+    ? `${setupCount} επιβεβαιωμένο setup${setupCount === 1 ? '' : 's'} τώρα`
+    : trapCount > 0
+      ? `${trapCount} πιθανή παγίδα${trapCount === 1 ? '' : 'ες'} χρειάζεται προσοχή`
+      : rows.length
+        ? 'Δεν υπάρχει επιβεβαιωμένο setup για νέα είσοδο τώρα'
+        : sourceDecisionCount > 0
+          ? 'Υπάρχουν αναλύσεις, αλλά καμία νέα ιδέα δεν περνά τώρα τους ενεργούς κανόνες'
+          : 'Δεν υπάρχουν ακόμη τελικές αναλύσεις αγοράς';
 
   return (
     <View style={styles.minbeisShell}>
@@ -309,10 +344,10 @@ function MinbeisDashboard({ dashboard, sourceDecisionCount = 0, decisionContext 
         <Text style={styles.minbeisHeroTitle}>{headline}</Text>
         <Text style={styles.minbeisHeroText}>Αυτή η ενότητα αφορά νέες ιδέες εκτός του χαρτοφυλακίου σου. Οι δικές σου θέσεις εμφανίζονται ξεχωριστά παραπάνω. Δεν εκτελούνται συναλλαγές.</Text>
         <View style={styles.minbeisCountRow}>
-          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{buyCount}</Text><Text style={styles.minbeisCountLabel}>BUY</Text></View>
-          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{marketCounts.WATCH || 0}</Text><Text style={styles.minbeisCountLabel}>WATCH</Text></View>
-          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{marketCounts.NO_BUY || 0}</Text><Text style={styles.minbeisCountLabel}>NO BUY</Text></View>
-          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{rows.length}</Text><Text style={styles.minbeisCountLabel}>ΑΝΑΛΥΘΗΚΑΝ</Text></View>
+          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{setupCount}</Text><Text style={styles.minbeisCountLabel}>SETUP</Text></View>
+          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{trapCount}</Text><Text style={styles.minbeisCountLabel}>TRAP</Text></View>
+          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{noTradeCount}</Text><Text style={styles.minbeisCountLabel}>NO-TRADE</Text></View>
+          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{confirmCount}</Text><Text style={styles.minbeisCountLabel}>CHECK</Text></View>
         </View>
         {!decisionContext?.feedFresh ? <Text style={styles.minbeisCaution}>Οι ενεργές πράξεις απενεργοποιούνται όταν η ροή δεν είναι αρκετά πρόσφατη.</Text> : null}
       </View>
@@ -329,6 +364,7 @@ function MinbeisDashboard({ dashboard, sourceDecisionCount = 0, decisionContext 
               <Text style={styles.minbeisActionText}>{minbeisActionLabel(row.action)}</Text>
             </View>
           </View>
+          <MinbeisAssessmentStrip assessment={row.minbeisAssessment} />
           <Text style={styles.minbeisDecisionReason}>{minbeisReasonText(row)}</Text>
           <Text style={styles.ageText}>Confidence: {Number.isFinite(Number(row.confidenceScore)) ? Number(row.confidenceScore).toFixed(0) : '—'} · Data quality: {Number.isFinite(Number(row.dataQualityScore)) ? Number(row.dataQualityScore).toFixed(0) : '—'}</Text>
         </View>
@@ -685,6 +721,13 @@ const styles = StyleSheet.create({
   interimPlanAction: { color: '#16345f', fontSize: 16, lineHeight: 21, fontWeight: '900', marginTop: 5 },
   systemDetailsToggle: { marginTop: 10, minHeight: 42, borderRadius: 13, borderWidth: 1, borderColor: '#bdd9ff', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   systemDetailsToggleText: { color: '#0B66FF', fontSize: 11, fontWeight: '900' },
+  assessmentStrip: { backgroundColor: '#f3f7fd', borderWidth: 1, borderColor: '#cbd9ec', borderRadius: 14, padding: 11, marginTop: 10, marginBottom: 8 },
+  assessmentTrap: { backgroundColor: '#fff1f1', borderColor: '#f1b9b9' },
+  assessmentSetup: { backgroundColor: '#eefaf3', borderColor: '#b8dfc8' },
+  assessmentLabel: { color: '#18385f', fontSize: 12, fontWeight: '900' },
+  assessmentMeta: { color: '#8090a7', fontSize: 9, fontWeight: '900' },
+  assessmentSummary: { color: '#40536f', fontSize: 12, lineHeight: 18, marginTop: 6 },
+  assessmentChange: { color: '#64758e', fontSize: 10, lineHeight: 15, marginTop: 6, fontWeight: '700' },
   minbeisShell: { marginBottom: 20 },
   minbeisHero: { backgroundColor: '#081d3d', borderRadius: 24, padding: 18, marginBottom: 10 },
   minbeisEyebrow: { color: '#8fbaff', fontSize: 11, fontWeight: '900', letterSpacing: 1.1 },
