@@ -138,7 +138,10 @@ jobs:
           curl --fail --silent --show-error --retry 2 --retry-delay 2 \
             -H "X-Investor-Control-Client: $CLIENT_ID" \
             "$NORMALIZED_GATEWAY_URL/v1/fx?pair=EURUSD" > "$FX_FILE"
-          HEALTH_FILE="$HEALTH_FILE" QUOTE_FILE="$QUOTE_FILE" FX_FILE="$FX_FILE" node - <<'NODE'
+          curl --fail --silent --show-error --retry 2 --retry-delay 2 \
+            -H "X-Investor-Control-Client: $CLIENT_ID" \
+            "$NORMALIZED_GATEWAY_URL/v1/research-queue?symbol=SPCE.US" > "$QUEUE_FILE"
+          HEALTH_FILE="$HEALTH_FILE" QUOTE_FILE="$QUOTE_FILE" FX_FILE="$FX_FILE" QUEUE_FILE="$QUEUE_FILE" node - <<'NODE'
           const fs = require('fs');
           const { validateGatewayQuote, validateGatewayFx, validateResearchQueueStatus } = require('./src/market-gateway-client');
           const health = JSON.parse(fs.readFileSync(process.env.HEALTH_FILE, 'utf8'));
