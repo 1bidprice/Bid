@@ -5,6 +5,8 @@ const {
   normalizeGatewayBaseUrl,
   fetchCanonicalGatewayMarketSnapshot,
   fetchInstrumentCapability,
+  requestMinbeisResearch,
+  fetchMinbeisResearchQueueStatus,
 } = require('./market-gateway-client');
 
 // This value is intentionally public. Expo inlines EXPO_PUBLIC_* values into the client bundle.
@@ -76,4 +78,47 @@ export async function fetchConfiguredInstrumentCapability(symbol, options = {}) 
     enabled: true,
     ...result,
   };
+}
+
+
+export async function requestConfiguredMinbeisResearch(symbol, options = {}) {
+  const baseUrl = configuredMarketGatewayUrl(options.baseUrl === undefined ? COMPILED_MARKET_GATEWAY_URL : options.baseUrl);
+  if (!baseUrl) {
+    return {
+      enabled: false,
+      requestedSymbol: symbol,
+      queueStatus: 'GATEWAY_NOT_CONFIGURED',
+      queued: false,
+    };
+  }
+  const storage = options.storage || AsyncStorage;
+  const clientId = await getOrCreateInstallationId(storage, options.installationIdOptions || {});
+  const result = await requestMinbeisResearch(symbol, {
+    baseUrl,
+    clientId,
+    fetchImpl: options.fetchImpl,
+    timeoutMs: options.timeoutMs,
+  });
+  return { enabled: true, ...result };
+}
+
+export async function fetchConfiguredMinbeisResearchQueueStatus(symbol, options = {}) {
+  const baseUrl = configuredMarketGatewayUrl(options.baseUrl === undefined ? COMPILED_MARKET_GATEWAY_URL : options.baseUrl);
+  if (!baseUrl) {
+    return {
+      enabled: false,
+      requestedSymbol: symbol,
+      queueStatus: 'GATEWAY_NOT_CONFIGURED',
+      queued: false,
+    };
+  }
+  const storage = options.storage || AsyncStorage;
+  const clientId = await getOrCreateInstallationId(storage, options.installationIdOptions || {});
+  const result = await fetchMinbeisResearchQueueStatus(symbol, {
+    baseUrl,
+    clientId,
+    fetchImpl: options.fetchImpl,
+    timeoutMs: options.timeoutMs,
+  });
+  return { enabled: true, ...result };
 }
