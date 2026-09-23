@@ -177,13 +177,42 @@ function minbeisReasonText(row) {
   }[row?.reason] || 'Η απόφαση προκύπτει από τον canonical Investor Control engine.';
 }
 
-function PortfolioMinbeisSection({ dashboard, portfolioPositions = [] }) {
+function portfolioBlockedReason(item) {
+  const blockers = Array.isArray(item?.finalAction?.blockers) ? item.finalAction.blockers : [];
+  const labels = {
+    ACTIVE_LISTING_NOT_VERIFIED: 'Χρειάζεται επιβεβαίωση ότι η μετοχή διαπραγματεύεται ενεργά.',
+    LISTING_NOT_ACTIVE: 'Η κατάσταση της εισαγωγής δεν επιτρέπει ενεργή επενδυτική απόφαση.',
+    REFERENCE_PRICE_TIMESTAMP_NOT_VERIFIED: 'Η τιμή υπάρχει, αλλά ο ακριβής χρόνος της δεν είναι επαληθευμένος για τελική απόφαση.',
+    REFERENCE_PRICE_NOT_DECISION_ELIGIBLE: 'Η διαθέσιμη τιμή είναι κατάλληλη για ενημέρωση/αποτίμηση, όχι για τελική επενδυτική πράξη.',
+    REFERENCE_PRICE_NOT_EXECUTION_ELIGIBLE: 'Η διαθέσιμη τιμή δεν είναι αρκετά φρέσκια για execution-sensitive απόφαση.',
+    QUOTE_TIMESTAMP_NOT_VERIFIED: 'Ο χρόνος της χρηματιστηριακής τιμής δεν είναι επαληθευμένος.',
+    QUOTE_NOT_DECISION_ELIGIBLE: 'Η τρέχουσα χρηματιστηριακή τιμή δεν επιτρέπεται να οδηγήσει τελική απόφαση.',
+  };
+  const explained = blockers.map((code) => labels[code]).filter(Boolean);
+  if (explained.length) return explained.join(' ');
+  return item?.nextStep || 'Η ανάλυση υπάρχει, αλλά ένας υποχρεωτικός έλεγχος δεν έχει ολοκληρωθεί.';
+}
+
+function blockedPortfolioDossierIndex(feed) {
+  const map = new Map();
+  const groups = [feed?.reviewReady, feed?.research, feed?.published, feed?.urgent];
+  for (const item of groups.flatMap((group) => Array.isArray(group) ? group : [])) {
+    const symbol = canonicalDecisionSymbol(item?.symbol);
+    if (!symbol || item?.finalAction?.status !== 'BLOCKED') continue;
+    const current = map.get(symbol);
+    if (!current || item?.status === 'REVIEW_READY') map.set(symbol, item);
+  }
+  return map;
+}
+
+function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = null }) {
   const rowBySymbol = new Map((dashboard?.rows || []).map((row) => [canonicalDecisionSymbol(row?.symbol), row]));
+  const blockedBySymbol = blockedPortfolioDossierIndex(feed);
   const positions = (Array.isArray(portfolioPositions) ? portfolioPositions : [])
     .filter((position) => Number(position?.quantity || 0) > 0);
   if (!positions.length) return null;
 
-  const coveredCount = positions.filter((position) => rowBySymbol.has(canonicalDecisionSymbol(position?.symbol))).length;
+  const coveredCount = positions.filter((position) => { const symbol = canonicalDecisionSymbol(position?.symbol); return rowBySymbol.has(symbol) || blockedBySymbol.has(symbol); }).length;
 
   return (
     <View style={styles.portfolioMinbeisSection}>
@@ -194,7 +223,10 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [] }) {
         </View>
       </View>
       {positions.map((position) => {
-        const row = rowBySymbol.get(canonicalDecisionSymbol(position?.symbol)) || null;
+        const symbol = canonicalDecisionSymbol(position?.symbol);
+        const row = rowBySymbol.get(symbol) || null;
+        const blockedDossier = blockedBySymbol.get(symbol) || null;
+        const badgeLabel = row ? minbeisActionLabel(row.action) : blockedDossier ? 'ΜΠΛΟΚΑΡΙΣΜΕΝΗ ΑΠΟΦΑΣΗ' : 'ΑΝΑΛΥΣΗ ΕΚΚΡΕΜΕΙ';
         return (
           <View key={position.symbol} style={styles.portfolioMinbeisCard}>
             <View style={styles.rowTop}>
@@ -203,13 +235,13 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [] }) {
                 <Text style={styles.symbol}>{position.symbol} · {Number(position.quantity || 0).toLocaleString('el-GR')} μετοχές</Text>
               </View>
               <View style={[styles.minbeisActionBadge, !row && styles.pendingActionBadge]}>
-                <Text style={[styles.minbeisActionText, !row && styles.pendingActionText]}>{row ? minbeisActionLabel(row.action) : 'ΑΝΑΛΥΣΗ ΕΚΚΡΕΜΕΙ'}</Text>
+                <Text style={[styles.minbeisActionText, !row && styles.pendingActionText]}>{badgeLabel}</Text>
               </View>
             </View>
             <Text style={styles.minbeisDecisionReason}>
-              {row ? minbeisReasonText(row) : 'Η θέση υπάρχει στο χαρτοφυλάκιό σου, αλλά δεν περιλαμβάνεται στη σημερινή canonical ανάλυση. Δεν παράγεται τεχνητό HOLD/SELL χωρίς πλήρη έλεγχο.'}
+              {row ? minbeisReasonText(row) : blockedDossier ? portfolioBlockedReason(blockedDossier) : 'Η θέση υπάρχει στο χαρτοφυλάκιό σου, αλλά δεν περιλαμβάνεται στη σημερινή canonical ανάλυση. Δεν παράγεται τεχνητό HOLD/SELL χωρίς πλήρη έλεγχο.'}
             </Text>
-            {row ? <Text style={styles.ageText}>Confidence: {Number.isFinite(Number(row.confidenceScore)) ? Number(row.confidenceScore).toFixed(0) : '—'} · Data quality: {Number.isFinite(Number(row.dataQualityScore)) ? Number(row.dataQualityScore).toFixed(0) : '—'}</Text> : null}
+            {row ? <Text style={styles.ageText}>Confidence: {Number.isFinite(Number(row.confidenceScore)) ? Number(row.confidenceScore).toFixed(0) : '—'} · Data quality: {Number.isFinite(Number(row.dataQualityScore)) ? Number(row.dataQualityScore).toFixed(0) : '—'}</Text> : blockedDossier ? <Text style={styles.ageText}>Η ανάλυση είναι διαθέσιμη αλλά η τελική πράξη παραμένει fail-closed μέχρι να λυθεί το blocker.</Text> : null}
           </View>
         );
       })}
@@ -542,7 +574,7 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
         </View>
       ) : (
         <>
-          <PortfolioMinbeisSection dashboard={minbeisDashboard} portfolioPositions={portfolioPositions} />
+          <PortfolioMinbeisSection dashboard={minbeisDashboard} portfolioPositions={portfolioPositions} feed={feed} />
           <MinbeisDashboard dashboard={minbeisDashboard} sourceDecisionCount={(feed.decisions || []).length} decisionContext={decisionContext} />
           <View style={styles.summaryCard}>
             <Text style={styles.summaryHeadline}>{feed.today?.headline || 'Ημερήσια σύνοψη'}</Text>
