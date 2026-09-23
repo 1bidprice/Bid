@@ -226,7 +226,16 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = nu
         const symbol = canonicalDecisionSymbol(position?.symbol);
         const row = rowBySymbol.get(symbol) || null;
         const blockedDossier = blockedBySymbol.get(symbol) || null;
-        const badgeLabel = row ? minbeisActionLabel(row.action) : blockedDossier ? 'ΜΠΛΟΚΑΡΙΣΜΕΝΗ ΑΠΟΦΑΣΗ' : 'ΑΝΑΛΥΣΗ ΕΚΚΡΕΜΕΙ';
+        const interimPlan = blockedDossier?.finalAction?.controlledPlan?.status === 'AVAILABLE'
+          ? blockedDossier.finalAction.controlledPlan
+          : null;
+        const badgeLabel = row
+          ? minbeisActionLabel(row.action)
+          : interimPlan
+            ? 'ΠΡΟΣΩΡΙΝΟ ΠΛΑΝΟ'
+            : blockedDossier
+              ? 'ΜΠΛΟΚΑΡΙΣΜΕΝΗ ΑΠΟΦΑΣΗ'
+              : 'ΑΝΑΛΥΣΗ ΕΚΚΡΕΜΕΙ';
         return (
           <View key={position.symbol} style={styles.portfolioMinbeisCard}>
             <View style={styles.rowTop}>
@@ -238,10 +247,18 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = nu
                 <Text style={[styles.minbeisActionText, !row && styles.pendingActionText]}>{badgeLabel}</Text>
               </View>
             </View>
-            <Text style={styles.minbeisDecisionReason}>
-              {row ? minbeisReasonText(row) : blockedDossier ? portfolioBlockedReason(blockedDossier) : 'Η θέση υπάρχει στο χαρτοφυλάκιό σου, αλλά δεν περιλαμβάνεται στη σημερινή canonical ανάλυση. Δεν παράγεται τεχνητό HOLD/SELL χωρίς πλήρη έλεγχο.'}
-            </Text>
-            {row ? <Text style={styles.ageText}>Confidence: {Number.isFinite(Number(row.confidenceScore)) ? Number(row.confidenceScore).toFixed(0) : '—'} · Data quality: {Number.isFinite(Number(row.dataQualityScore)) ? Number(row.dataQualityScore).toFixed(0) : '—'}</Text> : blockedDossier ? <Text style={styles.ageText}>Η ανάλυση είναι διαθέσιμη αλλά η τελική πράξη παραμένει fail-closed μέχρι να λυθεί το blocker.</Text> : null}
+            {interimPlan ? (
+              <View style={styles.interimPlanBox}>
+                <Text style={styles.interimPlanEyebrow}>ΠΡΟΣΩΡΙΝΟ RISK-CONTROL · ΟΧΙ ΤΕΛΙΚΗ ΑΠΟΦΑΣΗ</Text>
+                <Text style={styles.interimPlanAction}>{interimPlan.holderActionLabel || 'ΠΑΡΑΚΟΛΟΥΘΗΣΗ'}</Text>
+                <Text style={styles.minbeisDecisionReason}>{interimPlan.rationale}</Text>
+              </View>
+            ) : (
+              <Text style={styles.minbeisDecisionReason}>
+                {row ? minbeisReasonText(row) : blockedDossier ? portfolioBlockedReason(blockedDossier) : 'Η θέση υπάρχει στο χαρτοφυλάκιό σου, αλλά δεν περιλαμβάνεται στη σημερινή canonical ανάλυση. Δεν παράγεται τεχνητό HOLD/SELL χωρίς πλήρη έλεγχο.'}
+              </Text>
+            )}
+            {row ? <Text style={styles.ageText}>Confidence: {Number.isFinite(Number(row.confidenceScore)) ? Number(row.confidenceScore).toFixed(0) : '—'} · Data quality: {Number.isFinite(Number(row.dataQualityScore)) ? Number(row.dataQualityScore).toFixed(0) : '—'}</Text> : blockedDossier ? <Text style={styles.ageText}>{portfolioBlockedReason(blockedDossier)} Η τελική πράξη παραμένει fail-closed μέχρι να λυθεί το blocker.</Text> : null}
           </View>
         );
       })}
@@ -639,6 +656,9 @@ const styles = StyleSheet.create({
   portfolioMinbeisCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#b9cce8', borderRadius: 18, padding: 14, marginBottom: 8 },
   pendingActionBadge: { backgroundColor: '#fff3d8' },
   pendingActionText: { color: '#976500' },
+  interimPlanBox: { backgroundColor: '#fff8e7', borderRadius: 13, padding: 11, marginTop: 10 },
+  interimPlanEyebrow: { color: '#8a5d00', fontSize: 9, lineHeight: 13, fontWeight: '900', letterSpacing: 0.4 },
+  interimPlanAction: { color: '#16345f', fontSize: 16, lineHeight: 21, fontWeight: '900', marginTop: 5 },
   systemDetailsToggle: { marginTop: 10, minHeight: 42, borderRadius: 13, borderWidth: 1, borderColor: '#bdd9ff', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   systemDetailsToggleText: { color: '#0B66FF', fontSize: 11, fontWeight: '900' },
   minbeisShell: { marginBottom: 20 },
