@@ -961,8 +961,8 @@ function MainApp({ onOpenDecisionGate }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}><LegalNoticeModal visible={!legalAccepted} onAccept={acceptLegalNotice} /><StatusBar barStyle="dark-content" backgroundColor="#eef5ff" /><View style={styles.app}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <Text style={styles.eyebrow}>ΠΡΟΣΩΠΙΚΟ ΧΑΡΤΟΦΥΛΑΚΙΟ</Text>
-        <View style={styles.rowTop}><View style={styles.grow}><Text style={[styles.title, width < 380 && styles.titleCompact]}>Investor Control</Text><Text style={styles.versionLine}>Λογιστική ακρίβεια · v{VERSION}</Text></View><Pressable style={styles.plus} onPress={openNewTransaction}><Text style={styles.plusText}>＋</Text></Pressable></View>
+        <Text style={styles.eyebrow}>ΠΡΟΣΩΠΙΚΟ ΧΑΡΤΟΦΥΛΑΚΙΟ · INVESTOR CONTROL</Text>
+        <View style={styles.rowTop}><View style={styles.grow}><Text style={[styles.title, width < 380 && styles.titleCompact]}>MINBEIS</Text><Text style={styles.versionLine}>Χαρτοφυλάκιο · έρευνα · αποφάσεις · v{VERSION}</Text></View><Pressable style={styles.plus} onPress={openNewTransaction}><Text style={styles.plusText}>＋</Text></Pressable></View>
         {tab === 'summary' ? <>
           <View style={styles.refreshCard}><View style={styles.grow}><Text style={styles.muted}>Τελευταίος έλεγχος</Text><Text style={styles.checked}>{when(state.meta.lastCheckedAt)}</Text></View><Pressable style={[styles.primarySmall, refreshing && styles.disabled]} onPress={() => refresh()} disabled={refreshing}>{refreshing ? <ActivityIndicator color="#fff" /> : <Text style={styles.whiteStrong}>Ανανέωση</Text>}</Pressable></View>
           {state.meta.errors?.length ? <Text style={styles.warning}>{state.meta.errors.join('\n')}</Text> : null}
