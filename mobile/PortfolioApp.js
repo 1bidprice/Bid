@@ -724,6 +724,7 @@ function MainApp({ onOpenDecisionGate }) {
   const tokenRef = useRef('');
   const appState = useRef(AppState.currentState);
   const onboardingAttemptedRef = useRef(new Set());
+  const minbeisHomeSyncingRef = useRef(false);
 
   useEffect(() => {
     AsyncStorage.getItem(LEGAL_ACCEPTANCE_KEY)
@@ -737,7 +738,8 @@ function MainApp({ onOpenDecisionGate }) {
   }, []);
 
   const refreshMinbeisHomeFeed = useCallback(async () => {
-    if (minbeisHomeSyncing) return;
+    if (minbeisHomeSyncingRef.current) return;
+    minbeisHomeSyncingRef.current = true;
     setMinbeisHomeSyncing(true);
     try {
       const cached = await loadCachedIntelligenceFeed();
@@ -747,9 +749,10 @@ function MainApp({ onOpenDecisionGate }) {
     } catch {
       // Home intelligence is additive. Portfolio accounting must remain usable offline.
     } finally {
+      minbeisHomeSyncingRef.current = false;
       setMinbeisHomeSyncing(false);
     }
-  }, [minbeisHomeSyncing]);
+  }, []);
 
   useEffect(() => {
     if (loading) return;
