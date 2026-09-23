@@ -56,6 +56,18 @@ function validateGatewayQuote(appSymbol, payload) {
   return null;
 }
 
+function validateInstrumentCapability(appSymbol, payload) {
+  if (payload?.format !== 'investor-control-instrument-capability') return 'GATEWAY_INSTRUMENT_FORMAT_INVALID';
+  if (payload?.requestedSymbol !== appSymbol) return 'GATEWAY_INSTRUMENT_SYMBOL_MISMATCH';
+  if (!['READY', 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED', 'IDENTITY_NOT_VERIFIED'].includes(payload?.onboardingStatus)) {
+    return 'GATEWAY_INSTRUMENT_STATUS_INVALID';
+  }
+  if (payload?.privacy?.portfolioQuantityRequired !== false) return 'GATEWAY_INSTRUMENT_PRIVACY_CONTRACT_INVALID';
+  if (payload?.privacy?.portfolioCostRequired !== false) return 'GATEWAY_INSTRUMENT_PRIVACY_CONTRACT_INVALID';
+  if (payload?.privacy?.pnlRequired !== false) return 'GATEWAY_INSTRUMENT_PRIVACY_CONTRACT_INVALID';
+  return null;
+}
+
 function validateGatewayFx(payload) {
   if (payload?.format !== 'investor-control-market-gateway-fx') return 'GATEWAY_FX_FORMAT_INVALID';
   const reference = payload?.reference;
@@ -102,6 +114,15 @@ async function fetchGatewayJson(pathname, options = {}) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function fetchInstrumentCapability(appSymbol, options = {}) {
+  const symbol = canonicalSymbol(appSymbol);
+  if (!symbol) throw new Error('MARKET_GATEWAY_SYMBOL_INVALID');
+  const payload = await fetchGatewayJson(`/v1/instrument?symbol=${encodeURIComponent(symbol)}`, options);
+  const validationError = validateInstrumentCapability(symbol, payload);
+  if (validationError) throw new Error(validationError);
+  return payload;
 }
 
 async function fetchCanonicalGatewayQuote(appSymbol, options = {}) {
@@ -162,7 +183,9 @@ module.exports = {
   createOpaqueInstallationId,
   getOrCreateInstallationId,
   validateGatewayQuote,
+  validateInstrumentCapability,
   validateGatewayFx,
+  fetchInstrumentCapability,
   fetchCanonicalGatewayQuote,
   fetchCanonicalGatewayFx,
   fetchCanonicalGatewayQuotes,
