@@ -48,6 +48,11 @@ import {
 } from './src/background-alert-task';
 import { exportBackupAsync, pickBackupAsync } from './src/backup';
 import OpportunitiesView from './src/OpportunitiesView';
+import {
+  canonicalInstrumentSymbol,
+  instrumentCurrency,
+  instrumentEntryFromTransaction,
+} from './src/instrument-entry';
 import { buildPortfolioSnapshot } from './src/portfolio-engine';
 import {
   allInPrice,
@@ -399,12 +404,14 @@ function PositionCard({ item, compact, expanded, onToggle, onAlert }) {
 
 function transactionForm(transaction = null) {
   const fees = transaction?.feeBreakdown || {};
+  const instrument = instrumentEntryFromTransaction(transaction || {});
   return {
     type: transaction?.type === 'sell' ? 'sell' : 'buy',
-    symbol: transaction?.symbol || '',
+    symbol: instrument.symbolInput || '',
+    market: instrument.market,
     company: transaction?.company || '',
     date: transaction?.date || new Date().toISOString().slice(0, 10),
-    currency: transaction?.currency === 'USD' ? 'USD' : 'EUR',
+    currency: instrument.currency,
     broker: transaction?.broker || '',
     quantity: inputNumber(transaction?.quantity),
     orderPrice: inputNumber(transactionOrderPrice(transaction)),
@@ -430,6 +437,12 @@ function TransactionModal({ visible, transaction, onClose, onSave }) {
     setForm(transactionForm(transaction));
   }, [visible, transaction]);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const setMarket = (market) => setForm((current) => ({
+    ...current,
+    market,
+    currency: instrumentCurrency(market),
+  }));
+  const canonicalSymbol = canonicalInstrumentSymbol(form.symbol, form.market);
   const quantity = parseNum(form.quantity);
   const executionPrice = parseNum(form.executionPrice);
   const calculatedGross = roundMoney(quantity * executionPrice);
@@ -480,11 +493,16 @@ function TransactionModal({ visible, transaction, onClose, onSave }) {
               {step === 1 ? <>
                 <Text style={styles.formSection}>1. Βασικά στοιχεία</Text>
                 <View style={styles.segmentRow}><Segment value="buy" current={form.type} label="Αγορά" onPress={() => set('type', 'buy')} /><Segment value="sell" current={form.type} label="Πώληση" onPress={() => set('type', 'sell')} /></View>
-                <Field label="Σύμβολο" helper="Το σύμβολο που χρησιμοποιεί η εφαρμογή, π.χ. ALWN.GR ή SPCE.US." value={form.symbol} onChangeText={(value) => set('symbol', value.toUpperCase())} autoCapitalize="characters" placeholder="ALWN.GR" />
-                <Field label="Εταιρεία" value={form.company} onChangeText={(value) => set('company', value)} placeholder="Allwyn" />
+                <Text style={styles.fieldLabel}>Αγορά</Text>
+                <View style={styles.segmentRow}><Segment value="GR" current={form.market} label="Ελλάδα" onPress={() => setMarket('GR')} /><Segment value="US" current={form.market} label="ΗΠΑ" onPress={() => setMarket('US')} /></View>
+                <Field label="Ticker" helper="Γράψε μόνο το ticker. Η εφαρμογή προσθέτει αυτόματα την αγορά, π.χ. CREDIA → CREDIA.GR ή NVDA → NVDA.US." value={form.symbol} onChangeText={(value) => set('symbol', value.toUpperCase().replace(/.(US|GR)$/i, ''))} autoCapitalize="characters" placeholder={form.market === 'US' ? 'NVDA' : 'CREDIA'} />
+                <View style={styles.instrumentPreview}>
+                  <Text style={styles.instrumentPreviewLabel}>Θα αποθηκευτεί ως</Text>
+                  <Text style={styles.instrumentPreviewValue}>{canonicalSymbol || '—'} · {instrumentCurrency(form.market)}</Text>
+                </View>
+                <Field label="Εταιρεία — προαιρετικά" helper="Μπορείς να βάλεις όνομα για ευκολότερη αναγνώριση. Το MINBEIS χρησιμοποιεί το canonical ticker." value={form.company} onChangeText={(value) => set('company', value)} placeholder={form.market === 'US' ? 'NVIDIA' : 'CrediaBank'} />
                 <Field label="Ημερομηνία συναλλαγής" value={form.date} onChangeText={(value) => set('date', value)} keyboardType="numbers-and-punctuation" placeholder="2026-07-14" />
                 <Field label="Broker / τράπεζα" value={form.broker} onChangeText={(value) => set('broker', value)} placeholder="Τράπεζα Πειραιώς" />
-                <View style={styles.segmentRow}><Segment value="EUR" current={form.currency} label="EUR" onPress={() => set('currency', 'EUR')} /><Segment value="USD" current={form.currency} label="USD" onPress={() => set('currency', 'USD')} /></View>
               </> : null}
               {step === 2 ? <>
                 <Text style={styles.formSection}>2. Εκτέλεση εντολής</Text>
