@@ -460,6 +460,19 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = nu
   );
 }
 
+function buildNewIdeaClarity(row) {
+  const assessment = row?.minbeisAssessment || null;
+  const action = row?.action || 'WATCH';
+  const confirmedBuy = ['BUY_PROBE', 'BUY_STARTER', 'BUY_CORE'].includes(action);
+  return {
+    now: confirmedBuy ? minbeisActionLabel(action) : action === 'NO_BUY' ? 'ΟΧΙ ΑΓΟΡΑ ΤΩΡΑ' : 'ΠΕΡΙΜΕΝΕ',
+    why: assessment?.explanation?.summary || minbeisReasonText(row),
+    change: assessment?.explanation?.whatWouldChange
+      || (row?.purchase?.nextGate ? purchaseNextGateLabel(row.purchase.nextGate) : null)
+      || 'Νέα επαληθευμένα δεδομένα που περνούν τα strict entry gates.',
+  };
+}
+
 function MinbeisDashboard({ dashboard, sourceDecisionCount = 0, decisionContext }) {
   const rows = (Array.isArray(dashboard?.rows) ? dashboard.rows : []).filter((row) => !row.owned);
   const assessmentCounts = rows.reduce((acc, row) => {
@@ -508,10 +521,12 @@ function MinbeisDashboard({ dashboard, sourceDecisionCount = 0, decisionContext 
               <Text style={styles.minbeisActionText}>{minbeisActionLabel(row.action)}</Text>
             </View>
           </View>
-          <MinbeisAssessmentStrip assessment={row.minbeisAssessment} />
+          <PositionClarityCard clarity={buildNewIdeaClarity(row)} />
+          <View style={styles.positionContextRow}>
+            <MinbeisAssessmentStrip assessment={row.minbeisAssessment} compact />
+            <Text style={styles.ageText}>Confidence {Number.isFinite(Number(row.confidenceScore)) ? Number(row.confidenceScore).toFixed(0) : '—'} · Data {Number.isFinite(Number(row.dataQualityScore)) ? Number(row.dataQualityScore).toFixed(0) : '—'}</Text>
+          </View>
           <HistoricalContextCard context={row.historicalContext} />
-          <Text style={styles.minbeisDecisionReason}>{minbeisReasonText(row)}</Text>
-          <Text style={styles.ageText}>Confidence: {Number.isFinite(Number(row.confidenceScore)) ? Number(row.confidenceScore).toFixed(0) : '—'} · Data quality: {Number.isFinite(Number(row.dataQualityScore)) ? Number(row.dataQualityScore).toFixed(0) : '—'}</Text>
         </View>
       ))}
     </View>
