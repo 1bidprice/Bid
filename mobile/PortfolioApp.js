@@ -431,17 +431,28 @@ function transactionForm(transaction = null) {
 function TransactionModal({ visible, transaction, onClose, onSave }) {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(transactionForm());
+  const [instrumentCheck, setInstrumentCheck] = useState(null);
+  const [checkingInstrument, setCheckingInstrument] = useState(false);
   useEffect(() => {
     if (!visible) return;
     setStep(1);
     setForm(transactionForm(transaction));
+    setInstrumentCheck(null);
+    setCheckingInstrument(false);
   }, [visible, transaction]);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
-  const setMarket = (market) => setForm((current) => ({
-    ...current,
-    market,
-    currency: instrumentCurrency(market),
-  }));
+  const setSymbolInput = (value) => {
+    setInstrumentCheck(null);
+    set('symbol', String(value || '').toUpperCase().replace(/[.](US|GR)$/i, ''));
+  };
+  const setMarket = (market) => {
+    setInstrumentCheck(null);
+    setForm((current) => ({
+      ...current,
+      market,
+      currency: instrumentCurrency(market),
+    }));
+  };
   const canonicalSymbol = canonicalInstrumentSymbol(form.symbol, form.market);
   const quantity = parseNum(form.quantity);
   const executionPrice = parseNum(form.executionPrice);
@@ -459,24 +470,76 @@ function TransactionModal({ visible, transaction, onClose, onSave }) {
   const total = form.type === 'sell' ? roundMoney(Math.max(0, gross - fees)) : roundMoney(gross + fees);
   const allIn = quantity > 0 ? total / quantity : 0;
 
-  const next = () => {
-    if (step === 1 && (!form.symbol.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(form.date))) {
-      Alert.alert('Λείπουν στοιχεία', 'Συμπλήρωσε σύμβολο και ημερομηνία σε μορφή ΕΕΕΕ-ΜΜ-ΗΗ.');
+  const continueAfterInstrumentCheck = () => setStep((current) => Math.min(3, current + 1));
+
+  const next = async () => {
+    if (step === 1 && (!canonicalSymbol || !/^\d{4}-\d{2}-\d{2}$/.test(form.date))) {
+      Alert.alert('Λείπουν στοιχεία', 'Διάλεξε αγορά, γράψε έγκυρο ticker και συμπλήρωσε ημερομηνία σε μορφή ΕΕΕΕ-ΜΜ-ΗΗ.');
       return;
     }
+
+    if (step === 1 && MARKET_GATEWAY_CONFIGURED) {
+      setCheckingInstrument(true);
+      try {
+        const capability = await fetchConfiguredInstrumentCapability(canonicalSymbol);
+        setInstrumentCheck(capability);
+        if (!form.company.trim() && capability?.displayName) {
+          set('company', capability.displayName);
+        }
+        if (capability?.identityVerified === true || capability?.analysisSupported === true) {
+          continueAfterInstrumentCheck();
+          return;
+        }
+        Alert.alert(
+          'Το προϊόν δεν επαληθεύτηκε ακόμη',
+          'Η συναλλαγή μπορεί να καταχωριστεί λογιστικά, αλλά το MINBEIS δεν θα δημιουργήσει απόφαση μέχρι να επαληθευτεί η ταυτότητα του προϊόντος.',
+          [
+            { text: 'Διόρθωση ticker', style: 'cancel' },
+            { text: 'Συνέχεια μόνο για καταγραφή', onPress: continueAfterInstrumentCheck },
+          ],
+        );
+        return;
+      } catch (error) {
+        setInstrumentCheck({
+          onboardingStatus: 'CHECK_FAILED',
+          error: String(error?.gatewayCode || error?.message || 'CHECK_FAILED'),
+        });
+        Alert.alert(
+          'Δεν ολοκληρώθηκε ο έλεγχος προϊόντος',
+          'Η συναλλαγή δεν χάνεται. Μπορείς να συνεχίσεις μόνο για λογιστική καταγραφή και το MINBEIS θα ξαναδοκιμάσει αργότερα.',
+          [
+            { text: 'Πίσω', style: 'cancel' },
+            { text: 'Συνέχεια', onPress: continueAfterInstrumentCheck },
+          ],
+        );
+        return;
+      } finally {
+        setCheckingInstrument(false);
+      }
+    }
+
     if (step === 2 && (quantity <= 0 || executionPrice <= 0)) {
       Alert.alert('Λείπουν στοιχεία', 'Συμπλήρωσε ποσότητα και πραγματική μέση τιμή εκτέλεσης.');
       return;
     }
-    setStep((current) => Math.min(3, current + 1));
+    continueAfterInstrumentCheck();
   };
 
   const save = () => {
-    if (!form.symbol.trim() || quantity <= 0 || executionPrice <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(form.date)) {
-      Alert.alert('Μη έγκυρη συναλλαγή', 'Έλεγξε σύμβολο, ημερομηνία, ποσότητα και μέση τιμή εκτέλεσης.');
+    if (!canonicalSymbol || quantity <= 0 || executionPrice <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(form.date)) {
+      Alert.alert('Μη έγκυρη συναλλαγή', 'Έλεγξε αγορά, ticker, ημερομηνία, ποσότητα και μέση τιμή εκτέλεσης.');
       return;
     }
-    onSave(buildTransaction({ ...form, quantity, orderPrice: optionalNumber(form.orderPrice), executionPrice, grossAmount: parseNum(form.grossAmount) > 0 ? parseNum(form.grossAmount) : null, feeBreakdown }, transaction));
+    onSave(buildTransaction({
+      ...form,
+      symbol: canonicalSymbol,
+      currency: instrumentCurrency(form.market),
+      quantity,
+      orderPrice: optionalNumber(form.orderPrice),
+      executionPrice,
+      grossAmount: parseNum(form.grossAmount) > 0 ? parseNum(form.grossAmount) : null,
+      feeBreakdown,
+    }, transaction));
   };
 
   return (
@@ -495,11 +558,33 @@ function TransactionModal({ visible, transaction, onClose, onSave }) {
                 <View style={styles.segmentRow}><Segment value="buy" current={form.type} label="Αγορά" onPress={() => set('type', 'buy')} /><Segment value="sell" current={form.type} label="Πώληση" onPress={() => set('type', 'sell')} /></View>
                 <Text style={styles.fieldLabel}>Αγορά</Text>
                 <View style={styles.segmentRow}><Segment value="GR" current={form.market} label="Ελλάδα" onPress={() => setMarket('GR')} /><Segment value="US" current={form.market} label="ΗΠΑ" onPress={() => setMarket('US')} /></View>
-                <Field label="Ticker" helper="Γράψε μόνο το ticker. Η εφαρμογή προσθέτει αυτόματα την αγορά, π.χ. CREDIA → CREDIA.GR ή NVDA → NVDA.US." value={form.symbol} onChangeText={(value) => set('symbol', value.toUpperCase().replace(/.(US|GR)$/i, ''))} autoCapitalize="characters" placeholder={form.market === 'US' ? 'NVDA' : 'CREDIA'} />
+                <Field label="Ticker" helper="Γράψε μόνο το ticker. Η εφαρμογή προσθέτει αυτόματα την αγορά, π.χ. CREDIA → CREDIA.GR ή NVDA → NVDA.US." value={form.symbol} onChangeText={setSymbolInput} autoCapitalize="characters" placeholder={form.market === 'US' ? 'NVDA' : 'CREDIA'} />
                 <View style={styles.instrumentPreview}>
                   <Text style={styles.instrumentPreviewLabel}>Θα αποθηκευτεί ως</Text>
                   <Text style={styles.instrumentPreviewValue}>{canonicalSymbol || '—'} · {instrumentCurrency(form.market)}</Text>
                 </View>
+                {instrumentCheck ? (
+                  <View style={[styles.instrumentCheck, instrumentCheck.identityVerified === true || instrumentCheck.analysisSupported === true ? styles.instrumentCheckGood : styles.instrumentCheckPending]}>
+                    <Text style={styles.instrumentCheckTitle}>
+                      {instrumentCheck.analysisSupported === true
+                        ? 'MINBEIS READY'
+                        : instrumentCheck.identityVerified === true
+                          ? 'ΤΑΥΤΟΤΗΤΑ ΕΠΑΛΗΘΕΥΤΗΚΕ'
+                          : 'ΕΛΕΓΧΟΣ ΕΚΚΡΕΜΕΙ'}
+                    </Text>
+                    <Text style={styles.instrumentCheckText}>
+                      {instrumentCheck.analysisSupported === true
+                        ? 'Το προϊόν υποστηρίζεται ήδη από την canonical MINBEIS ανάλυση.'
+                        : instrumentCheck.identityVerified === true
+                          ? 'Το προϊόν επαληθεύτηκε και μπορεί να περάσει στο research onboarding.'
+                          : 'Δεν υπάρχει ακόμη επαρκής canonical ταυτοποίηση για MINBEIS απόφαση.'}
+                    </Text>
+                  </View>
+                ) : MARKET_GATEWAY_CONFIGURED ? (
+                  <Text style={styles.instrumentCheckHint}>Θα γίνει ασφαλής έλεγχος ticker όταν πατήσεις «Συνέχεια».</Text>
+                ) : (
+                  <Text style={styles.instrumentCheckHint}>Preview build: ο canonical gateway δεν είναι embedded. Η λογιστική καταχώρηση λειτουργεί κανονικά.</Text>
+                )}
                 <Field label="Εταιρεία — προαιρετικά" helper="Μπορείς να βάλεις όνομα για ευκολότερη αναγνώριση. Το MINBEIS χρησιμοποιεί το canonical ticker." value={form.company} onChangeText={(value) => set('company', value)} placeholder={form.market === 'US' ? 'NVIDIA' : 'CrediaBank'} />
                 <Field label="Ημερομηνία συναλλαγής" value={form.date} onChangeText={(value) => set('date', value)} keyboardType="numbers-and-punctuation" placeholder="2026-07-14" />
                 <Field label="Broker / τράπεζα" value={form.broker} onChangeText={(value) => set('broker', value)} placeholder="Τράπεζα Πειραιώς" />
@@ -526,7 +611,7 @@ function TransactionModal({ visible, transaction, onClose, onSave }) {
                 <Field label="Σημείωση — προαιρετική" value={form.notes} onChangeText={(value) => set('notes', value)} placeholder="Τι θέλεις να θυμάσαι για αυτή τη συναλλαγή;" multiline />
                 <View style={styles.reviewCard}><Text style={styles.reviewTitle}>Τελικός έλεγχος</Text><ReviewLine label="Αξία συναλλαγής" value={cash(gross, form.currency)} /><ReviewLine label="Συνολικά έξοδα" value={cash(fees, form.currency)} /><ReviewLine label={form.type === 'sell' ? 'Καθαρό έσοδο' : 'Τελικό κόστος'} value={cash(total, form.currency)} strong /><ReviewLine label="Μέση τιμή all-in" value={quotePrice(allIn, form.currency, 4)} /></View>
               </> : null}
-              <View style={styles.modalActions}>{step > 1 ? <Pressable style={styles.secondaryAction} onPress={() => setStep((current) => current - 1)}><Text style={styles.secondaryStrong}>Πίσω</Text></Pressable> : null}<Pressable style={[styles.primaryAction, step === 1 && styles.actionFull]} onPress={step < 3 ? next : save}><Text style={styles.whiteStrong}>{step < 3 ? 'Συνέχεια' : transaction ? 'Αποθήκευση αλλαγών' : 'Αποθήκευση συναλλαγής'}</Text></Pressable></View>
+              <View style={styles.modalActions}>{step > 1 ? <Pressable style={styles.secondaryAction} onPress={() => setStep((current) => current - 1)}><Text style={styles.secondaryStrong}>Πίσω</Text></Pressable> : null}<Pressable style={[styles.primaryAction, step === 1 && styles.actionFull, checkingInstrument && styles.disabled]} onPress={step < 3 ? next : save} disabled={checkingInstrument}>{checkingInstrument ? <ActivityIndicator color="#fff" /> : <Text style={styles.whiteStrong}>{step < 3 ? 'Συνέχεια' : transaction ? 'Αποθήκευση αλλαγών' : 'Αποθήκευση συναλλαγής'}</Text>}</Pressable></View>
             </ScrollView>
           </SafeAreaView>
         </KeyboardAvoidingView>
