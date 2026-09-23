@@ -205,7 +205,27 @@ function blockedPortfolioDossierIndex(feed) {
   return map;
 }
 
-function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = null }) {
+function capabilityLabel(capability) {
+  return {
+    READY: 'MINBEIS READY',
+    IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED: 'ΤΑΥΤΟΠΟΙΗΘΗΚΕ',
+    IDENTITY_NOT_VERIFIED: 'ΧΡΕΙΑΖΕΤΑΙ ΤΑΥΤΟΠΟΙΗΣΗ',
+    GATEWAY_NOT_CONFIGURED: 'ONBOARDING ΜΗ ΔΙΑΘΕΣΙΜΟ',
+    CHECK_FAILED: 'ΕΛΕΓΧΟΣ ΑΠΕΤΥΧΕ',
+  }[capability?.onboardingStatus] || null;
+}
+
+function capabilityText(capability) {
+  return {
+    READY: 'Το προϊόν είναι canonical και υποστηρίζεται για πλήρη MINBEIS ανάλυση. Δεν υπάρχει ακόμη ενεργή τελική απόφαση στη σημερινή ροή.',
+    IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED: 'Το symbol και η χρηματιστηριακή ταυτότητα επαληθεύτηκαν. Η πλήρης MINBEIS research coverage δεν έχει ακόμη γίνει canonical.',
+    IDENTITY_NOT_VERIFIED: 'Το προϊόν αποθηκεύτηκε στο χαρτοφυλάκιο, αλλά το MINBEIS δεν θα δημιουργήσει απόφαση μέχρι να επαληθευτεί η canonical ταυτότητά του.',
+    GATEWAY_NOT_CONFIGURED: 'Το προϊόν αποθηκεύτηκε, αλλά ο κεντρικός gateway δεν είναι διαθέσιμος σε αυτή την έκδοση για automatic onboarding.',
+    CHECK_FAILED: 'Η καταχώρηση του προϊόντος αποθηκεύτηκε κανονικά, αλλά ο αυτόματος έλεγχος MINBEIS δεν ολοκληρώθηκε.',
+  }[capability?.onboardingStatus] || null;
+}
+
+function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = null, instrumentCapabilities = {} }) {
   const rowBySymbol = new Map((dashboard?.rows || []).map((row) => [canonicalDecisionSymbol(row?.symbol), row]));
   const blockedBySymbol = blockedPortfolioDossierIndex(feed);
   const positions = (Array.isArray(portfolioPositions) ? portfolioPositions : [])
@@ -226,6 +246,7 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = nu
         const symbol = canonicalDecisionSymbol(position?.symbol);
         const row = rowBySymbol.get(symbol) || null;
         const blockedDossier = blockedBySymbol.get(symbol) || null;
+        const capability = instrumentCapabilities?.[String(position?.symbol || '').trim().toUpperCase()] || null;
         const interimPlan = blockedDossier?.finalAction?.controlledPlan?.status === 'AVAILABLE'
           ? blockedDossier.finalAction.controlledPlan
           : null;
@@ -235,7 +256,7 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = nu
             ? 'ΠΡΟΣΩΡΙΝΟ ΠΛΑΝΟ'
             : blockedDossier
               ? 'ΜΠΛΟΚΑΡΙΣΜΕΝΗ ΑΠΟΦΑΣΗ'
-              : 'ΑΝΑΛΥΣΗ ΕΚΚΡΕΜΕΙ';
+              : capabilityLabel(capability) || 'ΑΝΑΛΥΣΗ ΕΚΚΡΕΜΕΙ';
         return (
           <View key={position.symbol} style={styles.portfolioMinbeisCard}>
             <View style={styles.rowTop}>
@@ -255,7 +276,7 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = nu
               </View>
             ) : (
               <Text style={styles.minbeisDecisionReason}>
-                {row ? minbeisReasonText(row) : blockedDossier ? portfolioBlockedReason(blockedDossier) : 'Η θέση υπάρχει στο χαρτοφυλάκιό σου, αλλά δεν περιλαμβάνεται στη σημερινή canonical ανάλυση. Δεν παράγεται τεχνητό HOLD/SELL χωρίς πλήρη έλεγχο.'}
+                {row ? minbeisReasonText(row) : blockedDossier ? portfolioBlockedReason(blockedDossier) : capabilityText(capability) || 'Η θέση υπάρχει στο χαρτοφυλάκιό σου, αλλά δεν περιλαμβάνεται στη σημερινή canonical ανάλυση. Δεν παράγεται τεχνητό HOLD/SELL χωρίς πλήρη έλεγχο.'}
               </Text>
             )}
             {row ? <Text style={styles.ageText}>Confidence: {Number.isFinite(Number(row.confidenceScore)) ? Number(row.confidenceScore).toFixed(0) : '—'} · Data quality: {Number.isFinite(Number(row.dataQualityScore)) ? Number(row.dataQualityScore).toFixed(0) : '—'}</Text> : blockedDossier ? <Text style={styles.ageText}>{portfolioBlockedReason(blockedDossier)} Η τελική πράξη παραμένει fail-closed μέχρι να λυθεί το blocker.</Text> : null}
@@ -412,7 +433,7 @@ function Section({ title, subtitle, items, decisionContext }) {
   return <View style={styles.sectionBlock}><Text style={styles.sectionTitle}>{title}</Text>{subtitle ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}{items.map((item) => <IntelligenceCard key={item.id} item={item} decisionContext={decisionContext} />)}</View>;
 }
 
-export default function OpportunitiesView({ portfolioPositions = [], portfolioPolicy = {} }) {
+export default function OpportunitiesView({ portfolioPositions = [], portfolioPolicy = {}, instrumentCapabilities = {} }) {
   const [feed, setFeed] = useState(null);
   const [syncState, setSyncState] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -594,7 +615,7 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
         </View>
       ) : (
         <>
-          <PortfolioMinbeisSection dashboard={minbeisDashboard} portfolioPositions={portfolioPositions} feed={feed} />
+          <PortfolioMinbeisSection dashboard={minbeisDashboard} portfolioPositions={portfolioPositions} feed={feed} instrumentCapabilities={instrumentCapabilities} />
           <MinbeisDashboard dashboard={minbeisDashboard} sourceDecisionCount={(feed.decisions || []).length} decisionContext={decisionContext} />
           <View style={styles.summaryCard}>
             <Text style={styles.summaryHeadline}>{feed.today?.headline || 'Ημερήσια σύνοψη'}</Text>
