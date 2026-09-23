@@ -129,6 +129,7 @@ jobs:
           HEALTH_FILE="$RUNNER_TEMP/investor-control-gateway-health.json"
           QUOTE_FILE="$RUNNER_TEMP/investor-control-gateway-spce.json"
           FX_FILE="$RUNNER_TEMP/investor-control-gateway-eurusd.json"
+          QUEUE_FILE="$RUNNER_TEMP/investor-control-gateway-research-queue.json"
           CLIENT_ID="play_release_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
           curl --fail --silent --show-error --retry 3 --retry-delay 2 "$NORMALIZED_GATEWAY_URL/health" > "$HEALTH_FILE"
           curl --fail --silent --show-error --retry 2 --retry-delay 2 \
@@ -139,9 +140,13 @@ jobs:
             "$NORMALIZED_GATEWAY_URL/v1/fx?pair=EURUSD" > "$FX_FILE"
           HEALTH_FILE="$HEALTH_FILE" QUOTE_FILE="$QUOTE_FILE" FX_FILE="$FX_FILE" node - <<'NODE'
           const fs = require('fs');
-          const { validateGatewayQuote, validateGatewayFx } = require('./src/market-gateway-client');
+          const { validateGatewayQuote, validateGatewayFx, validateResearchQueueStatus } = require('./src/market-gateway-client');
           const health = JSON.parse(fs.readFileSync(process.env.HEALTH_FILE, 'utf8'));
-          if (health?.status !== 'ok' || health?.providers?.us !== 'configured' || health?.providers?.athens !== 'official_delayed_15m' || health?.providers?.fx !== 'ecb_official_daily_reference') {
+          if (health?.status !== 'ok'
+            || health?.providers?.us !== 'configured'
+            || health?.providers?.athens !== 'official_delayed_15m'
+            || health?.providers?.fx !== 'ecb_official_daily_reference'
+            || health?.providers?.researchQueue !== 'configured') {
             throw new Error('live market gateway health contract failed');
           }
           const quote = JSON.parse(fs.readFileSync(process.env.QUOTE_FILE, 'utf8'));
@@ -150,8 +155,11 @@ jobs:
           const fx = JSON.parse(fs.readFileSync(process.env.FX_FILE, 'utf8'));
           const fxError = validateGatewayFx(fx);
           if (fxError) throw new Error(`live market gateway EURUSD contract failed: ${fxError}`);
+          const queue = JSON.parse(fs.readFileSync(process.env.QUEUE_FILE, 'utf8'));
+          const queueError = validateResearchQueueStatus('SPCE.US', queue);
+          if (queueError) throw new Error(`live MINBEIS research queue contract failed: ${queueError}`);
           NODE
-          rm -f "$HEALTH_FILE" "$QUOTE_FILE" "$FX_FILE"
+          rm -f "$HEALTH_FILE" "$QUOTE_FILE" "$FX_FILE" "$QUEUE_FILE"
 
       - name: Validate release source
         working-directory: mobile
