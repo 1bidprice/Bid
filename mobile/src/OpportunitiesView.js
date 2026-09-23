@@ -196,7 +196,7 @@ function minbeisAssessmentLabel(classification) {
   }[classification] || classification || '—';
 }
 
-function MinbeisAssessmentStrip({ assessment }) {
+function MinbeisAssessmentStrip({ assessment, compact = false }) {
   if (!assessment) return null;
   const classification = assessment.classification;
   const risk = classification === 'TRAP';
@@ -207,8 +207,8 @@ function MinbeisAssessmentStrip({ assessment }) {
         <Text style={[styles.assessmentLabel, risk && styles.riskText]}>{minbeisAssessmentLabel(classification)}</Text>
         <Text style={styles.assessmentMeta}>MINBEIS</Text>
       </View>
-      {assessment?.explanation?.summary ? <Text style={styles.assessmentSummary}>{assessment.explanation.summary}</Text> : null}
-      {assessment?.explanation?.whatWouldChange ? <Text style={styles.assessmentChange}>Τι θα άλλαζε την εικόνα: {assessment.explanation.whatWouldChange}</Text> : null}
+      {!compact && assessment?.explanation?.summary ? <Text style={styles.assessmentSummary}>{assessment.explanation.summary}</Text> : null}
+      {!compact && assessment?.explanation?.whatWouldChange ? <Text style={styles.assessmentChange}>Τι θα άλλαζε την εικόνα: {assessment.explanation.whatWouldChange}</Text> : null}
     </View>
   );
 }
@@ -309,6 +309,69 @@ function capabilityText(capability) {
   }[capability?.onboardingStatus] || null;
 }
 
+function buildPositionClarity({ row, blockedDossier, interimPlan, capability, assessment }) {
+  if (row) {
+    return {
+      now: minbeisActionLabel(row.action),
+      why: assessment?.explanation?.summary || minbeisReasonText(row),
+      change: assessment?.explanation?.whatWouldChange || 'Νέα επαληθευμένα δεδομένα που αλλάζουν την canonical αξιολόγηση.',
+    };
+  }
+  if (interimPlan) {
+    return {
+      now: interimPlan.holderActionLabel || 'ΠΑΡΑΚΟΛΟΥΘΗΣΗ',
+      why: interimPlan.rationale || 'Υπάρχει προσωρινό risk-control πλάνο όσο η τελική απόφαση παραμένει μπλοκαρισμένη.',
+      change: assessment?.explanation?.whatWouldChange || portfolioBlockedReason(blockedDossier),
+    };
+  }
+  if (blockedDossier) {
+    return {
+      now: 'ΠΕΡΙΜΕΝΕ · ΟΧΙ ΤΕΛΙΚΗ ΠΡΑΞΗ',
+      why: portfolioBlockedReason(blockedDossier),
+      change: assessment?.explanation?.whatWouldChange || blockedDossier?.nextStep || 'Να λυθεί ο υποχρεωτικός blocker και να τρέξει νέα canonical αξιολόγηση.',
+    };
+  }
+  if (capability?.queueStatus === 'QUEUED') {
+    return {
+      now: 'ΠΕΡΙΜΕΝΕ ΤΗΝ ΑΝΑΛΥΣΗ',
+      why: capabilityText(capability),
+      change: 'Να ολοκληρωθεί ο canonical research κύκλος και να δημοσιευτεί νέα έγκυρη MINBEIS feed.',
+    };
+  }
+  if (capability?.onboardingStatus === 'READY') {
+    return {
+      now: 'ΠΕΡΙΜΕΝΕ ΝΕΑ ΑΞΙΟΛΟΓΗΣΗ',
+      why: capabilityText(capability),
+      change: 'Να παραχθεί ενεργή canonical απόφαση στην επόμενη έγκυρη ροή.',
+    };
+  }
+  return {
+    now: 'ΑΝΑΜΟΝΗ ΕΛΕΓΧΟΥ',
+    why: capabilityText(capability) || 'Η θέση είναι καταχωρημένη, αλλά δεν υπάρχει ακόμη επαρκής canonical ανάλυση για πράξη.',
+    change: 'Να ολοκληρωθούν τα identity/data/research checks.',
+  };
+}
+
+function PositionClarityCard({ clarity }) {
+  if (!clarity) return null;
+  return (
+    <View style={styles.positionClarityCard}>
+      <View style={styles.positionClarityNow}>
+        <Text style={styles.positionClarityLabel}>ΤΩΡΑ</Text>
+        <Text style={styles.positionClarityAction}>{clarity.now}</Text>
+      </View>
+      <View style={styles.positionClarityRow}>
+        <Text style={styles.positionClarityLabel}>ΓΙΑΤΙ</Text>
+        <Text style={styles.positionClarityText}>{clarity.why}</Text>
+      </View>
+      <View style={styles.positionClarityRow}>
+        <Text style={styles.positionClarityLabel}>ΤΙ ΘΑ ΑΛΛΑΞΕΙ ΤΗΝ ΕΙΚΟΝΑ</Text>
+        <Text style={styles.positionClarityText}>{clarity.change}</Text>
+      </View>
+    </View>
+  );
+}
+
 function portfolioMinbeisPriority(position, rowBySymbol, blockedBySymbol, instrumentCapabilities) {
   const symbol = canonicalDecisionSymbol(position?.symbol);
   const row = rowBySymbol.get(symbol) || null;
@@ -371,6 +434,7 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = nu
             : blockedDossier
               ? 'ΜΠΛΟΚΑΡΙΣΜΕΝΗ ΑΠΟΦΑΣΗ'
               : capabilityLabel(capability) || 'ΑΝΑΛΥΣΗ ΕΚΚΡΕΜΕΙ';
+        const clarity = buildPositionClarity({ row, blockedDossier, interimPlan, capability, assessment });
         return (
           <View key={position.symbol} style={styles.portfolioMinbeisCard}>
             <View style={styles.rowTop}>
@@ -382,20 +446,12 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = nu
                 <Text style={[styles.minbeisActionText, !row && styles.pendingActionText]}>{badgeLabel}</Text>
               </View>
             </View>
-            <MinbeisAssessmentStrip assessment={assessment} />
+            <PositionClarityCard clarity={clarity} />
+            <View style={styles.positionContextRow}>
+              <MinbeisAssessmentStrip assessment={assessment} compact />
+              {row ? <Text style={styles.ageText}>Confidence {Number.isFinite(Number(row.confidenceScore)) ? Number(row.confidenceScore).toFixed(0) : '—'} · Data {Number.isFinite(Number(row.dataQualityScore)) ? Number(row.dataQualityScore).toFixed(0) : '—'}</Text> : blockedDossier ? <Text style={styles.ageText}>Fail-closed μέχρι να λυθεί ο blocker</Text> : null}
+            </View>
             <HistoricalContextCard context={historicalContext} />
-            {interimPlan ? (
-              <View style={styles.interimPlanBox}>
-                <Text style={styles.interimPlanEyebrow}>ΠΡΟΣΩΡΙΝΟ RISK-CONTROL · ΟΧΙ ΤΕΛΙΚΗ ΑΠΟΦΑΣΗ</Text>
-                <Text style={styles.interimPlanAction}>{interimPlan.holderActionLabel || 'ΠΑΡΑΚΟΛΟΥΘΗΣΗ'}</Text>
-                <Text style={styles.minbeisDecisionReason}>{interimPlan.rationale}</Text>
-              </View>
-            ) : (
-              <Text style={styles.minbeisDecisionReason}>
-                {row ? minbeisReasonText(row) : blockedDossier ? portfolioBlockedReason(blockedDossier) : capabilityText(capability) || 'Η θέση υπάρχει στο χαρτοφυλάκιό σου, αλλά δεν περιλαμβάνεται στη σημερινή canonical ανάλυση. Δεν παράγεται τεχνητό HOLD/SELL χωρίς πλήρη έλεγχο.'}
-              </Text>
-            )}
-            {row ? <Text style={styles.ageText}>Confidence: {Number.isFinite(Number(row.confidenceScore)) ? Number(row.confidenceScore).toFixed(0) : '—'} · Data quality: {Number.isFinite(Number(row.dataQualityScore)) ? Number(row.dataQualityScore).toFixed(0) : '—'}</Text> : blockedDossier ? <Text style={styles.ageText}>{portfolioBlockedReason(blockedDossier)} Η τελική πράξη παραμένει fail-closed μέχρι να λυθεί το blocker.</Text> : null}
             {!row && !blockedDossier && capability?.queueStatus === 'QUEUED' && capability?.queuedAt ? <Text style={styles.queueStatusText}>Στην ουρά από {when(capability.queuedAt)}</Text> : null}
           </View>
         );
@@ -859,6 +915,13 @@ const styles = StyleSheet.create({
   portfolioMinbeisHeader: { marginBottom: 8 },
   portfolioStatusRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 7 },
   portfolioStatusText: { color: '#60728b', fontSize: 9, fontWeight: '800', backgroundColor: '#edf3fb', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 5 },
+  positionClarityCard: { backgroundColor: '#f8fbff', borderRadius: 15, borderWidth: 1, borderColor: '#d5e1f1', padding: 12, marginTop: 11 },
+  positionClarityNow: { paddingBottom: 9, borderBottomWidth: 1, borderBottomColor: '#e2e9f3' },
+  positionClarityRow: { paddingTop: 9 },
+  positionClarityLabel: { color: '#7c899c', fontSize: 8, fontWeight: '900', letterSpacing: 0.5 },
+  positionClarityAction: { color: '#16345f', fontSize: 18, lineHeight: 23, fontWeight: '900', marginTop: 3 },
+  positionClarityText: { color: '#43566f', fontSize: 11, lineHeight: 17, marginTop: 3 },
+  positionContextRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   portfolioMinbeisCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#b9cce8', borderRadius: 18, padding: 14, marginBottom: 8 },
   pendingActionBadge: { backgroundColor: '#fff3d8' },
   pendingActionText: { color: '#976500' },
