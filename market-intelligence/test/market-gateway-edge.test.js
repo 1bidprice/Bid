@@ -19,6 +19,17 @@ function fxRequest(clientId = CLIENT_ID) {
   return new Request('https://gateway.test/v1/fx?pair=EURUSD', { headers });
 }
 
+function researchQueueRequest(symbol = 'NVDA.US', clientId = CLIENT_ID) {
+  const headers = clientId === null
+    ? { 'Content-Type': 'application/json' }
+    : { 'Content-Type': 'application/json', [MARKET_GATEWAY_CLIENT_HEADER]: clientId };
+  return new Request('https://gateway.test/v1/research-queue', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ symbol }),
+  });
+}
+
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), { status, headers: { 'Content-Type': 'application/json' } });
 }
@@ -178,4 +189,82 @@ test('missing edge rate-limit bindings fail closed rather than silently disablin
   const response = await handleMarketGatewayEdgeRequest(quoteRequest(), { FINNHUB_TOKEN: 'server-secret' }, {}, { cache: memoryCache(), coreOptions: { fetchImpl: liveUsFetch() } });
   assert.equal(response.status, 503);
   assert.equal((await response.json()).error.code, 'EDGE_RATE_LIMITER_NOT_CONFIGURED');
+});
+
+
+test('research queue POST requires client rate limit but never upstream quota', async () => {
+  const clientCalls = [];
+  const upstreamCalls = [];
+  const kv = new Map();
+  const env = {
+    FINNHUB_TOKEN: 'server-secret',
+    MINBEIS_RESEARCH_QUEUE: {
+      async get(key) { return kv.get(key) || null; },
+      async put(key, value) { kv.set(key, value); },
+    },
+    MARKET_GATEWAY_CLIENT_RATE_LIMITER: limiter(true, clientCalls),
+    MARKET_GATEWAY_UPSTREAM_RATE_LIMITER: limiter(true, upstreamCalls),
+  };
+  const fetchImpl = async (url) => {
+    if (String(url).includes('/quote')) return jsonResponse({ c: 120.5, pc: 119.5, o: 120, h: 122, l: 118, d: 1, dp: 0.8368, t: 1789052340 });
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const response = await handleMarketGatewayEdgeRequest(
+    researchQueueRequest(),
+    env,
+    {},
+    { coreOptions: { fetchImpl, now: '2026-09-10T15:00:00.000Z' } },
+  );
+  assert.equal(response.status, 202);
+  assert.deepEqual(clientCalls, [`client:${CLIENT_ID}`]);
+  assert.deepEqual(upstreamCalls, []);
+  const body = await response.json();
+  assert.equal(body.queueStatus, 'QUEUED');
+  assert.equal(body.privacy.clientIdentityStored, false);
+  const stored = JSON.parse(kv.get('research:NVDA.US'));
+  assert.equal(JSON.stringify(stored).includes(CLIENT_ID), false);
+});
+
+test('research queue POST without opaque client id fails before queue or provider work', async () => {
+  let queueCalls = 0;
+  let fetchCalls = 0;
+  const response = await handleMarketGatewayEdgeRequest(
+    researchQueueRequest('NVDA.US', null),
+    {
+      FINNHUB_TOKEN: 'server-secret',
+      MINBEIS_RESEARCH_QUEUE: {
+        async get() { queueCalls += 1; return null; },
+        async put() { queueCalls += 1; },
+      },
+      MARKET_GATEWAY_CLIENT_RATE_LIMITER: limiter(true, []),
+    },
+    {},
+    { coreOptions: { fetchImpl: async () => { fetchCalls += 1; throw new Error('must not run'); } } },
+  );
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'CLIENT_ID_REQUIRED');
+  assert.equal(queueCalls, 0);
+  assert.equal(fetchCalls, 0);
+});
+
+test('research queue POST is client-rate-limited before identity or storage work', async () => {
+  let queueCalls = 0;
+  let fetchCalls = 0;
+  const response = await handleMarketGatewayEdgeRequest(
+    researchQueueRequest(),
+    {
+      FINNHUB_TOKEN: 'server-secret',
+      MINBEIS_RESEARCH_QUEUE: {
+        async get() { queueCalls += 1; return null; },
+        async put() { queueCalls += 1; },
+      },
+      MARKET_GATEWAY_CLIENT_RATE_LIMITER: limiter(false, []),
+    },
+    {},
+    { coreOptions: { fetchImpl: async () => { fetchCalls += 1; throw new Error('must not run'); } } },
+  );
+  assert.equal(response.status, 429);
+  assert.equal((await response.json()).error.code, 'CLIENT_RATE_LIMITED');
+  assert.equal(queueCalls, 0);
+  assert.equal(fetchCalls, 0);
 });
