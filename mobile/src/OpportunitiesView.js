@@ -265,9 +265,17 @@ function blockedPortfolioDossierIndex(feed) {
 }
 
 function capabilityLabel(capability) {
+  if (capability?.onboardingStatus === 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED') {
+    return {
+      QUEUED: 'ΣΤΗΝ ΟΥΡΑ ΕΡΕΥΝΑΣ',
+      COMPLETED: 'ΕΡΕΥΝΑ ΟΛΟΚΛΗΡΩΘΗΚΕ',
+      QUEUE_NOT_CONFIGURED: 'ΕΤΟΙΜΟ ΓΙΑ ΕΡΕΥΝΑ',
+      QUEUE_FAILED: 'ΟΥΡΑ · ΠΡΟΣΩΡΙΝΟ ΣΦΑΛΜΑ',
+      NOT_QUEUED: 'ΑΝΑΜΟΝΗ ΕΡΕΥΝΑΣ',
+    }[capability?.queueStatus] || 'ΤΑΥΤΟΠΟΙΗΘΗΚΕ';
+  }
   return {
     READY: 'MINBEIS READY',
-    IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED: 'ΤΑΥΤΟΠΟΙΗΘΗΚΕ',
     IDENTITY_NOT_VERIFIED: 'ΧΡΕΙΑΖΕΤΑΙ ΤΑΥΤΟΠΟΙΗΣΗ',
     GATEWAY_NOT_CONFIGURED: 'ONBOARDING ΜΗ ΔΙΑΘΕΣΙΜΟ',
     CHECK_FAILED: 'ΕΛΕΓΧΟΣ ΑΠΕΤΥΧΕ',
@@ -275,9 +283,17 @@ function capabilityLabel(capability) {
 }
 
 function capabilityText(capability) {
+  if (capability?.onboardingStatus === 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED') {
+    return {
+      QUEUED: 'Το προϊόν ταυτοποιήθηκε και μπήκε στη μόνιμη MINBEIS research queue. Θα αποκτήσει πλήρη canonical ανάλυση όταν ολοκληρωθεί ο research κύκλος.',
+      COMPLETED: 'Η research queue έχει ολοκληρώσει το onboarding. Αναμένεται η επόμενη έγκυρη mobile feed για να εμφανιστεί η canonical ανάλυση.',
+      QUEUE_NOT_CONFIGURED: 'Το symbol και η χρηματιστηριακή ταυτότητα επαληθεύτηκαν. Η server-side μόνιμη research queue δεν έχει ακόμη ενεργοποιηθεί, οπότε δεν δηλώνεται ψευδώς ότι το προϊόν μπήκε σε ανάλυση.',
+      QUEUE_FAILED: 'Το προϊόν ταυτοποιήθηκε, αλλά η αποστολή του στη research queue απέτυχε προσωρινά. Η θέση παραμένει αποθηκευμένη και δεν παράγεται τεχνητή απόφαση.',
+      NOT_QUEUED: 'Το προϊόν ταυτοποιήθηκε, αλλά δεν έχει ακόμη καταχωρηθεί στη research queue.',
+    }[capability?.queueStatus] || 'Το symbol και η χρηματιστηριακή ταυτότητα επαληθεύτηκαν. Η πλήρης MINBEIS research coverage δεν έχει ακόμη γίνει canonical.';
+  }
   return {
     READY: 'Το προϊόν είναι canonical και υποστηρίζεται για πλήρη MINBEIS ανάλυση. Δεν υπάρχει ακόμη ενεργή τελική απόφαση στη σημερινή ροή.',
-    IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED: 'Το symbol και η χρηματιστηριακή ταυτότητα επαληθεύτηκαν. Η πλήρης MINBEIS research coverage δεν έχει ακόμη γίνει canonical.',
     IDENTITY_NOT_VERIFIED: 'Το προϊόν αποθηκεύτηκε στο χαρτοφυλάκιο, αλλά το MINBEIS δεν θα δημιουργήσει απόφαση μέχρι να επαληθευτεί η canonical ταυτότητά του.',
     GATEWAY_NOT_CONFIGURED: 'Το προϊόν αποθηκεύτηκε, αλλά ο κεντρικός gateway δεν είναι διαθέσιμος σε αυτή την έκδοση για automatic onboarding.',
     CHECK_FAILED: 'Η καταχώρηση του προϊόντος αποθηκεύτηκε κανονικά, αλλά ο αυτόματος έλεγχος MINBEIS δεν ολοκληρώθηκε.',
@@ -343,6 +359,7 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = nu
               </Text>
             )}
             {row ? <Text style={styles.ageText}>Confidence: {Number.isFinite(Number(row.confidenceScore)) ? Number(row.confidenceScore).toFixed(0) : '—'} · Data quality: {Number.isFinite(Number(row.dataQualityScore)) ? Number(row.dataQualityScore).toFixed(0) : '—'}</Text> : blockedDossier ? <Text style={styles.ageText}>{portfolioBlockedReason(blockedDossier)} Η τελική πράξη παραμένει fail-closed μέχρι να λυθεί το blocker.</Text> : null}
+            {!row && !blockedDossier && capability?.queueStatus === 'QUEUED' && capability?.queuedAt ? <Text style={styles.queueStatusText}>Στην ουρά από {when(capability.queuedAt)}</Text> : null}
           </View>
         );
       })}
@@ -806,6 +823,7 @@ const styles = StyleSheet.create({
   portfolioMinbeisCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#b9cce8', borderRadius: 18, padding: 14, marginBottom: 8 },
   pendingActionBadge: { backgroundColor: '#fff3d8' },
   pendingActionText: { color: '#976500' },
+  queueStatusText: { color: '#60728b', fontSize: 9, lineHeight: 14, marginTop: 6, fontWeight: '700' },
   interimPlanBox: { backgroundColor: '#fff8e7', borderRadius: 13, padding: 11, marginTop: 10 },
   interimPlanEyebrow: { color: '#8a5d00', fontSize: 9, lineHeight: 13, fontWeight: '900', letterSpacing: 0.4 },
   interimPlanAction: { color: '#16345f', fontSize: 16, lineHeight: 21, fontWeight: '900', marginTop: 5 },
