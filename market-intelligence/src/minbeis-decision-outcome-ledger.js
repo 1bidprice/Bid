@@ -30,6 +30,7 @@ export function createMinbeisDecisionOutcomeRecord(input = {}) {
     benchmarkSymbol: input.benchmarkSymbol || null,
     confidenceScore: finite(input.confidenceScore) ? Number(input.confidenceScore) : null,
     dataQualityScore: finite(input.dataQualityScore) ? Number(input.dataQualityScore) : null,
+    simpleBaselineSnapshot: input.simpleBaselineSnapshot || null,
     horizons: Object.fromEntries(HORIZONS.map((days) => [String(days), { tradingDays: days, status: 'OPEN', evaluatedAt: null, outcomePrice: null, realisedReturnPct: null, benchmarkReturnPct: null, excessReturnPct: null }])),
   };
   record.decisionId = idFor(record);
@@ -102,7 +103,12 @@ export function mergeMinbeisDecisionOutcomeLedger(existing = [], incoming = []) 
       const currentValue = mergedHorizons[key];
       mergedHorizons[key] = currentValue?.status === 'MATURED' ? currentValue : value;
     }
-    map.set(record.decisionId, { ...current, ...record, horizons: mergedHorizons });
+    map.set(record.decisionId, {
+      ...current,
+      ...record,
+      simpleBaselineSnapshot: current.simpleBaselineSnapshot || record.simpleBaselineSnapshot || null,
+      horizons: mergedHorizons,
+    });
   }
   return [...map.values()].sort((a, b) => String(a.decisionAt).localeCompare(String(b.decisionAt)) || String(a.decisionId).localeCompare(String(b.decisionId)));
 }
