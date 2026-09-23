@@ -467,6 +467,7 @@ export async function handleMarketGatewayRequest(request, env = {}, options = {}
         us: String(env.FINNHUB_TOKEN || '').trim() ? 'configured' : 'not_configured',
         athens: 'official_delayed_15m',
         fx: 'ecb_official_daily_reference',
+        researchQueue: researchQueueBinding(env) ? 'configured' : 'not_configured',
       },
     });
   }
