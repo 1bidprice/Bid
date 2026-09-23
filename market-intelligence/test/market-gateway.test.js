@@ -160,3 +160,49 @@ test('health reports provider configuration without exposing secret value', asyn
   assert.equal(body.providers.fx, 'ecb_official_daily_reference');
   assert.equal(JSON.stringify(body).includes('secret-value'), false);
 });
+
+
+test('dynamic US instrument capability verifies identity without pretending full MINBEIS coverage', async () => {
+  const secret = 'server-only-finnhub-secret';
+  const fetchImpl = async (url, init = {}) => {
+    assert.equal(init.headers?.['X-Finnhub-Token'], secret);
+    if (String(url).includes('/stock/profile2')) return jsonResponse({ ticker: 'NVDA', currency: 'USD', exchange: 'NASDAQ', country: 'US', name: 'NVIDIA Corp' });
+    if (String(url).includes('/quote')) return jsonResponse({ c: 120.5, pc: 119.5, o: 120, h: 122, l: 118, d: 1, dp: 0.8368, t: Math.floor(Date.parse('2026-09-10T14:59:00.000Z') / 1000) });
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const response = await handleMarketGatewayRequest(new Request('https://gateway.test/v1/instrument?symbol=NVDA.US'), { FINNHUB_TOKEN: secret }, { fetchImpl, now: '2026-09-10T15:00:00.000Z' });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.format, 'investor-control-instrument-capability');
+  assert.equal(body.requestedSymbol, 'NVDA.US');
+  assert.equal(body.identityVerified, true);
+  assert.equal(body.quoteSupported, true);
+  assert.equal(body.analysisSupported, false);
+  assert.equal(body.onboardingStatus, 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED');
+  assert.equal(body.privacy.portfolioQuantityRequired, false);
+  assert.equal(body.privacy.portfolioCostRequired, false);
+  assert.equal(body.privacy.pnlRequired, false);
+});
+
+test('canonical focus instrument reports READY for full MINBEIS coverage', async () => {
+  const fetchImpl = async (url) => {
+    if (String(url).includes('/quote')) return jsonResponse({ c: 3.21, pc: 3.10, o: 3.12, h: 3.25, l: 3.05, d: 0.11, dp: 3.5484, t: Math.floor(Date.parse('2026-09-10T14:59:00.000Z') / 1000) });
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const response = await handleMarketGatewayRequest(new Request('https://gateway.test/v1/instrument?symbol=SPCE.US'), { FINNHUB_TOKEN: 'secret' }, { fetchImpl, now: '2026-09-10T15:00:00.000Z' });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.analysisSupported, true);
+  assert.equal(body.onboardingStatus, 'READY');
+  assert.equal(body.canonicalCompanyId, 'company:virgin-galactic-holdings');
+});
+
+test('unsupported Athens instrument fails closed instead of inventing canonical identity', async () => {
+  const response = await handleMarketGatewayRequest(new Request('https://gateway.test/v1/instrument?symbol=UNKNOWN.GR'), {}, { fetchImpl: async () => { throw new Error('should not call provider'); }, now: '2026-09-10T10:00:00.000Z' });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.identityVerified, false);
+  assert.equal(body.quoteSupported, false);
+  assert.equal(body.analysisSupported, false);
+  assert.equal(body.onboardingStatus, 'IDENTITY_NOT_VERIFIED');
+});
