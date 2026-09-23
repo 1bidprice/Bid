@@ -4,6 +4,7 @@ const {
   getOrCreateInstallationId,
   normalizeGatewayBaseUrl,
   fetchCanonicalGatewayMarketSnapshot,
+  fetchInstrumentCapability,
 } = require('./market-gateway-client');
 
 // This value is intentionally public. Expo inlines EXPO_PUBLIC_* values into the client bundle.
@@ -46,5 +47,33 @@ export async function fetchConfiguredMarketGatewaySnapshot(symbols, options = {}
     checkedAt: snapshot.checkedAt || new Date().toISOString(),
     fxReference: snapshot.fxReference || null,
     ...(snapshot.fxError ? { fxError: snapshot.fxError } : {}),
+  };
+}
+
+
+export async function fetchConfiguredInstrumentCapability(symbol, options = {}) {
+  const baseUrl = configuredMarketGatewayUrl(options.baseUrl === undefined ? COMPILED_MARKET_GATEWAY_URL : options.baseUrl);
+  if (!baseUrl) {
+    return {
+      enabled: false,
+      requestedSymbol: symbol,
+      onboardingStatus: 'GATEWAY_NOT_CONFIGURED',
+      identityVerified: false,
+      quoteSupported: false,
+      analysisSupported: false,
+    };
+  }
+
+  const storage = options.storage || AsyncStorage;
+  const clientId = await getOrCreateInstallationId(storage, options.installationIdOptions || {});
+  const result = await fetchInstrumentCapability(symbol, {
+    baseUrl,
+    clientId,
+    fetchImpl: options.fetchImpl,
+    timeoutMs: options.timeoutMs,
+  });
+  return {
+    enabled: true,
+    ...result,
   };
 }
