@@ -751,10 +751,7 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
   const sourceHealth = feed?.sourceHealth || null;
   const historicalAnalyticsStatus = operationalHealth?.historicalAnalyticsStatus || 'UNAVAILABLE';
   const historicalAnalyticsPartial = ['PARTIAL', 'UNAVAILABLE'].includes(historicalAnalyticsStatus);
-  const systemReady = operationalHealth?.status === 'OPERATIONAL'
-    && operationalHealth?.marketDataStatus === 'OPERATIONAL'
-    && operationalHealth?.fundamentalsStatus === 'OPERATIONAL'
-    && operationalHealth?.decisionEngineStatus === 'READY';
+  const systemReady = intelligenceSystemReady(operationalHealth || {});
   const decisionContext = useMemo(() => ({
     feedFresh: freshness.state === 'fresh',
     systemReady,
