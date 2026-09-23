@@ -84,7 +84,7 @@ function universeIdentityKeys(company = {}) {
   ].filter(Boolean);
 }
 
-function mergeUniverse(...groups) {
+export function mergeUniverse(...groups) {
   const records = [];
   const keyToIndex = new Map();
   for (const company of groups.flat().filter(Boolean)) {
@@ -102,6 +102,10 @@ function mergeUniverse(...groups) {
     for (const key of keys) keyToIndex.set(key, index);
   }
   return records;
+}
+
+export function buildFocusUniverse(seedUniverse = [], queuedResearchCompanies = []) {
+  return mergeUniverse(seedUniverse, queuedResearchCompanies);
 }
 
 function candidateByListing(items = []) {
@@ -398,7 +402,7 @@ export async function runAutonomousIntelligence(options = {}) {
   const generatedAt = new Date(options.now || Date.now()).toISOString();
   const seedUniverse = options.universe || await loadSeedUniverse(options.universePath);
   const queuedResearchCompanies = Array.isArray(options.queuedResearchCompanies) ? options.queuedResearchCompanies : [];
-  const focusUniverse = mergeUniverse(seedUniverse, queuedResearchCompanies);
+  const focusUniverse = buildFocusUniverse(seedUniverse, queuedResearchCompanies);
   const secUserAgent = options.secUserAgent || process.env.SEC_USER_AGENT || '';
   let discovery;
   try {
