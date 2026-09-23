@@ -114,7 +114,7 @@ function IntelligenceCard({ item, decisionContext }) {
         <Text style={[styles.category, risk && styles.riskText]}>{item.categoryLabel}</Text>
         <FinalDecisionCard item={item} decisionContext={decisionContext} />
         <View style={styles.actionRow}>
-          <View style={styles.actionBox}><Text style={styles.muted}>Αξιολόγηση</Text><Text style={[styles.action, risk && styles.riskText]}>{item.actionLabel}</Text></View>
+          <View style={styles.actionBox}><Text style={styles.muted}>Γενική ερευνητική ένδειξη</Text><Text style={[styles.action, risk && styles.riskText]}>{item.actionLabel}</Text><Text style={styles.ageText}>Δεν είναι η προσωπική σου πράξη</Text></View>
           <View style={styles.actionBox}><Text style={styles.muted}>Τιμή αναφοράς</Text><Text style={styles.action}>{money(item.referencePrice, item)}</Text><Text style={styles.ageText}>{Number.isFinite(referenceAge) ? (referenceAge < 1 ? 'πριν από λιγότερο από 1 ώρα' : 'πριν από ' + referenceAge.toFixed(1) + ' ώρες') : 'χωρίς έγκυρη ώρα'}</Text></View>
         </View>
         {item.marketQuote?.quoteContract?.publicMessage ? <View style={styles.marketQuoteContract}><Text style={styles.marketQuoteContractText}>{item.marketQuote.quoteContract.publicMessage}</Text></View> : null}
