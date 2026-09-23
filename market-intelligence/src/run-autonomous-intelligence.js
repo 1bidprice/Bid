@@ -38,6 +38,7 @@ import { reconcileOpportunityPurchaseDecisions } from './opportunity-purchase-re
 import { buildOperationalHealth } from './operational-health.js';
 import { buildMinbeisDecision } from './minbeis-decision-layer.js';
 import { createMinbeisDecisionOutcomeRecord, evaluateMinbeisDecisionOutcome, mergeMinbeisDecisionOutcomeLedger, summarizeMinbeisDecisionOutcomes } from './minbeis-decision-outcome-ledger.js';
+import { buildMinbeisSimpleBaselineSnapshot, summarizeMinbeisBaselineComparison } from './minbeis-simple-baseline.js';
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_UNIVERSE_PATH = path.resolve(MODULE_DIR, '../config/universe.seed.json');
@@ -128,7 +129,7 @@ function byCompanyId(items = []) {
   return new Map(items.filter((item) => item?.companyId).map((item) => [item.companyId, item]));
 }
 
-function createCurrentMinbeisOutcomeRecords(purchaseReconciliation, dossiers, generatedAt) {
+function createCurrentMinbeisOutcomeRecords(purchaseReconciliation, dossiers, historicalSeriesCollector, generatedAt) {
   const byDossierId = new Map((Array.isArray(dossiers) ? dossiers : []).filter((item) => item?.dossierId).map((item) => [item.dossierId, item]));
   const byCompany = dossierMap(Array.isArray(dossiers) ? dossiers : []);
   const records = [];
@@ -143,18 +144,24 @@ function createCurrentMinbeisOutcomeRecords(purchaseReconciliation, dossiers, ge
     if (!['BUY_PROBE', 'BUY_STARTER', 'BUY_CORE'].includes(decision.action)) continue;
     const referencePrice = Number(dossier?.referencePrice?.value);
     if (!Number.isFinite(referencePrice) || referencePrice <= 0) continue;
+    const decisionAt = finalActionDecisionTimestamp(dossier.finalAction, generatedAt);
+    const marketSeries = historicalSeriesCollector?.get(dossier.companyId) || null;
+    const simpleBaselineSnapshot = marketSeries?.usable && Array.isArray(marketSeries?.candles)
+      ? buildMinbeisSimpleBaselineSnapshot(marketSeries, decisionAt)
+      : null;
     records.push(createMinbeisDecisionOutcomeRecord({
       instrumentId: purchase.instrumentId || purchase.companyId || dossier.companyId,
       companyId: purchase.companyId || dossier.companyId || null,
       symbol: purchase.symbol || dossier?.listing?.symbol || dossier?.symbol || null,
       action: decision.action,
       allocationPct: decision.allocationPct,
-      decisionAt: finalActionDecisionTimestamp(dossier.finalAction, generatedAt),
+      decisionAt,
       referencePrice,
       currency: dossier?.referencePrice?.currency || dossier?.listing?.currency || null,
       benchmarkSymbol: dossier?.metrics?.market?.benchmarkSymbol || null,
       confidenceScore: decision.confidenceScore,
       dataQualityScore: decision.dataQualityScore,
+      simpleBaselineSnapshot,
     }));
   }
   return records;
@@ -439,10 +446,11 @@ export async function runAutonomousIntelligence(options = {}) {
     immediatePriceAgeHours: options.immediatePriceAgeHours,
     minimumImmediateLiquidityScore: options.minimumImmediateLiquidityScore,
   });
-  const currentMinbeisOutcomeRecords = createCurrentMinbeisOutcomeRecords(opportunityPurchaseReconciliation, researchDossiers, generatedAt);
+  const currentMinbeisOutcomeRecords = createCurrentMinbeisOutcomeRecords(opportunityPurchaseReconciliation, researchDossiers, historicalSeriesCollector, generatedAt);
   const mergedMinbeisOutcomeRecords = mergeMinbeisDecisionOutcomeLedger(options.minbeisDecisionOutcomeRecords || [], currentMinbeisOutcomeRecords);
   const minbeisDecisionOutcomeRecords = evaluateCurrentMinbeisOutcomeLedger(mergedMinbeisOutcomeRecords, historicalSeriesCollector, benchmarkSeriesCollector, generatedAt);
   const minbeisDecisionOutcomeSummary = summarizeMinbeisDecisionOutcomes(minbeisDecisionOutcomeRecords);
+  const minbeisSimpleBaselineComparison = summarizeMinbeisBaselineComparison(minbeisDecisionOutcomeRecords);
   if (typeof options.minbeisDecisionOutcomeLedgerSink === 'function') {
     await options.minbeisDecisionOutcomeLedgerSink({
       format: 'investor-control-minbeis-decision-outcome-archive',
@@ -450,6 +458,7 @@ export async function runAutonomousIntelligence(options = {}) {
       updatedAt: generatedAt,
       records: minbeisDecisionOutcomeRecords,
       summary: minbeisDecisionOutcomeSummary,
+      simpleBaselineComparison: minbeisSimpleBaselineComparison,
     });
   }
   const longHistoryResearch = await collectLongHistoryResearch({
