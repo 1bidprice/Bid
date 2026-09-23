@@ -177,8 +177,48 @@ function minbeisReasonText(row) {
   }[row?.reason] || 'Η απόφαση προκύπτει από τον canonical Investor Control engine.';
 }
 
+function PortfolioMinbeisSection({ dashboard, portfolioPositions = [] }) {
+  const rowBySymbol = new Map((dashboard?.rows || []).map((row) => [canonicalDecisionSymbol(row?.symbol), row]));
+  const positions = (Array.isArray(portfolioPositions) ? portfolioPositions : [])
+    .filter((position) => Number(position?.quantity || 0) > 0);
+  if (!positions.length) return null;
+
+  const coveredCount = positions.filter((position) => rowBySymbol.has(canonicalDecisionSymbol(position?.symbol))).length;
+
+  return (
+    <View style={styles.portfolioMinbeisSection}>
+      <View style={styles.portfolioMinbeisHeader}>
+        <View style={styles.grow}>
+          <Text style={styles.sectionTitle}>Οι θέσεις μου</Text>
+          <Text style={styles.sectionSubtitle}>Πρώτα ελέγχουμε το δικό σου χαρτοφυλάκιο. Κάλυψη σήμερα: {coveredCount}/{positions.length} θέσεις.</Text>
+        </View>
+      </View>
+      {positions.map((position) => {
+        const row = rowBySymbol.get(canonicalDecisionSymbol(position?.symbol)) || null;
+        return (
+          <View key={position.symbol} style={styles.portfolioMinbeisCard}>
+            <View style={styles.rowTop}>
+              <View style={styles.grow}>
+                <Text style={styles.company}>{position.company || position.symbol}</Text>
+                <Text style={styles.symbol}>{position.symbol} · {Number(position.quantity || 0).toLocaleString('el-GR')} μετοχές</Text>
+              </View>
+              <View style={[styles.minbeisActionBadge, !row && styles.pendingActionBadge]}>
+                <Text style={[styles.minbeisActionText, !row && styles.pendingActionText]}>{row ? minbeisActionLabel(row.action) : 'ΑΝΑΛΥΣΗ ΕΚΚΡΕΜΕΙ'}</Text>
+              </View>
+            </View>
+            <Text style={styles.minbeisDecisionReason}>
+              {row ? minbeisReasonText(row) : 'Η θέση υπάρχει στο χαρτοφυλάκιό σου, αλλά δεν περιλαμβάνεται στη σημερινή canonical ανάλυση. Δεν παράγεται τεχνητό HOLD/SELL χωρίς πλήρη έλεγχο.'}
+            </Text>
+            {row ? <Text style={styles.ageText}>Confidence: {Number.isFinite(Number(row.confidenceScore)) ? Number(row.confidenceScore).toFixed(0) : '—'} · Data quality: {Number.isFinite(Number(row.dataQualityScore)) ? Number(row.dataQualityScore).toFixed(0) : '—'}</Text> : null}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 function MinbeisDashboard({ dashboard, sourceDecisionCount = 0, decisionContext }) {
-  const rows = Array.isArray(dashboard?.rows) ? dashboard.rows : [];
+  const rows = (Array.isArray(dashboard?.rows) ? dashboard.rows : []).filter((row) => !row.owned);
   const counts = dashboard?.counts || {};
   const actionable = Number(dashboard?.actionableCount || 0);
   const headline = actionable > 0
@@ -204,6 +244,7 @@ function MinbeisDashboard({ dashboard, sourceDecisionCount = 0, decisionContext 
         {!decisionContext?.feedFresh ? <Text style={styles.minbeisCaution}>Οι ενεργές πράξεις απενεργοποιούνται όταν η ροή δεν είναι αρκετά πρόσφατη.</Text> : null}
       </View>
 
+      {rows.length ? <><Text style={styles.sectionTitle}>Νέες ιδέες</Text><Text style={styles.sectionSubtitle}>Μετοχές εκτός του χαρτοφυλακίου σου που πέρασαν στη σημερινή canonical ανάλυση.</Text></> : null}
       {rows.slice(0, 10).map((row) => (
         <View key={row.id} style={styles.minbeisDecisionCard}>
           <View style={styles.rowTop}>
@@ -326,6 +367,7 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
   const [syncing, setSyncing] = useState(false);
   const [importing, setImporting] = useState(false);
   const [syncError, setSyncError] = useState(null);
+  const [showSystemDetails, setShowSystemDetails] = useState(false);
 
   const sync = useCallback(async ({ manual = false } = {}) => {
     setSyncing(true);
@@ -466,6 +508,10 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
           </View>
         </View>
         <Text style={styles.connectionMeta}>Τελευταίος επιτυχής συγχρονισμός: {when(syncState?.lastSuccessAt)}</Text>
+        <Pressable style={styles.systemDetailsToggle} onPress={() => setShowSystemDetails((value) => !value)}>
+          <Text style={styles.systemDetailsToggleText}>{showSystemDetails ? 'Απόκρυψη κατάστασης συστήματος' : 'Κατάσταση συστήματος'}</Text>
+        </Pressable>
+        {showSystemDetails ? <>
         <View style={styles.sourcePolicyBox}><Text style={styles.sourcePolicyTitle}>Ποιος επιλέγει τις πηγές;</Text><Text style={styles.sourcePolicyText}>Έκδοση πολιτικής: {feed?.sourceSelection?.version || '—'}. Οι πηγές επιλέγονται από κλειδωμένη πολιτική κώδικα και επιτρεπόμενη λίστα, όχι αυθαίρετα από το AI.</Text></View>
         <View style={[styles.productionHealth, productionReady ? styles.productionHealthGood : styles.productionHealthLimited]}>
           <View style={styles.productionHealthTop}><View style={styles.grow}><Text style={styles.productionHealthEyebrow}>ΚΑΤΑΣΤΑΣΗ ΠΑΡΑΓΩΓΙΚΟΥ ΣΥΣΤΗΜΑΤΟΣ</Text><Text style={styles.productionHealthTitle}>{productionReady ? (historicalAnalyticsPartial ? 'Κανονική λειτουργία · μερική ιστορική κάλυψη' : 'Πλήρης αυτοματοποιημένη λειτουργία') : 'Περιορισμένη λειτουργία — χωρίς αυθαίρετα σήματα'}</Text></View><View style={[styles.productionHealthBadge, productionReady && styles.productionHealthBadgeGood]}><Text style={[styles.productionHealthBadgeText, productionReady && styles.productionHealthBadgeTextGood]}>{productionReady ? 'OPERATIONAL' : 'DEGRADED'}</Text></View></View>
@@ -478,6 +524,7 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
           </View>
           <Text style={styles.productionHealthMeta}>Τελευταία παραγωγή: {when(operationalHealth?.generatedAt || feed?.generatedAt)} · Διαγνωστικά: {sourceHealth?.diagnosticCount || 0}</Text>
         </View>
+        </> : null}
         {syncError ? <Text style={styles.syncWarning}>Η online ενημέρωση απέτυχε: {syncError} Προβάλλεται η τελευταία έγκυρη αποθηκευμένη ροή.</Text> : null}
       </View>
 
@@ -495,6 +542,7 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
         </View>
       ) : (
         <>
+          <PortfolioMinbeisSection dashboard={minbeisDashboard} portfolioPositions={portfolioPositions} />
           <MinbeisDashboard dashboard={minbeisDashboard} sourceDecisionCount={(feed.decisions || []).length} decisionContext={decisionContext} />
           <View style={styles.summaryCard}>
             <Text style={styles.summaryHeadline}>{feed.today?.headline || 'Ημερήσια σύνοψη'}</Text>
@@ -554,6 +602,13 @@ const styles = StyleSheet.create({
   primary: { minHeight: 56, borderRadius: 18, backgroundColor: '#0B66FF', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, marginTop: 18 },
   primaryText: { color: '#fff', fontWeight: '900', textAlign: 'center' },
   privacy: { color: '#718096', fontSize: 12, lineHeight: 18, marginTop: 13 },
+  portfolioMinbeisSection: { marginBottom: 20 },
+  portfolioMinbeisHeader: { marginBottom: 8 },
+  portfolioMinbeisCard: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#b9cce8', borderRadius: 18, padding: 14, marginBottom: 8 },
+  pendingActionBadge: { backgroundColor: '#fff3d8' },
+  pendingActionText: { color: '#976500' },
+  systemDetailsToggle: { marginTop: 10, minHeight: 42, borderRadius: 13, borderWidth: 1, borderColor: '#bdd9ff', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  systemDetailsToggleText: { color: '#0B66FF', fontSize: 11, fontWeight: '900' },
   minbeisShell: { marginBottom: 20 },
   minbeisHero: { backgroundColor: '#081d3d', borderRadius: 24, padding: 18, marginBottom: 10 },
   minbeisEyebrow: { color: '#8fbaff', fontSize: 11, fontWeight: '900', letterSpacing: 1.1 },
