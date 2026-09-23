@@ -39,6 +39,7 @@ import { buildOperationalHealth } from './operational-health.js';
 import { buildMinbeisDecision } from './minbeis-decision-layer.js';
 import { createMinbeisDecisionOutcomeRecord, evaluateMinbeisDecisionOutcome, mergeMinbeisDecisionOutcomeLedger, summarizeMinbeisDecisionOutcomes } from './minbeis-decision-outcome-ledger.js';
 import { buildMinbeisSimpleBaselineSnapshot, summarizeMinbeisBaselineComparison } from './minbeis-simple-baseline.js';
+import { resolveQueuedResearchUniverse } from './research-queue-onboarding.js';
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_UNIVERSE_PATH = path.resolve(MODULE_DIR, '../config/universe.seed.json');
@@ -396,10 +397,12 @@ function broadCandidatesToCompanies(broadOpportunityScan) {
 export async function runAutonomousIntelligence(options = {}) {
   const generatedAt = new Date(options.now || Date.now()).toISOString();
   const seedUniverse = options.universe || await loadSeedUniverse(options.universePath);
+  const queuedResearchCompanies = Array.isArray(options.queuedResearchCompanies) ? options.queuedResearchCompanies : [];
+  const focusUniverse = mergeUniverse(seedUniverse, queuedResearchCompanies);
   const secUserAgent = options.secUserAgent || process.env.SEC_USER_AGENT || '';
   let discovery;
   try {
-    discovery = await discoverAutonomousCandidates({ ...options, now: generatedAt, seedUniverse, secUserAgent });
+    discovery = await discoverAutonomousCandidates({ ...options, now: generatedAt, seedUniverse: focusUniverse, secUserAgent });
   } catch (error) {
     discovery = {
       format: 'investor-control-autonomous-discovery', version: 1, policyVersion: null, generatedAt, sourcePolicy: null,
@@ -410,7 +413,7 @@ export async function runAutonomousIntelligence(options = {}) {
 
   const broadOpportunityScan = await runBroadOpportunityScreen(options, generatedAt, secUserAgent);
   const broadCompanies = broadCandidatesToCompanies(broadOpportunityScan);
-  const expandedUniverse = mergeUniverse(seedUniverse, discovery.discoveredCompanies, broadCompanies);
+  const expandedUniverse = mergeUniverse(focusUniverse, discovery.discoveredCompanies, broadCompanies);
   const historicalSeriesCollector = new Map();
   const benchmarkSeriesCollector = new Map();
   const baseReport = await runDailyIntelligence({ ...options, now: generatedAt, universe: expandedUniverse, historicalSeriesCollector, benchmarkSeriesCollector, classificationSnapshots: discovery.classificationSnapshots || [] });
@@ -437,7 +440,7 @@ export async function runAutonomousIntelligence(options = {}) {
     immediatePriceAgeHours: options.immediatePriceAgeHours,
     minimumImmediateLiquidityScore: options.minimumImmediateLiquidityScore,
   });
-  const researchDossiers = annotateDiscovery(policyDossiers, discovery, broadOpportunityScan, seedUniverse);
+  const researchDossiers = annotateDiscovery(policyDossiers, discovery, broadOpportunityScan, focusUniverse);
   const opportunityPurchaseReconciliation = reconcileOpportunityPurchaseDecisions(opportunityUniverse, researchDossiers, {
     now: generatedAt,
     maxReferencePriceAgeHours: options.maxReferencePriceAgeHours,
@@ -596,11 +599,25 @@ const operationalHealth = buildOperationalHealth({
     policyVersion: FINAL_ACTION_POLICY_VERSION,
     universeExpansion: {
       seedCompanyCount: seedUniverse.length,
+      queuedResearchCompanyCount: queuedResearchCompanies.length,
+      focusCompanyCount: focusUniverse.length,
       eventDiscoveredCompanyCount: discovery.discoveredCompanies.length,
       broadScreenCompanyCount: broadCompanies.length,
       analysedCompanyCount: expandedUniverse.length,
       opportunityScannedInstrumentCount: opportunityUniverse.uniqueInstrumentCount,
       opportunityScorableInstrumentCount: opportunityUniverse.scorableInstrumentCount,
+    },
+    researchQueueResolution: options.researchQueueResolution || {
+      format: 'minbeis-research-queue-resolution',
+      version: 1,
+      generatedAt,
+      requestedCount: 0,
+      resolvedCount: 0,
+      blockedCount: 0,
+      companies: [],
+      results: [],
+      diagnostics: [],
+      decisionImpact: 'FOCUS_UNIVERSE_ONLY',
     },
     discovery,
     broadOpportunityScan,
@@ -653,8 +670,35 @@ async function main() {
     ? path.resolve(process.cwd(), process.env.MINBEIS_DECISION_OUTCOME_LEDGER_PATH)
     : null;
   const minbeisLedgerOutputPath = path.resolve(process.cwd(), process.env.MINBEIS_DECISION_OUTCOME_LEDGER_OUTPUT || 'out/minbeis-decision-outcome-ledger.json');
+  const researchQueuePath = process.env.MINBEIS_RESEARCH_QUEUE_PATH
+    ? path.resolve(process.cwd(), process.env.MINBEIS_RESEARCH_QUEUE_PATH)
+    : null;
+  let researchQueueResolution = {
+    format: 'minbeis-research-queue-resolution',
+    version: 1,
+    generatedAt: new Date().toISOString(),
+    requestedCount: 0,
+    resolvedCount: 0,
+    blockedCount: 0,
+    companies: [],
+    results: [],
+    diagnostics: [],
+    decisionImpact: 'FOCUS_UNIVERSE_ONLY',
+  };
   let forecastOutcomeLedgerRecords = [];
   let minbeisDecisionOutcomeRecords = [];
+  if (researchQueuePath) {
+    try {
+      const queueInput = JSON.parse(await readFile(researchQueuePath, 'utf8'));
+      researchQueueResolution = await resolveQueuedResearchUniverse(queueInput, {
+        generatedAt: new Date().toISOString(),
+        secUserAgent: process.env.SEC_USER_AGENT || '',
+        fetchImpl: globalThis.fetch,
+      });
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+  }
   if (ledgerInputPath) {
     try {
       const existingArchive = JSON.parse(await readFile(ledgerInputPath, 'utf8'));
@@ -674,6 +718,8 @@ async function main() {
   let persistedForecastOutcomeArchive = null;
   let persistedMinbeisDecisionOutcomeArchive = null;
   const report = await runAutonomousIntelligence({
+    queuedResearchCompanies: researchQueueResolution.companies || [],
+    researchQueueResolution,
     forecastOutcomeLedgerRecords,
     forecastOutcomeLedgerSink: (archive) => { persistedForecastOutcomeArchive = archive; },
     minbeisDecisionOutcomeRecords,
@@ -688,6 +734,7 @@ async function main() {
   await mkdir(path.dirname(minbeisLedgerOutputPath), { recursive: true });
   await writeFile(minbeisLedgerOutputPath, `${JSON.stringify(persistedMinbeisDecisionOutcomeArchive, null, 2)}\n`, 'utf8');
   console.log(`Wrote autonomous intelligence report to ${outputPath}`);
+  console.log(`Research queue: ${report.researchQueueResolution?.resolvedCount || 0}/${report.researchQueueResolution?.requestedCount || 0} queued symbols resolved into focus universe`);
   console.log(`Event discovery: ${report.discovery.candidateCount} candidates, ${report.discovery.deepAnalysisCompanyCount} additions`);
   console.log(`Broad opportunity screen: ${report.broadOpportunityScan.directoryEligibleCount || 0} eligible, ${report.broadOpportunityScan.candidates?.length || 0} deep-analysis additions`);
   console.log(`Opportunity hunter: ${report.opportunityUniverse.uniqueInstrumentCount} scanned, ${report.opportunityUniverse.scorableInstrumentCount} scorable, ${report.opportunityUniverse.ranking.superOpportunityCount} super candidates`);
