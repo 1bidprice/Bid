@@ -220,6 +220,7 @@ function fakeKv() {
 test('verified new US instrument enters research queue only with persistent storage', async () => {
   const kv = fakeKv();
   const fetchImpl = async (url) => {
+    if (String(url).includes('/stock/profile2')) return jsonResponse({ ticker: 'NVDA', currency: 'USD', exchange: 'NASDAQ', country: 'US', name: 'NVIDIA Corp' });
     if (String(url).includes('/quote')) return jsonResponse({ c: 120.5, pc: 119.5, o: 120, h: 122, l: 118, d: 1, dp: 0.8368, t: Math.floor(Date.parse('2026-09-10T14:59:00.000Z') / 1000) });
     throw new Error('Unexpected URL: ' + url);
   };
@@ -247,6 +248,7 @@ test('verified new US instrument enters research queue only with persistent stor
 
 test('research queue fails closed when persistent storage is missing', async () => {
   const fetchImpl = async (url) => {
+    if (String(url).includes('/stock/profile2')) return jsonResponse({ ticker: 'NVDA', currency: 'USD', exchange: 'NASDAQ', country: 'US', name: 'NVIDIA Corp' });
     if (String(url).includes('/quote')) return jsonResponse({ c: 120.5, pc: 119.5, o: 120, h: 122, l: 118, d: 1, dp: 0.8368, t: Math.floor(Date.parse('2026-09-10T14:59:00.000Z') / 1000) });
     throw new Error('Unexpected URL: ' + url);
   };
