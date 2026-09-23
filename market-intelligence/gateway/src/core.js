@@ -31,7 +31,7 @@ function json(body, status = 200) {
       'Content-Type': 'application/json; charset=utf-8',
       'Cache-Control': 'no-store, max-age=0',
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': CORS_HEADERS,
       'X-Content-Type-Options': 'nosniff',
     },
@@ -260,6 +260,144 @@ export async function resolveInstrumentCapability(appSymbol, env = {}, options =
   };
 }
 
+function researchQueueBinding(env = {}) {
+  const queue = env.MINBEIS_RESEARCH_QUEUE;
+  return queue && typeof queue.get === 'function' && typeof queue.put === 'function' ? queue : null;
+}
+
+export async function enqueueResearchRequest(appSymbol, env = {}, options = {}) {
+  const parsed = parseGatewaySymbol(appSymbol);
+  if (!parsed) {
+    return { status: 400, error: { code: 'SYMBOL_INVALID', message: 'Use a canonical symbol such as NVDA.US or ALWN.GR.' } };
+  }
+
+  const capability = await resolveInstrumentCapability(parsed.appSymbol, env, options);
+  if (capability.status !== 200) return capability;
+  const body = capability.body;
+
+  if (body.analysisSupported === true) {
+    return {
+      status: 200,
+      body: {
+        format: 'investor-control-research-queue-status',
+        version: 1,
+        requestedSymbol: parsed.appSymbol,
+        queueStatus: 'ALREADY_SUPPORTED',
+        analysisSupported: true,
+        queued: false,
+        privacy: { acceptedInputs: ['symbol'], portfolioDataStored: false, clientIdentityStored: false },
+      },
+    };
+  }
+
+  if (body.identityVerified !== true) {
+    return {
+      status: 409,
+      error: {
+        code: 'CANONICAL_IDENTITY_REQUIRED',
+        message: 'Research onboarding is blocked until the instrument identity is canonically verified.',
+      },
+    };
+  }
+
+  const queue = researchQueueBinding(env);
+  if (!queue) {
+    return {
+      status: 503,
+      error: {
+        code: 'RESEARCH_QUEUE_NOT_CONFIGURED',
+        message: 'Persistent MINBEIS research queue storage is not configured on the gateway.',
+      },
+    };
+  }
+
+  const now = new Date(options.now || Date.now()).toISOString();
+  const key = `research:${parsed.appSymbol}`;
+  let previous = null;
+  try {
+    const raw = await queue.get(key);
+    previous = raw ? JSON.parse(raw) : null;
+  } catch {
+    previous = null;
+  }
+  const record = {
+    format: 'minbeis-research-queue-record',
+    version: 1,
+    symbol: parsed.appSymbol,
+    market: parsed.market,
+    canonicalCompanyId: body.canonicalCompanyId || null,
+    displayName: body.displayName || parsed.symbol,
+    currency: body.currency || null,
+    status: previous?.status === 'COMPLETED' ? 'COMPLETED' : 'QUEUED',
+    firstRequestedAt: previous?.firstRequestedAt || now,
+    lastRequestedAt: now,
+    requestCount: Math.max(1, Number(previous?.requestCount || 0) + 1),
+    source: 'INVESTOR_CONTROL_APP',
+    privacy: {
+      storesSymbolOnly: true,
+      storesPortfolioData: false,
+      storesClientIdentity: false,
+    },
+  };
+  await queue.put(key, JSON.stringify(record));
+
+  return {
+    status: 202,
+    body: {
+      format: 'investor-control-research-queue-status',
+      version: 1,
+      requestedSymbol: parsed.appSymbol,
+      queueStatus: record.status,
+      queued: record.status === 'QUEUED',
+      firstRequestedAt: record.firstRequestedAt,
+      lastRequestedAt: record.lastRequestedAt,
+      privacy: { acceptedInputs: ['symbol'], portfolioDataStored: false, clientIdentityStored: false },
+    },
+  };
+}
+
+export async function resolveResearchQueueStatus(appSymbol, env = {}) {
+  const parsed = parseGatewaySymbol(appSymbol);
+  if (!parsed) {
+    return { status: 400, error: { code: 'SYMBOL_INVALID', message: 'Use a canonical symbol such as NVDA.US or ALWN.GR.' } };
+  }
+  const queue = researchQueueBinding(env);
+  if (!queue) {
+    return {
+      status: 503,
+      error: { code: 'RESEARCH_QUEUE_NOT_CONFIGURED', message: 'Persistent MINBEIS research queue storage is not configured on the gateway.' },
+    };
+  }
+  const raw = await queue.get(`research:${parsed.appSymbol}`);
+  if (!raw) {
+    return {
+      status: 200,
+      body: {
+        format: 'investor-control-research-queue-status',
+        version: 1,
+        requestedSymbol: parsed.appSymbol,
+        queueStatus: 'NOT_QUEUED',
+        queued: false,
+        privacy: { acceptedInputs: ['symbol'], portfolioDataStored: false, clientIdentityStored: false },
+      },
+    };
+  }
+  const record = JSON.parse(raw);
+  return {
+    status: 200,
+    body: {
+      format: 'investor-control-research-queue-status',
+      version: 1,
+      requestedSymbol: parsed.appSymbol,
+      queueStatus: record.status || 'QUEUED',
+      queued: record.status === 'QUEUED',
+      firstRequestedAt: record.firstRequestedAt || null,
+      lastRequestedAt: record.lastRequestedAt || null,
+      privacy: { acceptedInputs: ['symbol'], portfolioDataStored: false, clientIdentityStored: false },
+    },
+  };
+}
+
 export async function resolveCanonicalGatewayFx(pair, options = {}) {
   const normalizedPair = String(pair || '').trim().toUpperCase();
   if (normalizedPair !== 'EURUSD') {
@@ -295,10 +433,30 @@ export async function resolveCanonicalGatewayFx(pair, options = {}) {
 }
 
 export async function handleMarketGatewayRequest(request, env = {}, options = {}) {
-  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, OPTIONS', 'Access-Control-Allow-Headers': CORS_HEADERS } });
-  if (request.method !== 'GET') return gatewayError(405, 'METHOD_NOT_ALLOWED', 'Only GET is supported.');
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': CORS_HEADERS } });
 
   const url = new URL(request.url);
+  if (url.pathname === '/v1/research-queue' && request.method === 'POST') {
+    let payload = null;
+    try {
+      payload = await request.json();
+    } catch {
+      return gatewayError(400, 'JSON_BODY_INVALID', 'Research queue requests require a JSON body.');
+    }
+    const allowedKeys = Object.keys(payload || {});
+    if (allowedKeys.length !== 1 || allowedKeys[0] !== 'symbol') {
+      return gatewayError(400, 'RESEARCH_QUEUE_PRIVACY_CONTRACT_INVALID', 'Only the canonical symbol may be submitted for research onboarding.');
+    }
+    const result = await enqueueResearchRequest(payload.symbol, env, options);
+    if (![200, 202].includes(result.status)) return gatewayError(result.status, result.error.code, result.error.message, result.error.details);
+    return json(result.body, result.status);
+  }
+  if (url.pathname === '/v1/research-queue' && request.method === 'GET') {
+    const result = await resolveResearchQueueStatus(url.searchParams.get('symbol'), env);
+    if (result.status !== 200) return gatewayError(result.status, result.error.code, result.error.message, result.error.details);
+    return json(result.body, 200);
+  }
+  if (request.method !== 'GET') return gatewayError(405, 'METHOD_NOT_ALLOWED', 'Only GET and the symbol-only research queue POST are supported.');
   if (url.pathname === '/health') {
     return json({
       format: 'investor-control-market-gateway-health',
