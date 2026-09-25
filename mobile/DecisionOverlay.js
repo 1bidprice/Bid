@@ -444,7 +444,7 @@ export default function DecisionOverlay({ visible = false, onRequestClose }) {
               )) : (
                 <View style={styles.card}>
                   <Text style={styles.cardTitle}>Δεν υπάρχουν ενεργές θέσεις.</Text>
-                  <Text style={styles.heroText}>Καταχώρισε πρώτα μία αγορά στο Investor Control. Το Decision Gate θα τη βρει αυτόματα.</Text>
+                  <Text style={styles.heroText}>Καταχώρισε πρώτα μία αγορά στο MINBEIS. Το Decision Gate θα τη βρει αυτόματα.</Text>
                 </View>
               )}
 
