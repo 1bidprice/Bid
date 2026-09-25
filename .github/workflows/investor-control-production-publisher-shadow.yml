@@ -78,8 +78,9 @@ jobs:
           }
           const matches = payload.result.filter((item) => {
             const title = String(item?.title || '').toLowerCase();
-            return title.includes('investor-control-market-gateway')
-              && title.includes('minbeis_research_queue');
+            return title === 'investor-control-market-gateway-minbeis-research-queue'
+              || (title.includes('investor-control-market-gateway')
+                && (title.includes('minbeis-research-queue') || title.includes('minbeis_research_queue')));
           });
           if (matches.length > 1) {
             throw new Error('Expected at most one MINBEIS research queue namespace, found ' + matches.length);
