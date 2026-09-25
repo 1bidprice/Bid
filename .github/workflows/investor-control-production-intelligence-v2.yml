@@ -17,12 +17,14 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PRODUCTION_SOURCE_SHA: 22f6f56f379f07b803ccebf618a13e19ab58e9ff
+  PRODUCTION_SOURCE_SHA: aad8d7f0b4ecc82b3736c55a07c0825e974eb98f
+  KV_TITLE: investor-control-market-gateway-minbeis-research-queue
+  MARKET_GATEWAY_URL: https://investor-control-market-gateway.bidprice-alerts.workers.dev
 
 jobs:
   autonomous-intelligence:
     runs-on: ubuntu-latest
-    timeout-minutes: 80
+    timeout-minutes: 90
     steps:
       - name: Checkout immutable canonical production source
         uses: actions/checkout@v4
@@ -30,6 +32,7 @@ jobs:
           ref: ${{ env.PRODUCTION_SOURCE_SHA }}
           path: source
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Verify immutable production source provenance
         shell: bash
@@ -59,11 +62,97 @@ jobs:
             sudo apt-get install -y poppler-utils
           fi
 
+      - name: Require canonical server-side credentials
+        env:
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "${FINNHUB_TOKEN:-}" || { echo 'FINNHUB_TOKEN is not configured server-side' >&2; exit 1; }
+          test -n "${CLOUDFLARE_API_TOKEN:-}" || { echo 'CLOUDFLARE_API_TOKEN is not configured server-side' >&2; exit 1; }
+          test -n "${CLOUDFLARE_ACCOUNT_ID:-}" || { echo 'CLOUDFLARE_ACCOUNT_ID is not configured server-side' >&2; exit 1; }
+
+      - name: Capture persistent MINBEIS research queue
+        id: queue
+        working-directory: source/market-intelligence
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          RESPONSE="$RUNNER_TEMP/kv-namespaces.json"
+          curl --fail --silent --show-error             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces?per_page=100"             > "$RESPONSE"
+
+          KV_ID="$(RESPONSE="$RESPONSE" KV_TITLE="$KV_TITLE" node - <<'NODE'
+          const fs = require('fs');
+          const payload = JSON.parse(fs.readFileSync(process.env.RESPONSE, 'utf8'));
+          if (payload?.success !== true || !Array.isArray(payload?.result)) {
+            throw new Error('Cloudflare KV namespace listing failed');
+          }
+          const wanted = String(process.env.KV_TITLE || '').toLowerCase();
+          const matches = payload.result.filter((item) => {
+            const title = String(item?.title || '').toLowerCase();
+            return title === wanted
+              || (title.includes('investor-control-market-gateway')
+                && (title.includes('minbeis-research-queue') || title.includes('minbeis_research_queue')));
+          });
+          if (matches.length !== 1) {
+            throw new Error('Expected exactly one MINBEIS research queue namespace, found ' + matches.length);
+          }
+          process.stdout.write(String(matches[0].id));
+          NODE
+          )"
+          test -n "$KV_ID"
+          echo "kv_id=$KV_ID" >> "$GITHUB_OUTPUT"
+
+          npx --yes wrangler@4.129.1 kv key list             --namespace-id "$KV_ID"             --remote             --prefix 'research:'             > out/research-queue-keys.json
+
+          node - <<'NODE'
+          const fs = require('fs');
+          const keys = JSON.parse(fs.readFileSync('out/research-queue-keys.json', 'utf8'));
+          const names = (Array.isArray(keys) ? keys : [])
+            .map((item) => item?.name)
+            .filter((name) => String(name).startsWith('research:'));
+          fs.writeFileSync('out/research-queue-key-names.txt', names.join('\n') + (names.length ? '\n' : ''));
+          NODE
+
+          : > out/research-queue-values.ndjson
+          while IFS= read -r key; do
+            test -n "$key" || continue
+            VALUE="$(npx --yes wrangler@4.129.1 kv key get "$key" --namespace-id "$KV_ID" --remote --text)"
+            printf '%s\n' "$VALUE" >> out/research-queue-values.ndjson
+          done < out/research-queue-key-names.txt
+
+          node - <<'NODE'
+          const fs = require('fs');
+          const raw = fs.readFileSync('out/research-queue-values.ndjson', 'utf8')
+            .split(/\r?\n/)
+            .filter(Boolean);
+          const records = raw.map((line) => JSON.parse(line));
+          for (const record of records) {
+            if (record?.privacy?.storesPortfolioData !== false
+              || record?.privacy?.storesClientIdentity !== false
+              || record?.privacy?.storesSymbolOnly !== true) {
+              throw new Error('Research queue privacy invariant failed');
+            }
+          }
+          fs.writeFileSync('out/remote-research-queue.json', JSON.stringify({
+            format: 'minbeis-remote-research-queue-production',
+            version: 1,
+            capturedAt: new Date().toISOString(),
+            records,
+          }, null, 2) + '\n');
+          NODE
+
+          rm -f "$RESPONSE" out/research-queue-values.ndjson out/research-queue-key-names.txt out/research-queue-keys.json
+
       - name: Verify canonical source contracts and deterministic tests
         working-directory: source/market-intelligence
         run: npm test
 
-      - name: Build live intelligence from the tested canonical source tree
+      - name: Build live MINBEIS intelligence from tested source
         working-directory: source/market-intelligence
         env:
           SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
@@ -71,35 +160,38 @@ jobs:
           TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
           FORECAST_OUTCOME_LEDGER_PATH: ../../live-feed/forecast-outcome-ledger.json
           FORECAST_OUTCOME_LEDGER_OUTPUT: out/forecast-outcome-ledger.json
+          MINBEIS_DECISION_OUTCOME_LEDGER_PATH: ../../live-feed/minbeis-decision-outcome-ledger.json
+          MINBEIS_DECISION_OUTCOME_LEDGER_OUTPUT: out/minbeis-decision-outcome-ledger.json
+          MINBEIS_RESEARCH_QUEUE_PATH: out/remote-research-queue.json
         run: |
           set -euo pipefail
           node src/run-autonomous-intelligence.js out/autonomous-intelligence.json
           node src/build-mobile-feed.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json
-
-      - name: Verify strict production safety
-        working-directory: source/market-intelligence
-        run: |
-          set -euo pipefail
           node scripts/verify-production-output.js out/autonomous-intelligence.json out/mobile-intelligence-feed.json
-
-      - name: Verify opportunity hunter safety
-        working-directory: source/market-intelligence
-        run: |
-          set -euo pipefail
           node scripts/verify-opportunity-hunter-output.js out/autonomous-intelligence.json
+          node scripts/verify-forecast-outcome-archive.js out/forecast-outcome-ledger.json
+          node scripts/verify-canonical-live-source-connectivity.js out/mobile-intelligence-feed.json out/source-connectivity-audit.json
 
-      - name: Verify forecast outcome archive safety
+      - name: Build trusted research queue completion candidate
         working-directory: source/market-intelligence
         run: |
           set -euo pipefail
-          node scripts/verify-forecast-outcome-archive.js out/forecast-outcome-ledger.json
+          node scripts/build-research-queue-completion-plan.js             out/remote-research-queue.json             out/autonomous-intelligence.json             out/research-queue-completion-plan.json
+          node scripts/build-research-queue-kv-bulk.js             out/research-queue-completion-plan.json             out/autonomous-intelligence.json             out/research-queue-completion-bulk.json
+          node - <<'NODE'
+          const fs = require('fs');
+          const bulk = JSON.parse(fs.readFileSync('out/research-queue-completion-bulk.json','utf8'));
+          if (bulk.mutationAuthority !== 'TRUSTED_PUBLISHER_ONLY' || bulk.publicMutationEndpoint !== false) {
+            throw new Error('Research queue mutation authority contract failed');
+          }
+          console.log(JSON.stringify({ queueCompletionCandidateCount: bulk.updateCount }, null, 2));
+          NODE
 
       - name: Publish verified live feed transactionally
         shell: bash
         run: |
           set -euo pipefail
-
-          git -C live-feed config user.name 'Investor Control Intelligence'
+          git -C live-feed config user.name 'MINBEIS Intelligence'
           git -C live-feed config user.email 'actions@users.noreply.github.com'
 
           prepare_publication() {
@@ -109,13 +201,10 @@ jobs:
 
             cp source/market-intelligence/out/mobile-intelligence-feed.json live-feed/mobile-intelligence-feed.json
             cp source/market-intelligence/out/autonomous-intelligence.json live-feed/autonomous-intelligence.json
+            cp source/market-intelligence/out/minbeis-decision-outcome-ledger.json live-feed/minbeis-decision-outcome-ledger.json
 
-            node source/market-intelligence/scripts/merge-forecast-outcome-archives.js \
-              live-feed/forecast-outcome-ledger.json \
-              source/market-intelligence/out/forecast-outcome-ledger.json \
-              live-feed/forecast-outcome-ledger.json
-            node source/market-intelligence/scripts/verify-forecast-outcome-archive.js \
-              live-feed/forecast-outcome-ledger.json
+            node source/market-intelligence/scripts/merge-forecast-outcome-archives.js               live-feed/forecast-outcome-ledger.json               source/market-intelligence/out/forecast-outcome-ledger.json               live-feed/forecast-outcome-ledger.json
+            node source/market-intelligence/scripts/verify-forecast-outcome-archive.js               live-feed/forecast-outcome-ledger.json
 
             node - <<'NODE'
           const fs = require('fs');
@@ -124,96 +213,57 @@ jobs:
           const feed = JSON.parse(fs.readFileSync('./live-feed/mobile-intelligence-feed.json','utf8'));
           const report = JSON.parse(fs.readFileSync('./live-feed/autonomous-intelligence.json','utf8'));
           const forecastArchive = JSON.parse(fs.readFileSync('./live-feed/forecast-outcome-ledger.json','utf8'));
+          const minbeisArchive = JSON.parse(fs.readFileSync('./live-feed/minbeis-decision-outcome-ledger.json','utf8'));
           const pkg = JSON.parse(fs.readFileSync('./source/market-intelligence/package.json','utf8'));
-          const forecastSummary = forecastArchive.summary || {};
           const now = new Date().toISOString();
           const sourceCommit = execFileSync('git',['-C','source','rev-parse','HEAD'],{encoding:'utf8'}).trim();
           const sourcePin = String(process.env.PRODUCTION_SOURCE_SHA || '').trim();
-          if (!sourcePin || sourceCommit !== sourcePin) throw new Error(`production source provenance mismatch: ${sourceCommit} != ${sourcePin}`);
-          const release = pkg.version;
-          const greek = (report.discovery?.shortlist || []).filter((item) => item.market === 'GR');
-          const unresolvedGreek = greek.filter((item) => !item.symbol || item.identityStatus === 'SYMBOL_RESOLUTION_REQUIRED');
+          if (!sourcePin || sourceCommit !== sourcePin) throw new Error('production source provenance mismatch');
           const quotes = Object.values(feed.quoteRegistry || {});
-          const readyHistory = (report.historicalMarketMetrics || []).filter((item) => item?.readiness?.marketMetricsReady === true).length;
-          const broad = report.broadOpportunityScan || {};
-          const hunter = report.opportunityUniverse || {};
-          const ranking = hunter.ranking || {};
-          const deepQueue = report.opportunityDeepVerificationQueue || [];
-          const hunterTelemetry = {
-            broadEligibleUniverseCount:Number(broad.directoryEligibleCount || 0),
-            fundamentalPoolCount:Number(broad.fundamentalPoolCount || 0),
-            fundamentalSelectedCount:Number(broad.fundamentalSelectedCount || 0),
-            marketScreenInputCount:Number(broad.marketScreenInputCount || 0),
-            marketScreenScorableCount:Number(broad.marketScreenScorableCount || 0),
-            marketScreenEligibleCount:Number(broad.marketScreenEligibleCount || 0),
-            broadDeepAnalysisCandidateCount:(broad.candidates || []).length,
-            specializedOpportunityQuarantineCount:Number(broad.specializedQuarantineCount || 0),
-            opportunityScannedInstrumentCount:Number(hunter.uniqueInstrumentCount || 0),
-            opportunityScorableInstrumentCount:Number(hunter.scorableInstrumentCount || 0),
-            superOpportunityCount:Number(ranking.superOpportunityCount || 0),
-            highPriorityOpportunityCount:Number(ranking.highPriorityCount || 0),
-            deepVerificationQueueCount:deepQueue.length,
-          };
-          const forecastTelemetry = {
-            forecastOutcomeRecordCount:Number(forecastSummary.recordCount || 0),
-            forecastOutcomeOpenCount:Number(forecastSummary.openCount || 0),
-            forecastOutcomeMaturedCount:Number(forecastSummary.maturedCount || 0),
-            longHistoryResearchReadyCount:Number(report.longHistoryResearchSummary?.readyCount || 0),
-            longHistoryResearchRejectedCount:Number(report.longHistoryResearchSummary?.rejectedCount || 0),
-            independentHistoryOverlapAttemptedCount:Number(report.longHistoryResearchSummary?.independentOverlapAttemptedCount || 0),
-            independentHistoryOverlapReadyCount:Number(report.longHistoryResearchSummary?.independentOverlapReadyCount || 0),
-            independentHistoryOverlapRejectedCount:Number(report.longHistoryResearchSummary?.independentOverlapRejectedCount || 0),
-            forecastLearningLiveOosRecordCount:Number(report.forecastLearningStatus?.liveOosRecordCount || 0),
-            forecastLearningOpenCount:Number(report.forecastLearningStatus?.openCount || 0),
-            forecastLearningMaturedCount:Number(report.forecastLearningStatus?.maturedCount || 0),
-            forecastLearningPromotionCandidateGroupCount:Number(report.forecastLearningStatus?.promotionCandidateGroupCount || 0),
-          };
+          const missingCurrency = quotes.filter((q) => !q?.currency);
+          const unverifiedUsIdentity = quotes.filter((q) =>
+            String(q?.appSymbol || '').endsWith('.US') && q?.quoteContract?.identityVerified !== true
+          );
+          if (missingCurrency.length) throw new Error('canonical registry contains quote(s) without currency');
+          if (unverifiedUsIdentity.length) throw new Error('canonical registry contains unverified US identity');
+          const forecastSummary = forecastArchive.summary || {};
+          const minbeisSummary = minbeisArchive.summary || {};
           const status = {
-            format:'investor-control-live-feed-status', version:8,
-            generatedAt:feed.generatedAt, publishedAt:now,
+            format:'investor-control-live-feed-status',
+            version:10,
+            generatedAt:feed.generatedAt,
+            publishedAt:now,
             policyVersion:feed.policyVersion,
             sourcePolicyVersion:feed.sourceSelection?.version || null,
             sourceWorkflowRunId:process.env.GITHUB_RUN_ID,
             sourceCommit,
             sourcePin,
             canonicalSourceVersion:pkg.version,
-            runtimeReleaseVersion:release,
-            publisherContract:'CANONICAL_TRANSACTIONAL_V3_SINGLE_WRITER',
+            runtimeReleaseVersion:pkg.version,
+            publisherContract:'CANONICAL_TRANSACTIONAL_V4_MINBEIS_SINGLE_WRITER',
             forecastArchiveContract:'DAILY_OOS_TRANSACTIONAL_V1',
             forecastLearningContract:'LIVE_SHADOW_OOS_RESEARCH_ONLY_V1',
             feedSha256:crypto.createHash('sha256').update(fs.readFileSync('./live-feed/mobile-intelligence-feed.json')).digest('hex'),
             forecastArchiveSha256:crypto.createHash('sha256').update(fs.readFileSync('./live-feed/forecast-outcome-ledger.json')).digest('hex'),
             operationalHealth:{
               ...(report.operationalHealth || {}),
-              readyHistoricalMarketMetricsCount:readyHistory,
-              greekCandidateCount:greek.length,
-              unresolvedGreekIdentityCount:unresolvedGreek.length,
-              controlledPlanCount:(report.researchDossiers || []).filter((item)=>item.finalAction?.controlledPlan?.status==='AVAILABLE').length,
-              ...hunterTelemetry,
-              ...forecastTelemetry,
-              lastSuccessfulPublicationAt:now,
+              status:'OPERATIONAL',
+              infrastructureStatus:'OPERATIONAL',
               staleOutput:false,
+              lastSuccessfulPublicationAt:now,
             },
             counts:feed.summary,
             sourceHealth:{
-              evidenceCount:report.evidenceCount,
-              documentReviewedCount:report.documentReviewedCount,
-              independentDiscoveryCount:report.independentDiscoveryCount,
-              fundamentalSnapshotCount:report.fundamentalSnapshotCount,
-              marketSnapshotCount:report.marketSnapshotCount,
-              historicalMarketMetricsCount:report.historicalMarketMetricsCount,
-              readyHistoricalMarketMetricsCount:readyHistory,
               canonicalQuoteCount:quotes.length,
+              missingCurrencyCount:missingCurrency.length,
+              unverifiedUsIdentityCount:unverifiedUsIdentity.length,
               valuationEligibleQuoteCount:quotes.filter((q)=>q?.quoteContract?.valuationEligible===true).length,
               decisionEligibleQuoteCount:quotes.filter((q)=>q?.quoteContract?.decisionEligible===true).length,
-              marketsScanned:report.discovery?.marketsScanned || [],
-              secRegistryCompanyCount:report.discovery?.secRegistryCompanyCount || 0,
-              athensActiveIssuerCount:report.discovery?.athensActiveIssuerCount || 0,
-              athensAnnouncementEventCount:report.discovery?.athensAnnouncementEventCount || 0,
-              greekCandidateCount:greek.length,
-              unresolvedGreekIdentityCount:unresolvedGreek.length,
-              ...hunterTelemetry,
-              ...forecastTelemetry,
+              forecastOutcomeRecordCount:Number(forecastSummary.recordCount || 0),
+              minbeisDecisionOutcomeRecordCount:Number(minbeisSummary.recordCount || 0),
+              queuedResearchRequestedCount:Number(report?.researchQueueResolution?.requestedCount || 0),
+              queuedResearchResolvedCount:Number(report?.researchQueueResolution?.resolvedCount || 0),
+              queuedResearchBlockedCount:Number(report?.researchQueueResolution?.blockedCount || 0),
             },
           };
           fs.writeFileSync('./live-feed/status.json',JSON.stringify(status,null,2)+'\n');
@@ -230,14 +280,22 @@ jobs:
           }));
           const key=(item)=>`${item.dossierId}|${item.marketAction}|${item.referencePrice?.timestamp || ''}`;
           const seen=new Set(current.map(key));
-          fs.writeFileSync('./live-feed/decision-history.json',JSON.stringify({format:'investor-control-decision-history',version:2,updatedAt:now,items:[...current,...old.filter((item)=>!seen.has(key(item)))].slice(0,500)},null,2)+'\n');
-          fs.writeFileSync('./live-feed/discovery-radar.json',JSON.stringify({format:'investor-control-discovery-radar',version:3,updatedAt:now,sourcePolicy:feed.sourceSelection,marketsScanned:report.discovery?.marketsScanned || [],items:feed.discoveryRadar},null,2)+'\n');
+          fs.writeFileSync('./live-feed/decision-history.json',JSON.stringify({
+            format:'investor-control-decision-history',version:2,updatedAt:now,
+            items:[...current,...old.filter((item)=>!seen.has(key(item)))].slice(0,500)
+          },null,2)+'\n');
+          fs.writeFileSync('./live-feed/discovery-radar.json',JSON.stringify({
+            format:'investor-control-discovery-radar',version:3,updatedAt:now,
+            sourcePolicy:feed.sourceSelection,marketsScanned:report.discovery?.marketsScanned || [],
+            items:feed.discoveryRadar
+          },null,2)+'\n');
           NODE
 
-            git -C live-feed add mobile-intelligence-feed.json autonomous-intelligence.json forecast-outcome-ledger.json status.json decision-history.json discovery-radar.json
+            git -C live-feed add               mobile-intelligence-feed.json               autonomous-intelligence.json               forecast-outcome-ledger.json               minbeis-decision-outcome-ledger.json               status.json               decision-history.json               discovery-radar.json
+
             HAS_CHANGES=0
             if ! git -C live-feed diff --cached --quiet; then
-              git -C live-feed commit -m "chore(feed): verified canonical production ${GITHUB_RUN_ID} transactional-v3 [skip ci]"
+              git -C live-feed commit -m "chore(feed): verified canonical MINBEIS production ${GITHUB_RUN_ID} transactional-v4 [skip ci]"
               HAS_CHANGES=1
             fi
           }
@@ -251,126 +309,110 @@ jobs:
               exit 0
             fi
             if git -C live-feed push origin HEAD:investor-control-live-feed; then
-              echo 'Verified canonical feed and forecast archive published successfully.'
+              echo 'Verified MINBEIS feed published successfully.'
               exit 0
             fi
-            echo 'Remote changed before push; rebuilding publication from the newest remote base.'
             sleep $((attempt * 2))
           done
-
           echo 'Transactional publication failed after 3 clean retries.' >&2
           exit 1
 
-      - name: Verify published remote feed
+      - name: Verify published remote MINBEIS feed
         shell: bash
         run: |
           set -euo pipefail
           git -C live-feed fetch origin investor-control-live-feed
-          LOCAL_HEAD="$(git -C live-feed rev-parse HEAD)"
-          REMOTE_HEAD="$(git -C live-feed rev-parse origin/investor-control-live-feed)"
-          test "$LOCAL_HEAD" = "$REMOTE_HEAD"
           git -C live-feed reset --hard origin/investor-control-live-feed
 
-          node source/market-intelligence/scripts/verify-production-output.js \
-            live-feed/autonomous-intelligence.json \
-            live-feed/mobile-intelligence-feed.json
-          node source/market-intelligence/scripts/verify-opportunity-hunter-output.js \
-            live-feed/autonomous-intelligence.json
-          node source/market-intelligence/scripts/verify-forecast-outcome-archive.js \
-            live-feed/forecast-outcome-ledger.json
+          node source/market-intelligence/scripts/verify-production-output.js             live-feed/autonomous-intelligence.json             live-feed/mobile-intelligence-feed.json
+          node source/market-intelligence/scripts/verify-opportunity-hunter-output.js             live-feed/autonomous-intelligence.json
+          node source/market-intelligence/scripts/verify-forecast-outcome-archive.js             live-feed/forecast-outcome-ledger.json
 
           node - <<'NODE'
           const fs=require('fs');
           const status=JSON.parse(fs.readFileSync('./live-feed/status.json','utf8'));
           const report=JSON.parse(fs.readFileSync('./live-feed/autonomous-intelligence.json','utf8'));
-          const forecastArchive=JSON.parse(fs.readFileSync('./live-feed/forecast-outcome-ledger.json','utf8'));
-          const forecastSummary=forecastArchive.summary || {};
-          const broad=report.broadOpportunityScan || {};
-          const hunter=report.opportunityUniverse || {};
-          const ranking=hunter.ranking || {};
-          const expectedSource=String(process.env.PRODUCTION_SOURCE_SHA || '').trim();
+          const expected=String(process.env.PRODUCTION_SOURCE_SHA || '').trim();
           if (String(status.sourceWorkflowRunId) !== String(process.env.GITHUB_RUN_ID)) throw new Error('remote status belongs to a different workflow run');
-          if (status.publisherContract !== 'CANONICAL_TRANSACTIONAL_V3_SINGLE_WRITER') throw new Error('canonical single-writer transactional publisher marker missing');
-          if (status.sourceCommit !== expectedSource || status.sourcePin !== expectedSource) throw new Error('remote canonical source provenance mismatch');
-          if (!status.canonicalSourceVersion || status.canonicalSourceVersion !== status.runtimeReleaseVersion) throw new Error('canonical source version mismatch');
-          if (status.forecastArchiveContract !== 'DAILY_OOS_TRANSACTIONAL_V1') throw new Error('forecast archive transactional contract missing');
-          if (status.forecastLearningContract !== 'LIVE_SHADOW_OOS_RESEARCH_ONLY_V1') throw new Error('forecast learning research-only contract missing');
-          if (status.generatedAt !== report.generatedAt) throw new Error('remote status/report generation mismatch');
-          if (status.operationalHealth?.staleOutput !== false) throw new Error('remote feed incorrectly marked stale');
-          if (Number(status.sourceHealth?.marketScreenScorableCount || 0) !== Number(broad.marketScreenScorableCount || 0)) throw new Error('remote market-screen telemetry mismatch');
-          if (Number(status.sourceHealth?.superOpportunityCount || 0) !== Number(ranking.superOpportunityCount || 0)) throw new Error('remote super-opportunity telemetry mismatch');
-          if (Number(status.sourceHealth?.forecastOutcomeRecordCount || 0) !== Number(forecastSummary.recordCount || 0)) throw new Error('remote forecast record telemetry mismatch');
-          if (Number(status.sourceHealth?.forecastOutcomeOpenCount || 0) !== Number(forecastSummary.openCount || 0)) throw new Error('remote forecast open telemetry mismatch');
-          if (Number(status.sourceHealth?.forecastOutcomeMaturedCount || 0) !== Number(forecastSummary.maturedCount || 0)) throw new Error('remote forecast matured telemetry mismatch');
-          if (Number(status.sourceHealth?.independentHistoryOverlapAttemptedCount || 0) !== Number(report.longHistoryResearchSummary?.independentOverlapAttemptedCount || 0)) throw new Error('remote independent-overlap attempted telemetry mismatch');
-          if (Number(status.sourceHealth?.independentHistoryOverlapReadyCount || 0) !== Number(report.longHistoryResearchSummary?.independentOverlapReadyCount || 0)) throw new Error('remote independent-overlap ready telemetry mismatch');
-          if (Number(status.sourceHealth?.independentHistoryOverlapRejectedCount || 0) !== Number(report.longHistoryResearchSummary?.independentOverlapRejectedCount || 0)) throw new Error('remote independent-overlap rejected telemetry mismatch');
-          if (Number(status.sourceHealth?.forecastLearningMaturedCount || 0) !== Number(report.forecastLearningStatus?.maturedCount || 0)) throw new Error('remote forecast-learning matured telemetry mismatch');
-          if (report.forecastLearningStatus?.decisionIntegrationEnabled !== false || report.forecastLearningStatus?.forecastMayInfluenceFinalAction !== false) throw new Error('forecast learning decision isolation violated');
+          if (status.publisherContract !== 'CANONICAL_TRANSACTIONAL_V4_MINBEIS_SINGLE_WRITER') throw new Error('MINBEIS publisher marker missing');
+          if (status.sourceCommit !== expected || status.sourcePin !== expected) throw new Error('remote source provenance mismatch');
+          if (status.operationalHealth?.staleOutput !== false) throw new Error('remote feed marked stale');
+          if (Number(report?.researchQueueResolution?.requestedCount || 0) > 0
+            && Number(report?.researchQueueResolution?.resolvedCount || 0) < 1) {
+            throw new Error('queued research was not resolved into canonical focus universe');
+          }
+          const nvda=(report.researchDossiers || []).find((d) =>
+            String(d?.referencePrice?.appSymbol || d?.marketQuote?.appSymbol || '').toUpperCase() === 'NVDA.US'
+          );
+          if (Number(report?.researchQueueResolution?.requestedCount || 0) > 0 && !nvda) {
+            throw new Error('NVDA.US canonical dossier missing from published production report');
+          }
           console.log(JSON.stringify({
             remotePublication:'VERIFIED',
-            sourceWorkflowRunId:status.sourceWorkflowRunId,
             sourceCommit:status.sourceCommit,
-            sourcePin:status.sourcePin,
-            canonicalSourceVersion:status.canonicalSourceVersion,
-            runtimeReleaseVersion:status.runtimeReleaseVersion,
-            publisherContract:status.publisherContract,
-            forecastArchiveContract:status.forecastArchiveContract,
-            forecastLearningContract:status.forecastLearningContract,
-            forecastOutcomeRecordCount:status.sourceHealth?.forecastOutcomeRecordCount || 0,
-            forecastOutcomeOpenCount:status.sourceHealth?.forecastOutcomeOpenCount || 0,
-            forecastOutcomeMaturedCount:status.sourceHealth?.forecastOutcomeMaturedCount || 0,
-            forecastLearningPromotionCandidateGroupCount:status.sourceHealth?.forecastLearningPromotionCandidateGroupCount || 0,
-            longHistoryResearchReadyCount:status.sourceHealth?.longHistoryResearchReadyCount || 0,
-            independentHistoryOverlapAttemptedCount:status.sourceHealth?.independentHistoryOverlapAttemptedCount || 0,
-            independentHistoryOverlapReadyCount:status.sourceHealth?.independentHistoryOverlapReadyCount || 0,
-            independentHistoryOverlapRejectedCount:status.sourceHealth?.independentHistoryOverlapRejectedCount || 0,
-            broadEligibleUniverseCount:status.sourceHealth?.broadEligibleUniverseCount || 0,
-            fundamentalSelectedCount:status.sourceHealth?.fundamentalSelectedCount || 0,
-            marketScreenScorableCount:status.sourceHealth?.marketScreenScorableCount || 0,
-            broadDeepAnalysisCandidateCount:status.sourceHealth?.broadDeepAnalysisCandidateCount || 0,
-            opportunityScorableInstrumentCount:status.sourceHealth?.opportunityScorableInstrumentCount || 0,
-            superOpportunityCount:status.sourceHealth?.superOpportunityCount || 0,
-            highPriorityOpportunityCount:status.sourceHealth?.highPriorityOpportunityCount || 0,
+            queuedResearchRequestedCount:status.sourceHealth?.queuedResearchRequestedCount || 0,
+            queuedResearchResolvedCount:status.sourceHealth?.queuedResearchResolvedCount || 0,
+            nvdaPublished:Boolean(nvda),
           },null,2));
           NODE
 
-      - name: Record failure heartbeat safely
-        if: failure()
+      - name: Commit trusted research queue completions after publication
+        id: completion
+        working-directory: source/market-intelligence
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          KV_ID: ${{ steps.queue.outputs.kv_id }}
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs=require('fs');
+          const bulk=JSON.parse(fs.readFileSync('out/research-queue-completion-bulk.json','utf8'));
+          if (bulk.mutationAuthority!=='TRUSTED_PUBLISHER_ONLY' || bulk.publicMutationEndpoint!==false) {
+            throw new Error('trusted completion authority invalid');
+          }
+          fs.writeFileSync('out/research-queue-completion-items.json',JSON.stringify(bulk.items || []));
+          fs.writeFileSync('out/research-queue-completion-count.txt',String(Number(bulk.updateCount || 0)));
+          NODE
+          COUNT="$(cat out/research-queue-completion-count.txt)"
+          if [ "$COUNT" -eq 0 ]; then
+            echo 'No queue completions required.'
+            echo "update_count=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          RESPONSE="$RUNNER_TEMP/kv-bulk-response.json"
+          curl --fail --silent --show-error             -X PUT             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             -H "Content-Type: application/json"             --data-binary @out/research-queue-completion-items.json             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces/$KV_ID/bulk"             > "$RESPONSE"
+          RESPONSE="$RESPONSE" node - <<'NODE'
+          const fs=require('fs');
+          const payload=JSON.parse(fs.readFileSync(process.env.RESPONSE,'utf8'));
+          if (payload?.success !== true) throw new Error('Cloudflare KV bulk completion write failed');
+          NODE
+          rm -f "$RESPONSE"
+          echo "update_count=$COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: Verify completed onboarding through live gateway
+        if: steps.completion.outputs.update_count != '0'
         shell: bash
         run: |
           set -euo pipefail
-          test -d live-feed/.git || exit 0
-          git -C live-feed config user.name 'Investor Control Intelligence'
-          git -C live-feed config user.email 'actions@users.noreply.github.com'
-
-          for attempt in 1 2 3; do
-            git -C live-feed rebase --abort >/dev/null 2>&1 || true
-            git -C live-feed fetch origin investor-control-live-feed
-            git -C live-feed reset --hard origin/investor-control-live-feed
-
-            node - <<'NODE'
-          const fs=require('fs');
-          let status={format:'investor-control-live-feed-status',version:8};
-          try { status=JSON.parse(fs.readFileSync('./live-feed/status.json','utf8')); } catch {}
-          const now=new Date().toISOString();
-          status.publishedAt=now;
-          status.lastFailureAt=now;
-          status.lastFailureWorkflowRunId=process.env.GITHUB_RUN_ID;
-          status.operationalHealth={...(status.operationalHealth||{}),status:'FAILED',infrastructureStatus:'FAILED',staleOutput:true,lastFailureAt:now};
-          fs.writeFileSync('./live-feed/status.json',JSON.stringify(status,null,2)+'\n');
-          NODE
-
-            git -C live-feed add status.json
-            if git -C live-feed diff --cached --quiet; then exit 0; fi
-            git -C live-feed commit -m "chore(feed): production failure ${GITHUB_RUN_ID} safe-heartbeat [skip ci]"
-            if git -C live-feed push origin HEAD:investor-control-live-feed; then exit 0; fi
-            sleep $((attempt * 2))
+          CLIENT_ID="minbeis_publish_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          for attempt in 1 2 3 4 5 6 7 8; do
+            curl --fail --silent --show-error               -H "X-Investor-Control-Client: $CLIENT_ID"               "$MARKET_GATEWAY_URL/v1/research-queue?symbol=NVDA.US" > queue-status.json
+            if node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('queue-status.json','utf8')); process.exit(p.requestedSymbol==='NVDA.US'&&p.queueStatus==='COMPLETED'&&p.queued===false?0:1)"; then
+              curl --fail --silent --show-error                 -H "X-Investor-Control-Client: $CLIENT_ID"                 "$MARKET_GATEWAY_URL/v1/instrument?symbol=NVDA.US" > instrument.json
+              node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('instrument.json','utf8')); if(p.requestedSymbol!=='NVDA.US'||p.analysisSupported!==true||p.onboardingStatus!=='READY'||p.researchEnrollmentStatus!=='COMPLETED') process.exit(1);"
+              rm -f queue-status.json instrument.json
+              echo 'NVDA.US production onboarding is COMPLETED and READY.'
+              exit 0
+            fi
+            sleep 10
           done
-          echo 'Could not record failure heartbeat after 3 clean retries.' >&2
+          cat queue-status.json >&2 || true
+          echo 'Gateway did not observe completed NVDA.US enrollment within propagation window.' >&2
           exit 1
 
-      - name: Upload evidence
+      - name: Upload production evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -379,7 +421,11 @@ jobs:
             source/market-intelligence/out/autonomous-intelligence.json
             source/market-intelligence/out/mobile-intelligence-feed.json
             source/market-intelligence/out/forecast-outcome-ledger.json
-            live-feed/forecast-outcome-ledger.json
+            source/market-intelligence/out/minbeis-decision-outcome-ledger.json
+            source/market-intelligence/out/remote-research-queue.json
+            source/market-intelligence/out/research-queue-completion-plan.json
+            source/market-intelligence/out/research-queue-completion-bulk.json
+            source/market-intelligence/out/source-connectivity-audit.json
             live-feed/status.json
           if-no-files-found: warn
           retention-days: 30
