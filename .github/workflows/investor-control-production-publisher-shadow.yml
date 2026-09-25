@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - investor-control-core-stabilization-v174
+      - investor-control-minbeis-integration-v1
     paths:
       - market-intelligence/**
       - .github/workflows/investor-control-production-publisher-shadow.yml
@@ -50,9 +51,74 @@ jobs:
       - name: Require canonical server-side credentials
         env:
           FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
           test -n "$FINNHUB_TOKEN" || { echo 'FINNHUB_TOKEN is not configured server-side' >&2; exit 1; }
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo 'CLOUDFLARE_API_TOKEN is not configured server-side' >&2; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo 'CLOUDFLARE_ACCOUNT_ID is not configured server-side' >&2; exit 1; }
+
+      - name: Capture persistent MINBEIS research queue read-only when provisioned
+        working-directory: source/market-intelligence
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          RESPONSE="$RUNNER_TEMP/kv-namespaces.json"
+          curl --fail --silent --show-error             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces?per_page=100"             > "$RESPONSE"
+          KV_ID="$(RESPONSE="$RESPONSE" node - <<'NODE'
+          const fs = require('fs');
+          const payload = JSON.parse(fs.readFileSync(process.env.RESPONSE,'utf8'));
+          if (payload?.success !== true || !Array.isArray(payload?.result)) throw new Error('Cloudflare KV namespace listing failed');
+          const matches = payload.result.filter((item) => {
+            const title = String(item?.title || '').toLowerCase();
+            return title.includes('investor-control-market-gateway') && title.includes('minbeis_research_queue');
+          });
+          if (matches.length > 1) throw new Error(`Expected at most one MINBEIS research queue namespace, found ${matches.length}`);
+          process.stdout.write(matches.length === 1 ? String(matches[0].id) : '');
+          NODE
+          )"
+          if [ -z "$KV_ID" ]; then
+            printf '%s
+' '{"format":"minbeis-remote-research-queue-shadow","version":1,"records":[]}' > out/remote-research-queue.json
+            echo 'Research queue not provisioned yet; publication rehearsal continues with an empty queue.'
+            exit 0
+          fi
+          npx --yes wrangler@4.129.1 kv key list --namespace-id "$KV_ID" --remote --prefix 'research:' > out/research-queue-keys.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const keys=JSON.parse(fs.readFileSync('out/research-queue-keys.json','utf8'));
+          const names=(Array.isArray(keys)?keys:[]).map((x)=>x?.name).filter((x)=>String(x).startsWith('research:'));
+          fs.writeFileSync('out/research-queue-key-names.txt',names.join('\n')+(names.length?'\n':''));
+          NODE
+          : > out/research-queue-values.ndjson
+          while IFS= read -r key; do
+            test -n "$key" || continue
+            VALUE="$(npx --yes wrangler@4.129.1 kv key get "$key" --namespace-id "$KV_ID" --remote --text)"
+            printf '%s
+' "$VALUE" >> out/research-queue-values.ndjson
+          done < out/research-queue-key-names.txt
+          node - <<'NODE'
+          const fs=require('fs');
+          const lines=fs.readFileSync('out/research-queue-values.ndjson','utf8').split(/\r?\n/).filter(Boolean);
+          const records=lines.map((line)=>JSON.parse(line));
+          for(const record of records){
+            if(record?.privacy?.storesPortfolioData!==false || record?.privacy?.storesClientIdentity!==false){
+              throw new Error('Research queue privacy invariant failed');
+            }
+          }
+          fs.writeFileSync('out/remote-research-queue.json',JSON.stringify({
+            format:'minbeis-remote-research-queue-shadow',
+            version:1,
+            capturedAt:new Date().toISOString(),
+            readOnly:true,
+            records,
+          },null,2)+'\n');
+          NODE
+          rm -f "$RESPONSE" out/research-queue-values.ndjson out/research-queue-key-names.txt out/research-queue-keys.json
 
       - name: Verify canonical source before rehearsal
         working-directory: source/market-intelligence
@@ -65,6 +131,9 @@ jobs:
           FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
           FORECAST_OUTCOME_LEDGER_PATH: ../../live-feed/forecast-outcome-ledger.json
           FORECAST_OUTCOME_LEDGER_OUTPUT: out/forecast-outcome-ledger.json
+          MINBEIS_DECISION_OUTCOME_LEDGER_PATH: ../../live-feed/minbeis-decision-outcome-ledger.json
+          MINBEIS_DECISION_OUTCOME_LEDGER_OUTPUT: out/minbeis-decision-outcome-ledger.json
+          MINBEIS_RESEARCH_QUEUE_PATH: out/remote-research-queue.json
         run: |
           set -euo pipefail
           node src/run-autonomous-intelligence.js out/autonomous-intelligence.json
@@ -83,6 +152,7 @@ jobs:
 
           cp source/market-intelligence/out/mobile-intelligence-feed.json publication-rehearsal/mobile-intelligence-feed.json
           cp source/market-intelligence/out/autonomous-intelligence.json publication-rehearsal/autonomous-intelligence.json
+          cp source/market-intelligence/out/minbeis-decision-outcome-ledger.json publication-rehearsal/minbeis-decision-outcome-ledger.json
 
           node source/market-intelligence/scripts/merge-forecast-outcome-archives.js \
             publication-rehearsal/forecast-outcome-ledger.json \
@@ -100,6 +170,8 @@ jobs:
           const pkg = JSON.parse(fs.readFileSync('./source/market-intelligence/package.json','utf8'));
           const forecastArchive = JSON.parse(fs.readFileSync('./publication-rehearsal/forecast-outcome-ledger.json','utf8'));
           const forecastSummary = forecastArchive.summary || {};
+          const minbeisArchive = JSON.parse(fs.readFileSync('./publication-rehearsal/minbeis-decision-outcome-ledger.json','utf8'));
+          const minbeisSummary = minbeisArchive.summary || {};
           const now = new Date().toISOString();
           const sourceCommit = execFileSync('git',['-C','source','rev-parse','HEAD'],{encoding:'utf8'}).trim();
           const quotes = Object.values(feed.quoteRegistry || {});
@@ -128,13 +200,18 @@ jobs:
               valuationEligibleQuoteCount:quotes.filter((q)=>q?.quoteContract?.valuationEligible===true).length,
               decisionEligibleQuoteCount:quotes.filter((q)=>q?.quoteContract?.decisionEligible===true).length,
               forecastOutcomeRecordCount:Number(forecastSummary.recordCount || 0),
+              minbeisDecisionOutcomeRecordCount:Number(minbeisSummary.recordCount || 0),
+              queuedResearchRequestedCount:Number(report?.researchQueueResolution?.requestedCount || 0),
+              queuedResearchResolvedCount:Number(report?.researchQueueResolution?.resolvedCount || 0),
             },
           };
           fs.writeFileSync('./publication-rehearsal/status.shadow.json',JSON.stringify(status,null,2)+'\n');
           NODE
 
           node source/market-intelligence/scripts/verify-production-output.js \
-            publication-rehearsal/autonomous-intelligence.json \
+            publication-rehearsal/autonomous-intelligence.json
+            publication-rehearsal/minbeis-decision-outcome-ledger.json
+            source/market-intelligence/out/remote-research-queue.json \
             publication-rehearsal/mobile-intelligence-feed.json
           node source/market-intelligence/scripts/verify-opportunity-hunter-output.js \
             publication-rehearsal/autonomous-intelligence.json
@@ -143,7 +220,7 @@ jobs:
 
           git -C publication-rehearsal config user.name 'Investor Control Publisher Shadow'
           git -C publication-rehearsal config user.email 'actions@users.noreply.github.com'
-          git -C publication-rehearsal add mobile-intelligence-feed.json autonomous-intelligence.json forecast-outcome-ledger.json status.shadow.json
+          git -C publication-rehearsal add mobile-intelligence-feed.json autonomous-intelligence.json forecast-outcome-ledger.json minbeis-decision-outcome-ledger.json status.shadow.json
           if ! git -C publication-rehearsal diff --cached --quiet; then
             git -C publication-rehearsal commit -m "chore(feed): canonical publication shadow ${GITHUB_RUN_ID} [skip ci]"
           fi
