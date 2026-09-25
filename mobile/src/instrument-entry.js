@@ -12,7 +12,7 @@ export function baseInstrumentSymbol(value) {
   return String(value || '')
     .trim()
     .toUpperCase()
-    .replace(/.(US|GR)$/i, '');
+    .replace(/\.(US|GR)$/i, '');
 }
 
 export function canonicalInstrumentSymbol(value, market = 'GR') {
