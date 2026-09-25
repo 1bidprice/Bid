@@ -13,6 +13,7 @@ const decision = read('DecisionOverlay.js');
 const finalDecision = read('src/FinalDecisionCard.js');
 const opportunities = read('src/OpportunitiesView.js');
 const decisionValidity = read('src/decision-validity.js');
+const intelligenceReadiness = read('src/intelligence-readiness.js');
 const market = read('src/market-data.js');
 const marketRules = read('src/market-rules.js');
 const quoteContract = read('src/quote-contract.js');
@@ -62,7 +63,12 @@ assert.ok(finalDecision.includes('if (!decisionValidity.eligible) return null;')
 assert.ok(finalDecision.includes("decisionValidity.reason === 'DECISION_EXPIRED'"), 'expired decision UX missing');
 assert.ok(opportunities.includes("import { finalActionIsCurrent } from './decision-validity';"), 'Research counters must use canonical decision validity');
 assert.ok(opportunities.includes('if (!finalActionIsCurrent(finalAction, decisionContext)) continue;'), 'stale/expired BUY/SELL count gate missing');
-assert.ok(opportunities.includes("operationalHealth?.decisionEngineStatus === 'READY'"), 'decision engine readiness must gate active actions');
+assert.ok(opportunities.includes("import { intelligenceSystemReady } from './intelligence-readiness';"), 'OpportunitiesView must use canonical intelligence readiness');
+assert.ok(opportunities.includes('const systemReady = intelligenceSystemReady(operationalHealth || {});'), 'canonical intelligence readiness must gate active actions');
+assert.ok(intelligenceReadiness.includes("health?.status === 'OPERATIONAL'"), 'overall intelligence health must fail closed');
+assert.ok(intelligenceReadiness.includes("health?.marketDataStatus === 'OPERATIONAL'"), 'market data readiness must fail closed');
+assert.ok(intelligenceReadiness.includes("health?.fundamentalsStatus === 'OPERATIONAL'"), 'fundamentals readiness must fail closed');
+assert.ok(intelligenceReadiness.includes("health?.decisionEngineStatus === 'READY'"), 'decision engine readiness must fail closed');
 assert.ok(opportunities.includes('items={decisionContext.feedFresh && decisionContext.systemReady ? (feed.confirmedBuyOpportunities || []) : []}'), 'stale confirmed BUY opportunities must be hidden');
 assert.ok(!opportunities.includes('decisionContext={decisionContext} decisionContext={decisionContext}'), 'decisionContext prop materialization must remain idempotent');
 
