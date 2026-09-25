@@ -163,6 +163,20 @@ jobs:
           }, null, 2) + '\n');
           NODE
 
+      - name: Build trusted queue completion plan without applying it
+        if: success()
+        working-directory: market-intelligence
+        run: |
+          set -euo pipefail
+          node scripts/build-research-queue-completion-plan.js             out/remote-research-queue.json             out/remote-queue-autonomous-intelligence.json             out/research-queue-completion-plan.json
+          node - <<'NODE'
+          const fs = require('fs');
+          const plan = JSON.parse(fs.readFileSync('out/research-queue-completion-plan.json', 'utf8'));
+          if (plan.mutationAuthority !== 'TRUSTED_PUBLISHER_ONLY' || plan.publicMutationEndpoint !== false) {
+            throw new Error('Queue completion authority invariant failed');
+          }
+          NODE
+
       - name: Upload read-only queue evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -172,5 +186,6 @@ jobs:
             market-intelligence/out/remote-research-queue.json
             market-intelligence/out/remote-queue-autonomous-intelligence.json
             market-intelligence/out/remote-queue-shadow-summary.json
+            market-intelligence/out/research-queue-completion-plan.json
           if-no-files-found: warn
           retention-days: 30
