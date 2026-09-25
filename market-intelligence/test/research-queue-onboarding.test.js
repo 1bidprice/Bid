@@ -27,16 +27,18 @@ function athensDirectoryHtml() {
   </table>`;
 }
 
-test('queue records dedupe and keep only active queued canonical symbols', () => {
+test('queue records dedupe and retain completed research enrollments', () => {
   const rows = normalizeQueuedResearchRecords([
     { symbol: 'nvda.us', status: 'QUEUED', lastRequestedAt: '2026-09-01T00:00:00Z' },
     { symbol: 'NVDA.US', status: 'QUEUED', lastRequestedAt: '2026-09-02T00:00:00Z' },
     { symbol: 'SPCE.US', status: 'COMPLETED' },
     { symbol: 'bad', status: 'QUEUED' },
   ]);
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0].symbol, 'NVDA.US');
-  assert.equal(rows[0].lastRequestedAt, '2026-09-02T00:00:00Z');
+  assert.equal(rows.length, 2);
+  const nvda = rows.find((row) => row.symbol === 'NVDA.US');
+  const spce = rows.find((row) => row.symbol === 'SPCE.US');
+  assert.equal(nvda.lastRequestedAt, '2026-09-02T00:00:00Z');
+  assert.equal(spce.status, 'COMPLETED');
 });
 
 test('queued US symbol resolves through SEC identity into a canonical focus company', async () => {
@@ -54,6 +56,23 @@ test('queued US symbol resolves through SEC identity into a canonical focus comp
   assert.equal(result.companies[0].primaryListing.symbol, 'NVDA');
   assert.equal(result.companies[0].primaryListing.mic, 'XNAS');
   assert.equal(result.companies[0].researchQueue.requestedSymbol, 'NVDA.US');
+});
+
+test('completed research enrollment remains in the canonical focus universe', async () => {
+  const result = await resolveQueuedResearchUniverse([
+    { symbol: 'GOOGL.US', status: 'COMPLETED', firstRequestedAt: '2026-09-01T00:00:00Z' },
+  ], {
+    generatedAt: '2026-09-23T12:00:00Z',
+    secUserAgent: 'Investor Control test test@example.com',
+    fetchImpl: async () => new Response(JSON.stringify(secPayload()), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+  });
+  assert.equal(result.requestedCount, 1);
+  assert.equal(result.queuedCount, 0);
+  assert.equal(result.completedEnrollmentCount, 1);
+  assert.equal(result.resolvedCount, 1);
+  assert.equal(result.companies[0].companyId, 'company:sec:0001652044');
+  assert.equal(result.companies[0].researchQueue.requestedSymbol, 'GOOGL.US');
+  assert.equal(result.companies[0].researchQueue.status, 'COMPLETED');
 });
 
 test('queued Greek symbol resolves through official Euronext Athens trading directory', async () => {

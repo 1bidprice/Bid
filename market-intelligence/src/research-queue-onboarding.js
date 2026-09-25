@@ -20,7 +20,10 @@ export function normalizeQueuedResearchRecords(input) {
   const dedupe = new Map();
   for (const raw of rows) {
     const record = cleanRecord(raw);
-    if (!record || record.status !== 'QUEUED') continue;
+    // COMPLETED is a durable research enrollment, not a tombstone. Keeping it
+    // here ensures a newly onboarded instrument remains in the canonical focus
+    // universe after trusted queue completion.
+    if (!record || !['QUEUED', 'COMPLETED'].includes(record.status)) continue;
     const current = dedupe.get(record.symbol);
     if (!current || String(record.lastRequestedAt || '') > String(current.lastRequestedAt || '')) dedupe.set(record.symbol, record);
   }
@@ -85,6 +88,7 @@ export async function resolveQueuedResearchUniverse(input, options = {}) {
         researchQueue: {
           source: 'MINBEIS_PERSISTENT_RESEARCH_QUEUE',
           requestedSymbol: record.symbol,
+          status: record.status,
           firstRequestedAt: record.firstRequestedAt,
           lastRequestedAt: record.lastRequestedAt,
           resolvedAt: generatedAt,
@@ -125,6 +129,7 @@ export async function resolveQueuedResearchUniverse(input, options = {}) {
       researchQueue: {
         source: 'MINBEIS_PERSISTENT_RESEARCH_QUEUE',
         requestedSymbol: record.symbol,
+        status: record.status,
         firstRequestedAt: record.firstRequestedAt,
         lastRequestedAt: record.lastRequestedAt,
         resolvedAt: generatedAt,
@@ -145,6 +150,8 @@ export async function resolveQueuedResearchUniverse(input, options = {}) {
     version: 1,
     generatedAt,
     requestedCount: records.length,
+    queuedCount: records.filter((record) => record.status === 'QUEUED').length,
+    completedEnrollmentCount: records.filter((record) => record.status === 'COMPLETED').length,
     resolvedCount: companies.length,
     blockedCount: results.filter((item) => item.status === 'BLOCKED').length,
     companies,
