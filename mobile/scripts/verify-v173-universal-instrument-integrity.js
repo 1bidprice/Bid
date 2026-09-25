@@ -186,8 +186,8 @@ assert.ok(!portfolio.includes('function positionsFrom(state) {'));
 assert.ok(portfolioEngine.includes('positionCurrencyVerified'));
 assert.ok(portfolioEngine.includes('route.expectedCurrency !== position.currency'));
 assert.ok(portfolio.includes("maxWidth: '48%', flexShrink: 1"));
-assert.equal(app.expo.version, '1.7.3');
-assert.equal(app.expo.android.versionCode, 31);
-assert.equal(pkg.version, '1.7.3');
+assert.equal(app.expo.version, '1.8.0');
+assert.equal(app.expo.android.versionCode, 32);
+assert.equal(pkg.version, '1.8.0');
 
-console.log('Investor Control v1.7.3 universal instrument integrity verification passed, including closed-market valuation and mobile badge-width regression coverage.');
+console.log('Investor Control v1.8.0 universal instrument integrity verification passed, including closed-market valuation and mobile badge-width regression coverage.');
