@@ -5,7 +5,15 @@ function canonicalSymbol(value) {
 function dossierSymbols(report = {}) {
   const symbols = new Set();
   for (const dossier of Array.isArray(report?.researchDossiers) ? report.researchDossiers : []) {
-    const symbol = canonicalSymbol(dossier?.listing?.symbol);
+    const candidates = [
+      dossier?.referencePrice?.appSymbol,
+      dossier?.marketQuote?.appSymbol,
+    ];
+    const symbol = candidates
+      .map(canonicalSymbol)
+      .find((value) => /^([A-Z0-9][A-Z0-9.-]{0,19})\.(US|GR)$/.test(value));
+    // Queue completion is an identity mutation. Never infer market identity from
+    // a bare listing ticker because the same ticker can exist in multiple markets.
     if (symbol) symbols.add(symbol);
   }
   return symbols;
@@ -31,8 +39,7 @@ export function buildResearchQueueCompletionPlan(queueInput = {}, report = {}, o
   for (const raw of records) {
     const record = normalizeQueueRecord(raw);
     if (!record) continue;
-    const base = record.symbol.replace(/\.(US|GR)$/i, '');
-    const analysed = analysedSymbols.has(base);
+    const analysed = analysedSymbols.has(record.symbol);
 
     if (record.status === 'QUEUED' && analysed) {
       updates.push({

@@ -12,7 +12,7 @@ test('queued symbol becomes COMPLETED only after canonical dossier exists', () =
     }],
   }, {
     generatedAt: '2026-09-25T12:00:00Z',
-    researchDossiers: [{ listing: { symbol: 'NVDA' } }],
+    researchDossiers: [{ listing: { symbol: 'NVDA' }, referencePrice: { appSymbol: 'NVDA.US' } }],
   });
   assert.equal(plan.updateCount, 1);
   assert.equal(plan.updates[0].key, 'research:NVDA.US');
@@ -27,10 +27,35 @@ test('queue remains QUEUED if canonical dossier is absent', () => {
     records: [{ symbol: 'NVDA.US', status: 'QUEUED' }],
   }, {
     generatedAt: '2026-09-25T12:00:00Z',
-    researchDossiers: [{ listing: { symbol: 'SPCE' } }],
+    researchDossiers: [{ listing: { symbol: 'SPCE' }, referencePrice: { appSymbol: 'SPCE.US' } }],
   });
   assert.equal(plan.updateCount, 0);
   assert.equal(plan.untouched[0].reason, 'CANONICAL_DOSSIER_NOT_PRESENT');
+});
+
+test('same bare ticker in another market cannot complete a queue record', () => {
+  const plan = buildResearchQueueCompletionPlan({
+    records: [{ symbol: 'ABC.GR', status: 'QUEUED' }],
+  }, {
+    generatedAt: '2026-09-25T12:00:00Z',
+    researchDossiers: [{
+      listing: { symbol: 'ABC', mic: 'XNAS' },
+      referencePrice: { appSymbol: 'ABC.US' },
+    }],
+  });
+  assert.equal(plan.updateCount, 0);
+  assert.equal(plan.untouched[0].symbol, 'ABC.GR');
+  assert.equal(plan.untouched[0].reason, 'CANONICAL_DOSSIER_NOT_PRESENT');
+});
+
+test('bare ticker without canonical app symbol can never authorize completion', () => {
+  const plan = buildResearchQueueCompletionPlan({
+    records: [{ symbol: 'NVDA.US', status: 'QUEUED' }],
+  }, {
+    generatedAt: '2026-09-25T12:00:00Z',
+    researchDossiers: [{ listing: { symbol: 'NVDA', mic: 'XNAS' } }],
+  });
+  assert.equal(plan.updateCount, 0);
 });
 
 test('completion plan never grants public mutation authority', () => {
