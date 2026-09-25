@@ -69,8 +69,8 @@ assert(opportunities.includes('inferredReferenceCurrency(referencePrice, item)')
 assert(opportunities.includes("style: 'currency',\n      currency,"), 'currency formatter syntax contract missing');
 assert(!opportunities.includes("currency: referencePrice.currency || 'EUR'"), 'false EUR fallback still present');
 
-assert(versionAtLeast(app.expo.version, '1.7.1'), `app version predates v1.7.1: ${app.expo.version}`);
-assert(Number(app.expo.android.versionCode) >= 29, `Android versionCode predates v1.7.1: ${app.expo.android.versionCode}`);
+assert(versionAtLeast(app.expo.version, '1.8.0'), `app version predates MINBEIS v1.8.0: ${app.expo.version}`);
+assert(Number(app.expo.android.versionCode) >= 32, `Android versionCode predates MINBEIS build 32: ${app.expo.android.versionCode}`);
 assert(pkg.version === app.expo.version, `package/app version mismatch: ${pkg.version} vs ${app.expo.version}`);
 assert(portfolio.includes(`const VERSION = '${app.expo.version}';`), `PortfolioApp runtime version mismatch: ${app.expo.version}`);
 assert(decision.includes(`const VERSION = '${app.expo.version}';`), `DecisionOverlay runtime version mismatch: ${app.expo.version}`);
@@ -91,4 +91,4 @@ assert(portfolio.includes("currency: instrumentCurrency(form.market)"), 'transac
 assert(portfolio.includes("value=\"GR\" current={form.market} label=\"Ελλάδα\""), 'Greek market selector missing');
 assert(portfolio.includes("value=\"US\" current={form.market} label=\"ΗΠΑ\""), 'US market selector missing');
 assert(portfolio.includes("onChangeText={setSymbolInput}"), 'ticker input does not use canonical-safe setter');
-console.log(`PASS v1.7.1+ portfolio-aware holder/non-holder decisions, validity-gated personalized counters, safe currency inference, JSX parse and consistent release identity ${app.expo.version} build ${app.expo.android.versionCode}.`);
+console.log(`PASS MINBEIS v1.8.0+ portfolio-aware decisions, clarity UX, research queue, canonical routing and consistent release identity ${app.expo.version} build ${app.expo.android.versionCode}.`);
