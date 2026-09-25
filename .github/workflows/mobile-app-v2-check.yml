@@ -10,6 +10,8 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    env:
+      EXPO_PUBLIC_MARKET_GATEWAY_URL: ${{ vars.EXPO_PUBLIC_MARKET_GATEWAY_URL }}
     defaults:
       run:
         working-directory: mobile
@@ -24,6 +26,15 @@ jobs:
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+
+      - name: Report market gateway build wiring
+        shell: bash
+        run: |
+          if [ -n "${EXPO_PUBLIC_MARKET_GATEWAY_URL:-}" ]; then
+            node -e "const u=new URL(process.env.EXPO_PUBLIC_MARKET_GATEWAY_URL); if(u.protocol!=='https:') process.exit(2); console.log('Canonical gateway URL is wired into this validation build');"
+          else
+            echo 'Canonical gateway URL is not configured for this validation environment.'
+          fi
 
       - name: Verify v1.7 Opportunity Hunter mobile contract
         run: npm run test:hunter-ui
