@@ -82,7 +82,7 @@ assert(opportunities.includes(">ΤΩΡΑ<"), 'MINBEIS clarity NOW label missing'
 assert(opportunities.includes(">ΓΙΑΤΙ<"), 'MINBEIS clarity WHY label missing');
 assert(opportunities.includes("ΤΙ ΘΑ ΑΛΛΑΞΕΙ ΤΗΝ ΕΙΚΟΝΑ"), 'MINBEIS clarity change-condition label missing');
 assert(opportunities.includes("ΣΤΗΝ ΟΥΡΑ ΕΡΕΥΝΑΣ"), 'MINBEIS research queue status missing from portfolio UX');
-assert(opportunities.includes("Research queue:"), 'MINBEIS portfolio research queue summary missing');
+assert(opportunities.includes("Σε έρευνα:"), 'MINBEIS portfolio research queue summary missing');
 
 // User-friendly transaction entry must always persist the canonical market-qualified symbol.
 assert(portfolio.includes("const canonicalSymbol = canonicalInstrumentSymbol(form.symbol, form.market);"), 'canonical ticker transaction entry missing');
