@@ -217,6 +217,44 @@ function fakeKv() {
   };
 }
 
+test('completed dynamic enrollment reports READY through the gateway capability contract', async () => {
+  const kv = fakeKv();
+  await kv.put('research:NVDA.US', JSON.stringify({
+    format: 'minbeis-research-queue-record',
+    version: 1,
+    symbol: 'NVDA.US',
+    market: 'US',
+    canonicalCompanyId: 'company:sec:0001045810',
+    displayName: 'NVIDIA CORP',
+    currency: 'USD',
+    status: 'COMPLETED',
+    firstRequestedAt: '2026-09-10T12:00:00.000Z',
+    lastRequestedAt: '2026-09-10T13:00:00.000Z',
+    privacy: {
+      storesSymbolOnly: true,
+      storesPortfolioData: false,
+      storesClientIdentity: false,
+    },
+  }));
+  const fetchImpl = async (url) => {
+    if (String(url).includes('/stock/profile2')) return jsonResponse({ ticker: 'NVDA', currency: 'USD', exchange: 'NASDAQ', country: 'US', name: 'NVIDIA Corp' });
+    if (String(url).includes('/quote')) return jsonResponse({ c: 120.5, pc: 119.5, o: 120, h: 122, l: 118, d: 1, dp: 0.8368, t: Math.floor(Date.parse('2026-09-10T14:59:00.000Z') / 1000) });
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const response = await handleMarketGatewayRequest(
+    new Request('https://gateway.test/v1/instrument?symbol=NVDA.US'),
+    { FINNHUB_TOKEN: 'secret', MINBEIS_RESEARCH_QUEUE: kv },
+    { fetchImpl, now: '2026-09-10T15:00:00.000Z' },
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.identityVerified, true);
+  assert.equal(body.analysisSupported, true);
+  assert.equal(body.onboardingStatus, 'READY');
+  assert.equal(body.researchEnrollmentStatus, 'COMPLETED');
+  assert.equal(body.canonicalCompanyId, 'company:sec:0001045810');
+});
+
 test('verified new US instrument enters research queue only with persistent storage', async () => {
   const kv = fakeKv();
   const fetchImpl = async (url) => {

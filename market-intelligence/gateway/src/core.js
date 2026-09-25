@@ -222,7 +222,8 @@ export async function resolveInstrumentCapability(appSymbol, env = {}, options =
   const identityVerified = quote?.quoteContract?.identityVerified === true
     || (parsed.market === 'GR' && quote?.quoteContract?.sourceRole === 'PRIMARY_EXCHANGE');
 
-  const analysisSupported = Boolean(canonicalFocus);
+  const completedEnrollment = canonicalFocus ? null : await completedResearchEnrollment(parsed.appSymbol, env);
+  const analysisSupported = Boolean(canonicalFocus || completedEnrollment);
   const onboardingStatus = analysisSupported
     ? 'READY'
     : identityVerified
@@ -241,9 +242,10 @@ export async function resolveInstrumentCapability(appSymbol, env = {}, options =
       quoteSupported,
       analysisSupported,
       onboardingStatus,
-      canonicalCompanyId: canonicalFocus?.companyId || quote?.companyId || null,
-      displayName: canonicalFocus?.displayName || quote?.companyName || parsed.symbol,
-      currency: quote?.currency || canonicalFocus?.currency || null,
+      canonicalCompanyId: canonicalFocus?.companyId || completedEnrollment?.canonicalCompanyId || quote?.companyId || null,
+      displayName: canonicalFocus?.displayName || completedEnrollment?.displayName || quote?.companyName || parsed.symbol,
+      currency: quote?.currency || canonicalFocus?.currency || completedEnrollment?.currency || null,
+      researchEnrollmentStatus: completedEnrollment ? 'COMPLETED' : canonicalFocus ? 'BUILT_IN' : null,
       quoteContract: quote?.quoteContract || null,
       limitations: analysisSupported
         ? []
@@ -263,6 +265,22 @@ export async function resolveInstrumentCapability(appSymbol, env = {}, options =
 function researchQueueBinding(env = {}) {
   const queue = env.MINBEIS_RESEARCH_QUEUE;
   return queue && typeof queue.get === 'function' && typeof queue.put === 'function' ? queue : null;
+}
+
+async function completedResearchEnrollment(appSymbol, env = {}) {
+  const queue = researchQueueBinding(env);
+  if (!queue) return null;
+  try {
+    const raw = await queue.get(`research:${appSymbol}`);
+    const record = raw ? JSON.parse(raw) : null;
+    if (record?.format !== 'minbeis-research-queue-record' || Number(record?.version) !== 1) return null;
+    if (String(record?.symbol || '').trim().toUpperCase() !== appSymbol) return null;
+    if (String(record?.status || '').trim().toUpperCase() !== 'COMPLETED') return null;
+    if (record?.privacy?.storesPortfolioData !== false || record?.privacy?.storesClientIdentity !== false) return null;
+    return record;
+  } catch {
+    return null;
+  }
 }
 
 export async function enqueueResearchRequest(appSymbol, env = {}, options = {}) {
