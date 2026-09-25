@@ -23,12 +23,23 @@ const accounting = read('src/transaction-accounting.js');
 const postinstall = String(pkg.scripts?.postinstall || '');
 assert.ok(!postinstall.includes('apply-v'), 'production package must not execute historical apply-v patch chain');
 
-assert.equal(pkg.version, '1.7.3');
-assert.equal(app.expo.version, '1.7.3');
-assert.equal(app.expo.android.versionCode, 31);
+const versionAtLeast = (actual, minimum) => {
+  const a = String(actual || '').split('.').map((value) => Number(value));
+  const b = String(minimum || '').split('.').map((value) => Number(value));
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+    const left = Number.isFinite(a[index]) ? a[index] : 0;
+    const right = Number.isFinite(b[index]) ? b[index] : 0;
+    if (left !== right) return left > right;
+  }
+  return true;
+};
+
+assert.equal(pkg.version, app.expo.version, 'package/app version must match');
+assert.ok(versionAtLeast(app.expo.version, '1.8.0'), `canonical mobile version predates MINBEIS v1.8.0: ${app.expo.version}`);
+assert.ok(Number(app.expo.android.versionCode) >= 32, `Android build predates MINBEIS build 32: ${app.expo.android.versionCode}`);
 assert.equal(app.expo.android.package, 'gr.investorcontrol.app');
-assert.ok(portfolio.includes("const VERSION = '1.7.3';"), 'PortfolioApp must be canonical v1.7.3 source');
-assert.ok(decision.includes("const VERSION = '1.7.3';"), 'DecisionOverlay must be canonical v1.7.3 source');
+assert.ok(portfolio.includes(`const VERSION = '${app.expo.version}';`), 'PortfolioApp must match canonical app version');
+assert.ok(decision.includes(`const VERSION = '${app.expo.version}';`), 'DecisionOverlay must match canonical app version');
 
 assert.ok(portfolio.includes('function quoteHeadlineLabel(quote)'), 'quote timing UI must be materialized in canonical source');
 assert.ok(portfolio.includes('<OpportunitiesView portfolioPositions={positions} portfolioPolicy={state.minbeisPolicy} instrumentCapabilities={state.minbeisOnboarding} />'), 'portfolio-aware MINBEIS policy bridge must be canonical source');
@@ -112,4 +123,4 @@ assert.ok(accounting.includes('function safeText(value, fallback ='), 'legacy tr
 assert.ok(accounting.includes('function canonicalCurrency(value)'), 'canonical transaction currency guard missing');
 assert.ok(accounting.includes("return explicit === 'USD' || explicit === 'EUR' ? explicit : null;"), 'invalid transaction currency must stay missing instead of being inferred');
 
-console.log('Canonical mobile source PASS: patch chain retired; accounting, portfolio, Euronext Athens/US market rules, quote, decision validity and UI responsibilities are separated and guarded, including Transactions runtime, render-safe fail-closed legacy records, closing-print valuation, stale/expired actions and idempotent decision-context materialization.');
+console.log(`Canonical mobile source PASS v${app.expo.version} build ${app.expo.android.versionCode}: accounting, portfolio, market rules, MINBEIS onboarding and decision boundaries are canonical and guarded.`);
