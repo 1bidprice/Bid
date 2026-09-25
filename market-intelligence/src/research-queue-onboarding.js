@@ -1,4 +1,5 @@
 import { fetchSecCompanyUniverse } from './adapters/sec-company-universe.js';
+import { fetchAthensCompaniesBySymbols } from './adapters/euronext-athens-discovery.js';
 
 function cleanRecord(record) {
   const symbol = String(record?.symbol || '').trim().toUpperCase();
@@ -39,7 +40,9 @@ export async function resolveQueuedResearchUniverse(input, options = {}) {
   const results = [];
 
   const usRecords = records.filter((record) => record.market === 'US');
+  const grRecords = records.filter((record) => record.market === 'GR');
   let secUniverse = { companies: [], diagnostics: [] };
+  let athensResolution = { companies: [], results: [], diagnostics: [] };
   if (usRecords.length) {
     secUniverse = await fetchSecCompanyUniverse({
       fetchImpl: options.fetchImpl || globalThis.fetch,
@@ -48,14 +51,53 @@ export async function resolveQueuedResearchUniverse(input, options = {}) {
     });
     diagnostics.push(...(secUniverse.diagnostics || []).map((item) => ({ ...item, source: 'SEC_QUEUE_IDENTITY' })));
   }
+  if (grRecords.length) {
+    athensResolution = await fetchAthensCompaniesBySymbols(
+      grRecords.map((record) => record.baseSymbol),
+      {
+        fetchImpl: options.fetchImpl || globalThis.fetch,
+        generatedAt,
+        userAgent: options.athensUserAgent || 'MINBEIS-Market-Intelligence/1.8',
+      },
+    );
+    diagnostics.push(...(athensResolution.diagnostics || []).map((item) => ({ ...item, source: 'EURONEXT_ATHENS_QUEUE_IDENTITY' })));
+  }
 
   for (const record of records) {
-    if (record.market !== 'US') {
+    if (record.market === 'GR') {
+      const match = (athensResolution.companies || [])
+        .find((company) => String(company?.primaryListing?.symbol || '').trim().toUpperCase() === record.baseSymbol);
+      const result = (athensResolution.results || [])
+        .find((item) => String(item?.symbol || '').trim().toUpperCase() === record.baseSymbol);
+
+      if (!match || result?.status !== 'RESOLVED') {
+        results.push({
+          symbol: record.symbol,
+          status: 'BLOCKED',
+          code: result?.code || 'ATHENS_QUEUE_IDENTITY_NOT_FOUND',
+          matchCount: result?.matchCount ?? 0,
+        });
+        continue;
+      }
+
+      const queuedCompany = {
+        ...match,
+        researchQueue: {
+          source: 'MINBEIS_PERSISTENT_RESEARCH_QUEUE',
+          requestedSymbol: record.symbol,
+          firstRequestedAt: record.firstRequestedAt,
+          lastRequestedAt: record.lastRequestedAt,
+          resolvedAt: generatedAt,
+        },
+      };
+      companies.push(queuedCompany);
       results.push({
         symbol: record.symbol,
-        status: 'BLOCKED',
-        code: 'DYNAMIC_QUEUE_MARKET_IDENTITY_NOT_SUPPORTED',
-        message: 'Dynamic queue identity onboarding is currently canonical only for US SEC-listed equities.',
+        status: 'RESOLVED',
+        companyId: queuedCompany.companyId,
+        issuerId: queuedCompany.issuerId || null,
+        isin: queuedCompany.isin || null,
+        listing: queuedCompany.primaryListing,
       });
       continue;
     }
