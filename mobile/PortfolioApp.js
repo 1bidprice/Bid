@@ -18,7 +18,7 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { fetchConfiguredInstrumentCapability, isMarketGatewayConfigured, requestConfiguredMinbeisResearch } from './src/market-gateway-runtime';
+import { fetchConfiguredInstrumentCapability, fetchConfiguredMinbeisResearchQueueStatus, isMarketGatewayConfigured, requestConfiguredMinbeisResearch } from './src/market-gateway-runtime';
 import * as SecureStore from 'expo-secure-store';
 import {
   SafeAreaProvider,
@@ -926,6 +926,36 @@ function MainApp({ onOpenDecisionGate }) {
     }
   }, [persist]);
 
+  const refreshQueuedResearchStatus = useCallback(async (symbol) => {
+    const clean = String(symbol || '').trim().toUpperCase();
+    if (!/^([A-Z0-9][A-Z0-9.-]{0,19})\.(US|GR)$/.test(clean)) return null;
+    try {
+      const remote = await fetchConfiguredMinbeisResearchQueueStatus(clean);
+      const current = stateRef.current;
+      const previous = current.minbeisOnboarding?.[clean];
+      if (!previous) return remote;
+      const nextQueueStatus = remote.queueStatus || previous.queueStatus || null;
+      const nextQueuedAt = remote.lastRequestedAt || remote.firstRequestedAt || previous.queuedAt || null;
+      if (nextQueueStatus === previous.queueStatus && nextQueuedAt === previous.queuedAt) return remote;
+      await persist({
+        ...current,
+        minbeisOnboarding: {
+          ...(current.minbeisOnboarding || {}),
+          [clean]: {
+            ...previous,
+            queueStatus: nextQueueStatus,
+            queuedAt: nextQueuedAt,
+            queueError: null,
+            checkedAt: new Date().toISOString(),
+          },
+        },
+      });
+      return remote;
+    } catch {
+      return null;
+    }
+  }, [persist]);
+
   const onboardingSymbolsToCheck = useMemo(
     () => positions
       .map((position) => String(position?.symbol || '').trim().toUpperCase())
@@ -955,6 +985,29 @@ function MainApp({ onOpenDecisionGate }) {
     })().catch(() => {});
     return () => { cancelled = true; };
   }, [loading, onboardingSymbolsKey, syncMinbeisOnboarding]);
+
+  const queuedResearchSymbols = useMemo(
+    () => Object.entries(state.minbeisOnboarding || {})
+      .filter(([, entry]) => entry?.queueStatus === 'QUEUED')
+      .map(([symbol]) => symbol)
+      .sort(),
+    [state.minbeisOnboarding],
+  );
+  const queuedResearchSymbolsKey = queuedResearchSymbols.join('|');
+
+  useEffect(() => {
+    if (loading || !queuedResearchSymbols.length) return undefined;
+    let cancelled = false;
+    const check = async () => {
+      for (const symbol of queuedResearchSymbols) {
+        if (cancelled) break;
+        await refreshQueuedResearchStatus(symbol);
+      }
+    };
+    check().catch(() => {});
+    const interval = setInterval(() => { check().catch(() => {}); }, 5 * 60 * 1000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [loading, queuedResearchSymbolsKey, refreshQueuedResearchStatus]);
 
   const openNewTransaction = () => { setEditingTransaction(null); setTransactionModal(true); };
 
