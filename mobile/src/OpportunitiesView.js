@@ -336,7 +336,7 @@ function buildPositionClarity({ row, blockedDossier, interimPlan, capability, as
     return {
       now: 'ΠΕΡΙΜΕΝΕ ΤΗΝ ΑΝΑΛΥΣΗ',
       why: capabilityText(capability),
-      change: 'Να ολοκληρωθεί ο canonical research κύκλος και να δημοσιευτεί νέα έγκυρη MINBEIS feed.',
+      change: 'Να ολοκληρωθεί η πλήρης έρευνα και να δημοσιευτεί νέα επαληθευμένη ανάλυση MINBEIS.',
     };
   }
   if (capability?.onboardingStatus === 'READY') {
@@ -348,7 +348,7 @@ function buildPositionClarity({ row, blockedDossier, interimPlan, capability, as
   }
   return {
     now: 'ΑΝΑΜΟΝΗ ΕΛΕΓΧΟΥ',
-    why: capabilityText(capability) || 'Η θέση είναι καταχωρημένη, αλλά δεν υπάρχει ακόμη επαρκής canonical ανάλυση για πράξη.',
+    why: capabilityText(capability) || 'Η θέση είναι καταχωρημένη, αλλά δεν υπάρχει ακόμη επαρκής επαληθευμένη ανάλυση για πράξη.',
     change: 'Να ολοκληρωθούν τα identity/data/research checks.',
   };
 }
@@ -414,7 +414,7 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = nu
           <View style={styles.portfolioStatusRow}>
             <Text style={styles.portfolioStatusText}>Προσοχή: {attentionCount}</Text>
             <Text style={styles.portfolioStatusText}>Ανάλυση: {coveredCount}/{positions.length}</Text>
-            <Text style={styles.portfolioStatusText}>Research queue: {queuedCount}</Text>
+            <Text style={styles.portfolioStatusText}>Σε έρευνα: {queuedCount}</Text>
           </View>
         </View>
       </View>
@@ -498,19 +498,19 @@ function MinbeisDashboard({ dashboard, sourceDecisionCount = 0, decisionContext 
   return (
     <View style={styles.minbeisShell}>
       <View style={styles.minbeisHero}>
-        <Text style={styles.minbeisEyebrow}>MINBEIS · MARKET SCAN TODAY</Text>
+        <Text style={styles.minbeisEyebrow}>MINBEIS · ΣΗΜΕΡΙΝΗ ΣΑΡΩΣΗ ΑΓΟΡΑΣ</Text>
         <Text style={styles.minbeisHeroTitle}>{headline}</Text>
         <Text style={styles.minbeisHeroText}>Αυτή η ενότητα αφορά νέες ιδέες εκτός του χαρτοφυλακίου σου. Οι δικές σου θέσεις εμφανίζονται ξεχωριστά παραπάνω. Δεν εκτελούνται συναλλαγές.</Text>
         <View style={styles.minbeisCountRow}>
-          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{setupCount}</Text><Text style={styles.minbeisCountLabel}>SETUP</Text></View>
-          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{trapCount}</Text><Text style={styles.minbeisCountLabel}>TRAP</Text></View>
-          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{noTradeCount}</Text><Text style={styles.minbeisCountLabel}>NO-TRADE</Text></View>
-          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{confirmCount}</Text><Text style={styles.minbeisCountLabel}>CHECK</Text></View>
+          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{setupCount}</Text><Text style={styles.minbeisCountLabel}>ΥΠΟΨΗΦΙΑ</Text></View>
+          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{trapCount}</Text><Text style={styles.minbeisCountLabel}>ΠΑΓΙΔΑ</Text></View>
+          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{noTradeCount}</Text><Text style={styles.minbeisCountLabel}>ΑΠΟΧΗ</Text></View>
+          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{confirmCount}</Text><Text style={styles.minbeisCountLabel}>ΕΛΕΓΧΟΣ</Text></View>
         </View>
         {!decisionContext?.feedFresh ? <Text style={styles.minbeisCaution}>Οι ενεργές πράξεις απενεργοποιούνται όταν η ροή δεν είναι αρκετά πρόσφατη.</Text> : null}
       </View>
 
-      {rows.length ? <><Text style={styles.sectionTitle}>Νέες ιδέες</Text><Text style={styles.sectionSubtitle}>Μετοχές εκτός του χαρτοφυλακίου σου που πέρασαν στη σημερινή canonical ανάλυση.</Text></> : null}
+      {rows.length ? <><Text style={styles.sectionTitle}>Νέες ιδέες</Text><Text style={styles.sectionSubtitle}>Μετοχές εκτός του χαρτοφυλακίου σου που πέρασαν στη σημερινή επαληθευμένη ανάλυση.</Text></> : null}
       {rows.slice(0, 10).map((row) => (
         <View key={row.id} style={styles.minbeisDecisionCard}>
           <View style={styles.rowTop}>
@@ -835,7 +835,7 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
         {showSystemDetails ? <>
         <View style={styles.sourcePolicyBox}><Text style={styles.sourcePolicyTitle}>Ποιος επιλέγει τις πηγές;</Text><Text style={styles.sourcePolicyText}>Έκδοση πολιτικής: {feed?.sourceSelection?.version || '—'}. Οι πηγές επιλέγονται από κλειδωμένη πολιτική κώδικα και επιτρεπόμενη λίστα, όχι αυθαίρετα από το AI.</Text></View>
         <View style={[styles.productionHealth, productionReady ? styles.productionHealthGood : styles.productionHealthLimited]}>
-          <View style={styles.productionHealthTop}><View style={styles.grow}><Text style={styles.productionHealthEyebrow}>ΚΑΤΑΣΤΑΣΗ ΠΑΡΑΓΩΓΙΚΟΥ ΣΥΣΤΗΜΑΤΟΣ</Text><Text style={styles.productionHealthTitle}>{productionReady ? (historicalAnalyticsPartial ? 'Κανονική λειτουργία · μερική ιστορική κάλυψη' : 'Πλήρης αυτοματοποιημένη λειτουργία') : 'Περιορισμένη λειτουργία — χωρίς αυθαίρετα σήματα'}</Text></View><View style={[styles.productionHealthBadge, productionReady && styles.productionHealthBadgeGood]}><Text style={[styles.productionHealthBadgeText, productionReady && styles.productionHealthBadgeTextGood]}>{productionReady ? 'OPERATIONAL' : 'DEGRADED'}</Text></View></View>
+          <View style={styles.productionHealthTop}><View style={styles.grow}><Text style={styles.productionHealthEyebrow}>ΚΑΤΑΣΤΑΣΗ ΠΑΡΑΓΩΓΙΚΟΥ ΣΥΣΤΗΜΑΤΟΣ</Text><Text style={styles.productionHealthTitle}>{productionReady ? (historicalAnalyticsPartial ? 'Κανονική λειτουργία · μερική ιστορική κάλυψη' : 'Πλήρης αυτοματοποιημένη λειτουργία') : 'Περιορισμένη λειτουργία — χωρίς αυθαίρετα σήματα'}</Text></View><View style={[styles.productionHealthBadge, productionReady && styles.productionHealthBadgeGood]}><Text style={[styles.productionHealthBadgeText, productionReady && styles.productionHealthBadgeTextGood]}>{productionReady ? 'ΕΝΕΡΓΟ' : 'ΠΕΡΙΟΡΙΣΜΕΝΟ'}</Text></View></View>
           <Text style={styles.productionHealthText}>{productionReady ? (historicalAnalyticsPartial ? 'Η ροή είναι πρόσφατη και οι τρέχοντες έλεγχοι αγοράς και θεμελιωδών λειτουργούν. Η ιστορική ανάλυση είναι διαθέσιμη μόνο όπου έχει επαρκή και επαληθευμένα δεδομένα· οι υπόλοιποι φάκελοι παραμένουν μπλοκαρισμένοι.' : 'Η ροή είναι πρόσφατη και οι υποχρεωτικοί έλεγχοι αγοράς, ιστορικού και θεμελιωδών λειτουργούν.') : 'Το σύστημα συνεχίζει να συλλέγει και να ελέγχει δεδομένα, αλλά δεν εγκρίνει αγορά ή πώληση όταν λείπει πηγή, ιστορικό, benchmark, θεμελιώδη ή διασταύρωση.'}</Text>
           <Text style={styles.healthSplitText}>Υποδομή: {operationalHealth?.infrastructureStatus || '—'} · Τρέχουσα αγορά: {operationalHealth?.marketDataStatus || '—'} · Ιστορική ανάλυση: {historicalAnalyticsStatus} · Θεμελιώδη: {operationalHealth?.fundamentalsStatus || '—'} · Αποφάσεις: {operationalHealth?.decisionEngineStatus || '—'}</Text>
           <View style={styles.productionMetrics}>

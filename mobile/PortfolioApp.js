@@ -569,17 +569,17 @@ function TransactionModal({ visible, transaction, onClose, onSave }) {
                   <View style={[styles.instrumentCheck, instrumentCheck.identityVerified === true || instrumentCheck.analysisSupported === true ? styles.instrumentCheckGood : styles.instrumentCheckPending]}>
                     <Text style={styles.instrumentCheckTitle}>
                       {instrumentCheck.analysisSupported === true
-                        ? 'MINBEIS READY'
+                        ? 'ΕΤΟΙΜΟ ΓΙΑ ΑΝΑΛΥΣΗ'
                         : instrumentCheck.identityVerified === true
                           ? 'ΤΑΥΤΟΤΗΤΑ ΕΠΑΛΗΘΕΥΤΗΚΕ'
                           : 'ΕΛΕΓΧΟΣ ΕΚΚΡΕΜΕΙ'}
                     </Text>
                     <Text style={styles.instrumentCheckText}>
                       {instrumentCheck.analysisSupported === true
-                        ? 'Το προϊόν υποστηρίζεται ήδη από την canonical MINBEIS ανάλυση.'
+                        ? 'Το προϊόν υποστηρίζεται ήδη από την πλήρη ανάλυση MINBEIS.'
                         : instrumentCheck.identityVerified === true
-                          ? 'Το προϊόν επαληθεύτηκε και μπορεί να περάσει στο research onboarding.'
-                          : 'Δεν υπάρχει ακόμη επαρκής canonical ταυτοποίηση για MINBEIS απόφαση.'}
+                          ? 'Το προϊόν επαληθεύτηκε και μπορεί να περάσει στη σειρά πλήρους έρευνας.'
+                          : 'Δεν υπάρχει ακόμη επαρκής επαληθευμένη ταυτοποίηση για απόφαση MINBEIS.'}
                     </Text>
                   </View>
                 ) : MARKET_GATEWAY_CONFIGURED ? (
@@ -587,7 +587,7 @@ function TransactionModal({ visible, transaction, onClose, onSave }) {
                 ) : (
                   <Text style={styles.instrumentCheckHint}>Preview build: ο canonical gateway δεν είναι embedded. Η λογιστική καταχώρηση λειτουργεί κανονικά.</Text>
                 )}
-                <Field label="Εταιρεία — προαιρετικά" helper="Μπορείς να βάλεις όνομα για ευκολότερη αναγνώριση. Το MINBEIS χρησιμοποιεί το canonical ticker." value={form.company} onChangeText={(value) => set('company', value)} placeholder={form.market === 'US' ? 'NVIDIA' : 'CrediaBank'} />
+                <Field label="Εταιρεία — προαιρετικά" helper="Μπορείς να βάλεις όνομα για ευκολότερη αναγνώριση. Το MINBEIS χρησιμοποιεί το επαληθευμένο ticker." value={form.company} onChangeText={(value) => set('company', value)} placeholder={form.market === 'US' ? 'NVIDIA' : 'CrediaBank'} />
                 <Field label="Ημερομηνία συναλλαγής" value={form.date} onChangeText={(value) => set('date', value)} keyboardType="numbers-and-punctuation" placeholder="2026-07-14" />
                 <Field label="Broker / τράπεζα" value={form.broker} onChangeText={(value) => set('broker', value)} placeholder="Τράπεζα Πειραιώς" />
               </> : null}
@@ -1048,7 +1048,7 @@ function MainApp({ onOpenDecisionGate }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}><LegalNoticeModal visible={!legalAccepted} onAccept={acceptLegalNotice} /><StatusBar barStyle="dark-content" backgroundColor="#eef5ff" /><View style={styles.app}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <Text style={styles.eyebrow}>MINBEIS · INVESTOR CONTROL</Text>
+        <Text style={styles.eyebrow}>MINBEIS · ΕΠΕΝΔΥΤΙΚΗ ΝΟΗΜΟΣΥΝΗ</Text>
         <View style={styles.rowTop}><View style={styles.grow}><Text style={[styles.title, width < 380 && styles.titleCompact]}>MINBEIS</Text><Text style={styles.versionLine}>Χαρτοφυλάκιο · έρευνα · αποφάσεις · v{VERSION}</Text></View><Pressable style={styles.plus} onPress={openNewTransaction}><Text style={styles.plusText}>＋</Text></Pressable></View>
         {tab === 'summary' ? <>
           <View style={styles.refreshCard}><View style={styles.grow}><Text style={styles.muted}>Τελευταίος έλεγχος</Text><Text style={styles.checked}>{when(state.meta.lastCheckedAt)}</Text></View><Pressable style={[styles.primarySmall, refreshing && styles.disabled]} onPress={() => refresh()} disabled={refreshing}>{refreshing ? <ActivityIndicator color="#fff" /> : <Text style={styles.whiteStrong}>Ανανέωση</Text>}</Pressable></View>
@@ -1079,9 +1079,9 @@ function MainApp({ onOpenDecisionGate }) {
             <View style={styles.minbeisHomeStats}>
               <Text style={styles.minbeisHomeStat}>Κάλυψη {minbeisHomeSummary.coveredPositionCount}/{minbeisHomeSummary.portfolioPositionCount}</Text>
               <Text style={styles.minbeisHomeStat}>Εκκρεμούν {minbeisHomeSummary.pendingPositionCount}</Text>
-              {minbeisHomeSummary.queuedResearchCount > 0 ? <Text style={styles.minbeisHomeStat}>Research queue {minbeisHomeSummary.queuedResearchCount}</Text> : null}
+              {minbeisHomeSummary.queuedResearchCount > 0 ? <Text style={styles.minbeisHomeStat}>Σε έρευνα {minbeisHomeSummary.queuedResearchCount}</Text> : null}
               {minbeisHomeSummary.identityBlockedCount > 0 ? <Text style={styles.minbeisHomeStat}>Ταυτοποίηση {minbeisHomeSummary.identityBlockedCount}</Text> : null}
-              <Text style={styles.minbeisHomeStat}>{minbeisHomeSyncing ? 'Ανανέωση…' : minbeisHomeSummary.feedFresh ? 'Live feed' : 'Έλεγχος feed'}</Text>
+              <Text style={styles.minbeisHomeStat}>{minbeisHomeSyncing ? 'Ανανέωση…' : minbeisHomeSummary.feedFresh ? 'Ροή ενημερωμένη' : 'Έλεγχος ενημέρωσης'}</Text>
             </View>
           </Pressable>
           <Pressable style={styles.decisionEntry} onPress={onOpenDecisionGate} accessibilityLabel="Άνοιγμα Decision Gate">
