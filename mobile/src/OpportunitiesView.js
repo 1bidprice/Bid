@@ -243,7 +243,7 @@ function minbeisReasonText(row) {
     BUY_REQUIRES_STRICT_PURCHASE_CONFIRMATION: 'Υπάρχει θετική κατεύθυνση, αλλά δεν έχει περάσει ακόμη το strict purchase reconciliation.',
     NON_HOLDER_BLOCKED: 'Η τρέχουσα canonical απόφαση δεν επιτρέπει νέα αγορά.',
     NON_HOLDER_WATCH: 'Δεν υπάρχει επιβεβαιωμένη αγορά τώρα· παραμένει σε παρακολούθηση.',
-  }[row?.reason] || 'Η απόφαση προκύπτει από τον canonical Investor Control engine.';
+  }[row?.reason] || 'Η απόφαση προκύπτει από τον canonical MINBEIS decision engine.';
 }
 
 function portfolioBlockedReason(item) {
@@ -811,7 +811,7 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
       <View style={styles.headerRow}>
         <View style={styles.grow}>
           <Text style={styles.title}>MINBEIS</Text>
-          <Text style={styles.subtitle}>Ο επενδυτικός εγκέφαλος του Investor Control · αποφάσεις, ρίσκο και επόμενη πράξη</Text>
+          <Text style={styles.subtitle}>Προσωπική επενδυτική νοημοσύνη · αποφάσεις, ρίσκο και επόμενη πράξη</Text>
         </View>
         <Pressable style={[styles.syncSmall, syncing && styles.disabled]} onPress={() => sync({ manual: true })} disabled={syncing}>
           {syncing ? <ActivityIndicator color="#fff" /> : <Text style={styles.syncSmallText}>Ανανέωση</Text>}
