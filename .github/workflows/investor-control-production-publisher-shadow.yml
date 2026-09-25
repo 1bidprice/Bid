@@ -164,6 +164,27 @@ jobs:
           node scripts/verify-forecast-outcome-archive.js out/forecast-outcome-ledger.json
           node scripts/verify-canonical-live-source-connectivity.js out/mobile-intelligence-feed.json out/source-connectivity-audit.json
 
+      - name: Build trusted queue completion candidate after canonical analysis
+        working-directory: source/market-intelligence
+        run: |
+          set -euo pipefail
+          node scripts/build-research-queue-completion-plan.js \
+            out/remote-research-queue.json \
+            out/autonomous-intelligence.json \
+            out/research-queue-completion-plan.json
+          node scripts/build-research-queue-kv-bulk.js \
+            out/research-queue-completion-plan.json \
+            out/autonomous-intelligence.json \
+            out/research-queue-completion-bulk.json
+          node - <<'NODE'
+          const fs = require('fs');
+          const bulk = JSON.parse(fs.readFileSync('out/research-queue-completion-bulk.json', 'utf8'));
+          if (bulk.mutationAuthority !== 'TRUSTED_PUBLISHER_ONLY' || bulk.publicMutationEndpoint !== false) {
+            throw new Error('Research queue completion bulk lost trusted-only mutation authority');
+          }
+          console.log(JSON.stringify({ queueCompletionCandidateCount: bulk.updateCount }, null, 2));
+          NODE
+
       - name: Rehearse transactional publication without remote write
         shell: bash
         run: |
@@ -262,6 +283,8 @@ jobs:
           path: |
             source/market-intelligence/out/source-connectivity-audit.json
             source/market-intelligence/out/remote-research-queue.json
+            source/market-intelligence/out/research-queue-completion-plan.json
+            source/market-intelligence/out/research-queue-completion-bulk.json
             publication-rehearsal/status.shadow.json
             publication-rehearsal/mobile-intelligence-feed.json
             publication-rehearsal/autonomous-intelligence.json
