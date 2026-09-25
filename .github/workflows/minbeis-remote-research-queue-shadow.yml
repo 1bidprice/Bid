@@ -81,15 +81,34 @@ jobs:
             const title = String(item?.title || '').toLowerCase();
             return title.includes('investor-control-market-gateway') && title.includes('minbeis_research_queue');
           });
-          if (matches.length !== 1) throw new Error(`Expected exactly one MINBEIS research queue namespace, found ${matches.length}`);
-          process.stdout.write(String(matches[0].id));
+          if (matches.length > 1) throw new Error(`Expected at most one MINBEIS research queue namespace, found ${matches.length}`);
+          process.stdout.write(matches.length === 1 ? String(matches[0].id) : '');
           NODE
           )"
-          test -n "$KV_ID"
-          echo "kv_id=$KV_ID" >> "$GITHUB_OUTPUT"
+          if [ -n "$KV_ID" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "kv_id=$KV_ID" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "kv_id=" >> "$GITHUB_OUTPUT"
+            mkdir -p market-intelligence/out
+            cat > market-intelligence/out/remote-queue-shadow-summary.json <<EOF
+          {
+            "format": "minbeis-remote-queue-shadow-summary",
+            "version": 1,
+            "generatedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "status": "BLOCKED_NOT_DEPLOYED",
+            "reason": "MINBEIS_RESEARCH_QUEUE namespace is not provisioned in production yet.",
+            "noPublicationPerformed": true,
+            "noQueueMutationPerformed": true,
+            "noBrokerWritePerformed": true
+          }
+          EOF
+          fi
           rm -f "$RESPONSE"
 
       - name: Capture queued symbols read-only
+        if: steps.namespace.outputs.configured == 'true'
         working-directory: market-intelligence
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -134,6 +153,7 @@ jobs:
           rm -f out/research-queue-values.ndjson out/research-queue-key-names.txt
 
       - name: Run canonical engine with remote queue as focus input
+        if: steps.namespace.outputs.configured == 'true'
         working-directory: market-intelligence
         env:
           SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
@@ -164,7 +184,7 @@ jobs:
           NODE
 
       - name: Build trusted queue completion plan without applying it
-        if: success()
+        if: steps.namespace.outputs.configured == 'true'
         working-directory: market-intelligence
         run: |
           set -euo pipefail
