@@ -9,9 +9,10 @@ const {
   fetchMinbeisResearchQueueStatus,
 } = require('./market-gateway-client');
 
-// This value is intentionally public. Expo inlines EXPO_PUBLIC_* values into the client bundle.
-// Never place provider credentials or any other secret in this variable.
-const COMPILED_MARKET_GATEWAY_URL = process.env.EXPO_PUBLIC_MARKET_GATEWAY_URL;
+// This endpoint is intentionally public. Provider credentials remain server-side.
+export const DEFAULT_MARKET_GATEWAY_URL = 'https://investor-control-market-gateway.bidprice-alerts.workers.dev';
+// Expo may override the verified public endpoint for controlled environments.
+const COMPILED_MARKET_GATEWAY_URL = process.env.EXPO_PUBLIC_MARKET_GATEWAY_URL || DEFAULT_MARKET_GATEWAY_URL;
 
 export function configuredMarketGatewayUrl(value = COMPILED_MARKET_GATEWAY_URL) {
   return normalizeGatewayBaseUrl(value);
