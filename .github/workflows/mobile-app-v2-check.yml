@@ -11,7 +11,7 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     env:
-      EXPO_PUBLIC_MARKET_GATEWAY_URL: ${{ vars.EXPO_PUBLIC_MARKET_GATEWAY_URL }}
+      EXPO_PUBLIC_MARKET_GATEWAY_URL: ${{ vars.EXPO_PUBLIC_MARKET_GATEWAY_URL || 'https://investor-control-market-gateway.bidprice-alerts.workers.dev' }}
     defaults:
       run:
         working-directory: mobile
