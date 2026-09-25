@@ -39,6 +39,9 @@ function priorityFor(item) {
 
 export function buildMinbeisHomeSummary(feed, positions = [], options = {}) {
   const now = Number(options.now || Date.now());
+  const instrumentCapabilities = options.instrumentCapabilities && typeof options.instrumentCapabilities === 'object'
+    ? options.instrumentCapabilities
+    : {};
   const feedFresh = freshness(feed, now);
   const systemReady = operational(feed);
   const positionSymbols = new Set(
@@ -80,6 +83,17 @@ export function buildMinbeisHomeSummary(feed, positions = [], options = {}) {
 
   const coveredSymbols = new Set(rows.map((row) => row.symbol));
   const pendingSymbols = [...positionSymbols].filter((symbol) => !coveredSymbols.has(symbol));
+  const capabilityFor = (symbol) => instrumentCapabilities[
+    Object.keys(instrumentCapabilities).find((key) => canonicalSymbol(key) === symbol)
+  ] || null;
+  const queuedSymbols = pendingSymbols.filter((symbol) => capabilityFor(symbol)?.queueStatus === 'QUEUED');
+  const identityBlockedSymbols = pendingSymbols.filter((symbol) => capabilityFor(symbol)?.onboardingStatus === 'IDENTITY_NOT_VERIFIED');
+  const onboardingReadySymbols = pendingSymbols.filter((symbol) => {
+    const item = capabilityFor(symbol);
+    return item?.onboardingStatus === 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED'
+      && item?.queueStatus !== 'QUEUED'
+      && item?.queueStatus !== 'COMPLETED';
+  });
   const attentionRows = rows.filter((row) => row.attention).sort((a, b) => {
     const score = (row) => {
       if (row.holderAction === 'SELL_NOW' || row.holderAction === 'REDUCE') return 100;
@@ -99,9 +113,14 @@ export function buildMinbeisHomeSummary(feed, positions = [], options = {}) {
     portfolioPositionCount: positionSymbols.size,
     coveredPositionCount: coveredSymbols.size,
     pendingPositionCount: pendingSymbols.length,
+    queuedResearchCount: queuedSymbols.length,
+    identityBlockedCount: identityBlockedSymbols.length,
+    onboardingReadyCount: onboardingReadySymbols.length,
     attentionCount: attentionRows.length,
     attentionSymbols: attentionRows.slice(0, 5).map((row) => row.symbol),
     pendingSymbols: pendingSymbols.slice(0, 5),
+    queuedResearchSymbols: queuedSymbols.slice(0, 5),
+    identityBlockedSymbols: identityBlockedSymbols.slice(0, 5),
     state: !feed
       ? 'NO_FEED'
       : !feedFresh
