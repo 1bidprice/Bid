@@ -33,7 +33,10 @@ jobs:
           set -euo pipefail
           test "$CONFIRM_PRODUCTION" = 'DEPLOY' || { echo 'Production confirmation is not DEPLOY.' >&2; exit 1; }
           test "$EXPECTED_SHA" = "$GITHUB_SHA" || { echo "Authorized SHA does not match workflow SHA: $GITHUB_SHA" >&2; exit 1; }
-          test "$GITHUB_REF_NAME" = 'investor-control-core-stabilization-v174' || { echo 'Deployment is restricted to the controlled release branch.' >&2; exit 1; }
+          case "$GITHUB_REF_NAME" in
+            investor-control-core-stabilization-v174|investor-control-minbeis-integration-v1) ;;
+            *) echo "Deployment is restricted to controlled Investor Control release branches." >&2; exit 1 ;;
+          esac
 
       - name: Require deployment credentials without exposing values
         shell: bash
@@ -66,6 +69,13 @@ jobs:
           node --check gateway/src/index.js
           node scripts/verify-canonical-source.js
           node --test test/market-gateway.test.js test/market-gateway-edge.test.js
+
+      - name: Verify MINBEIS research queue contract
+        working-directory: market-intelligence
+        run: |
+          set -euo pipefail
+          node --test test/research-queue-onboarding.test.js test/market-gateway.test.js test/market-gateway-edge.test.js
+          grep -q '"binding": "MINBEIS_RESEARCH_QUEUE"' gateway/wrangler.jsonc
 
       - name: Production bundle dry-run before deployment
         working-directory: market-intelligence/gateway
