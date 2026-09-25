@@ -831,8 +831,8 @@ function MainApp({ onOpenDecisionGate }) {
     missingValuationSymbols,
   } = portfolioSnapshot.summary;
   const minbeisHomeSummary = useMemo(
-    () => buildMinbeisHomeSummary(minbeisHomeFeed, positions),
-    [minbeisHomeFeed, positions],
+    () => buildMinbeisHomeSummary(minbeisHomeFeed, positions, { instrumentCapabilities: state.minbeisOnboarding }),
+    [minbeisHomeFeed, positions, state.minbeisOnboarding],
   );
 
 
@@ -1079,6 +1079,8 @@ function MainApp({ onOpenDecisionGate }) {
             <View style={styles.minbeisHomeStats}>
               <Text style={styles.minbeisHomeStat}>Κάλυψη {minbeisHomeSummary.coveredPositionCount}/{minbeisHomeSummary.portfolioPositionCount}</Text>
               <Text style={styles.minbeisHomeStat}>Εκκρεμούν {minbeisHomeSummary.pendingPositionCount}</Text>
+              {minbeisHomeSummary.queuedResearchCount > 0 ? <Text style={styles.minbeisHomeStat}>Research queue {minbeisHomeSummary.queuedResearchCount}</Text> : null}
+              {minbeisHomeSummary.identityBlockedCount > 0 ? <Text style={styles.minbeisHomeStat}>Ταυτοποίηση {minbeisHomeSummary.identityBlockedCount}</Text> : null}
               <Text style={styles.minbeisHomeStat}>{minbeisHomeSyncing ? 'Ανανέωση…' : minbeisHomeSummary.feedFresh ? 'Live feed' : 'Έλεγχος feed'}</Text>
             </View>
           </Pressable>
