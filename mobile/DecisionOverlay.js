@@ -32,7 +32,7 @@ import {
   portfolioSnapshot,
 } from './src/decision-engine';
 
-const VERSION = '1.7.3';
+const VERSION = '1.8.0';
 const SUPPORTED_BACKUP_VERSIONS = [1, DECISION_VERSION];
 
 const parseNum = (value) => {
@@ -320,7 +320,7 @@ export default function DecisionOverlay({ visible = false, onRequestClose }) {
         plans,
       };
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const uri = `${FileSystem.cacheDirectory}investor-control-decision-os-${stamp}.json`;
+      const uri = `${FileSystem.cacheDirectory}minbeis-decision-os-${stamp}.json`;
       await FileSystem.writeAsStringAsync(uri, JSON.stringify(payload, null, 2), {
         encoding: FileSystem.EncodingType.UTF8,
       });
