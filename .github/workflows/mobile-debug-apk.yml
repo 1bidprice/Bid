@@ -10,6 +10,8 @@ on:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
+    env:
+      EXPO_PUBLIC_MARKET_GATEWAY_URL: ${{ vars.EXPO_PUBLIC_MARKET_GATEWAY_URL }}
     defaults:
       run:
         working-directory: mobile
@@ -30,6 +32,13 @@ jobs:
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+
+      - name: Verify production market gateway build contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${EXPO_PUBLIC_MARKET_GATEWAY_URL:-}" || { echo 'Missing repository variable EXPO_PUBLIC_MARKET_GATEWAY_URL. Release APK would disable the canonical gateway.' >&2; exit 1; }
+          node -e "const u=new URL(process.env.EXPO_PUBLIC_MARKET_GATEWAY_URL); if(u.protocol!=='https:') process.exit(2); console.log('Gateway build contract: HTTPS URL configured');"
 
       - name: Verify v1.7 mobile release identity
         run: npm run test:release-identity
