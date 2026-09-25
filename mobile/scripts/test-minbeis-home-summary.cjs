@@ -48,11 +48,21 @@ const positions = [
   { symbol: 'ALWN.GR', quantity: 5 },
 ];
 
-const summary = buildMinbeisHomeSummary(feed, positions, { now });
+const summary = buildMinbeisHomeSummary(feed, positions, {
+  now,
+  instrumentCapabilities: {
+    'ALWN.GR': {
+      onboardingStatus: 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED',
+      queueStatus: 'QUEUED',
+    },
+  },
+});
 assert.equal(summary.state, 'ATTENTION');
 assert.equal(summary.attentionCount, 2);
 assert.equal(summary.coveredPositionCount, 2);
 assert.equal(summary.pendingPositionCount, 1);
+assert.equal(summary.queuedResearchCount, 1);
+assert.deepEqual(summary.queuedResearchSymbols, ['ALWN']);
 assert.ok(summary.attentionSymbols.includes('SPCE'));
 assert.ok(summary.attentionSymbols.includes('CREDIA'));
 assert.deepEqual(summary.pendingSymbols, ['ALWN']);
