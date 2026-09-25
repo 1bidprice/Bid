@@ -1,11 +1,17 @@
 name: MINBEIS Remote Research Queue Shadow
 
 on:
+  push:
+    branches:
+      - investor-control-minbeis-integration-v1
+    paths:
+      - 'market-intelligence/**'
+      - '.github/workflows/minbeis-remote-research-queue-shadow.yml'
   workflow_dispatch:
     inputs:
       expected_sha:
         description: 'Exact source SHA to verify against the remote queue'
-        required: true
+        required: false
         type: string
 
 permissions:
@@ -28,7 +34,7 @@ jobs:
 
       - name: Enforce exact source
         env:
-          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          EXPECTED_SHA: ${{ inputs.expected_sha || github.sha }}
         run: |
           set -euo pipefail
           test -n "$EXPECTED_SHA"
