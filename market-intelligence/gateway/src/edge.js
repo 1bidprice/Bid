@@ -25,6 +25,7 @@ export function normalizeGatewayClientId(value) {
 }
 
 export function gatewayCacheTtlSeconds(resourceKey) {
+  if (String(resourceKey || '').startsWith('instrument:')) return 300;
   if (String(resourceKey || '').endsWith('.US')) return 30;
   if (String(resourceKey || '').endsWith('.GR')) return 60;
   if (String(resourceKey || '') === 'EURUSD') return 900;
@@ -36,6 +37,11 @@ function protectedResource(url) {
     const parsed = parseGatewaySymbol(url.searchParams.get('symbol'));
     if (!parsed) return null;
     return { resourceKey: parsed.appSymbol, upstreamKey: parsed.market, paramName: 'symbol', paramValue: parsed.appSymbol, pathname: '/v1/quote' };
+  }
+  if (url.pathname === '/v1/instrument') {
+    const parsed = parseGatewaySymbol(url.searchParams.get('symbol'));
+    if (!parsed) return null;
+    return { resourceKey: `instrument:${parsed.appSymbol}`, upstreamKey: parsed.market, paramName: 'symbol', paramValue: parsed.appSymbol, pathname: '/v1/instrument' };
   }
   if (url.pathname === '/v1/fx' && String(url.searchParams.get('pair') || '').trim().toUpperCase() === 'EURUSD') {
     return { resourceKey: 'EURUSD', upstreamKey: 'FX', paramName: 'pair', paramValue: 'EURUSD', pathname: '/v1/fx' };
@@ -82,6 +88,25 @@ async function rateLimit(limiter, key) {
 
 export async function handleMarketGatewayEdgeRequest(request, env = {}, ctx = {}, options = {}) {
   const url = new URL(request.url);
+
+  if (url.pathname === '/v1/research-queue' && ['GET', 'POST'].includes(request.method)) {
+    const clientId = normalizeGatewayClientId(request.headers.get(MARKET_GATEWAY_CLIENT_HEADER));
+    if (!clientId) {
+      return jsonError(400, 'CLIENT_ID_REQUIRED', `${MARKET_GATEWAY_CLIENT_HEADER} must contain a stable opaque installation identifier.`);
+    }
+    const clientLimiter = options.clientLimiter || env.MARKET_GATEWAY_CLIENT_RATE_LIMITER;
+    if (!clientLimiter) {
+      return jsonError(503, 'EDGE_RATE_LIMITER_NOT_CONFIGURED', 'Gateway abuse protection is not configured.');
+    }
+    const clientLimit = await rateLimit(clientLimiter, `client:${clientId}`);
+    if (!clientLimit?.success) {
+      const response = jsonError(429, 'CLIENT_RATE_LIMITED', 'Client request rate limit exceeded.');
+      response.headers.set('Retry-After', '60');
+      return response;
+    }
+    return handleMarketGatewayRequest(request, env, options.coreOptions || {});
+  }
+
   if (request.method !== 'GET') return handleMarketGatewayRequest(request, env, options.coreOptions || {});
 
   const resource = protectedResource(url);

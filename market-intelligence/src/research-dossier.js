@@ -113,6 +113,48 @@ function referencePrice(marketSnapshot, historicalMetrics) {
   return null;
 }
 
+function normalizedListingSymbol(value) {
+  return String(value || '').trim().toUpperCase().replace(/\.(US|GR)$/i, '').replace(/\.AT$/i, '');
+}
+
+function verifiedActiveTradingFromMarket(company, marketSnapshot) {
+  const explicitLifecycle = String(company?.listingStatus || company?.primaryListing?.status || '').trim().toUpperCase();
+  if (['DELISTED', 'INACTIVE', 'PRIVATE', 'ACQUIRED', 'CEASED_TRADING', 'TERMINATED', 'EXPIRED'].includes(explicitLifecycle)) {
+    return { verified: false, source: null, verifiedAt: null };
+  }
+
+  if (company?.activeTradingVerified === true || company?.primaryListing?.activeTradingVerified === true) {
+    return {
+      verified: true,
+      source: 'CANONICAL_LISTING_METADATA',
+      verifiedAt: company?.listingVerifiedAt || company?.primaryListing?.verifiedAt || null,
+    };
+  }
+
+  const contract = marketSnapshot?.quoteContract || {};
+  const expectedSymbol = normalizedListingSymbol(company?.primaryListing?.symbol);
+  const quotedSymbol = normalizedListingSymbol(marketSnapshot?.appSymbol || marketSnapshot?.symbol || marketSnapshot?.providerSymbol);
+  const expectedCompanyId = company?.companyId || null;
+  const quotedCompanyId = marketSnapshot?.companyId || null;
+  const positivePrice = Number(marketSnapshot?.price ?? marketSnapshot?.currentPrice);
+
+  const verified = contract.identityVerified === true
+    && contract.sourceApproved === true
+    && contract.timestampVerified === true
+    && contract.decisionEligible === true
+    && Number.isFinite(positivePrice)
+    && positivePrice > 0
+    && Boolean(expectedSymbol)
+    && expectedSymbol === quotedSymbol
+    && (!expectedCompanyId || !quotedCompanyId || expectedCompanyId === quotedCompanyId);
+
+  return {
+    verified,
+    source: verified ? 'VERIFIED_DECISION_GRADE_MARKET_QUOTE' : null,
+    verifiedAt: verified ? (marketSnapshot?.checkedAt || marketSnapshot?.quoteAt || marketSnapshot?.generatedAt || null) : null,
+  };
+}
+
 function entityIntegrityBlockers(company, records, reference) {
   const blockers = [];
   const companyId = company?.companyId || null;
@@ -179,6 +221,8 @@ export function buildResearchDossier(input = {}) {
     category,
   };
 
+  const activeTrading = verifiedActiveTradingFromMarket(company, input.marketSnapshot);
+
   return {
     dossierId: `dossier:${company.companyId || 'unknown'}:${contentHash(identity).slice(0, 20)}`,
     version: 2,
@@ -187,9 +231,10 @@ export function buildResearchDossier(input = {}) {
     listing: company.primaryListing || { exchange: 'Unknown', symbol: 'UNKNOWN', mic: null },
     integrityContractVersion: 1,
     listingIntegrity: {
-      activeTradingVerified: company.activeTradingVerified === true || company.primaryListing?.activeTradingVerified === true,
+      activeTradingVerified: activeTrading.verified,
+      verificationSource: activeTrading.source,
       lifecycleStatus: company.listingStatus || company.primaryListing?.status || null,
-      verifiedAt: company.listingVerifiedAt || company.primaryListing?.verifiedAt || null,
+      verifiedAt: activeTrading.verifiedAt,
     },
     decisionBasis: input.decisionBasis || 'EVENT_DRIVEN',
     instrumentProfile: input.instrumentProfile || null,

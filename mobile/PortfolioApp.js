@@ -18,7 +18,7 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { isMarketGatewayConfigured } from './src/market-gateway-runtime';
+import { fetchConfiguredInstrumentCapability, fetchConfiguredMinbeisResearchQueueStatus, isMarketGatewayConfigured, requestConfiguredMinbeisResearch } from './src/market-gateway-runtime';
 import * as SecureStore from 'expo-secure-store';
 import {
   SafeAreaProvider,
@@ -48,6 +48,13 @@ import {
 } from './src/background-alert-task';
 import { exportBackupAsync, pickBackupAsync } from './src/backup';
 import OpportunitiesView from './src/OpportunitiesView';
+import { buildMinbeisHomeSummary } from './src/minbeis-home-summary';
+import { loadCachedIntelligenceFeed, syncIntelligenceFeedAsync } from './src/intelligence-feed-store';
+import {
+  canonicalInstrumentSymbol,
+  instrumentCurrency,
+  instrumentEntryFromTransaction,
+} from './src/instrument-entry';
 import { buildPortfolioSnapshot } from './src/portfolio-engine';
 import {
   allInPrice,
@@ -61,18 +68,66 @@ import {
   transactionTotal,
 } from './src/transaction-accounting';
 
-const VERSION = '1.7.3';
+const VERSION = '1.8.0';
 const PRIVACY_POLICY_URL = 'https://1bidprice.github.io/Bid/privacy-policy.html';
 const TERMS_URL = 'https://1bidprice.github.io/Bid/terms.html';
 const SUPPORT_EMAIL = 'xrimapp@gmail.com';
 const LEGAL_ACCEPTANCE_KEY = 'investor-control.legal-acceptance.v1';
 const MARKET_GATEWAY_CONFIGURED = isMarketGatewayConfigured();
+const DEFAULT_MINBEIS_POLICY = {
+  concentrationPolicyMode: 'INFORM_ONLY',
+  maxSinglePositionPct: 10,
+  concentrationAlertsEnabled: false,
+};
+
+function normalizeMinbeisOnboarding(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const allowed = new Set(['READY', 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED', 'IDENTITY_NOT_VERIFIED', 'GATEWAY_NOT_CONFIGURED', 'CHECK_FAILED']);
+  return Object.fromEntries(Object.entries(value).map(([symbol, item]) => {
+    const key = String(symbol || '').trim().toUpperCase();
+    if (!/^([A-Z0-9][A-Z0-9.-]{0,19})\.(US|GR)$/.test(key)) return null;
+    const status = allowed.has(item?.onboardingStatus) ? item.onboardingStatus : 'CHECK_FAILED';
+    const allowedQueue = new Set(['QUEUED', 'COMPLETED', 'ALREADY_SUPPORTED', 'NOT_QUEUED', 'QUEUE_NOT_CONFIGURED', 'QUEUE_FAILED', 'GATEWAY_NOT_CONFIGURED']);
+    const queueStatus = allowedQueue.has(item?.queueStatus) ? item.queueStatus : null;
+    return [key, {
+      requestedSymbol: key,
+      onboardingStatus: status,
+      queueStatus,
+      identityVerified: item?.identityVerified === true,
+      quoteSupported: item?.quoteSupported === true,
+      analysisSupported: item?.analysisSupported === true,
+      canonicalCompanyId: item?.canonicalCompanyId || null,
+      displayName: item?.displayName || null,
+      currency: item?.currency || null,
+      checkedAt: item?.checkedAt || null,
+      queuedAt: item?.queuedAt || null,
+      queueError: item?.queueError || null,
+      error: item?.error || null,
+    }];
+  }).filter(Boolean));
+}
+
+function normalizeMinbeisPolicy(value) {
+  const allowedModes = new Set(['INFORM_ONLY', 'USER_LIMIT', 'NO_LIMIT']);
+  const mode = allowedModes.has(value?.concentrationPolicyMode)
+    ? value.concentrationPolicyMode
+    : DEFAULT_MINBEIS_POLICY.concentrationPolicyMode;
+  const rawLimit = Number(value?.maxSinglePositionPct);
+  return {
+    concentrationPolicyMode: mode,
+    maxSinglePositionPct: Number.isFinite(rawLimit) ? Math.max(0.5, Math.min(100, rawLimit)) : DEFAULT_MINBEIS_POLICY.maxSinglePositionPct,
+    concentrationAlertsEnabled: value?.concentrationAlertsEnabled === true,
+  };
+}
+
 const EMPTY_STATE = {
   schemaVersion: 5,
   transactions: [],
   prices: {},
   meta: { lastCheckedAt: null, errors: [], accountingVersion: 2 },
   alerts: normalizeAlerts(null),
+  minbeisPolicy: DEFAULT_MINBEIS_POLICY,
+  minbeisOnboarding: {},
 };
 
 const valid = (value) => value !== null && value !== undefined && Number.isFinite(Number(value));
@@ -140,6 +195,8 @@ function normalizeState(raw) {
       accountingVersion: 2,
     },
     alerts: normalizeAlerts(raw.alerts),
+    minbeisPolicy: normalizeMinbeisPolicy(raw.minbeisPolicy),
+    minbeisOnboarding: normalizeMinbeisOnboarding(raw.minbeisOnboarding),
   };
 }
 
@@ -227,7 +284,7 @@ function PositionLotRow({ lot, currency, stale }) {
         </View>
         <Text style={[styles.lotPerformance, performanceStyle]}>{stale ? '—' : pct(performance)}</Text>
       </View>
-      <Text style={styles.lotMeta}>{remaining.toLocaleString('el-GR')} μετοχές{remaining !== original ? ' από ' + original.toLocaleString('el-GR') + ' αρχικές' : ''} · all-in {quotePrice(lot.allInPrice, currency, 4)}</Text>
+      <Text style={styles.lotMeta}>{remaining.toLocaleString('el-GR')} μετοχές{remaining !== original ? ' από ' + original.toLocaleString('el-GR') + ' αρχικές' : ''} · με έξοδα {quotePrice(lot.allInPrice, currency, 4)}</Text>
       <View style={styles.lotResultRow}>
         <Text style={styles.lotResultLabel}>Από τη συγκεκριμένη αγορά</Text>
         <Text style={[styles.lotResultValue, performanceStyle]}>{stale ? '—' : cash(lot.pnl, currency)}</Text>
@@ -252,7 +309,24 @@ function quoteQualityLabel(quote) {
 }
 
 function quoteSessionLabel(quote) {
-  return quote?.marketSession || quote?.session || 'Δεν δηλώνεται από την πηγή';
+  const raw = String(quote?.marketSession || quote?.session || '').trim();
+  return {
+    open: 'Ανοιχτή',
+    closed: 'Κλειστή',
+    premarket: 'Προσυνεδρίαση',
+    pre_market: 'Προσυνεδρίαση',
+    postmarket: 'Μετασυνεδριακή',
+    after_hours: 'Μετασυνεδριακή',
+    auction: 'Δημοπρασία',
+  }[raw.toLowerCase()] || raw || 'Δεν δηλώνεται από την πηγή';
+}
+
+function quoteSourceLabel(quote) {
+  const raw = String(quote?.source || '').trim();
+  if (/euronext athens delayed market data/i.test(raw)) return 'Euronext Athens · καθυστερημένα δεδομένα';
+  if (/finnhub quote api/i.test(raw)) return 'Finnhub · τιμή αγοράς';
+  if (/ecb/i.test(raw)) return 'Ευρωπαϊκή Κεντρική Τράπεζα';
+  return raw || '—';
 }
 
 function quoteHeadlineLabel(quote) {
@@ -311,7 +385,7 @@ function PositionCard({ item, compact, expanded, onToggle, onAlert }) {
         </View>
         <View style={styles.quoteTransparency}>
           <Text style={styles.quoteTransparencyTitle}>Διαφάνεια τιμής</Text>
-          <Text style={styles.quoteTransparencyText}>Πηγή: {item.quote?.source || '—'}</Text>
+          <Text style={styles.quoteTransparencyText}>Πηγή: {quoteSourceLabel(item.quote)}</Text>
           <Text style={styles.quoteTransparencyText}>{item.quote?.priceTimestampVerified === false ? 'Χρόνος δεδομένου: δεν δηλώνεται από την πηγή' : `Χρόνος δεδομένου: ${item.quote?.updatedAt ? when(item.quote.updatedAt) : '—'}`}</Text>
           <Text style={styles.quoteTransparencyText}>Τελευταίος έλεγχος: {item.quote?.checkedAt ? when(item.quote.checkedAt) : '—'}</Text>
           <Text style={styles.quoteTransparencyText}>Κατάσταση: {quoteQualityLabel(item.quote)} · Τρέχουσα συνεδρία: {quoteSessionLabel({ session: currentSession })}</Text>
@@ -322,7 +396,7 @@ function PositionCard({ item, compact, expanded, onToggle, onAlert }) {
           <Metric compact={compact} label="Αξία θέσης" value={cash(item.nativeValue, item.currency)} />
           <Metric compact={compact} label="Συνολικό κόστος" value={cash(item.cost, item.currency)} />
           <Metric compact={compact} label="Κέρδος / Ζημία" value={cash(item.nativePnl, item.currency)} negative={item.nativePnl < 0} positiveValue={item.nativePnl > 0} />
-          <Metric compact={compact} label="Μέση τιμή all-in" value={quotePrice(item.average, item.currency, 4)} />
+          <Metric compact={compact} label="Μέση τιμή με έξοδα" value={quotePrice(item.average, item.currency, 4)} />
         </View>
       </Pressable>
       {expanded ? (
@@ -330,7 +404,7 @@ function PositionCard({ item, compact, expanded, onToggle, onAlert }) {
           {item.currency === 'USD' && item.eurValue !== null ? <Text style={styles.note}>Σε ευρώ: αξία ≈ {cash(item.eurValue)} · αποτέλεσμα ≈ {cash(item.eurPnl)}</Text> : null}
           <View style={styles.lotsSection}>
             <View style={styles.lotsHeader}>
-              <View style={styles.grow}><Text style={styles.lotsTitle}>Επιμέρους αγορές</Text><Text style={styles.lotsSubtitle}>Κάθε αγορά κρατά το δικό της all-in και πρόσημο.</Text></View>
+              <View style={styles.grow}><Text style={styles.lotsTitle}>Επιμέρους αγορές</Text><Text style={styles.lotsSubtitle}>Κάθε αγορά κρατά τη δική της τελική τιμή με έξοδα και το δικό της αποτέλεσμα.</Text></View>
               <View style={styles.lotsCountBadge}><Text style={styles.lotsCountText}>{item.lots?.length || 0}</Text></View>
             </View>
             {(item.lots || []).map((lot) => <PositionLotRow key={lot.lotId} lot={lot} currency={item.currency} stale={stale} />)}
@@ -349,12 +423,14 @@ function PositionCard({ item, compact, expanded, onToggle, onAlert }) {
 
 function transactionForm(transaction = null) {
   const fees = transaction?.feeBreakdown || {};
+  const instrument = instrumentEntryFromTransaction(transaction || {});
   return {
     type: transaction?.type === 'sell' ? 'sell' : 'buy',
-    symbol: transaction?.symbol || '',
+    symbol: instrument.symbolInput || '',
+    market: instrument.market,
     company: transaction?.company || '',
     date: transaction?.date || new Date().toISOString().slice(0, 10),
-    currency: transaction?.currency === 'USD' ? 'USD' : 'EUR',
+    currency: instrument.currency,
     broker: transaction?.broker || '',
     quantity: inputNumber(transaction?.quantity),
     orderPrice: inputNumber(transactionOrderPrice(transaction)),
@@ -374,12 +450,29 @@ function transactionForm(transaction = null) {
 function TransactionModal({ visible, transaction, onClose, onSave }) {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState(transactionForm());
+  const [instrumentCheck, setInstrumentCheck] = useState(null);
+  const [checkingInstrument, setCheckingInstrument] = useState(false);
   useEffect(() => {
     if (!visible) return;
     setStep(1);
     setForm(transactionForm(transaction));
+    setInstrumentCheck(null);
+    setCheckingInstrument(false);
   }, [visible, transaction]);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const setSymbolInput = (value) => {
+    setInstrumentCheck(null);
+    set('symbol', String(value || '').toUpperCase().replace(/[.](US|GR)$/i, ''));
+  };
+  const setMarket = (market) => {
+    setInstrumentCheck(null);
+    setForm((current) => ({
+      ...current,
+      market,
+      currency: instrumentCurrency(market),
+    }));
+  };
+  const canonicalSymbol = canonicalInstrumentSymbol(form.symbol, form.market);
   const quantity = parseNum(form.quantity);
   const executionPrice = parseNum(form.executionPrice);
   const calculatedGross = roundMoney(quantity * executionPrice);
@@ -396,24 +489,76 @@ function TransactionModal({ visible, transaction, onClose, onSave }) {
   const total = form.type === 'sell' ? roundMoney(Math.max(0, gross - fees)) : roundMoney(gross + fees);
   const allIn = quantity > 0 ? total / quantity : 0;
 
-  const next = () => {
-    if (step === 1 && (!form.symbol.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(form.date))) {
-      Alert.alert('Λείπουν στοιχεία', 'Συμπλήρωσε σύμβολο και ημερομηνία σε μορφή ΕΕΕΕ-ΜΜ-ΗΗ.');
+  const continueAfterInstrumentCheck = () => setStep((current) => Math.min(3, current + 1));
+
+  const next = async () => {
+    if (step === 1 && (!canonicalSymbol || !/^\d{4}-\d{2}-\d{2}$/.test(form.date))) {
+      Alert.alert('Λείπουν στοιχεία', 'Διάλεξε αγορά, γράψε έγκυρο ticker και συμπλήρωσε ημερομηνία σε μορφή ΕΕΕΕ-ΜΜ-ΗΗ.');
       return;
     }
+
+    if (step === 1 && MARKET_GATEWAY_CONFIGURED) {
+      setCheckingInstrument(true);
+      try {
+        const capability = await fetchConfiguredInstrumentCapability(canonicalSymbol);
+        setInstrumentCheck(capability);
+        if (!form.company.trim() && capability?.displayName) {
+          set('company', capability.displayName);
+        }
+        if (capability?.identityVerified === true || capability?.analysisSupported === true) {
+          continueAfterInstrumentCheck();
+          return;
+        }
+        Alert.alert(
+          'Το προϊόν δεν επαληθεύτηκε ακόμη',
+          'Η συναλλαγή μπορεί να καταχωριστεί λογιστικά, αλλά το MINBEIS δεν θα δημιουργήσει απόφαση μέχρι να επαληθευτεί η ταυτότητα του προϊόντος.',
+          [
+            { text: 'Διόρθωση ticker', style: 'cancel' },
+            { text: 'Συνέχεια μόνο για καταγραφή', onPress: continueAfterInstrumentCheck },
+          ],
+        );
+        return;
+      } catch (error) {
+        setInstrumentCheck({
+          onboardingStatus: 'CHECK_FAILED',
+          error: String(error?.gatewayCode || error?.message || 'CHECK_FAILED'),
+        });
+        Alert.alert(
+          'Δεν ολοκληρώθηκε ο έλεγχος προϊόντος',
+          'Η συναλλαγή δεν χάνεται. Μπορείς να συνεχίσεις μόνο για λογιστική καταγραφή και το MINBEIS θα ξαναδοκιμάσει αργότερα.',
+          [
+            { text: 'Πίσω', style: 'cancel' },
+            { text: 'Συνέχεια', onPress: continueAfterInstrumentCheck },
+          ],
+        );
+        return;
+      } finally {
+        setCheckingInstrument(false);
+      }
+    }
+
     if (step === 2 && (quantity <= 0 || executionPrice <= 0)) {
       Alert.alert('Λείπουν στοιχεία', 'Συμπλήρωσε ποσότητα και πραγματική μέση τιμή εκτέλεσης.');
       return;
     }
-    setStep((current) => Math.min(3, current + 1));
+    continueAfterInstrumentCheck();
   };
 
   const save = () => {
-    if (!form.symbol.trim() || quantity <= 0 || executionPrice <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(form.date)) {
-      Alert.alert('Μη έγκυρη συναλλαγή', 'Έλεγξε σύμβολο, ημερομηνία, ποσότητα και μέση τιμή εκτέλεσης.');
+    if (!canonicalSymbol || quantity <= 0 || executionPrice <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(form.date)) {
+      Alert.alert('Μη έγκυρη συναλλαγή', 'Έλεγξε αγορά, ticker, ημερομηνία, ποσότητα και μέση τιμή εκτέλεσης.');
       return;
     }
-    onSave(buildTransaction({ ...form, quantity, orderPrice: optionalNumber(form.orderPrice), executionPrice, grossAmount: parseNum(form.grossAmount) > 0 ? parseNum(form.grossAmount) : null, feeBreakdown }, transaction));
+    onSave(buildTransaction({
+      ...form,
+      symbol: canonicalSymbol,
+      currency: instrumentCurrency(form.market),
+      quantity,
+      orderPrice: optionalNumber(form.orderPrice),
+      executionPrice,
+      grossAmount: parseNum(form.grossAmount) > 0 ? parseNum(form.grossAmount) : null,
+      feeBreakdown,
+    }, transaction));
   };
 
   return (
@@ -430,11 +575,38 @@ function TransactionModal({ visible, transaction, onClose, onSave }) {
               {step === 1 ? <>
                 <Text style={styles.formSection}>1. Βασικά στοιχεία</Text>
                 <View style={styles.segmentRow}><Segment value="buy" current={form.type} label="Αγορά" onPress={() => set('type', 'buy')} /><Segment value="sell" current={form.type} label="Πώληση" onPress={() => set('type', 'sell')} /></View>
-                <Field label="Σύμβολο" helper="Το σύμβολο που χρησιμοποιεί η εφαρμογή, π.χ. ALWN.GR ή SPCE.US." value={form.symbol} onChangeText={(value) => set('symbol', value.toUpperCase())} autoCapitalize="characters" placeholder="ALWN.GR" />
-                <Field label="Εταιρεία" value={form.company} onChangeText={(value) => set('company', value)} placeholder="Allwyn" />
+                <Text style={styles.fieldLabel}>Αγορά</Text>
+                <View style={styles.segmentRow}><Segment value="GR" current={form.market} label="Ελλάδα" onPress={() => setMarket('GR')} /><Segment value="US" current={form.market} label="ΗΠΑ" onPress={() => setMarket('US')} /></View>
+                <Field label="Ticker" helper="Γράψε μόνο το ticker. Η εφαρμογή προσθέτει αυτόματα την αγορά, π.χ. CREDIA → CREDIA.GR ή NVDA → NVDA.US." value={form.symbol} onChangeText={setSymbolInput} autoCapitalize="characters" placeholder={form.market === 'US' ? 'NVDA' : 'CREDIA'} />
+                <View style={styles.instrumentPreview}>
+                  <Text style={styles.instrumentPreviewLabel}>Θα αποθηκευτεί ως</Text>
+                  <Text style={styles.instrumentPreviewValue}>{canonicalSymbol || '—'} · {instrumentCurrency(form.market)}</Text>
+                </View>
+                {instrumentCheck ? (
+                  <View style={[styles.instrumentCheck, instrumentCheck.identityVerified === true || instrumentCheck.analysisSupported === true ? styles.instrumentCheckGood : styles.instrumentCheckPending]}>
+                    <Text style={styles.instrumentCheckTitle}>
+                      {instrumentCheck.analysisSupported === true
+                        ? 'ΕΤΟΙΜΟ ΓΙΑ ΑΝΑΛΥΣΗ'
+                        : instrumentCheck.identityVerified === true
+                          ? 'ΤΑΥΤΟΤΗΤΑ ΕΠΑΛΗΘΕΥΤΗΚΕ'
+                          : 'ΕΛΕΓΧΟΣ ΕΚΚΡΕΜΕΙ'}
+                    </Text>
+                    <Text style={styles.instrumentCheckText}>
+                      {instrumentCheck.analysisSupported === true
+                        ? 'Το προϊόν υποστηρίζεται ήδη από την πλήρη ανάλυση MINBEIS.'
+                        : instrumentCheck.identityVerified === true
+                          ? 'Το προϊόν επαληθεύτηκε και μπορεί να περάσει στη σειρά πλήρους έρευνας.'
+                          : 'Δεν υπάρχει ακόμη επαρκής επαληθευμένη ταυτοποίηση για απόφαση MINBEIS.'}
+                    </Text>
+                  </View>
+                ) : MARKET_GATEWAY_CONFIGURED ? (
+                  <Text style={styles.instrumentCheckHint}>Θα γίνει ασφαλής έλεγχος ticker όταν πατήσεις «Συνέχεια».</Text>
+                ) : (
+                  <Text style={styles.instrumentCheckHint}>Η κεντρική υπηρεσία δεδομένων MINBEIS δεν είναι διαθέσιμη σε αυτή την έκδοση. Η λογιστική καταχώρηση λειτουργεί κανονικά.</Text>
+                )}
+                <Field label="Εταιρεία — προαιρετικά" helper="Μπορείς να βάλεις όνομα για ευκολότερη αναγνώριση. Το MINBEIS χρησιμοποιεί το επαληθευμένο ticker." value={form.company} onChangeText={(value) => set('company', value)} placeholder={form.market === 'US' ? 'NVIDIA' : 'CrediaBank'} />
                 <Field label="Ημερομηνία συναλλαγής" value={form.date} onChangeText={(value) => set('date', value)} keyboardType="numbers-and-punctuation" placeholder="2026-07-14" />
                 <Field label="Broker / τράπεζα" value={form.broker} onChangeText={(value) => set('broker', value)} placeholder="Τράπεζα Πειραιώς" />
-                <View style={styles.segmentRow}><Segment value="EUR" current={form.currency} label="EUR" onPress={() => set('currency', 'EUR')} /><Segment value="USD" current={form.currency} label="USD" onPress={() => set('currency', 'USD')} /></View>
               </> : null}
               {step === 2 ? <>
                 <Text style={styles.formSection}>2. Εκτέλεση εντολής</Text>
@@ -456,9 +628,9 @@ function TransactionModal({ visible, transaction, onClose, onSave }) {
                   <View style={styles.halfField}><Field label="Άλλα έξοδα" value={form.other} onChangeText={(value) => set('other', value)} keyboardType="decimal-pad" placeholder="0,00" /></View>
                 </View>
                 <Field label="Σημείωση — προαιρετική" value={form.notes} onChangeText={(value) => set('notes', value)} placeholder="Τι θέλεις να θυμάσαι για αυτή τη συναλλαγή;" multiline />
-                <View style={styles.reviewCard}><Text style={styles.reviewTitle}>Τελικός έλεγχος</Text><ReviewLine label="Αξία συναλλαγής" value={cash(gross, form.currency)} /><ReviewLine label="Συνολικά έξοδα" value={cash(fees, form.currency)} /><ReviewLine label={form.type === 'sell' ? 'Καθαρό έσοδο' : 'Τελικό κόστος'} value={cash(total, form.currency)} strong /><ReviewLine label="Μέση τιμή all-in" value={quotePrice(allIn, form.currency, 4)} /></View>
+                <View style={styles.reviewCard}><Text style={styles.reviewTitle}>Τελικός έλεγχος</Text><ReviewLine label="Αξία συναλλαγής" value={cash(gross, form.currency)} /><ReviewLine label="Συνολικά έξοδα" value={cash(fees, form.currency)} /><ReviewLine label={form.type === 'sell' ? 'Καθαρό έσοδο' : 'Τελικό κόστος'} value={cash(total, form.currency)} strong /><ReviewLine label="Μέση τιμή με έξοδα" value={quotePrice(allIn, form.currency, 4)} /></View>
               </> : null}
-              <View style={styles.modalActions}>{step > 1 ? <Pressable style={styles.secondaryAction} onPress={() => setStep((current) => current - 1)}><Text style={styles.secondaryStrong}>Πίσω</Text></Pressable> : null}<Pressable style={[styles.primaryAction, step === 1 && styles.actionFull]} onPress={step < 3 ? next : save}><Text style={styles.whiteStrong}>{step < 3 ? 'Συνέχεια' : transaction ? 'Αποθήκευση αλλαγών' : 'Αποθήκευση συναλλαγής'}</Text></Pressable></View>
+              <View style={styles.modalActions}>{step > 1 ? <Pressable style={styles.secondaryAction} onPress={() => setStep((current) => current - 1)}><Text style={styles.secondaryStrong}>Πίσω</Text></Pressable> : null}<Pressable style={[styles.primaryAction, step === 1 && styles.actionFull, checkingInstrument && styles.disabled]} onPress={step < 3 ? next : save} disabled={checkingInstrument}>{checkingInstrument ? <ActivityIndicator color="#fff" /> : <Text style={styles.whiteStrong}>{step < 3 ? 'Συνέχεια' : transaction ? 'Αποθήκευση αλλαγών' : 'Αποθήκευση συναλλαγής'}</Text>}</Pressable></View>
             </ScrollView>
           </SafeAreaView>
         </KeyboardAvoidingView>
@@ -491,8 +663,8 @@ function TransactionCard({ transaction, expanded, onToggle, onEdit, onDelete }) 
         <ReviewLine label="Αξία συναλλαγής" value={cash(gross, currency)} />
         <ReviewLine label="Συνολικά έξοδα" value={cash(fees, currency)} />
         <ReviewLine label={transaction.type === 'sell' ? 'Καθαρό έσοδο' : 'Τελικό κόστος'} value={cash(total, currency)} strong />
-        <ReviewLine label="Μέση τιμή all-in" value={quotePrice(allInPrice(transaction), currency, 4)} />
-        {transaction.broker ? <Text style={styles.source}>Broker: {transaction.broker}</Text> : null}
+        <ReviewLine label="Μέση τιμή με έξοδα" value={quotePrice(allInPrice(transaction), currency, 4)} />
+        {transaction.broker ? <Text style={styles.source}>Χρηματιστηριακή: {transaction.broker}</Text> : null}
         {transaction.orderReference ? <Text style={styles.source}>Αριθμός εντολής: {transaction.orderReference}</Text> : null}
         {transaction.notes ? <Text style={styles.note}>Σημείωση: {transaction.notes}</Text> : null}
         {transaction.migrationNote ? <Text style={styles.successNote}>{transaction.migrationNote}</Text> : null}
@@ -531,7 +703,7 @@ function LegalNoticeModal({ visible, onAccept }) {
     <Modal visible={visible} animationType="fade" transparent={false} onRequestClose={() => {}}>
       <SafeAreaView style={styles.legalScreen} edges={['top', 'bottom', 'left', 'right']}>
         <ScrollView contentContainerStyle={styles.legalContent} showsVerticalScrollIndicator={false}>
-          <Text style={styles.eyebrow}>INVESTOR CONTROL</Text>
+          <Text style={styles.eyebrow}>ΠΡΟΣΩΠΙΚΗ ΕΠΕΝΔΥΤΙΚΗ ΝΟΗΜΟΣΥΝΗ</Text>
           <Text style={styles.legalTitle}>Σημαντική ενημέρωση πριν τη χρήση</Text>
           <Text style={styles.legalBody}>Η εφαρμογή είναι εργαλείο προσωπικής καταγραφής χαρτοφυλακίου και αυτοματοποιημένης επενδυτικής έρευνας. Δεν είναι χρηματιστηριακή εταιρεία, δεν κρατά χρήματα και δεν στέλνει εντολές αγοράς ή πώλησης σε broker.</Text>
           <Text style={styles.legalBody}>Οι ενδείξεις ΑΓΟΡΑ, ΠΩΛΗΣΗ, ΚΡΑΤΗΣΕ ή ΑΠΟΦΥΓΕ βασίζονται σε αυτοματοποιημένους κανόνες και διαθέσιμα δεδομένα. Μπορεί να είναι ελλιπείς, καθυστερημένες ή λανθασμένες. Δεν αποτελούν εγγύηση απόδοσης ούτε εξατομικευμένη επενδυτική συμβουλή.</Text>
@@ -564,8 +736,12 @@ function MainApp({ onOpenDecisionGate }) {
   const [notificationStatus, setNotificationStatus] = useState('unknown');
   const [backgroundRegistered, setBackgroundRegistered] = useState(false);
   const [legalAccepted, setLegalAccepted] = useState(null);
+  const [minbeisHomeFeed, setMinbeisHomeFeed] = useState(null);
+  const [minbeisHomeSyncing, setMinbeisHomeSyncing] = useState(false);
   const tokenRef = useRef('');
   const appState = useRef(AppState.currentState);
+  const onboardingAttemptedRef = useRef(new Set());
+  const minbeisHomeSyncingRef = useRef(false);
 
   useEffect(() => {
     AsyncStorage.getItem(LEGAL_ACCEPTANCE_KEY)
@@ -577,6 +753,30 @@ function MainApp({ onOpenDecisionGate }) {
     await AsyncStorage.setItem(LEGAL_ACCEPTANCE_KEY, 'accepted');
     setLegalAccepted(true);
   }, []);
+
+  const refreshMinbeisHomeFeed = useCallback(async () => {
+    if (minbeisHomeSyncingRef.current) return;
+    minbeisHomeSyncingRef.current = true;
+    setMinbeisHomeSyncing(true);
+    try {
+      const cached = await loadCachedIntelligenceFeed();
+      if (cached) setMinbeisHomeFeed(cached);
+      const synced = await syncIntelligenceFeedAsync();
+      if (synced?.feed) setMinbeisHomeFeed(synced.feed);
+    } catch {
+      // Home intelligence is additive. Portfolio accounting must remain usable offline.
+    } finally {
+      minbeisHomeSyncingRef.current = false;
+      setMinbeisHomeSyncing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    refreshMinbeisHomeFeed();
+    const interval = setInterval(() => { refreshMinbeisHomeFeed(); }, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [loading, refreshMinbeisHomeFeed]);
 
   const persist = useCallback(async (nextInput) => {
     const normalized = normalizeState(nextInput);
@@ -647,6 +847,11 @@ function MainApp({ onOpenDecisionGate }) {
     valuationCoverage,
     missingValuationSymbols,
   } = portfolioSnapshot.summary;
+  const minbeisHomeSummary = useMemo(
+    () => buildMinbeisHomeSummary(minbeisHomeFeed, positions, { instrumentCapabilities: state.minbeisOnboarding }),
+    [minbeisHomeFeed, positions, state.minbeisOnboarding],
+  );
+
 
   const liveUsProviderSymbols = useMemo(
     () => [...new Set(positions
@@ -670,6 +875,157 @@ function MainApp({ onOpenDecisionGate }) {
       );
     });
   }, [applyQuotes, liveUsProviderSymbolsKey, loading, token]);
+  const syncMinbeisOnboarding = useCallback(async (symbol) => {
+    const clean = String(symbol || '').trim().toUpperCase();
+    if (!/^([A-Z0-9][A-Z0-9.-]{0,19})\.(US|GR)$/.test(clean)) return null;
+    try {
+      const capability = await fetchConfiguredInstrumentCapability(clean);
+      let queueStatus = capability.analysisSupported === true ? 'ALREADY_SUPPORTED' : null;
+      let queuedAt = null;
+      let queueError = null;
+
+      if (capability.onboardingStatus === 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED') {
+        try {
+          const queued = await requestConfiguredMinbeisResearch(clean);
+          queueStatus = queued.queueStatus || (queued.queued ? 'QUEUED' : 'NOT_QUEUED');
+          queuedAt = queued.lastRequestedAt || queued.firstRequestedAt || new Date().toISOString();
+        } catch (queueFailure) {
+          const code = String(queueFailure?.gatewayCode || queueFailure?.message || 'MINBEIS_RESEARCH_QUEUE_FAILED');
+          queueStatus = code === 'RESEARCH_QUEUE_NOT_CONFIGURED' ? 'QUEUE_NOT_CONFIGURED' : 'QUEUE_FAILED';
+          queueError = code;
+        }
+      }
+
+      const current = stateRef.current;
+      const entry = {
+        requestedSymbol: clean,
+        onboardingStatus: capability.onboardingStatus,
+        queueStatus,
+        identityVerified: capability.identityVerified === true,
+        quoteSupported: capability.quoteSupported === true,
+        analysisSupported: capability.analysisSupported === true,
+        canonicalCompanyId: capability.canonicalCompanyId || null,
+        displayName: capability.displayName || null,
+        currency: capability.currency || null,
+        checkedAt: new Date().toISOString(),
+        queuedAt,
+        queueError,
+        error: null,
+      };
+      await persist({
+        ...current,
+        minbeisOnboarding: { ...(current.minbeisOnboarding || {}), [clean]: entry },
+      });
+      return entry;
+    } catch (error) {
+      const current = stateRef.current;
+      const previous = current.minbeisOnboarding?.[clean] || {};
+      const entry = {
+        requestedSymbol: clean,
+        onboardingStatus: 'CHECK_FAILED',
+        queueStatus: previous.queueStatus || null,
+        identityVerified: previous.identityVerified === true,
+        quoteSupported: previous.quoteSupported === true,
+        analysisSupported: previous.analysisSupported === true,
+        canonicalCompanyId: previous.canonicalCompanyId || null,
+        displayName: previous.displayName || null,
+        currency: previous.currency || null,
+        checkedAt: new Date().toISOString(),
+        queuedAt: previous.queuedAt || null,
+        queueError: previous.queueError || null,
+        error: String(error?.gatewayCode || error?.message || 'MINBEIS_ONBOARDING_CHECK_FAILED'),
+      };
+      await persist({
+        ...current,
+        minbeisOnboarding: { ...(current.minbeisOnboarding || {}), [clean]: entry },
+      });
+      return entry;
+    }
+  }, [persist]);
+
+  const refreshQueuedResearchStatus = useCallback(async (symbol) => {
+    const clean = String(symbol || '').trim().toUpperCase();
+    if (!/^([A-Z0-9][A-Z0-9.-]{0,19})\.(US|GR)$/.test(clean)) return null;
+    try {
+      const remote = await fetchConfiguredMinbeisResearchQueueStatus(clean);
+      const current = stateRef.current;
+      const previous = current.minbeisOnboarding?.[clean];
+      if (!previous) return remote;
+      const nextQueueStatus = remote.queueStatus || previous.queueStatus || null;
+      const nextQueuedAt = remote.lastRequestedAt || remote.firstRequestedAt || previous.queuedAt || null;
+      if (nextQueueStatus === previous.queueStatus && nextQueuedAt === previous.queuedAt) return remote;
+      await persist({
+        ...current,
+        minbeisOnboarding: {
+          ...(current.minbeisOnboarding || {}),
+          [clean]: {
+            ...previous,
+            queueStatus: nextQueueStatus,
+            queuedAt: nextQueuedAt,
+            queueError: null,
+            checkedAt: new Date().toISOString(),
+          },
+        },
+      });
+      return remote;
+    } catch {
+      return null;
+    }
+  }, [persist]);
+
+  const onboardingSymbolsToCheck = useMemo(
+    () => positions
+      .map((position) => String(position?.symbol || '').trim().toUpperCase())
+      .filter((symbol) => /^([A-Z0-9][A-Z0-9.-]{0,19})\.(US|GR)$/.test(symbol))
+      .filter((symbol) => {
+        const entry = state.minbeisOnboarding?.[symbol];
+        if (!entry) return true;
+        if (entry.onboardingStatus === 'CHECK_FAILED') return true;
+        return entry.onboardingStatus === 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED'
+          && !['QUEUED', 'COMPLETED'].includes(entry.queueStatus);
+      })
+      .filter((symbol) => !onboardingAttemptedRef.current.has(symbol))
+      .sort(),
+    [positions, state.minbeisOnboarding],
+  );
+  const onboardingSymbolsKey = onboardingSymbolsToCheck.join('|');
+
+  useEffect(() => {
+    if (loading || !onboardingSymbolsToCheck.length) return;
+    let cancelled = false;
+    (async () => {
+      for (const symbol of onboardingSymbolsToCheck) {
+        if (cancelled) break;
+        onboardingAttemptedRef.current.add(symbol);
+        await syncMinbeisOnboarding(symbol);
+      }
+    })().catch(() => {});
+    return () => { cancelled = true; };
+  }, [loading, onboardingSymbolsKey, syncMinbeisOnboarding]);
+
+  const queuedResearchSymbols = useMemo(
+    () => Object.entries(state.minbeisOnboarding || {})
+      .filter(([, entry]) => entry?.queueStatus === 'QUEUED')
+      .map(([symbol]) => symbol)
+      .sort(),
+    [state.minbeisOnboarding],
+  );
+  const queuedResearchSymbolsKey = queuedResearchSymbols.join('|');
+
+  useEffect(() => {
+    if (loading || !queuedResearchSymbols.length) return undefined;
+    let cancelled = false;
+    const check = async () => {
+      for (const symbol of queuedResearchSymbols) {
+        if (cancelled) break;
+        await refreshQueuedResearchStatus(symbol);
+      }
+    };
+    check().catch(() => {});
+    const interval = setInterval(() => { check().catch(() => {}); }, 5 * 60 * 1000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [loading, queuedResearchSymbolsKey, refreshQueuedResearchStatus]);
+
   const openNewTransaction = () => { setEditingTransaction(null); setTransactionModal(true); };
 
   const saveTransaction = async (transaction) => {
@@ -683,6 +1039,9 @@ function MainApp({ onOpenDecisionGate }) {
     const transactions = editingTransaction ? current.transactions.map((item) => item.id === editingTransaction.id ? transaction : item) : [...current.transactions, transaction];
     await persist({ ...current, transactions });
     setTransactionModal(false); setEditingTransaction(null); setExpandedTransaction(transaction.id); refresh({ silent: true });
+    if (transaction.type === 'buy') {
+      syncMinbeisOnboarding(transaction.symbol);
+    }
   };
 
   const deleteTransaction = (transaction) => Alert.alert('Διαγραφή συναλλαγής', `Να διαγραφεί η συναλλαγή ${transaction.company};`, [{ text: 'Άκυρο', style: 'cancel' }, { text: 'Διαγραφή', style: 'destructive', onPress: async () => { await persist({ ...stateRef.current, transactions: stateRef.current.transactions.filter((item) => item.id !== transaction.id) }); setExpandedTransaction(null); refresh({ silent: true }); } }]);
@@ -706,16 +1065,45 @@ function MainApp({ onOpenDecisionGate }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}><LegalNoticeModal visible={!legalAccepted} onAccept={acceptLegalNotice} /><StatusBar barStyle="dark-content" backgroundColor="#eef5ff" /><View style={styles.app}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <Text style={styles.eyebrow}>ΠΡΟΣΩΠΙΚΟ ΧΑΡΤΟΦΥΛΑΚΙΟ</Text>
-        <View style={styles.rowTop}><View style={styles.grow}><Text style={[styles.title, width < 380 && styles.titleCompact]}>Investor Control</Text><Text style={styles.versionLine}>Λογιστική ακρίβεια · v{VERSION}</Text></View><Pressable style={styles.plus} onPress={openNewTransaction}><Text style={styles.plusText}>＋</Text></Pressable></View>
+        <Text style={styles.eyebrow}>MINBEIS · ΕΠΕΝΔΥΤΙΚΗ ΝΟΗΜΟΣΥΝΗ</Text>
+        <View style={styles.rowTop}><View style={styles.grow}><Text style={[styles.title, width < 380 && styles.titleCompact]}>MINBEIS</Text><Text style={styles.versionLine}>Χαρτοφυλάκιο · έρευνα · αποφάσεις · v{VERSION}</Text></View><Pressable style={styles.plus} onPress={openNewTransaction}><Text style={styles.plusText}>＋</Text></Pressable></View>
         {tab === 'summary' ? <>
           <View style={styles.refreshCard}><View style={styles.grow}><Text style={styles.muted}>Τελευταίος έλεγχος</Text><Text style={styles.checked}>{when(state.meta.lastCheckedAt)}</Text></View><Pressable style={[styles.primarySmall, refreshing && styles.disabled]} onPress={() => refresh()} disabled={refreshing}>{refreshing ? <ActivityIndicator color="#fff" /> : <Text style={styles.whiteStrong}>Ανανέωση</Text>}</Pressable></View>
           {state.meta.errors?.length ? <Text style={styles.warning}>{state.meta.errors.join('\n')}</Text> : null}
           <View style={styles.grid}><Metric compact={compactMetrics} label={valuesReady ? 'Αξία χαρτοφυλακίου' : 'Επιβεβ. αξία'} value={cash(totalValue)} /><Metric compact={compactMetrics} label={costsReady ? 'Καθαρό κόστος' : 'Επιβεβ. κόστος'} value={cash(totalCost)} /><Metric compact={compactMetrics} label={valuesReady ? 'Κέρδος / Ζημία' : 'Επιβεβ. αποτέλεσμα'} value={cash(totalPnl)} negative={totalPnl < 0} positiveValue={totalPnl > 0} /><Metric compact={compactMetrics} label="Κάλυψη τιμών" value={valuationCoverage} /></View>
           {!valuesReady ? <Text style={styles.warning}>Μερική αποτίμηση {valuationCoverage}. Εξαιρούνται από την αξία και το αποτέλεσμα μόνο οι θέσεις χωρίς χρησιμοποιήσιμη τιμή ή ισοτιμία: {missingValuationSymbols.join(', ') || '—'}.</Text> : null}
-          <Pressable style={styles.decisionEntry} onPress={onOpenDecisionGate} accessibilityLabel="Άνοιγμα Decision Gate">
+          <Pressable style={[styles.minbeisHomeCard, minbeisHomeSummary.state === 'ATTENTION' && styles.minbeisHomeCardAttention]} onPress={() => setTab('opportunities')}>
+            <View style={styles.minbeisHomeTop}>
+              <View style={styles.grow}>
+                <Text style={styles.minbeisHomeEyebrow}>MINBEIS · ΧΑΡΤΟΦΥΛΑΚΙΟ ΣΗΜΕΡΑ</Text>
+                <Text style={styles.minbeisHomeTitle}>
+                  {minbeisHomeSummary.state === 'ATTENTION'
+                    ? `${minbeisHomeSummary.attentionCount} θέση${minbeisHomeSummary.attentionCount === 1 ? '' : 'εις'} χρειάζονται προσοχή`
+                    : minbeisHomeSummary.state === 'PENDING'
+                      ? 'Υπάρχουν θέσεις που περιμένουν πλήρη ανάλυση'
+                      : minbeisHomeSummary.state === 'CLEAR'
+                        ? 'Καμία θέση δεν απαιτεί άμεση προσοχή'
+                        : minbeisHomeSummary.state === 'STALE'
+                          ? 'Η MINBEIS ροή χρειάζεται ανανέωση'
+                          : minbeisHomeSummary.state === 'SYSTEM_LIMITED'
+                            ? 'Η ανάλυση είναι προσωρινά περιορισμένη'
+                            : 'Φόρτωση MINBEIS ανάλυσης'}
+                </Text>
+              </View>
+              <Text style={styles.minbeisHomeArrow}>›</Text>
+            </View>
+            {minbeisHomeSummary.attentionSymbols.length ? <Text style={styles.minbeisHomeAttention}>Προσοχή: {minbeisHomeSummary.attentionSymbols.join(', ')}</Text> : null}
+            <View style={styles.minbeisHomeStats}>
+              <Text style={styles.minbeisHomeStat}>Κάλυψη {minbeisHomeSummary.coveredPositionCount}/{minbeisHomeSummary.portfolioPositionCount}</Text>
+              <Text style={styles.minbeisHomeStat}>Εκκρεμούν {minbeisHomeSummary.pendingPositionCount}</Text>
+              {minbeisHomeSummary.queuedResearchCount > 0 ? <Text style={styles.minbeisHomeStat}>Σε έρευνα {minbeisHomeSummary.queuedResearchCount}</Text> : null}
+              {minbeisHomeSummary.identityBlockedCount > 0 ? <Text style={styles.minbeisHomeStat}>Ταυτοποίηση {minbeisHomeSummary.identityBlockedCount}</Text> : null}
+              <Text style={styles.minbeisHomeStat}>{minbeisHomeSyncing ? 'Ανανέωση…' : minbeisHomeSummary.feedFresh ? 'Ροή ενημερωμένη' : 'Έλεγχος ενημέρωσης'}</Text>
+            </View>
+          </Pressable>
+          <Pressable style={styles.decisionEntry} onPress={onOpenDecisionGate} accessibilityLabel="Άνοιγμα ελέγχου απόφασης">
             <View style={styles.decisionEntryIcon}><Text style={styles.decisionEntryCheck}>✓</Text></View>
-            <View style={styles.grow}><Text style={styles.decisionEntryTitle}>Decision Gate</Text><Text style={styles.decisionEntryText}>Έλεγχος πειθαρχίας πριν από αγορά ή ενίσχυση θέσης</Text></View>
+            <View style={styles.grow}><Text style={styles.decisionEntryTitle}>Έλεγχος απόφασης</Text><Text style={styles.decisionEntryText}>Πριν από νέα αγορά ή ενίσχυση, έλεγξε όρια, κίνδυνο και πλάνο</Text></View>
             <Text style={styles.decisionEntryArrow}>›</Text>
           </Pressable>
           <View style={styles.quickActions}><Pressable style={styles.primaryQuick} onPress={openNewTransaction}><Text style={styles.whiteStrong}>＋ Νέα συναλλαγή</Text></Pressable><Pressable style={styles.secondaryQuick} onPress={() => setTab('transactions')}><Text style={styles.secondaryStrong}>Ιστορικό</Text></Pressable></View>
@@ -737,17 +1125,42 @@ function MainApp({ onOpenDecisionGate }) {
           <View style={styles.sectionRow}><Text style={styles.subsection}>Ιστορικό</Text>{state.alerts.history.length ? <Pressable onPress={() => persist({ ...stateRef.current, alerts: { ...stateRef.current.alerts, history: [] } })}><Text style={styles.link}>Καθαρισμός</Text></Pressable> : null}</View>
           {state.alerts.history.length ? state.alerts.history.map((event) => <View key={event.id} style={styles.historyItem}><Text style={styles.statusStrong}>{event.symbol}</Text><Text style={styles.note}>{event.message}</Text><Text style={styles.source}>{when(event.triggeredAt)}</Text></View>) : <View style={styles.emptyCard}><Text style={styles.emptyTitle}>Καμία ενεργοποίηση.</Text><Text style={styles.note}>Οι ειδοποιήσεις που πυροδοτούνται θα καταγράφονται εδώ.</Text></View>}
         </> : null}
-        {tab === 'opportunities' ? <OpportunitiesView portfolioPositions={positions} /> : null}
+        {tab === 'opportunities' ? <OpportunitiesView portfolioPositions={positions} portfolioPolicy={state.minbeisPolicy} instrumentCapabilities={state.minbeisOnboarding} /> : null}
         {tab === 'settings' ? <>
           <Text style={styles.section}>Ρυθμίσεις</Text>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Στρατηγική συγκέντρωσης MINBEIS</Text>
+            <Text style={styles.note}>Η εφαρμογή δεν επιβάλλει δική της φιλοσοφία κατανομής. Επίλεξε πώς θέλεις να χρησιμοποιείται ο κίνδυνος συγκέντρωσης στις προτάσεις θέσης.</Text>
+            <View style={styles.segmentRow}>
+              <Segment value="INFORM_ONLY" current={state.minbeisPolicy.concentrationPolicyMode} label="Ενημέρωση μόνο" onPress={() => persist({ ...stateRef.current, minbeisPolicy: { ...stateRef.current.minbeisPolicy, concentrationPolicyMode: 'INFORM_ONLY' } })} />
+              <Segment value="USER_LIMIT" current={state.minbeisPolicy.concentrationPolicyMode} label="Δικό μου όριο" onPress={() => persist({ ...stateRef.current, minbeisPolicy: { ...stateRef.current.minbeisPolicy, concentrationPolicyMode: 'USER_LIMIT' } })} />
+              <Segment value="NO_LIMIT" current={state.minbeisPolicy.concentrationPolicyMode} label="Χωρίς όριο" onPress={() => persist({ ...stateRef.current, minbeisPolicy: { ...stateRef.current.minbeisPolicy, concentrationPolicyMode: 'NO_LIMIT' } })} />
+            </View>
+            {state.minbeisPolicy.concentrationPolicyMode === 'USER_LIMIT' ? (
+              <Field
+                label="Μέγιστο ποσοστό σε μία μετοχή (%)"
+                helper="Το όριο είναι δικό σου και μπορεί να είναι από 0,5% έως 100%."
+                value={String(state.minbeisPolicy.maxSinglePositionPct)}
+                onChangeText={(value) => {
+                  const numeric = Number(String(value).replace(',', '.'));
+                  if (!Number.isFinite(numeric)) return;
+                  persist({ ...stateRef.current, minbeisPolicy: { ...stateRef.current.minbeisPolicy, maxSinglePositionPct: numeric } });
+                }}
+                keyboardType="decimal-pad"
+                placeholder="10"
+              />
+            ) : null}
+            <ReviewLine label="Push για συγκέντρωση" value="Ανενεργά από προεπιλογή" />
+            <Text style={styles.privacyNotice}>Ακόμη και στο «Χωρίς όριο», το app μπορεί να δείξει ότι μια θέση είναι πολύ συγκεντρωμένη, αλλά δεν θα μειώνει ή θα μπλοκάρει τη δική σου επιλογή.</Text>
+          </View>
           <View style={styles.card}><Text style={styles.cardTitle}>Ιδιωτικότητα δεδομένων</Text><Text style={styles.note}>Συναλλαγές, όρια και ιστορικό αποθηκεύονται μόνο στη συγκεκριμένη συσκευή. Δεν υπάρχει κοινός λογαριασμός ή πρόσβαση διαχειριστή.</Text><ReviewLine label="Αποθήκευση" value="Μόνο στη συσκευή" /><ReviewLine label="Cloud συγχρονισμός" value="Ανενεργός" /></View>
           <View style={styles.card}><Text style={styles.cardTitle}>Ακρίβεια συναλλαγών</Text><Text style={styles.note}>Κάθε συναλλαγή κρατά χωριστά τιμή εντολής, μέση τιμή εκτέλεσης, αξία συναλλαγής, αναλυτικά έξοδα και τελικό κόστος.</Text><ReviewLine label="Λογιστικό μοντέλο" value="v2 ενεργό" /><ReviewLine label="Σχήμα δεδομένων" value="v5" /></View>
           <View style={styles.card}><Text style={styles.cardTitle}>Αντίγραφο ασφαλείας</Text><Text style={styles.note}>Το JSON περιλαμβάνει συναλλαγές και όρια. Δεν περιλαμβάνει το Finnhub token.</Text><Pressable style={styles.primary} onPress={exportBackup}><Text style={styles.whiteStrong}>Εξαγωγή αντιγράφου JSON</Text></Pressable><Pressable style={styles.secondaryActionFull} onPress={importBackup}><Text style={styles.secondaryStrong}>Επαναφορά από JSON</Text></Pressable></View>
           <View style={styles.card}><Text style={styles.cardTitle}>Διαχειριζόμενες πηγές δεδομένων</Text><Text style={styles.note}>Οι εγκεκριμένες τιμές και η έρευνα ενημερώνονται από την κεντρική ροή της εφαρμογής. Δεν απαιτείται προσωπικό API token. Εφεδρικές ή μη επαληθευμένες τιμές εμφανίζονται μόνο πληροφοριακά και δεν ενεργοποιούν τελική απόφαση ή ειδοποίηση.</Text><ReviewLine label="Επίσημες ελληνικές πηγές" value="Euronext Athens" /><ReviewLine label="Αμερικανικά δεδομένα" value="Αδειοδοτημένος πάροχος / SEC" /><ReviewLine label="Προσωπικό API token" value="Δεν απαιτείται" /><Text style={styles.privacyNotice}>Για την ανάκτηση τιμής μπορεί να αποστέλλεται στον πάροχο μόνο το σύμβολο της μετοχής. Ποσότητες, κόστος, κέρδος/ζημία και σημειώσεις δεν αποστέλλονται.</Text></View>
-          <View style={styles.card}><Text style={styles.cardTitle}>Νομικά και υποστήριξη</Text><Text style={styles.note}>Η εφαρμογή δεν εκτελεί συναλλαγές και δεν εγγυάται απόδοση. Κάθε επενδυτική απόφαση και η εκτέλεσή της παραμένει αποκλειστικά στον χρήστη.</Text><Pressable style={styles.secondaryActionFull} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}><Text style={styles.secondaryStrong}>Πολιτική απορρήτου</Text></Pressable><Pressable style={styles.secondaryActionFull} onPress={() => Linking.openURL(TERMS_URL)}><Text style={styles.secondaryStrong}>Όροι χρήσης</Text></Pressable><Pressable style={styles.secondaryActionFull} onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=Investor%20Control%20Support`)}><Text style={styles.secondaryStrong}>Επικοινωνία υποστήριξης</Text></Pressable></View><View style={styles.card}><Text style={styles.cardTitle}>Τοπικά δεδομένα</Text><Text style={styles.note}>Η διαγραφή αφορά μόνο αυτή τη συσκευή και δεν αναιρείται. Η αποδοχή της νομικής ενημέρωσης διατηρείται χωριστά για λόγους διαφάνειας.</Text><Pressable style={styles.dangerActionFull} onPress={resetLocalData}><Text style={styles.dangerStrong}>Διαγραφή όλων των τοπικών δεδομένων</Text></Pressable></View>
+          <View style={styles.card}><Text style={styles.cardTitle}>Νομικά και υποστήριξη</Text><Text style={styles.note}>Η εφαρμογή δεν εκτελεί συναλλαγές και δεν εγγυάται απόδοση. Κάθε επενδυτική απόφαση και η εκτέλεσή της παραμένει αποκλειστικά στον χρήστη.</Text><Pressable style={styles.secondaryActionFull} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}><Text style={styles.secondaryStrong}>Πολιτική απορρήτου</Text></Pressable><Pressable style={styles.secondaryActionFull} onPress={() => Linking.openURL(TERMS_URL)}><Text style={styles.secondaryStrong}>Όροι χρήσης</Text></Pressable><Pressable style={styles.secondaryActionFull} onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=MINBEIS%20Support`)}><Text style={styles.secondaryStrong}>Επικοινωνία υποστήριξης</Text></Pressable></View><View style={styles.card}><Text style={styles.cardTitle}>Τοπικά δεδομένα</Text><Text style={styles.note}>Η διαγραφή αφορά μόνο αυτή τη συσκευή και δεν αναιρείται. Η αποδοχή της νομικής ενημέρωσης διατηρείται χωριστά για λόγους διαφάνειας.</Text><Pressable style={styles.dangerActionFull} onPress={resetLocalData}><Text style={styles.dangerStrong}>Διαγραφή όλων των τοπικών δεδομένων</Text></Pressable></View>
         </> : null}
       </ScrollView>
-      <View style={styles.nav}>{[['summary', '⌂', 'Σύνοψη'], ['transactions', '⇄', 'Συναλλαγές'], ['opportunities', '◎', 'Έρευνα'], ['alerts', '!', 'Ειδοπ.'], ['settings', '⚙', 'Ρυθμίσεις']].map(([key, icon, label]) => <Pressable key={key} style={[styles.navItem, tab === key && styles.navItemOn]} onPress={() => setTab(key)}><Text style={[styles.navIcon, tab === key && styles.navTextOn]}>{icon}</Text><Text style={[styles.navText, tab === key && styles.navTextOn]}>{label}</Text></Pressable>)}</View>
+      <View style={styles.nav}>{[['summary', '⌂', 'Σύνοψη'], ['transactions', '⇄', 'Συναλλαγές'], ['opportunities', '◎', 'MINBEIS'], ['alerts', '!', 'Ειδοπ.'], ['settings', '⚙', 'Ρυθμίσεις']].map(([key, icon, label]) => <Pressable key={key} style={[styles.navItem, tab === key && styles.navItemOn]} onPress={() => setTab(key)}><Text style={[styles.navIcon, tab === key && styles.navTextOn]}>{icon}</Text><Text style={[styles.navText, tab === key && styles.navTextOn]}>{label}</Text></Pressable>)}</View>
       <TransactionModal visible={transactionModal} transaction={editingTransaction} onClose={() => { setTransactionModal(false); setEditingTransaction(null); }} onSave={saveTransaction} />
       <AlertRuleModal visible={Boolean(alertPosition)} position={alertPosition} rule={alertPosition ? getRule(state.alerts, alertPosition.symbol) : null} onClose={() => setAlertPosition(null)} onSave={saveAlertRule} />
     </View></SafeAreaView>
@@ -766,7 +1179,17 @@ const styles = StyleSheet.create({
   plus: { width: 58, height: 58, borderRadius: 20, borderWidth: 1, borderColor: '#cfdae9', backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' }, plusText: { color: '#16345f', fontSize: 42, lineHeight: 46, fontWeight: '300' },
   refreshCard: { marginTop: 24, backgroundColor: '#fff', borderRadius: 24, borderWidth: 1, borderColor: '#d5dfec', padding: 18, flexDirection: 'row', alignItems: 'center', gap: 14 }, checked: { color: '#16345f', fontWeight: '900', fontSize: 20, marginTop: 4 }, muted: { color: '#7b889d', fontSize: 15, lineHeight: 22 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10, marginTop: 12 }, metric: { width: '48.5%', minHeight: 102, borderRadius: 20, borderWidth: 1, borderColor: '#d5dfec', backgroundColor: '#fff', padding: 14, justifyContent: 'space-between' }, metricCompact: { paddingHorizontal: 11 }, metricValue: { color: '#16345f', fontSize: 21, lineHeight: 26, fontWeight: '900', marginTop: 9 }, red: { color: '#d83b4d' }, green: { color: '#078548' },
-  warning: { color: '#a66700', backgroundColor: '#fff6df', borderRadius: 14, padding: 12, marginTop: 12, lineHeight: 21, fontWeight: '700' }, decisionEntry: { minHeight: 76, borderRadius: 21, backgroundColor: '#07163E', flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 15, paddingVertical: 12, marginTop: 16 }, decisionEntryIcon: { width: 44, height: 44, borderRadius: 15, backgroundColor: '#0B66FF', alignItems: 'center', justifyContent: 'center' }, decisionEntryCheck: { color: '#fff', fontSize: 28, lineHeight: 32, fontWeight: '900' }, decisionEntryTitle: { color: '#fff', fontSize: 17, fontWeight: '900' }, decisionEntryText: { color: '#b8c9e8', fontSize: 12, lineHeight: 17, marginTop: 2 }, decisionEntryArrow: { color: '#8eb8ff', fontSize: 34, lineHeight: 36, fontWeight: '500' }, quickActions: { flexDirection: 'row', gap: 12, marginTop: 18 }, primaryQuick: { flex: 1.35, minHeight: 54, backgroundColor: '#0B66FF', borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 }, secondaryQuick: { flex: 0.75, minHeight: 54, backgroundColor: '#fff', borderRadius: 17, borderWidth: 1, borderColor: '#d3deeb', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  warning: { color: '#a66700', backgroundColor: '#fff6df', borderRadius: 14, padding: 12, marginTop: 12, lineHeight: 21, fontWeight: '700' },
+  minbeisHomeCard: { marginTop: 16, borderRadius: 21, borderWidth: 1, borderColor: '#bfd3ef', backgroundColor: '#f8fbff', padding: 15 },
+  minbeisHomeCardAttention: { borderColor: '#e8b562', backgroundColor: '#fff8e8' },
+  minbeisHomeTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  minbeisHomeEyebrow: { color: '#0B66FF', fontSize: 10, fontWeight: '900', letterSpacing: 0.7 },
+  minbeisHomeTitle: { color: '#16345f', fontSize: 18, lineHeight: 24, fontWeight: '900', marginTop: 4 },
+  minbeisHomeArrow: { color: '#0B66FF', fontSize: 34, lineHeight: 36, fontWeight: '500' },
+  minbeisHomeAttention: { color: '#9a6500', fontSize: 11, lineHeight: 16, fontWeight: '900', marginTop: 9 },
+  minbeisHomeStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
+  minbeisHomeStat: { color: '#60728b', fontSize: 9, fontWeight: '800', backgroundColor: '#edf3fb', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 5 },
+  decisionEntry: { minHeight: 76, borderRadius: 21, backgroundColor: '#07163E', flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 15, paddingVertical: 12, marginTop: 16 }, decisionEntryIcon: { width: 44, height: 44, borderRadius: 15, backgroundColor: '#0B66FF', alignItems: 'center', justifyContent: 'center' }, decisionEntryCheck: { color: '#fff', fontSize: 28, lineHeight: 32, fontWeight: '900' }, decisionEntryTitle: { color: '#fff', fontSize: 17, fontWeight: '900' }, decisionEntryText: { color: '#b8c9e8', fontSize: 12, lineHeight: 17, marginTop: 2 }, decisionEntryArrow: { color: '#8eb8ff', fontSize: 34, lineHeight: 36, fontWeight: '500' }, quickActions: { flexDirection: 'row', gap: 12, marginTop: 18 }, primaryQuick: { flex: 1.35, minHeight: 54, backgroundColor: '#0B66FF', borderRadius: 17, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 }, secondaryQuick: { flex: 0.75, minHeight: 54, backgroundColor: '#fff', borderRadius: 17, borderWidth: 1, borderColor: '#d3deeb', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   sectionRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10, marginTop: 22, marginBottom: 12 }, section: { color: '#16345f', fontSize: 28, lineHeight: 34, fontWeight: '900', marginTop: 22, marginBottom: 12 }, subsection: { color: '#16345f', fontSize: 22, fontWeight: '900', marginTop: 20, marginBottom: 10 },
   card: { backgroundColor: '#fff', borderRadius: 22, borderWidth: 1, borderColor: '#d4deeb', padding: 17, marginBottom: 12 }, cardTitle: { color: '#16345f', fontSize: 21, lineHeight: 26, fontWeight: '900' }, badge: { backgroundColor: '#edf4ff', paddingHorizontal: 13, paddingVertical: 9, borderRadius: 18, maxWidth: '48%', flexShrink: 1 }, badgeText: { color: '#0B66FF', fontWeight: '900', fontSize: 13 }, badgeBad: { backgroundColor: '#fff0f2' }, badgeBadText: { color: '#d83b4d' },
   priceRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 18, gap: 10 }, big: { color: '#16345f', fontSize: 39, lineHeight: 45, fontWeight: '900', marginTop: 2 }, performanceStack: { width: '100%', borderRadius: 16, borderWidth: 1, borderColor: '#d8e2ee', backgroundColor: '#f8fbff', paddingHorizontal: 13, paddingVertical: 10, marginTop: 12 }, performanceLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 7 }, performanceLabel: { color: '#617087', fontSize: 13, lineHeight: 18, fontWeight: '800', flex: 1 }, performanceValue: { fontSize: 17, lineHeight: 21, fontWeight: '900', textAlign: 'right' }, performanceValuePrimary: { fontSize: 18, lineHeight: 22 }, performanceDivider: { height: 1, backgroundColor: '#e4ebf4', marginVertical: 7 }, quoteTransparency: { backgroundColor: '#f3f7fc', borderRadius: 14, padding: 11, marginTop: 10 }, quoteTransparencyTitle: { color: '#16345f', fontSize: 12, fontWeight: '900', marginBottom: 3 }, quoteTransparencyText: { color: '#718096', fontSize: 11, lineHeight: 16 }, quoteTransparencyWarning: { color: '#9a6500', fontSize: 11, lineHeight: 16, fontWeight: '800', marginTop: 5 }, quoteHeadlineWarning: { color: '#9a6500', fontSize: 9, lineHeight: 13, fontWeight: '800', marginTop: 3 }, quoteContractText: { color: '#40536f', fontSize: 10, lineHeight: 15, fontWeight: '700', marginTop: 5 }, note: { color: '#67768c', fontSize: 15, lineHeight: 23, marginTop: 10 }, source: { color: '#8591a3', fontSize: 13, lineHeight: 20, marginTop: 10 }, tapHint: { color: '#0B66FF', fontWeight: '800', marginTop: 15, fontSize: 13 }, detailPanel: { borderTopWidth: 1, borderTopColor: '#e5ebf3', marginTop: 16, paddingTop: 14 }, lotsSection: { marginTop: 14 }, lotsHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 }, lotsTitle: { color: '#16345f', fontSize: 18, fontWeight: '900' }, lotsSubtitle: { color: '#7b889d', fontSize: 12, lineHeight: 17, marginTop: 2 }, lotsCountBadge: { minWidth: 34, height: 34, borderRadius: 17, backgroundColor: '#edf4ff', alignItems: 'center', justifyContent: 'center' }, lotsCountText: { color: '#0B66FF', fontWeight: '900' }, lotCard: { borderRadius: 17, borderWidth: 1, borderColor: '#d7e1ed', backgroundColor: '#f9fbfe', padding: 13, marginBottom: 9 }, lotTitle: { color: '#16345f', fontSize: 16, fontWeight: '900' }, lotDate: { color: '#8490a2', fontSize: 11, lineHeight: 16, marginTop: 2 }, lotPerformance: { fontSize: 17, fontWeight: '900' }, lotMeta: { color: '#62738a', fontSize: 12, lineHeight: 18, marginTop: 8 }, lotResultRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 9, paddingTop: 9, borderTopWidth: 1, borderTopColor: '#e3eaf3' }, lotResultLabel: { color: '#7b889d', fontSize: 11, flex: 1 }, lotResultValue: { fontSize: 14, fontWeight: '900', textAlign: 'right' }, lotMethodNote: { color: '#6d7b8e', backgroundColor: '#f1f5fa', borderRadius: 13, padding: 10, fontSize: 11, lineHeight: 16, marginTop: 2 },

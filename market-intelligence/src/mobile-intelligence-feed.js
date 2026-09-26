@@ -1,3 +1,6 @@
+import { buildMinbeisDecision } from './minbeis-decision-layer.js';
+import { buildMinbeisAssessment } from './minbeis-assessment.js';
+
 function categoryLabel(category, status) {
   if (status === 'DRAFT_RESEARCH' && ['EVENT_DRIVEN', 'SPECULATIVE_CATALYST'].includes(category)) {
     return 'Υπόθεση καταλύτη υπό έλεγχο';
@@ -139,6 +142,44 @@ function buildQuoteRegistry(snapshots = []) {
   return registry;
 }
 
+function compactHistoricalContext(shadow) {
+  const pattern = shadow?.historicalPatternForecast || null;
+  if (!pattern) return null;
+  const preferredKeys = ['week1', 'month1', 'month3'];
+  const horizons = {};
+  for (const key of preferredKeys) {
+    const item = pattern?.horizons?.[key];
+    if (!item) continue;
+    horizons[key] = {
+      tradingDays: item.tradingDays,
+      status: item.status,
+      historicalPositiveFrequencyPct: Number.isFinite(Number(item.rawProbabilityPositive))
+        ? Number((Number(item.rawProbabilityPositive) * 100).toFixed(2))
+        : null,
+      historicalAverageReturnPct: Number.isFinite(Number(item.expectedReturnPct))
+        ? Number(item.expectedReturnPct)
+        : null,
+      selectedAnalogCount: Number(item?.sample?.selectedAnalogCount || 0),
+      effectiveSampleSize: Number.isFinite(Number(item?.sample?.effectiveSampleSize))
+        ? Number(item.sample.effectiveSampleSize)
+        : null,
+      blockers: Array.isArray(item?.blockers) ? item.blockers : [],
+    };
+  }
+  return {
+    format: 'minbeis-historical-context',
+    version: 1,
+    status: pattern.status,
+    asOf: pattern.asOf || null,
+    regime: pattern?.currentPattern?.regime || null,
+    calibrationStatus: pattern.calibrationStatus || 'NOT_CALIBRATED',
+    finalActionEligible: false,
+    decisionImpact: 'NONE',
+    horizons,
+    caution: 'Ιστορικά ανάλογα για έρευνα. Δεν αποτελούν πρόβλεψη και δεν επηρεάζουν την τελική canonical απόφαση.',
+  };
+}
+
 function metricNotes(dossier) {
   const notes = [];
   const metrics = dossier?.metrics?.fundamentals?.metrics || dossier?.metrics?.fundamentals || {};
@@ -149,7 +190,7 @@ function metricNotes(dossier) {
   return notes;
 }
 
-function compactDossier(dossier, generatedAt) {
+function compactDossier(dossier, generatedAt, purchase = null, historicalContext = null) {
   const readinessBlockers = Array.isArray(dossier?.readiness?.blockers) ? dossier.readiness.blockers : [];
   const finalBlockers = Array.isArray(dossier?.finalAction?.blockers) ? dossier.finalAction.blockers : [];
   const blockers = [...new Set([...readinessBlockers, ...finalBlockers])];
@@ -203,9 +244,11 @@ function compactDossier(dossier, generatedAt) {
           : nextStep(blockers),
     sources: compactSources(dossier.evidence),
     metricNotes: metricNotes(dossier),
+    historicalContext,
     generatedAt: dossier.generatedAt,
     publicationMode: dossier.publicationMode || null,
     finalAction: dossier.finalAction || null,
+    minbeisAssessment: buildMinbeisAssessment(dossier, purchase),
   };
 }
 
@@ -295,7 +338,23 @@ function countFinalActions(items) {
 
 export function buildMobileIntelligenceFeed(report = {}, options = {}) {
   const generatedAt = new Date(options.generatedAt || report.generatedAt || Date.now()).toISOString();
-  const dossiers = (Array.isArray(report.researchDossiers) ? report.researchDossiers : []).map((item) => compactDossier(item, generatedAt));
+  const rawPurchaseByDossier = new Map();
+  const rawPurchaseByCompany = new Map();
+  for (const item of report.opportunityPurchaseReconciliation?.decisions || []) {
+    if (item?.dossierId) rawPurchaseByDossier.set(item.dossierId, item);
+    if (item?.companyId || item?.instrumentId) rawPurchaseByCompany.set(item.companyId || item.instrumentId, item);
+  }
+  const shadowByCompany = new Map(
+    (Array.isArray(report.shadowForecasts) ? report.shadowForecasts : [])
+      .filter((item) => item?.companyId)
+      .map((item) => [item.companyId, item]),
+  );
+  const dossiers = (Array.isArray(report.researchDossiers) ? report.researchDossiers : []).map((item) => compactDossier(
+    item,
+    generatedAt,
+    rawPurchaseByDossier.get(item?.dossierId) || rawPurchaseByCompany.get(item?.companyId) || null,
+    compactHistoricalContext(shadowByCompany.get(item?.companyId) || null),
+  ));
   dossiers.sort((a, b) => priority(b) - priority(a) || String(b.generatedAt).localeCompare(String(a.generatedAt)));
   const published = dossiers.filter((item) => item.status === 'PUBLISHED');
   const reviewReady = dossiers.filter((item) => item.status === 'REVIEW_READY');
@@ -306,7 +365,26 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
   const avoidDecisions = decisions.filter((item) => item.finalAction?.marketAction === 'AVOID');
   const urgent = dossiers.filter((item) => item.finalAction?.urgency === 'IMMEDIATE' || ['EVENT_RISK', 'DETERIORATION'].includes(item.category)).slice(0, 5);
   const discoveryRadar = (report.discovery?.shortlist || []).filter((item) => !item.isExistingFocusCompany).map(compactDiscovery).slice(0, 12);
-  const opportunityPurchaseDecisions = (report.opportunityPurchaseReconciliation?.decisions || []).map(compactOpportunityPurchaseDecision);
+  const dossierByKey = new Map();
+  for (const dossier of dossiers) {
+    if (dossier.id) dossierByKey.set(`DOSSIER:${dossier.id}`, dossier);
+    if (dossier.companyId) dossierByKey.set(`COMPANY:${dossier.companyId}`, dossier);
+  }
+  const opportunityPurchaseDecisions = (report.opportunityPurchaseReconciliation?.decisions || [])
+    .map(compactOpportunityPurchaseDecision)
+    .map((item) => {
+      const dossier = (item.dossierId && dossierByKey.get(`DOSSIER:${item.dossierId}`))
+        || (item.companyId && dossierByKey.get(`COMPANY:${item.companyId}`))
+        || null;
+      return {
+        ...item,
+        minbeisDecision: buildMinbeisDecision({
+          finalAction: dossier?.finalAction || null,
+          opportunityPurchase: item,
+          hasPosition: false,
+        }),
+      };
+    });
   const confirmedBuyOpportunities = opportunityPurchaseDecisions.filter((item) => item.status === 'BUY_CONFIRMED');
   const waitingEntryOpportunities = opportunityPurchaseDecisions.filter((item) => item.status === 'WAIT_FOR_ENTRY_CONFIRMATION');
   const rejectedOpportunities = opportunityPurchaseDecisions.filter((item) => item.status === 'REJECTED');
@@ -354,6 +432,12 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
       waitingEntryOpportunityCount: waitingEntryOpportunities.length,
       rejectedOpportunityCount: rejectedOpportunities.length,
       blockedOpportunityCount: blockedOpportunities.length,
+      minbeisProbeCount: opportunityPurchaseDecisions.filter((item) => item.minbeisDecision?.action === 'BUY_PROBE').length,
+      minbeisStarterCount: opportunityPurchaseDecisions.filter((item) => item.minbeisDecision?.action === 'BUY_STARTER').length,
+      minbeisSetupCount: dossiers.filter((item) => item.minbeisAssessment?.classification === 'SETUP').length,
+      minbeisTrapCount: dossiers.filter((item) => item.minbeisAssessment?.classification === 'TRAP').length,
+      minbeisNoTradeCount: dossiers.filter((item) => item.minbeisAssessment?.classification === 'NO_TRADE').length,
+      minbeisConfirmationRequiredCount: dossiers.filter((item) => item.minbeisAssessment?.classification === 'CONFIRMATION_REQUIRED').length,
       unresolvedDiagnosticCount: Array.isArray(report.diagnostics) ? report.diagnostics.length : 0,
       ...actionCounts,
     },
@@ -399,6 +483,7 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
       whyNotBuyNow: item.whyNotBuyNow,
       nextGate: item.nextGate,
       strictAction: item.strictAction,
+      minbeisDecision: item.minbeisDecision,
     })),
     assistantContext: dossiers.map((item) => ({
       companyId: item.companyId,
@@ -411,11 +496,13 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
       category: item.category,
       action: item.action,
       finalAction: item.finalAction,
+      minbeisAssessment: item.minbeisAssessment,
+      historicalContext: item.historicalContext,
       thesis: item.thesis,
       blockers: item.blockers,
       nextStep: item.nextStep,
       reviewDate: item.reviewDate,
     })),
-    disclosure: 'Ο Opportunity Hunter σαρώνει ευρύ επενδυτικό universe και προτεραιοποιεί υποψήφιες ευκαιρίες. High/Super Opportunity δεν σημαίνει αγορά. Μόνο η δεύτερη αυστηρή αξιολόγηση BUY, με πλήρη έλεγχο πηγών, θεμελιωδών, αγοράς, ρευστότητας, φρεσκότητας, τάσης, ρίσκου και αντιφάσεων, μπορεί να εμφανίσει ΑΓΟΡΑ ΕΠΙΒΕΒΑΙΩΘΗΚΕ. Δεν εκτελούνται συναλλαγές.',
+    disclosure: 'Ο Opportunity Hunter σαρώνει ευρύ επενδυτικό universe και προτεραιοποιεί υποψήφιες ευκαιρίες. High/Super Opportunity δεν σημαίνει αγορά. Μόνο η δεύτερη αυστηρή αξιολόγηση BUY, με πλήρη έλεγχο πηγών, θεμελιωδών, αγοράς, ρευστότητας, φρεσκότητας, τάσης, ρίσκου και αντιφάσεων, μπορεί να εμφανίσει ΑΓΟΡΑ ΕΠΙΒΕΒΑΙΩΘΗΚΕ. Το MINBEIS μεταφράζει μόνο αυτή την canonical απόφαση σε πλάνο θέσης και δεν αποτελεί δεύτερο ανεξάρτητο scoring engine. Δεν εκτελούνται συναλλαγές.',
   };
 }

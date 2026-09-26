@@ -62,17 +62,33 @@ parser.parse(opportunities, { sourceType: 'module', plugins: ['jsx'] });
 parser.parse(portfolio, { sourceType: 'module', plugins: ['jsx'] });
 
 assert(finalCard.includes('canonicalPositionSymbol(position.symbol) === canonicalPositionSymbol(item?.symbol)'), 'FinalDecisionCard canonical holder match missing');
-assert(portfolio.includes('<OpportunitiesView portfolioPositions={positions} />'), 'portfolio positions are not bridged to OpportunitiesView');
+assert(portfolio.includes('<OpportunitiesView portfolioPositions={positions} portfolioPolicy={state.minbeisPolicy} instrumentCapabilities={state.minbeisOnboarding} />'), 'portfolio positions and MINBEIS portfolio policy are not bridged to OpportunitiesView');
 assert(opportunities.includes('personalizedDecisionCounts(feed, portfolioPositions, decisionContext)'), 'personalized decision counter with validity context missing');
 assert(opportunities.includes("import { finalActionIsCurrent } from './decision-validity';"), 'personalized counters must fail closed through decision validity');
 assert(opportunities.includes('inferredReferenceCurrency(referencePrice, item)'), 'safe currency inference missing');
 assert(opportunities.includes("style: 'currency',\n      currency,"), 'currency formatter syntax contract missing');
 assert(!opportunities.includes("currency: referencePrice.currency || 'EUR'"), 'false EUR fallback still present');
 
-assert(versionAtLeast(app.expo.version, '1.7.1'), `app version predates v1.7.1: ${app.expo.version}`);
-assert(Number(app.expo.android.versionCode) >= 29, `Android versionCode predates v1.7.1: ${app.expo.android.versionCode}`);
+assert(versionAtLeast(app.expo.version, '1.8.0'), `app version predates MINBEIS v1.8.0: ${app.expo.version}`);
+assert(Number(app.expo.android.versionCode) >= 32, `Android versionCode predates MINBEIS build 32: ${app.expo.android.versionCode}`);
 assert(pkg.version === app.expo.version, `package/app version mismatch: ${pkg.version} vs ${app.expo.version}`);
 assert(portfolio.includes(`const VERSION = '${app.expo.version}';`), `PortfolioApp runtime version mismatch: ${app.expo.version}`);
 assert(decision.includes(`const VERSION = '${app.expo.version}';`), `DecisionOverlay runtime version mismatch: ${app.expo.version}`);
 
-console.log(`PASS v1.7.1+ portfolio-aware holder/non-holder decisions, validity-gated personalized counters, safe currency inference, JSX parse and consistent release identity ${app.expo.version} build ${app.expo.android.versionCode}.`);
+
+// 30-second clarity UX must remain visible for both holdings and new ideas.
+assert(opportunities.includes("function PositionClarityCard"), '30-second clarity UX component missing');
+assert(opportunities.includes(">ΤΩΡΑ<"), 'MINBEIS clarity NOW label missing');
+assert(opportunities.includes(">ΓΙΑΤΙ<"), 'MINBEIS clarity WHY label missing');
+assert(opportunities.includes("ΤΙ ΘΑ ΑΛΛΑΞΕΙ ΤΗΝ ΕΙΚΟΝΑ"), 'MINBEIS clarity change-condition label missing');
+assert(opportunities.includes("ΣΤΗΝ ΟΥΡΑ ΕΡΕΥΝΑΣ"), 'MINBEIS research queue status missing from portfolio UX');
+assert(opportunities.includes("Σε έρευνα:"), 'MINBEIS portfolio research queue summary missing');
+
+// User-friendly transaction entry must always persist the canonical market-qualified symbol.
+assert(portfolio.includes("const canonicalSymbol = canonicalInstrumentSymbol(form.symbol, form.market);"), 'canonical ticker transaction entry missing');
+assert(portfolio.includes("symbol: canonicalSymbol"), 'transaction save does not persist canonical ticker');
+assert(portfolio.includes("currency: instrumentCurrency(form.market)"), 'transaction currency is not derived from selected market');
+assert(portfolio.includes("value=\"GR\" current={form.market} label=\"Ελλάδα\""), 'Greek market selector missing');
+assert(portfolio.includes("value=\"US\" current={form.market} label=\"ΗΠΑ\""), 'US market selector missing');
+assert(portfolio.includes("onChangeText={setSymbolInput}"), 'ticker input does not use canonical-safe setter');
+console.log(`PASS MINBEIS v1.8.0+ portfolio-aware decisions, clarity UX, research queue, canonical routing and consistent release identity ${app.expo.version} build ${app.expo.android.versionCode}.`);
