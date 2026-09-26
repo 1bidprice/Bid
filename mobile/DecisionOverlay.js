@@ -377,8 +377,8 @@ export default function DecisionOverlay({ visible = false, onRequestClose }) {
               <Text style={styles.headerAction}>{screen === 'list' ? 'Κλείσιμο' : '‹ Πίσω'}</Text>
             </Pressable>
             <View style={styles.headerCenter}>
-              <Text style={styles.headerTitle}>Decision Gate</Text>
-              <Text style={styles.headerVersion}>Investment Decision OS · v{VERSION}</Text>
+              <Text style={styles.headerTitle}>Έλεγχος απόφασης</Text>
+              <Text style={styles.headerVersion}>MINBEIS · v{VERSION}</Text>
             </View>
             <View style={styles.headerSpacer} />
           </View>
@@ -444,7 +444,7 @@ export default function DecisionOverlay({ visible = false, onRequestClose }) {
               )) : (
                 <View style={styles.card}>
                   <Text style={styles.cardTitle}>Δεν υπάρχουν ενεργές θέσεις.</Text>
-                  <Text style={styles.heroText}>Καταχώρισε πρώτα μία αγορά στο MINBEIS. Το Decision Gate θα τη βρει αυτόματα.</Text>
+                  <Text style={styles.heroText}>Καταχώρισε πρώτα μία αγορά στο MINBEIS. Ο Έλεγχος απόφασης θα τη βρει αυτόματα.</Text>
                 </View>
               )}
 
@@ -578,7 +578,7 @@ export default function DecisionOverlay({ visible = false, onRequestClose }) {
 
                 <View style={styles.card}>
                   <Text style={styles.cardTitle}>Τι αλλάζει άμεσα</Text>
-                  <Text style={styles.heroText}>Το Decision Gate επανυπολογίζει βάρη, κίνδυνο και ετυμηγορία για όλες τις θέσεις. Δεν αλλάζει καμία συναλλαγή.</Text>
+                  <Text style={styles.heroText}>Ο Έλεγχος απόφασης επανυπολογίζει βάρη, κίνδυνο και αποτέλεσμα για όλες τις θέσεις. Δεν αλλάζει καμία συναλλαγή.</Text>
                 </View>
 
                 <Pressable style={styles.primary} onPress={saveRules}><Text style={styles.primaryText}>Αποθήκευση γενικών κανόνων</Text></Pressable>
