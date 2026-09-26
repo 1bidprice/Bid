@@ -284,7 +284,7 @@ function PositionLotRow({ lot, currency, stale }) {
         </View>
         <Text style={[styles.lotPerformance, performanceStyle]}>{stale ? '—' : pct(performance)}</Text>
       </View>
-      <Text style={styles.lotMeta}>{remaining.toLocaleString('el-GR')} μετοχές{remaining !== original ? ' από ' + original.toLocaleString('el-GR') + ' αρχικές' : ''} · all-in {quotePrice(lot.allInPrice, currency, 4)}</Text>
+      <Text style={styles.lotMeta}>{remaining.toLocaleString('el-GR')} μετοχές{remaining !== original ? ' από ' + original.toLocaleString('el-GR') + ' αρχικές' : ''} · με έξοδα {quotePrice(lot.allInPrice, currency, 4)}</Text>
       <View style={styles.lotResultRow}>
         <Text style={styles.lotResultLabel}>Από τη συγκεκριμένη αγορά</Text>
         <Text style={[styles.lotResultValue, performanceStyle]}>{stale ? '—' : cash(lot.pnl, currency)}</Text>
@@ -309,7 +309,24 @@ function quoteQualityLabel(quote) {
 }
 
 function quoteSessionLabel(quote) {
-  return quote?.marketSession || quote?.session || 'Δεν δηλώνεται από την πηγή';
+  const raw = String(quote?.marketSession || quote?.session || '').trim();
+  return {
+    open: 'Ανοιχτή',
+    closed: 'Κλειστή',
+    premarket: 'Προσυνεδρίαση',
+    pre_market: 'Προσυνεδρίαση',
+    postmarket: 'Μετασυνεδριακή',
+    after_hours: 'Μετασυνεδριακή',
+    auction: 'Δημοπρασία',
+  }[raw.toLowerCase()] || raw || 'Δεν δηλώνεται από την πηγή';
+}
+
+function quoteSourceLabel(quote) {
+  const raw = String(quote?.source || '').trim();
+  if (/euronext athens delayed market data/i.test(raw)) return 'Euronext Athens · καθυστερημένα δεδομένα';
+  if (/finnhub quote api/i.test(raw)) return 'Finnhub · τιμή αγοράς';
+  if (/ecb/i.test(raw)) return 'Ευρωπαϊκή Κεντρική Τράπεζα';
+  return raw || '—';
 }
 
 function quoteHeadlineLabel(quote) {
@@ -368,7 +385,7 @@ function PositionCard({ item, compact, expanded, onToggle, onAlert }) {
         </View>
         <View style={styles.quoteTransparency}>
           <Text style={styles.quoteTransparencyTitle}>Διαφάνεια τιμής</Text>
-          <Text style={styles.quoteTransparencyText}>Πηγή: {item.quote?.source || '—'}</Text>
+          <Text style={styles.quoteTransparencyText}>Πηγή: {quoteSourceLabel(item.quote)}</Text>
           <Text style={styles.quoteTransparencyText}>{item.quote?.priceTimestampVerified === false ? 'Χρόνος δεδομένου: δεν δηλώνεται από την πηγή' : `Χρόνος δεδομένου: ${item.quote?.updatedAt ? when(item.quote.updatedAt) : '—'}`}</Text>
           <Text style={styles.quoteTransparencyText}>Τελευταίος έλεγχος: {item.quote?.checkedAt ? when(item.quote.checkedAt) : '—'}</Text>
           <Text style={styles.quoteTransparencyText}>Κατάσταση: {quoteQualityLabel(item.quote)} · Τρέχουσα συνεδρία: {quoteSessionLabel({ session: currentSession })}</Text>
@@ -379,7 +396,7 @@ function PositionCard({ item, compact, expanded, onToggle, onAlert }) {
           <Metric compact={compact} label="Αξία θέσης" value={cash(item.nativeValue, item.currency)} />
           <Metric compact={compact} label="Συνολικό κόστος" value={cash(item.cost, item.currency)} />
           <Metric compact={compact} label="Κέρδος / Ζημία" value={cash(item.nativePnl, item.currency)} negative={item.nativePnl < 0} positiveValue={item.nativePnl > 0} />
-          <Metric compact={compact} label="Μέση τιμή all-in" value={quotePrice(item.average, item.currency, 4)} />
+          <Metric compact={compact} label="Μέση τιμή με έξοδα" value={quotePrice(item.average, item.currency, 4)} />
         </View>
       </Pressable>
       {expanded ? (
@@ -387,7 +404,7 @@ function PositionCard({ item, compact, expanded, onToggle, onAlert }) {
           {item.currency === 'USD' && item.eurValue !== null ? <Text style={styles.note}>Σε ευρώ: αξία ≈ {cash(item.eurValue)} · αποτέλεσμα ≈ {cash(item.eurPnl)}</Text> : null}
           <View style={styles.lotsSection}>
             <View style={styles.lotsHeader}>
-              <View style={styles.grow}><Text style={styles.lotsTitle}>Επιμέρους αγορές</Text><Text style={styles.lotsSubtitle}>Κάθε αγορά κρατά το δικό της all-in και πρόσημο.</Text></View>
+              <View style={styles.grow}><Text style={styles.lotsTitle}>Επιμέρους αγορές</Text><Text style={styles.lotsSubtitle}>Κάθε αγορά κρατά τη δική της τελική τιμή με έξοδα και το δικό της αποτέλεσμα.</Text></View>
               <View style={styles.lotsCountBadge}><Text style={styles.lotsCountText}>{item.lots?.length || 0}</Text></View>
             </View>
             {(item.lots || []).map((lot) => <PositionLotRow key={lot.lotId} lot={lot} currency={item.currency} stale={stale} />)}
@@ -585,7 +602,7 @@ function TransactionModal({ visible, transaction, onClose, onSave }) {
                 ) : MARKET_GATEWAY_CONFIGURED ? (
                   <Text style={styles.instrumentCheckHint}>Θα γίνει ασφαλής έλεγχος ticker όταν πατήσεις «Συνέχεια».</Text>
                 ) : (
-                  <Text style={styles.instrumentCheckHint}>Preview build: ο canonical gateway δεν είναι embedded. Η λογιστική καταχώρηση λειτουργεί κανονικά.</Text>
+                  <Text style={styles.instrumentCheckHint}>Η κεντρική υπηρεσία δεδομένων MINBEIS δεν είναι διαθέσιμη σε αυτή την έκδοση. Η λογιστική καταχώρηση λειτουργεί κανονικά.</Text>
                 )}
                 <Field label="Εταιρεία — προαιρετικά" helper="Μπορείς να βάλεις όνομα για ευκολότερη αναγνώριση. Το MINBEIS χρησιμοποιεί το επαληθευμένο ticker." value={form.company} onChangeText={(value) => set('company', value)} placeholder={form.market === 'US' ? 'NVIDIA' : 'CrediaBank'} />
                 <Field label="Ημερομηνία συναλλαγής" value={form.date} onChangeText={(value) => set('date', value)} keyboardType="numbers-and-punctuation" placeholder="2026-07-14" />
@@ -611,7 +628,7 @@ function TransactionModal({ visible, transaction, onClose, onSave }) {
                   <View style={styles.halfField}><Field label="Άλλα έξοδα" value={form.other} onChangeText={(value) => set('other', value)} keyboardType="decimal-pad" placeholder="0,00" /></View>
                 </View>
                 <Field label="Σημείωση — προαιρετική" value={form.notes} onChangeText={(value) => set('notes', value)} placeholder="Τι θέλεις να θυμάσαι για αυτή τη συναλλαγή;" multiline />
-                <View style={styles.reviewCard}><Text style={styles.reviewTitle}>Τελικός έλεγχος</Text><ReviewLine label="Αξία συναλλαγής" value={cash(gross, form.currency)} /><ReviewLine label="Συνολικά έξοδα" value={cash(fees, form.currency)} /><ReviewLine label={form.type === 'sell' ? 'Καθαρό έσοδο' : 'Τελικό κόστος'} value={cash(total, form.currency)} strong /><ReviewLine label="Μέση τιμή all-in" value={quotePrice(allIn, form.currency, 4)} /></View>
+                <View style={styles.reviewCard}><Text style={styles.reviewTitle}>Τελικός έλεγχος</Text><ReviewLine label="Αξία συναλλαγής" value={cash(gross, form.currency)} /><ReviewLine label="Συνολικά έξοδα" value={cash(fees, form.currency)} /><ReviewLine label={form.type === 'sell' ? 'Καθαρό έσοδο' : 'Τελικό κόστος'} value={cash(total, form.currency)} strong /><ReviewLine label="Μέση τιμή με έξοδα" value={quotePrice(allIn, form.currency, 4)} /></View>
               </> : null}
               <View style={styles.modalActions}>{step > 1 ? <Pressable style={styles.secondaryAction} onPress={() => setStep((current) => current - 1)}><Text style={styles.secondaryStrong}>Πίσω</Text></Pressable> : null}<Pressable style={[styles.primaryAction, step === 1 && styles.actionFull, checkingInstrument && styles.disabled]} onPress={step < 3 ? next : save} disabled={checkingInstrument}>{checkingInstrument ? <ActivityIndicator color="#fff" /> : <Text style={styles.whiteStrong}>{step < 3 ? 'Συνέχεια' : transaction ? 'Αποθήκευση αλλαγών' : 'Αποθήκευση συναλλαγής'}</Text>}</Pressable></View>
             </ScrollView>
@@ -646,8 +663,8 @@ function TransactionCard({ transaction, expanded, onToggle, onEdit, onDelete }) 
         <ReviewLine label="Αξία συναλλαγής" value={cash(gross, currency)} />
         <ReviewLine label="Συνολικά έξοδα" value={cash(fees, currency)} />
         <ReviewLine label={transaction.type === 'sell' ? 'Καθαρό έσοδο' : 'Τελικό κόστος'} value={cash(total, currency)} strong />
-        <ReviewLine label="Μέση τιμή all-in" value={quotePrice(allInPrice(transaction), currency, 4)} />
-        {transaction.broker ? <Text style={styles.source}>Broker: {transaction.broker}</Text> : null}
+        <ReviewLine label="Μέση τιμή με έξοδα" value={quotePrice(allInPrice(transaction), currency, 4)} />
+        {transaction.broker ? <Text style={styles.source}>Χρηματιστηριακή: {transaction.broker}</Text> : null}
         {transaction.orderReference ? <Text style={styles.source}>Αριθμός εντολής: {transaction.orderReference}</Text> : null}
         {transaction.notes ? <Text style={styles.note}>Σημείωση: {transaction.notes}</Text> : null}
         {transaction.migrationNote ? <Text style={styles.successNote}>{transaction.migrationNote}</Text> : null}
@@ -1084,9 +1101,9 @@ function MainApp({ onOpenDecisionGate }) {
               <Text style={styles.minbeisHomeStat}>{minbeisHomeSyncing ? 'Ανανέωση…' : minbeisHomeSummary.feedFresh ? 'Ροή ενημερωμένη' : 'Έλεγχος ενημέρωσης'}</Text>
             </View>
           </Pressable>
-          <Pressable style={styles.decisionEntry} onPress={onOpenDecisionGate} accessibilityLabel="Άνοιγμα Decision Gate">
+          <Pressable style={styles.decisionEntry} onPress={onOpenDecisionGate} accessibilityLabel="Άνοιγμα ελέγχου απόφασης">
             <View style={styles.decisionEntryIcon}><Text style={styles.decisionEntryCheck}>✓</Text></View>
-            <View style={styles.grow}><Text style={styles.decisionEntryTitle}>Decision Gate</Text><Text style={styles.decisionEntryText}>Έλεγχος πειθαρχίας πριν από αγορά ή ενίσχυση θέσης</Text></View>
+            <View style={styles.grow}><Text style={styles.decisionEntryTitle}>Έλεγχος απόφασης</Text><Text style={styles.decisionEntryText}>Πριν από νέα αγορά ή ενίσχυση, έλεγξε όρια, κίνδυνο και πλάνο</Text></View>
             <Text style={styles.decisionEntryArrow}>›</Text>
           </Pressable>
           <View style={styles.quickActions}><Pressable style={styles.primaryQuick} onPress={openNewTransaction}><Text style={styles.whiteStrong}>＋ Νέα συναλλαγή</Text></Pressable><Pressable style={styles.secondaryQuick} onPress={() => setTab('transactions')}><Text style={styles.secondaryStrong}>Ιστορικό</Text></Pressable></View>
