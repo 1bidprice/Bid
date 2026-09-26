@@ -113,7 +113,7 @@ function IntelligenceCard({ item, decisionContext }) {
           </View>
           <StatusBadge item={item} />
         </View>
-        <Text style={[styles.category, risk && styles.riskText]}>{item.categoryLabel}</Text>
+        <Text style={[styles.category, risk && styles.riskText]}>{intelligenceCategoryLabel(item.categoryLabel || item.category)}</Text>
         <MinbeisAssessmentStrip assessment={item.minbeisAssessment} />
         <HistoricalContextCard context={item.historicalContext} />
         <FinalDecisionCard item={item} decisionContext={decisionContext} />
@@ -122,8 +122,8 @@ function IntelligenceCard({ item, decisionContext }) {
           <View style={styles.actionBox}><Text style={styles.muted}>Τιμή αναφοράς</Text><Text style={styles.action}>{money(item.referencePrice, item)}</Text><Text style={styles.ageText}>{Number.isFinite(referenceAge) ? (referenceAge < 1 ? 'πριν από λιγότερο από 1 ώρα' : 'πριν από ' + referenceAge.toFixed(1) + ' ώρες') : 'χωρίς έγκυρη ώρα'}</Text></View>
         </View>
         {item.marketQuote?.quoteContract?.publicMessage ? <View style={styles.marketQuoteContract}><Text style={styles.marketQuoteContractText}>{item.marketQuote.quoteContract.publicMessage}</Text></View> : null}
-        {item.thesis ? <Text style={styles.thesis} numberOfLines={expanded ? undefined : 4}>{item.thesis}</Text> : <Text style={styles.warning}>Δεν έχει ολοκληρωθεί ακόμη τεκμηριωμένη επενδυτική θέση.</Text>}
-        <View style={styles.nextBox}><Text style={styles.nextLabel}>Επόμενο βήμα</Text><Text style={styles.nextText}>{item.nextStep}</Text></View>
+        {item.thesis ? <Text style={styles.thesis} numberOfLines={expanded ? undefined : 4}>{userFacingAnalysisText(item.thesis)}</Text> : <Text style={styles.warning}>Δεν έχει ολοκληρωθεί ακόμη τεκμηριωμένη επενδυτική θέση.</Text>}
+        <View style={styles.nextBox}><Text style={styles.nextLabel}>Επόμενο βήμα</Text><Text style={styles.nextText}>{userFacingAnalysisText(item.nextStep)}</Text></View>
         <Text style={styles.expand}>{expanded ? 'Απόκρυψη λεπτομερειών' : 'Προβολή πλήρους φακέλου'}</Text>
       </Pressable>
       {expanded ? (
@@ -157,6 +157,56 @@ function historicalHorizonLabel(key) {
   }[key] || key;
 }
 
+function historicalRegimeLabel(value) {
+  return {
+    BULL_TREND: 'Ανοδική τάση',
+    BEAR_TREND: 'Πτωτική τάση',
+    SIDEWAYS: 'Πλάγια αγορά',
+    HIGH_VOLATILITY: 'Υψηλή μεταβλητότητα',
+    LOW_VOLATILITY: 'Χαμηλή μεταβλητότητα',
+  }[String(value || '').toUpperCase()] || String(value || '').replace(/_/g, ' ').toLowerCase();
+}
+
+function userFacingAnalysisText(value) {
+  return String(value || '')
+    .replace(/canonical analysis/gi, 'επαληθευμένη ανάλυση MINBEIS')
+    .replace(/canonical αξιολόγηση/gi, 'επαληθευμένη αξιολόγηση MINBEIS')
+    .replace(/canonical απόφαση/gi, 'τελική αξιολόγηση MINBEIS')
+    .replace(/canonical decision engine/gi, 'μηχανή αποφάσεων MINBEIS')
+    .replace(/strict purchase reconciliation/gi, 'τελικό αυστηρό έλεγχο αγοράς')
+    .replace(/strict entry gates/gi, 'αυστηρούς ελέγχους εισόδου')
+    .replace(/strict BUY gates/gi, 'αυστηρούς ελέγχους αγοράς')
+    .replace(/risk flags/gi, 'ενδείξεις κινδύνου')
+    .replace(/blocker/gi, 'υποχρεωτικό έλεγχο')
+    .replace(/research queue/gi, 'ουρά έρευνας')
+    .replace(/mobile feed/gi, 'ροή ενημέρωσης')
+    .replace(/research coverage/gi, 'ερευνητική κάλυψη')
+    .replace(/gateway/gi, 'κεντρική υπηρεσία δεδομένων')
+    .replace(/onboarding/gi, 'ένταξη')
+    .replace(/symbol/gi, 'κωδικός μετοχής');
+}
+
+function operationalStatusLabel(value) {
+  return {
+    OPERATIONAL: 'ΕΝΕΡΓΟ',
+    READY: 'ΕΤΟΙΜΟ',
+    PARTIAL: 'ΜΕΡΙΚΟ',
+    LIMITED: 'ΠΕΡΙΟΡΙΣΜΕΝΟ',
+    DEGRADED: 'ΠΕΡΙΟΡΙΣΜΕΝΟ',
+    FAILED: 'ΣΦΑΛΜΑ',
+    NOT_READY: 'ΜΗ ΕΤΟΙΜΟ',
+  }[String(value || '').toUpperCase()] || String(value || '—').replace(/_/g, ' ');
+}
+
+function intelligenceCategoryLabel(value) {
+  return {
+    FUNDAMENTAL_BASELINE: 'ΘΕΜΕΛΙΩΔΗΣ ΑΝΑΛΥΣΗ',
+    EVENT_RISK: 'ΚΙΝΔΥΝΟΣ ΓΕΓΟΝΟΤΟΣ',
+    DETERIORATION: 'ΕΠΙΔΕΙΝΩΣΗ',
+    OPPORTUNITY: 'ΕΥΚΑΙΡΙΑ',
+  }[String(value || '').toUpperCase()] || String(value || '').replace(/_/g, ' ');
+}
+
 function HistoricalContextCard({ context }) {
   const [expanded, setExpanded] = useState(false);
   if (!context || context.status !== 'RESEARCH_READY_UNCALIBRATED') return null;
@@ -167,22 +217,22 @@ function HistoricalContextCard({ context }) {
       <Pressable onPress={() => setExpanded((value) => !value)} style={styles.historicalHeader}>
         <View style={styles.grow}>
           <Text style={styles.historicalTitle}>Ιστορικά ανάλογα</Text>
-          <Text style={styles.historicalMeta}>Research context · όχι πρόβλεψη</Text>
+          <Text style={styles.historicalMeta}>Ιστορικό πλαίσιο · όχι πρόβλεψη</Text>
         </View>
         <Text style={styles.historicalToggle}>{expanded ? 'Απόκρυψη' : 'Προβολή'}</Text>
       </Pressable>
       {expanded ? <>
-        {context.regime ? <Text style={styles.historicalMeta}>Regime: {String(context.regime).replace(/_/g, ' ')}</Text> : null}
+        {context.regime ? <Text style={styles.historicalMeta}>Καθεστώς αγοράς: {historicalRegimeLabel(context.regime)}</Text> : null}
         {rows.map(([key, item]) => (
           <View key={key} style={styles.historicalRow}>
             <Text style={styles.historicalHorizon}>{historicalHorizonLabel(key)}</Text>
             <Text style={styles.historicalValue}>
               {Number.isFinite(Number(item.historicalPositiveFrequencyPct)) ? `${Number(item.historicalPositiveFrequencyPct).toFixed(0)}% θετικές ιστορικές εκβάσεις` : 'χωρίς επαρκή συχνότητα'}
             </Text>
-            <Text style={styles.historicalMeta}>{item.selectedAnalogCount || 0} ανεξάρτητα ανάλογα · effective sample {Number.isFinite(Number(item.effectiveSampleSize)) ? Number(item.effectiveSampleSize).toFixed(1) : '—'}</Text>
+            <Text style={styles.historicalMeta}>{item.selectedAnalogCount || 0} ανεξάρτητα ανάλογα · σταθμισμένο δείγμα {Number.isFinite(Number(item.effectiveSampleSize)) ? Number(item.effectiveSampleSize).toFixed(1) : '—'}</Text>
           </View>
         ))}
-        <Text style={styles.historicalCaution}>{context.caution}</Text>
+        <Text style={styles.historicalCaution}>{userFacingAnalysisText(context.caution)}</Text>
       </> : null}
     </View>
   );
@@ -190,9 +240,9 @@ function HistoricalContextCard({ context }) {
 
 function minbeisAssessmentLabel(classification) {
   return {
-    SETUP: 'SETUP',
-    TRAP: 'TRAP',
-    NO_TRADE: 'NO-TRADE',
+    SETUP: 'ΥΠΟΨΗΦΙΑ ΑΓΟΡΑ',
+    TRAP: 'ΠΙΘΑΝΗ ΠΑΓΙΔΑ',
+    NO_TRADE: 'ΑΠΟΧΗ',
     CONFIRMATION_REQUIRED: 'ΧΡΕΙΑΖΕΤΑΙ ΕΠΙΒΕΒΑΙΩΣΗ',
   }[classification] || classification || '—';
 }
@@ -208,21 +258,21 @@ function MinbeisAssessmentStrip({ assessment, compact = false }) {
         <Text style={[styles.assessmentLabel, risk && styles.riskText]}>{minbeisAssessmentLabel(classification)}</Text>
         <Text style={styles.assessmentMeta}>MINBEIS</Text>
       </View>
-      {!compact && assessment?.explanation?.summary ? <Text style={styles.assessmentSummary}>{assessment.explanation.summary}</Text> : null}
-      {!compact && assessment?.explanation?.whatWouldChange ? <Text style={styles.assessmentChange}>Τι θα άλλαζε την εικόνα: {assessment.explanation.whatWouldChange}</Text> : null}
+      {!compact && assessment?.explanation?.summary ? <Text style={styles.assessmentSummary}>{userFacingAnalysisText(assessment.explanation.summary)}</Text> : null}
+      {!compact && assessment?.explanation?.whatWouldChange ? <Text style={styles.assessmentChange}>Τι θα άλλαζε την εικόνα: {userFacingAnalysisText(assessment.explanation.whatWouldChange)}</Text> : null}
     </View>
   );
 }
 
 function minbeisActionLabel(action) {
   return {
-    NO_BUY: 'NO BUY',
-    WATCH: 'WATCH',
-    HOLD: 'HOLD',
-    REDUCE: 'REDUCE',
-    BUY_PROBE: 'BUY PROBE',
-    BUY_STARTER: 'BUY STARTER',
-    BUY_CORE: 'BUY CORE',
+    NO_BUY: 'ΟΧΙ ΑΓΟΡΑ',
+    WATCH: 'ΠΑΡΑΚΟΛΟΥΘΗΣΗ',
+    HOLD: 'ΔΙΑΚΡΑΤΗΣΗ',
+    REDUCE: 'ΜΕΙΩΣΗ',
+    BUY_PROBE: 'ΔΟΚΙΜΑΣΤΙΚΗ ΑΓΟΡΑ',
+    BUY_STARTER: 'ΑΡΧΙΚΗ ΑΓΟΡΑ',
+    BUY_CORE: 'ΚΥΡΙΑ ΑΓΟΡΑ',
   }[action] || action || '—';
 }
 
@@ -236,14 +286,14 @@ function minbeisAllocationText(decision) {
 
 function minbeisReasonText(row) {
   return {
-    HOLDER_SELL_NOW: 'Η θέση σου έχει ενεργό σήμα μείωσης/πώλησης από τον canonical decision engine.',
+    HOLDER_SELL_NOW: 'Η θέση σου έχει ενεργό σήμα μείωσης ή πώλησης από την τελική αξιολόγηση MINBEIS.',
     HOLDER_HOLD: 'Η θέση σου παραμένει σε διακράτηση με τα τρέχοντα επαληθευμένα δεδομένα.',
     HOLDER_WATCH: 'Δεν υπάρχει ενεργή εντολή μείωσης ή ενίσχυσης για τη θέση σου.',
-    STRICT_PURCHASE_CONFIRMED: 'Η νέα αγορά πέρασε και το strict purchase reconciliation.',
-    BUY_REQUIRES_STRICT_PURCHASE_CONFIRMATION: 'Υπάρχει θετική κατεύθυνση, αλλά δεν έχει περάσει ακόμη το strict purchase reconciliation.',
-    NON_HOLDER_BLOCKED: 'Η τρέχουσα canonical απόφαση δεν επιτρέπει νέα αγορά.',
+    STRICT_PURCHASE_CONFIRMED: 'Η νέα αγορά πέρασε και τον τελικό αυστηρό έλεγχο αγοράς.',
+    BUY_REQUIRES_STRICT_PURCHASE_CONFIRMATION: 'Υπάρχει θετική κατεύθυνση, αλλά δεν έχει περάσει ακόμη ο τελικός αυστηρός έλεγχος αγοράς.',
+    NON_HOLDER_BLOCKED: 'Η τρέχουσα τελική αξιολόγηση MINBEIS δεν επιτρέπει νέα αγορά.',
     NON_HOLDER_WATCH: 'Δεν υπάρχει επιβεβαιωμένη αγορά τώρα· παραμένει σε παρακολούθηση.',
-  }[row?.reason] || 'Η απόφαση προκύπτει από τον canonical MINBEIS decision engine.';
+  }[row?.reason] || 'Η απόφαση προκύπτει από την επαληθευμένη αξιολόγηση MINBEIS.';
 }
 
 function portfolioBlockedReason(item) {
@@ -253,7 +303,7 @@ function portfolioBlockedReason(item) {
     LISTING_NOT_ACTIVE: 'Η κατάσταση της εισαγωγής δεν επιτρέπει ενεργή επενδυτική απόφαση.',
     REFERENCE_PRICE_TIMESTAMP_NOT_VERIFIED: 'Η τιμή υπάρχει, αλλά ο ακριβής χρόνος της δεν είναι επαληθευμένος για τελική απόφαση.',
     REFERENCE_PRICE_NOT_DECISION_ELIGIBLE: 'Η διαθέσιμη τιμή είναι κατάλληλη για ενημέρωση/αποτίμηση, όχι για τελική επενδυτική πράξη.',
-    REFERENCE_PRICE_NOT_EXECUTION_ELIGIBLE: 'Η διαθέσιμη τιμή δεν είναι αρκετά φρέσκια για execution-sensitive απόφαση.',
+    REFERENCE_PRICE_NOT_EXECUTION_ELIGIBLE: 'Η διαθέσιμη τιμή δεν είναι αρκετά φρέσκια για τελική απόφαση.',
     QUOTE_TIMESTAMP_NOT_VERIFIED: 'Ο χρόνος της χρηματιστηριακής τιμής δεν είναι επαληθευμένος.',
     QUOTE_NOT_DECISION_ELIGIBLE: 'Η τρέχουσα χρηματιστηριακή τιμή δεν επιτρέπεται να οδηγήσει τελική απόφαση.',
   };
@@ -285,9 +335,9 @@ function capabilityLabel(capability) {
     }[capability?.queueStatus] || 'ΤΑΥΤΟΠΟΙΗΘΗΚΕ';
   }
   return {
-    READY: 'MINBEIS READY',
+    READY: 'ΕΤΟΙΜΟ ΓΙΑ ΑΝΑΛΥΣΗ',
     IDENTITY_NOT_VERIFIED: 'ΧΡΕΙΑΖΕΤΑΙ ΤΑΥΤΟΠΟΙΗΣΗ',
-    GATEWAY_NOT_CONFIGURED: 'ONBOARDING ΜΗ ΔΙΑΘΕΣΙΜΟ',
+    GATEWAY_NOT_CONFIGURED: 'Η ΕΝΤΑΞΗ ΔΕΝ ΕΙΝΑΙ ΔΙΑΘΕΣΙΜΗ',
     CHECK_FAILED: 'ΕΛΕΓΧΟΣ ΑΠΕΤΥΧΕ',
   }[capability?.onboardingStatus] || null;
 }
@@ -295,16 +345,16 @@ function capabilityLabel(capability) {
 function capabilityText(capability) {
   if (capability?.onboardingStatus === 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED') {
     return {
-      QUEUED: 'Το προϊόν ταυτοποιήθηκε και μπήκε στη μόνιμη MINBEIS research queue. Θα αποκτήσει πλήρη canonical ανάλυση όταν ολοκληρωθεί ο research κύκλος.',
-      COMPLETED: 'Η research queue έχει ολοκληρώσει το onboarding. Αναμένεται η επόμενη έγκυρη mobile feed για να εμφανιστεί η canonical ανάλυση.',
+      QUEUED: 'Η μετοχή ταυτοποιήθηκε και μπήκε σε μόνιμη ουρά έρευνας. Θα εμφανιστεί πλήρης ανάλυση όταν ολοκληρωθεί ο κύκλος ελέγχων.',
+      COMPLETED: 'Η έρευνα ολοκληρώθηκε. Αναμένεται η επόμενη έγκυρη ενημέρωση για να εμφανιστεί η πλήρης ανάλυση.',
       QUEUE_NOT_CONFIGURED: 'Το symbol και η χρηματιστηριακή ταυτότητα επαληθεύτηκαν. Η server-side μόνιμη research queue δεν έχει ακόμη ενεργοποιηθεί, οπότε δεν δηλώνεται ψευδώς ότι το προϊόν μπήκε σε ανάλυση.',
       QUEUE_FAILED: 'Το προϊόν ταυτοποιήθηκε, αλλά η αποστολή του στη research queue απέτυχε προσωρινά. Η θέση παραμένει αποθηκευμένη και δεν παράγεται τεχνητή απόφαση.',
       NOT_QUEUED: 'Το προϊόν ταυτοποιήθηκε, αλλά δεν έχει ακόμη καταχωρηθεί στη research queue.',
     }[capability?.queueStatus] || 'Το symbol και η χρηματιστηριακή ταυτότητα επαληθεύτηκαν. Η πλήρης MINBEIS research coverage δεν έχει ακόμη γίνει canonical.';
   }
   return {
-    READY: 'Το προϊόν είναι canonical και υποστηρίζεται για πλήρη MINBEIS ανάλυση. Δεν υπάρχει ακόμη ενεργή τελική απόφαση στη σημερινή ροή.',
-    IDENTITY_NOT_VERIFIED: 'Το προϊόν αποθηκεύτηκε στο χαρτοφυλάκιο, αλλά το MINBEIS δεν θα δημιουργήσει απόφαση μέχρι να επαληθευτεί η canonical ταυτότητά του.',
+    READY: 'Η μετοχή υποστηρίζεται για πλήρη ανάλυση MINBEIS. Δεν υπάρχει ακόμη ενεργή τελική απόφαση στη σημερινή ενημέρωση.',
+    IDENTITY_NOT_VERIFIED: 'Η μετοχή αποθηκεύτηκε στο χαρτοφυλάκιο, αλλά το MINBEIS δεν θα δημιουργήσει απόφαση μέχρι να επαληθευτεί η χρηματιστηριακή ταυτότητά της.',
     GATEWAY_NOT_CONFIGURED: 'Το προϊόν αποθηκεύτηκε, αλλά ο κεντρικός gateway δεν είναι διαθέσιμος σε αυτή την έκδοση για automatic onboarding.',
     CHECK_FAILED: 'Η καταχώρηση του προϊόντος αποθηκεύτηκε κανονικά, αλλά ο αυτόματος έλεγχος MINBEIS δεν ολοκληρώθηκε.',
   }[capability?.onboardingStatus] || null;
@@ -315,13 +365,13 @@ function buildPositionClarity({ row, blockedDossier, interimPlan, capability, as
     return {
       now: minbeisActionLabel(row.action),
       why: assessment?.explanation?.summary || minbeisReasonText(row),
-      change: assessment?.explanation?.whatWouldChange || 'Νέα επαληθευμένα δεδομένα που αλλάζουν την canonical αξιολόγηση.',
+      change: assessment?.explanation?.whatWouldChange || 'Νέα επαληθευμένα δεδομένα που αλλάζουν την αξιολόγηση MINBEIS.',
     };
   }
   if (interimPlan) {
     return {
       now: interimPlan.holderActionLabel || 'ΠΑΡΑΚΟΛΟΥΘΗΣΗ',
-      why: interimPlan.rationale || 'Υπάρχει προσωρινό risk-control πλάνο όσο η τελική απόφαση παραμένει μπλοκαρισμένη.',
+      why: interimPlan.rationale || 'Υπάρχει προσωρινό πλάνο περιορισμού κινδύνου όσο η τελική απόφαση παραμένει σε αναμονή.',
       change: assessment?.explanation?.whatWouldChange || portfolioBlockedReason(blockedDossier),
     };
   }
@@ -329,7 +379,7 @@ function buildPositionClarity({ row, blockedDossier, interimPlan, capability, as
     return {
       now: 'ΠΕΡΙΜΕΝΕ · ΟΧΙ ΤΕΛΙΚΗ ΠΡΑΞΗ',
       why: portfolioBlockedReason(blockedDossier),
-      change: assessment?.explanation?.whatWouldChange || blockedDossier?.nextStep || 'Να λυθεί ο υποχρεωτικός blocker και να τρέξει νέα canonical αξιολόγηση.',
+      change: assessment?.explanation?.whatWouldChange || blockedDossier?.nextStep || 'Να ολοκληρωθεί ο υποχρεωτικός έλεγχος και να γίνει νέα αξιολόγηση MINBEIS.',
     };
   }
   if (capability?.queueStatus === 'QUEUED') {
@@ -343,13 +393,13 @@ function buildPositionClarity({ row, blockedDossier, interimPlan, capability, as
     return {
       now: 'ΠΕΡΙΜΕΝΕ ΝΕΑ ΑΞΙΟΛΟΓΗΣΗ',
       why: capabilityText(capability),
-      change: 'Να παραχθεί ενεργή canonical απόφαση στην επόμενη έγκυρη ροή.',
+      change: 'Να παραχθεί ενεργή τελική αξιολόγηση στην επόμενη έγκυρη ενημέρωση.',
     };
   }
   return {
     now: 'ΑΝΑΜΟΝΗ ΕΛΕΓΧΟΥ',
     why: capabilityText(capability) || 'Η θέση είναι καταχωρημένη, αλλά δεν υπάρχει ακόμη επαρκής επαληθευμένη ανάλυση για πράξη.',
-    change: 'Να ολοκληρωθούν τα identity/data/research checks.',
+    change: 'Να ολοκληρωθούν οι έλεγχοι ταυτότητας, δεδομένων και έρευνας.',
   };
 }
 
@@ -450,7 +500,7 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = nu
             <PositionClarityCard clarity={clarity} />
             <View style={styles.positionContextRow}>
               <MinbeisAssessmentStrip assessment={assessment} compact />
-              {row ? <Text style={styles.ageText}>Confidence {Number.isFinite(Number(row.confidenceScore)) ? Number(row.confidenceScore).toFixed(0) : '—'} · Data {Number.isFinite(Number(row.dataQualityScore)) ? Number(row.dataQualityScore).toFixed(0) : '—'}</Text> : blockedDossier ? <Text style={styles.ageText}>Fail-closed μέχρι να λυθεί ο blocker</Text> : null}
+              {row ? <Text style={styles.ageText}>Εμπιστοσύνη {Number.isFinite(Number(row.confidenceScore)) ? Number(row.confidenceScore).toFixed(0) : '—'} · Δεδομένα {Number.isFinite(Number(row.dataQualityScore)) ? Number(row.dataQualityScore).toFixed(0) : '—'}</Text> : blockedDossier ? <Text style={styles.ageText}>Αναμονή μέχρι να ολοκληρωθεί ο υποχρεωτικός έλεγχος</Text> : null}
             </View>
             <HistoricalContextCard context={historicalContext} />
             {!row && !blockedDossier && capability?.queueStatus === 'QUEUED' && capability?.queuedAt ? <Text style={styles.queueStatusText}>Στην ουρά από {when(capability.queuedAt)}</Text> : null}
@@ -470,7 +520,7 @@ function buildNewIdeaClarity(row) {
     why: assessment?.explanation?.summary || minbeisReasonText(row),
     change: assessment?.explanation?.whatWouldChange
       || (row?.purchase?.nextGate ? purchaseNextGateLabel(row.purchase.nextGate) : null)
-      || 'Νέα επαληθευμένα δεδομένα που περνούν τα strict entry gates.',
+      || 'Νέα επαληθευμένα δεδομένα που περνούν τους αυστηρούς ελέγχους εισόδου.',
   };
 }
 
@@ -486,11 +536,11 @@ function MinbeisDashboard({ dashboard, sourceDecisionCount = 0, decisionContext 
   const noTradeCount = Number(assessmentCounts.NO_TRADE || 0);
   const confirmCount = Number(assessmentCounts.CONFIRMATION_REQUIRED || 0);
   const headline = setupCount > 0
-    ? `${setupCount} επιβεβαιωμένο setup${setupCount === 1 ? '' : 's'} τώρα`
+    ? `${setupCount} επιβεβαιωμένη υποψήφια αγορά${setupCount === 1 ? '' : 's'} τώρα`
     : trapCount > 0
       ? `${trapCount} πιθανή παγίδα${trapCount === 1 ? '' : 'ες'} χρειάζεται προσοχή`
       : rows.length
-        ? 'Δεν υπάρχει επιβεβαιωμένο setup για νέα είσοδο τώρα'
+        ? 'Δεν υπάρχει επιβεβαιωμένη υποψήφια αγορά για νέα είσοδο τώρα'
         : sourceDecisionCount > 0
           ? 'Υπάρχουν αναλύσεις, αλλά καμία νέα ιδέα δεν περνά τώρα τους ενεργούς κανόνες'
           : 'Δεν υπάρχουν ακόμη τελικές αναλύσεις αγοράς';
@@ -525,7 +575,7 @@ function MinbeisDashboard({ dashboard, sourceDecisionCount = 0, decisionContext 
           <PositionClarityCard clarity={buildNewIdeaClarity(row)} />
           <View style={styles.positionContextRow}>
             <MinbeisAssessmentStrip assessment={row.minbeisAssessment} compact />
-            <Text style={styles.ageText}>Confidence {Number.isFinite(Number(row.confidenceScore)) ? Number(row.confidenceScore).toFixed(0) : '—'} · Data {Number.isFinite(Number(row.dataQualityScore)) ? Number(row.dataQualityScore).toFixed(0) : '—'}</Text>
+            <Text style={styles.ageText}>Εμπιστοσύνη {Number.isFinite(Number(row.confidenceScore)) ? Number(row.confidenceScore).toFixed(0) : '—'} · Δεδομένα {Number.isFinite(Number(row.dataQualityScore)) ? Number(row.dataQualityScore).toFixed(0) : '—'}</Text>
           </View>
           <HistoricalContextCard context={row.historicalContext} />
         </View>
@@ -579,7 +629,7 @@ function purchaseReasonLabel(reason) {
 function purchaseNextGateLabel(gate) {
   return {
     USER_EXECUTION_ONLY: 'Η απόφαση είναι επιβεβαιωμένη. Τυχόν εκτέλεση γίνεται μόνο από εσένα.',
-    RECHECK_STRICT_BUY_GATES: 'Επανέλεγχος των αυστηρών BUY gates όταν αλλάξουν τα δεδομένα.',
+    RECHECK_STRICT_BUY_GATES: 'Επανέλεγχος των αυστηρών κριτηρίων αγοράς όταν αλλάξουν τα δεδομένα.',
     NEW_EVIDENCE_OR_MATERIAL_CHANGE: 'Νέα ουσιαστικά στοιχεία ή σημαντική αλλαγή πριν επανεξεταστεί.',
     COMPLETE_BLOCKING_CHECKS: 'Ολοκλήρωση όλων των ελέγχων που λείπουν.',
     FULL_DEEP_DOSSIER: 'Ολοκλήρωση πλήρους επενδυτικού φακέλου.',
@@ -605,18 +655,18 @@ function OpportunityPurchaseCard({ item, portfolioPositions = [], portfolioPolic
       </View>
       <View style={styles.actionRow}>
         <View style={styles.actionBox}>
-          <Text style={styles.muted}>Opportunity score</Text>
+          <Text style={styles.muted}>Βαθμός ευκαιρίας</Text>
           <Text style={styles.action}>{Number.isFinite(score) ? score.toFixed(1) : '—'}</Text>
         </View>
         <View style={styles.actionBox}>
-          <Text style={styles.muted}>Strict BUY</Text>
+          <Text style={styles.muted}>Αυστηρός έλεγχος αγοράς</Text>
           <Text style={[styles.action, rejected && styles.riskText]}>{confirmed ? 'ΕΠΙΒΕΒΑΙΩΘΗΚΕ' : 'ΟΧΙ'}</Text>
         </View>
       </View>
       {confirmed ? (
         <View style={styles.nextBox}>
           <Text style={styles.nextLabel}>ΑΓΟΡΑ ΕΠΙΒΕΒΑΙΩΘΗΚΕ</Text>
-          <Text style={styles.nextText}>Πέρασε την ίδια αυστηρή τελική πολιτική BUY_NOW. Καμία εντολή broker δεν εκτελείται αυτόματα.</Text>
+          <Text style={styles.nextText}>Πέρασε τον αυστηρό τελικό έλεγχο αγοράς. Καμία εντολή χρηματιστηριακής δεν εκτελείται αυτόματα.</Text>
         </View>
       ) : item.whyNotBuyNow?.length ? (
         <View style={styles.blockers}>
@@ -631,7 +681,7 @@ function OpportunityPurchaseCard({ item, portfolioPositions = [], portfolioPolic
           {personalizedMinbeisDecision.portfolioSizingStatus === 'BLOCKED_BY_USER_POLICY' ? <Text style={styles.warning}>Η νέα θέση μπλοκάρεται μόνο επειδή παραβιάζει το όριο συγκέντρωσης που όρισες εσύ.</Text> : null}
           {personalizedMinbeisDecision.portfolioSizingStatus === 'PERSONALIZATION_UNAVAILABLE' ? <Text style={styles.warning}>Η βασική πρόταση παραμένει διαθέσιμη, αλλά δεν μπορεί να γίνει προσωπική προσαρμογή συγκέντρωσης μέχρι να είναι πλήρης η αποτίμηση του χαρτοφυλακίου.</Text> : null}
           {personalizedMinbeisDecision.portfolioSizingNote ? <Text style={styles.ageText}>{personalizedMinbeisDecision.portfolioSizingNote}</Text> : null}
-          <Text style={styles.ageText}>Απαιτείται ανθρώπινη έγκριση · καμία αυτόματη εντολή broker</Text>
+          <Text style={styles.ageText}>Απαιτείται δική σου έγκριση · καμία αυτόματη εντολή αγοράς ή πώλησης</Text>
         </View>
       ) : null}
       <View style={styles.nextBox}>
@@ -700,7 +750,7 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
       const result = await syncIntelligenceFeedAsync();
       setFeed(result.feed);
       setSyncState(result.syncState);
-      if (manual) Alert.alert('Market Intelligence', result.changed ? 'Η συσκευή ενημερώθηκε με τη νεότερη έγκυρη ροή.' : 'Η συσκευή έχει ήδη την τελευταία διαθέσιμη έγκυρη ροή.');
+      if (manual) Alert.alert('MINBEIS', result.changed ? 'Η συσκευή ενημερώθηκε με τη νεότερη έγκυρη ροή.' : 'Η συσκευή έχει ήδη την τελευταία διαθέσιμη έγκυρη ροή.');
     } catch (error) {
       setSyncState(error.syncState || await loadIntelligenceSyncState());
       setSyncError(error.message);
@@ -777,7 +827,7 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
         setFeed(imported);
         setSyncState(await loadIntelligenceSyncState());
         setSyncError(null);
-        Alert.alert('Market Intelligence', 'Η χειροκίνητη ροή ελέγχθηκε και αποθηκεύτηκε μόνο στη συσκευή.');
+        Alert.alert('MINBEIS', 'Η χειροκίνητη ροή ελέγχθηκε και αποθηκεύτηκε μόνο στη συσκευή.');
       }
     } catch (error) {
       Alert.alert('Μη έγκυρη ροή', error.message);
@@ -804,14 +854,14 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
     ],
   );
 
-  if (loading) return <View style={styles.loading}><ActivityIndicator color="#0B66FF" /><Text style={styles.muted}>Φόρτωση Market Intelligence…</Text></View>;
+  if (loading) return <View style={styles.loading}><ActivityIndicator color="#0B66FF" /><Text style={styles.muted}>Φόρτωση ανάλυσης MINBEIS…</Text></View>;
 
   return (
     <View>
       <View style={styles.headerRow}>
         <View style={styles.grow}>
-          <Text style={styles.title}>MINBEIS</Text>
-          <Text style={styles.subtitle}>Προσωπική επενδυτική νοημοσύνη · αποφάσεις, ρίσκο και επόμενη πράξη</Text>
+          <Text style={styles.title}>Ανάλυση & ευκαιρίες</Text>
+          <Text style={styles.subtitle}>Οι θέσεις σου, νέες ιδέες και η επόμενη πράξη σε μία οθόνη</Text>
         </View>
         <Pressable style={[styles.syncSmall, syncing && styles.disabled]} onPress={() => sync({ manual: true })} disabled={syncing}>
           {syncing ? <ActivityIndicator color="#fff" /> : <Text style={styles.syncSmallText}>Ανανέωση</Text>}
@@ -837,7 +887,7 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
         <View style={[styles.productionHealth, productionReady ? styles.productionHealthGood : styles.productionHealthLimited]}>
           <View style={styles.productionHealthTop}><View style={styles.grow}><Text style={styles.productionHealthEyebrow}>ΚΑΤΑΣΤΑΣΗ ΠΑΡΑΓΩΓΙΚΟΥ ΣΥΣΤΗΜΑΤΟΣ</Text><Text style={styles.productionHealthTitle}>{productionReady ? (historicalAnalyticsPartial ? 'Κανονική λειτουργία · μερική ιστορική κάλυψη' : 'Πλήρης αυτοματοποιημένη λειτουργία') : 'Περιορισμένη λειτουργία — χωρίς αυθαίρετα σήματα'}</Text></View><View style={[styles.productionHealthBadge, productionReady && styles.productionHealthBadgeGood]}><Text style={[styles.productionHealthBadgeText, productionReady && styles.productionHealthBadgeTextGood]}>{productionReady ? 'ΕΝΕΡΓΟ' : 'ΠΕΡΙΟΡΙΣΜΕΝΟ'}</Text></View></View>
           <Text style={styles.productionHealthText}>{productionReady ? (historicalAnalyticsPartial ? 'Η ροή είναι πρόσφατη και οι τρέχοντες έλεγχοι αγοράς και θεμελιωδών λειτουργούν. Η ιστορική ανάλυση είναι διαθέσιμη μόνο όπου έχει επαρκή και επαληθευμένα δεδομένα· οι υπόλοιποι φάκελοι παραμένουν μπλοκαρισμένοι.' : 'Η ροή είναι πρόσφατη και οι υποχρεωτικοί έλεγχοι αγοράς, ιστορικού και θεμελιωδών λειτουργούν.') : 'Το σύστημα συνεχίζει να συλλέγει και να ελέγχει δεδομένα, αλλά δεν εγκρίνει αγορά ή πώληση όταν λείπει πηγή, ιστορικό, benchmark, θεμελιώδη ή διασταύρωση.'}</Text>
-          <Text style={styles.healthSplitText}>Υποδομή: {operationalHealth?.infrastructureStatus || '—'} · Τρέχουσα αγορά: {operationalHealth?.marketDataStatus || '—'} · Ιστορική ανάλυση: {historicalAnalyticsStatus} · Θεμελιώδη: {operationalHealth?.fundamentalsStatus || '—'} · Αποφάσεις: {operationalHealth?.decisionEngineStatus || '—'}</Text>
+          <Text style={styles.healthSplitText}>Υποδομή: {operationalStatusLabel(operationalHealth?.infrastructureStatus)} · Τρέχουσα αγορά: {operationalStatusLabel(operationalHealth?.marketDataStatus)} · Ιστορική ανάλυση: {operationalStatusLabel(historicalAnalyticsStatus)} · Θεμελιώδη: {operationalStatusLabel(operationalHealth?.fundamentalsStatus)} · Αποφάσεις: {operationalStatusLabel(operationalHealth?.decisionEngineStatus)}</Text>
           <View style={styles.productionMetrics}>
             <View style={styles.productionMetric}><Text style={styles.productionMetricValue}>{sourceHealth?.marketSnapshotCount || 0}</Text><Text style={styles.productionMetricLabel}>Τρέχουσες τιμές</Text></View>
             <View style={styles.productionMetric}><Text style={styles.productionMetricValue}>{sourceHealth?.readyHistoricalMarketMetricsCount || 0}/{operationalHealth?.analysedCompanyCount || sourceHealth?.historicalMarketMetricsCount || 0}</Text><Text style={styles.productionMetricLabel}>Ιστορική κάλυψη</Text></View>
@@ -859,7 +909,7 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
           <Pressable style={styles.secondary} onPress={importFeed} disabled={importing}>
             {importing ? <ActivityIndicator color="#16345f" /> : <Text style={styles.secondaryText}>Εφεδρική εισαγωγή αρχείου JSON</Text>}
           </Pressable>
-          <Text style={styles.privacy}>Η ροή αποθηκεύεται σε ξεχωριστό τοπικό κλειδί. Δεν αλλάζει συναλλαγές, τιμές αγοράς, Decision Gate ή λογιστικά δεδομένα.</Text>
+          <Text style={styles.privacy}>Η ροή αποθηκεύεται σε ξεχωριστό τοπικό κλειδί. Δεν αλλάζει συναλλαγές, τιμές αγοράς, τον Έλεγχο απόφασης ή λογιστικά δεδομένα.</Text>
         </View>
       ) : (
         <>
@@ -870,16 +920,16 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
             <Text style={styles.summaryHeadline}>{feed.today?.headline || 'Ημερήσια σύνοψη'}</Text>
             <Text style={styles.updated}>Έγκυρη ροή: {when(feed.generatedAt)}</Text>
             <View style={styles.countRow}>
-              <View style={styles.countBox}><Text style={styles.countValue}>{personalizedCounts.buyNowCount || 0}</Text><Text style={styles.countLabel}>Canonical BUY</Text></View>
-              <View style={styles.countBox}><Text style={styles.countValue}>{personalizedCounts.sellNowCount || 0}</Text><Text style={styles.countLabel}>Canonical SELL</Text></View>
+              <View style={styles.countBox}><Text style={styles.countValue}>{personalizedCounts.buyNowCount || 0}</Text><Text style={styles.countLabel}>ΑΓΟΡΑ ΤΩΡΑ</Text></View>
+              <View style={styles.countBox}><Text style={styles.countValue}>{personalizedCounts.sellNowCount || 0}</Text><Text style={styles.countLabel}>ΜΕΙΩΣΗ / ΠΩΛΗΣΗ</Text></View>
               <View style={styles.countBox}><Text style={styles.countValue}>{counts.finalActionCount || 0}</Text><Text style={styles.countLabel}>Τελικές αναλύσεις</Text></View>
             </View>
           </View>
 
           {feed.discoveryRadar?.length ? <View style={styles.sectionBlock}><Text style={styles.sectionTitle}>Ραντάρ νέων μετοχών</Text><Text style={styles.sectionSubtitle}>Το σύστημα σαρώνει αυτόματα επίσημα γεγονότα της αγοράς, κατατάσσει νέες εταιρείες και περνά τις ισχυρότερες σε πλήρη ανάλυση.</Text>{feed.discoveryRadar.map((item) => <DiscoveryRadarCard key={item.discoveryId} item={item} />)}</View> : null}
-          <PurchaseSection title="ΑΓΟΡΑ ΕΠΙΒΕΒΑΙΩΘΗΚΕ" subtitle="Μόνο ευκαιρίες που πέρασαν και τη δεύτερη αυστηρή πολιτική BUY_NOW. Καμία αυτόματη συναλλαγή." items={decisionContext.feedFresh && decisionContext.systemReady ? (feed.confirmedBuyOpportunities || []) : []} portfolioPositions={portfolioPositions} portfolioPolicy={portfolioPolicy} />
-          <PurchaseSection title="Ισχυρές ευκαιρίες — αναμονή εισόδου" subtitle="Υψηλή κατάταξη Opportunity Hunter, αλλά δεν έχουν επιβεβαιωθεί ακόμη όλα τα strict BUY gates." items={feed.waitingEntryOpportunities || []} portfolioPositions={portfolioPositions} portfolioPolicy={portfolioPolicy} />
-          <PurchaseSection title="Απορρίφθηκαν για αγορά" subtitle="Ο Opportunity Hunter τις εντόπισε, αλλά ο αυστηρός τελικός έλεγχος απέρριψε αγορά με τα τωρινά δεδομένα." items={feed.rejectedOpportunities || []} portfolioPositions={portfolioPositions} portfolioPolicy={portfolioPolicy} />
+          <PurchaseSection title="ΑΓΟΡΑ ΕΠΙΒΕΒΑΙΩΘΗΚΕ" subtitle="Μόνο ευκαιρίες που πέρασαν και τον δεύτερο αυστηρό έλεγχο αγοράς. Καμία αυτόματη συναλλαγή." items={decisionContext.feedFresh && decisionContext.systemReady ? (feed.confirmedBuyOpportunities || []) : []} portfolioPositions={portfolioPositions} portfolioPolicy={portfolioPolicy} />
+          <PurchaseSection title="Ισχυρές ευκαιρίες — αναμονή εισόδου" subtitle="Υψηλή ερευνητική προτεραιότητα, αλλά δεν έχουν επιβεβαιωθεί ακόμη όλα τα κριτήρια αγοράς." items={feed.waitingEntryOpportunities || []} portfolioPositions={portfolioPositions} portfolioPolicy={portfolioPolicy} />
+          <PurchaseSection title="Απορρίφθηκαν για αγορά" subtitle="Το MINBEIS τις εντόπισε, αλλά ο αυστηρός τελικός έλεγχος απέρριψε αγορά με τα τωρινά δεδομένα." items={feed.rejectedOpportunities || []} portfolioPositions={portfolioPositions} portfolioPolicy={portfolioPolicy} />
           <PurchaseSection title="Μπλοκαρισμένες ευκαιρίες" subtitle="Χρειάζονται πλήρη ανάλυση ή υποχρεωτικούς ελέγχους πριν μπορούν να αξιολογηθούν για αγορά." items={feed.blockedOpportunities || []} portfolioPositions={portfolioPositions} portfolioPolicy={portfolioPolicy} />
 
           <Section title="Αυξημένη προτεραιότητα" subtitle="Κίνδυνοι ή εξελίξεις που χρειάζονται πρώτα προσοχή" items={feed.urgent || []} decisionContext={decisionContext} />
