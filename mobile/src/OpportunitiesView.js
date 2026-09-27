@@ -121,7 +121,7 @@ function IntelligenceCard({ item, decisionContext }) {
           <View style={styles.actionBox}><Text style={styles.muted}>Γενική ερευνητική ένδειξη</Text><Text style={[styles.action, risk && styles.riskText]}>{item.actionLabel}</Text><Text style={styles.ageText}>Δεν είναι η προσωπική σου πράξη</Text></View>
           <View style={styles.actionBox}><Text style={styles.muted}>Τιμή αναφοράς</Text><Text style={styles.action}>{money(item.referencePrice, item)}</Text><Text style={styles.ageText}>{Number.isFinite(referenceAge) ? (referenceAge < 1 ? 'πριν από λιγότερο από 1 ώρα' : 'πριν από ' + referenceAge.toFixed(1) + ' ώρες') : 'χωρίς έγκυρη ώρα'}</Text></View>
         </View>
-        {item.marketQuote?.quoteContract?.publicMessage ? <View style={styles.marketQuoteContract}><Text style={styles.marketQuoteContractText}>{item.marketQuote.quoteContract.publicMessage}</Text></View> : null}
+        {item.marketQuote?.quoteContract?.publicMessage ? <View style={styles.marketQuoteContract}><Text style={styles.marketQuoteContractText}>{userFacingAnalysisText(item.marketQuote.quoteContract.publicMessage)}</Text></View> : null}
         {item.thesis ? <Text style={styles.thesis} numberOfLines={expanded ? undefined : 4}>{userFacingAnalysisText(item.thesis)}</Text> : <Text style={styles.warning}>Δεν έχει ολοκληρωθεί ακόμη τεκμηριωμένη επενδυτική θέση.</Text>}
         <View style={styles.nextBox}><Text style={styles.nextLabel}>Επόμενο βήμα</Text><Text style={styles.nextText}>{userFacingAnalysisText(item.nextStep)}</Text></View>
         <Text style={styles.expand}>{expanded ? 'Απόκρυψη λεπτομερειών' : 'Προβολή πλήρους φακέλου'}</Text>
@@ -129,14 +129,14 @@ function IntelligenceCard({ item, decisionContext }) {
       {expanded ? (
         <View style={styles.details}>
           <View style={styles.timeContext}><Text style={styles.timeTitle}>Χρόνοι ανάλυσης</Text><Text style={styles.timeText}>Τελευταία αυτόματη ενημέρωση: {when(item.generatedAt)}</Text><Text style={styles.timeText}>Επίσημη επανεξέταση επενδυτικής υπόθεσης: {item.reviewDate || '—'}</Text></View>
-          {item.metricNotes?.map((note, index) => <View key={'m-' + index} style={styles.metricNote}><Text style={styles.metricNoteTitle}>Επεξήγηση ακραίας μέτρησης</Text><Text style={styles.detailText}>{note}</Text></View>)}
-          {item.causalMechanism ? <><Text style={styles.detailTitle}>Γιατί μπορεί να επηρεάσει τη μετοχή</Text><Text style={styles.detailText}>{item.causalMechanism}</Text></> : null}
-          {item.bullCase ? <><Text style={styles.detailTitle}>Θετικό σενάριο</Text><Text style={styles.detailText}>{item.bullCase}</Text></> : null}
-          {item.bearCase ? <><Text style={styles.detailTitle}>Αρνητικό σενάριο</Text><Text style={styles.detailText}>{item.bearCase}</Text></> : null}
-          {item.invalidationCondition ? <View style={styles.invalidation}><Text style={styles.invalidationTitle}>Τι ακυρώνει την υπόθεση</Text><Text style={styles.detailText}>{item.invalidationCondition}</Text></View> : null}
-          {item.catalysts?.length ? <><Text style={styles.detailTitle}>Καταλύτες</Text>{item.catalysts.map((entry, index) => <Text key={'c-' + index} style={styles.bullet}>• {claimText(entry)}</Text>)}</> : null}
-          {item.risks?.length ? <><Text style={styles.detailTitle}>Κίνδυνοι</Text>{item.risks.map((entry, index) => <Text key={'r-' + index} style={styles.bullet}>• {claimText(entry)}</Text>)}</> : null}
-          {item.blockerLabels?.length ? <View style={styles.blockers}><Text style={styles.blockerTitle}>Γιατί δεν είναι ακόμη τελική πρόταση</Text>{item.blockerLabels.map((label, index) => <Text key={'b-' + index} style={styles.blockerText}>• {label}</Text>)}</View> : null}
+          {item.metricNotes?.map((note, index) => <View key={'m-' + index} style={styles.metricNote}><Text style={styles.metricNoteTitle}>Επεξήγηση ακραίας μέτρησης</Text><Text style={styles.detailText}>{userFacingAnalysisText(note)}</Text></View>)}
+          {item.causalMechanism ? <><Text style={styles.detailTitle}>Γιατί μπορεί να επηρεάσει τη μετοχή</Text><Text style={styles.detailText}>{userFacingAnalysisText(item.causalMechanism)}</Text></> : null}
+          {item.bullCase ? <><Text style={styles.detailTitle}>Θετικό σενάριο</Text><Text style={styles.detailText}>{userFacingAnalysisText(item.bullCase)}</Text></> : null}
+          {item.bearCase ? <><Text style={styles.detailTitle}>Αρνητικό σενάριο</Text><Text style={styles.detailText}>{userFacingAnalysisText(item.bearCase)}</Text></> : null}
+          {item.invalidationCondition ? <View style={styles.invalidation}><Text style={styles.invalidationTitle}>Τι ακυρώνει την υπόθεση</Text><Text style={styles.detailText}>{userFacingAnalysisText(item.invalidationCondition)}</Text></View> : null}
+          {item.catalysts?.length ? <><Text style={styles.detailTitle}>Καταλύτες</Text>{item.catalysts.map((entry, index) => <Text key={'c-' + index} style={styles.bullet}>• {userFacingAnalysisText(claimText(entry))}</Text>)}</> : null}
+          {item.risks?.length ? <><Text style={styles.detailTitle}>Κίνδυνοι</Text>{item.risks.map((entry, index) => <Text key={'r-' + index} style={styles.bullet}>• {userFacingAnalysisText(claimText(entry))}</Text>)}</> : null}
+          {item.blockerLabels?.length ? <View style={styles.blockers}><Text style={styles.blockerTitle}>Γιατί δεν είναι ακόμη τελική πρόταση</Text>{item.blockerLabels.map((label, index) => <Text key={'b-' + index} style={styles.blockerText}>• {technicalReasonLabel(label)}</Text>)}</View> : null}
           <Text style={styles.detailTitle}>Πηγές</Text>
           {item.sources?.length ? item.sources.map((sourceItem, index) => <Pressable key={sourceItem.sourceUrl + '-' + index} style={styles.sourceRow} onPress={() => Linking.openURL(sourceItem.sourceUrl).catch(() => Alert.alert('Πηγή', 'Δεν ήταν δυνατό να ανοίξει ο σύνδεσμος.'))}><View style={styles.grow}><Text style={styles.sourceName}>{sourceItem.sourceName}</Text><Text style={styles.sourceTitle}>{sourceItem.title}</Text></View><Text style={styles.sourceState}>{sourceItem.reviewed ? 'Ελεγμένη' : 'Εντοπίστηκε'}</Text></Pressable>) : <Text style={styles.muted}>Δεν υπάρχουν διαθέσιμες πηγές στην τρέχουσα ροή.</Text>}
         </View>
@@ -146,7 +146,7 @@ function IntelligenceCard({ item, decisionContext }) {
 }
 
 function DiscoveryRadarCard({ item }) {
-  return <View style={styles.discoveryCard}><View style={styles.rowTop}><View style={styles.grow}><Text style={styles.company}>{item.companyName}</Text><Text style={styles.symbol}>{item.symbol || '—'} · {item.exchange || '—'}</Text></View><View style={styles.discoveryScore}><Text style={styles.discoveryScoreValue}>{Math.round(Number(item.discoveryScore || 0))}</Text><Text style={styles.discoveryScoreLabel}>προτερ.</Text></View></View><Text style={styles.discoveryStatus}>ΑΥΤΟΜΑΤΗ ΑΝΑΚΑΛΥΨΗ · ΟΧΙ ΑΚΟΜΗ ΠΡΟΤΑΣΗ ΑΓΟΡΑΣ</Text><Text style={styles.discoveryDisclaimer}>Βαθμός προτεραιότητας διερεύνησης — όχι επενδυτική βαθμολογία.</Text>{(item.reasons || []).slice(0, 3).map((reason, index) => <Text key={index} style={styles.discoveryReason}>• {reason}</Text>)}<Text style={styles.discoveryTime}>Νεότερο γεγονός: {when(item.latestEventAt)}</Text></View>;
+  return <View style={styles.discoveryCard}><View style={styles.rowTop}><View style={styles.grow}><Text style={styles.company}>{item.companyName}</Text><Text style={styles.symbol}>{item.symbol || '—'} · {item.exchange || '—'}</Text></View><View style={styles.discoveryScore}><Text style={styles.discoveryScoreValue}>{Math.round(Number(item.discoveryScore || 0))}</Text><Text style={styles.discoveryScoreLabel}>προτερ.</Text></View></View><Text style={styles.discoveryStatus}>ΑΥΤΟΜΑΤΗ ΑΝΑΚΑΛΥΨΗ · ΟΧΙ ΑΚΟΜΗ ΠΡΟΤΑΣΗ ΑΓΟΡΑΣ</Text><Text style={styles.discoveryDisclaimer}>Βαθμός προτεραιότητας διερεύνησης — όχι επενδυτική βαθμολογία.</Text>{(item.reasons || []).slice(0, 3).map((reason, index) => <Text key={index} style={styles.discoveryReason}>• {userFacingAnalysisText(reason)}</Text>)}<Text style={styles.discoveryTime}>Νεότερο γεγονός: {when(item.latestEventAt)}</Text></View>;
 }
 
 function historicalHorizonLabel(key) {
@@ -169,21 +169,68 @@ function historicalRegimeLabel(value) {
 
 function userFacingAnalysisText(value) {
   return String(value || '')
+    .replace(/τελική\s+canonical απόφαση/gi, 'τελική αξιολόγηση MINBEIS')
     .replace(/canonical analysis/gi, 'επαληθευμένη ανάλυση MINBEIS')
     .replace(/canonical αξιολόγηση/gi, 'επαληθευμένη αξιολόγηση MINBEIS')
-    .replace(/canonical απόφαση/gi, 'τελική αξιολόγηση MINBEIS')
+    .replace(/canonical απόφαση/gi, 'αξιολόγηση MINBEIS')
     .replace(/canonical decision engine/gi, 'μηχανή αποφάσεων MINBEIS')
+    .replace(/canonical entry gates/gi, 'κριτήρια εισόδου MINBEIS')
+    .replace(/canonical/gi, 'επαληθευμένη')
     .replace(/strict purchase reconciliation/gi, 'τελικό αυστηρό έλεγχο αγοράς')
     .replace(/strict entry gates/gi, 'αυστηρούς ελέγχους εισόδου')
     .replace(/strict BUY gates/gi, 'αυστηρούς ελέγχους αγοράς')
-    .replace(/risk flags/gi, 'ενδείξεις κινδύνου')
+    .replace(/risk flags?/gi, 'ενδείξεις κινδύνου')
+    .replace(/fundamental risk score/gi, 'βαθμό θεμελιώδους κινδύνου')
+    .replace(/fundamental risk/gi, 'θεμελιώδη κίνδυνο')
+    .replace(/timing risk/gi, 'κίνδυνο χρονισμού')
+    .replace(/risk\/reward/gi, 'σχέση κινδύνου/απόδοσης')
+    .replace(/company claim/gi, 'εταιρικό ισχυρισμό')
+    .replace(/claim/gi, 'ισχυρισμό')
     .replace(/blocker/gi, 'υποχρεωτικό έλεγχο')
     .replace(/research queue/gi, 'ουρά έρευνας')
     .replace(/mobile feed/gi, 'ροή ενημέρωσης')
     .replace(/research coverage/gi, 'ερευνητική κάλυψη')
     .replace(/gateway/gi, 'κεντρική υπηρεσία δεδομένων')
     .replace(/onboarding/gi, 'ένταξη')
-    .replace(/symbol/gi, 'κωδικός μετοχής');
+    .replace(/Opportunity Hunter/gi, 'MINBEIS')
+    .replace(/High\/Super Opportunity/gi, 'υψηλή προτεραιότητα')
+    .replace(/symbol/gi, 'κωδικό μετοχής')
+    .replace(/τελική\s+τελική αξιολόγηση MINBEIS/gi, 'τελική αξιολόγηση MINBEIS')
+    .replace(/επαληθευμένη\s+επαληθευμένη/gi, 'επαληθευμένη');
+}
+
+function technicalReasonLabel(value) {
+  const raw = String(value || '').trim();
+  const labels = {
+    ACTIVE_LISTING_NOT_VERIFIED: 'Δεν έχει επιβεβαιωθεί ότι η μετοχή διαπραγματεύεται ακόμη ενεργά.',
+    LISTING_NOT_ACTIVE: 'Η μετοχή δεν έχει επιβεβαιωθεί ως ενεργά διαπραγματεύσιμη.',
+    QUOTE_NOT_DECISION_ELIGIBLE: 'Η διαθέσιμη χρηματιστηριακή τιμή δεν είναι κατάλληλη για τελική απόφαση.',
+    QUOTE_TIMESTAMP_NOT_VERIFIED: 'Ο χρόνος της χρηματιστηριακής τιμής δεν έχει επαληθευτεί.',
+    REFERENCE_PRICE_NOT_DECISION_ELIGIBLE: 'Η τιμή αναφοράς είναι μόνο πληροφοριακή και δεν είναι κατάλληλη για τελική απόφαση.',
+    REFERENCE_PRICE_NOT_EXECUTION_ELIGIBLE: 'Η τιμή αναφοράς δεν είναι αρκετά πρόσφατη ή επαληθευμένη για άμεση ενέργεια.',
+    REFERENCE_PRICE_TIMESTAMP_NOT_VERIFIED: 'Ο ακριβής χρόνος της τιμής αναφοράς δεν έχει επαληθευτεί.',
+    REFERENCE_PRICE_REQUIRED: 'Λείπει έγκυρη τιμή αναφοράς.',
+    REFERENCE_PRICE_STALE_FOR_PUBLICATION: 'Η τιμή αναφοράς δεν είναι αρκετά πρόσφατη.',
+    DOSSIER_NOT_PUBLISHABLE: 'Ο φάκελος δεν έχει περάσει ακόμη όλους τους ελέγχους δημοσίευσης.',
+    DOSSIER_NOT_READY: 'Η ανάλυση δεν είναι ακόμη έτοιμη για τελική ενέργεια.',
+    CROSS_CHECK_NOT_READY: 'Λείπει ανεξάρτητη διασταύρωση του ίδιου γεγονότος ή στοιχείου.',
+    FUNDAMENTALS_NOT_READY: 'Λείπουν επαρκή και επαληθευμένα θεμελιώδη στοιχεία.',
+    FUNDAMENTALS_REQUIRED: 'Λείπουν επαρκή θεμελιώδη στοιχεία.',
+    HISTORICAL_MARKET_METRICS_REQUIRED: 'Λείπει επαρκές ιστορικό τιμής, όγκου ή αγοράς.',
+    INDEPENDENT_CROSS_CHECK_REQUIRED: 'Λείπει ανεξάρτητη διασταύρωση.',
+    FULL_DEEP_DOSSIER_REQUIRED: 'Απαιτείται πλήρης ανάλυση πριν εξεταστεί αγορά.',
+    BUY_SETUP_NOT_CONFIRMED: 'Δεν έχουν επιβεβαιωθεί ακόμη όλα τα κριτήρια εισόδου.',
+    FINAL_ACTION_BLOCKED: 'Η τελική ενέργεια παραμένει σε αναμονή μέχρι να ολοκληρωθούν οι υποχρεωτικοί έλεγχοι.',
+    SEVERE_RISK_CONFIGURATION: 'Ο συνδυασμός κινδύνων είναι υπερβολικός για νέα αγορά.',
+  };
+  if (labels[raw]) return labels[raw];
+  if (/^[A-Z0-9_]+$/.test(raw)) {
+    return raw
+      .toLowerCase()
+      .replace(/_/g, ' ')
+      .replace(/^./, (character) => character.toUpperCase());
+  }
+  return userFacingAnalysisText(raw);
 }
 
 function operationalStatusLabel(value) {
@@ -199,12 +246,15 @@ function operationalStatusLabel(value) {
 }
 
 function intelligenceCategoryLabel(value) {
+  const normalized = String(value || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
   return {
     FUNDAMENTAL_BASELINE: 'ΘΕΜΕΛΙΩΔΗΣ ΑΝΑΛΥΣΗ',
+    FUNDAMENTAL_QUALITY: 'ΠΟΙΟΤΗΤΑ ΘΕΜΕΛΙΩΔΩΝ',
+    FUNDAMENTAL_RISK: 'ΘΕΜΕΛΙΩΔΗΣ ΚΙΝΔΥΝΟΣ',
     EVENT_RISK: 'ΚΙΝΔΥΝΟΣ ΓΕΓΟΝΟΤΟΣ',
     DETERIORATION: 'ΕΠΙΔΕΙΝΩΣΗ',
     OPPORTUNITY: 'ΕΥΚΑΙΡΙΑ',
-  }[String(value || '').toUpperCase()] || String(value || '').replace(/_/g, ' ');
+  }[normalized] || String(value || '').replace(/_/g, ' ');
 }
 
 function HistoricalContextCard({ context }) {
@@ -309,7 +359,7 @@ function portfolioBlockedReason(item) {
   };
   const explained = blockers.map((code) => labels[code]).filter(Boolean);
   if (explained.length) return explained.join(' ');
-  return item?.nextStep || 'Η ανάλυση υπάρχει, αλλά ένας υποχρεωτικός έλεγχος δεν έχει ολοκληρωθεί.';
+  return userFacingAnalysisText(item?.nextStep) || 'Η ανάλυση υπάρχει, αλλά ένας υποχρεωτικός έλεγχος δεν έχει ολοκληρωθεί.';
 }
 
 function blockedPortfolioDossierIndex(feed) {
@@ -347,15 +397,15 @@ function capabilityText(capability) {
     return {
       QUEUED: 'Η μετοχή ταυτοποιήθηκε και μπήκε σε μόνιμη ουρά έρευνας. Θα εμφανιστεί πλήρης ανάλυση όταν ολοκληρωθεί ο κύκλος ελέγχων.',
       COMPLETED: 'Η έρευνα ολοκληρώθηκε. Αναμένεται η επόμενη έγκυρη ενημέρωση για να εμφανιστεί η πλήρης ανάλυση.',
-      QUEUE_NOT_CONFIGURED: 'Το symbol και η χρηματιστηριακή ταυτότητα επαληθεύτηκαν. Η server-side μόνιμη research queue δεν έχει ακόμη ενεργοποιηθεί, οπότε δεν δηλώνεται ψευδώς ότι το προϊόν μπήκε σε ανάλυση.',
-      QUEUE_FAILED: 'Το προϊόν ταυτοποιήθηκε, αλλά η αποστολή του στη research queue απέτυχε προσωρινά. Η θέση παραμένει αποθηκευμένη και δεν παράγεται τεχνητή απόφαση.',
-      NOT_QUEUED: 'Το προϊόν ταυτοποιήθηκε, αλλά δεν έχει ακόμη καταχωρηθεί στη research queue.',
-    }[capability?.queueStatus] || 'Το symbol και η χρηματιστηριακή ταυτότητα επαληθεύτηκαν. Η πλήρης MINBEIS research coverage δεν έχει ακόμη γίνει canonical.';
+      QUEUE_NOT_CONFIGURED: 'Ο κωδικός και η χρηματιστηριακή ταυτότητα επαληθεύτηκαν, αλλά η μόνιμη ουρά έρευνας δεν είναι διαθέσιμη.',
+      QUEUE_FAILED: 'Η μετοχή ταυτοποιήθηκε, αλλά η αποστολή της για έρευνα απέτυχε προσωρινά. Η θέση παραμένει αποθηκευμένη χωρίς τεχνητή απόφαση.',
+      NOT_QUEUED: 'Η μετοχή ταυτοποιήθηκε, αλλά δεν έχει ακόμη καταχωρηθεί για έρευνα.',
+    }[capability?.queueStatus] || 'Ο κωδικός της μετοχής και η χρηματιστηριακή ταυτότητα επαληθεύτηκαν. Η πλήρης ερευνητική κάλυψη MINBEIS δεν έχει ακόμη ολοκληρωθεί.';
   }
   return {
     READY: 'Η μετοχή υποστηρίζεται για πλήρη ανάλυση MINBEIS. Δεν υπάρχει ακόμη ενεργή τελική απόφαση στη σημερινή ενημέρωση.',
     IDENTITY_NOT_VERIFIED: 'Η μετοχή αποθηκεύτηκε στο χαρτοφυλάκιο, αλλά το MINBEIS δεν θα δημιουργήσει απόφαση μέχρι να επαληθευτεί η χρηματιστηριακή ταυτότητά της.',
-    GATEWAY_NOT_CONFIGURED: 'Το προϊόν αποθηκεύτηκε, αλλά ο κεντρικός gateway δεν είναι διαθέσιμος σε αυτή την έκδοση για automatic onboarding.',
+    GATEWAY_NOT_CONFIGURED: 'Η μετοχή αποθηκεύτηκε, αλλά η κεντρική υπηρεσία δεδομένων δεν είναι διαθέσιμη για αυτόματη ένταξη.',
     CHECK_FAILED: 'Η καταχώρηση του προϊόντος αποθηκεύτηκε κανονικά, αλλά ο αυτόματος έλεγχος MINBEIS δεν ολοκληρώθηκε.',
   }[capability?.onboardingStatus] || null;
 }
@@ -613,17 +663,7 @@ function MinbeisProductFeedback({ feedback, summary, onFeedback }) {
 }
 
 function purchaseReasonLabel(reason) {
-  return {
-    FULL_DEEP_DOSSIER_REQUIRED: 'Απαιτείται πλήρης βαθιά ανάλυση πριν εξεταστεί αγορά.',
-    BUY_SETUP_NOT_CONFIRMED: 'Δεν έχουν επιβεβαιωθεί ακόμη όλα τα κριτήρια εισόδου.',
-    FINAL_ACTION_BLOCKED: 'Η τελική απόφαση παραμένει μπλοκαρισμένη από υποχρεωτικούς ελέγχους.',
-    SEVERE_RISK_CONFIGURATION: 'Ο συνδυασμός κινδύνων είναι υπερβολικός για αγορά.',
-    REFERENCE_PRICE_REQUIRED: 'Λείπει έγκυρη τιμή αναφοράς.',
-    REFERENCE_PRICE_STALE_FOR_PUBLICATION: 'Η τιμή αναφοράς δεν είναι αρκετά φρέσκια.',
-    FUNDAMENTALS_REQUIRED: 'Λείπουν επαρκή θεμελιώδη στοιχεία.',
-    HISTORICAL_MARKET_METRICS_REQUIRED: 'Λείπει επαρκές ιστορικό αγοράς και ρευστότητας.',
-    INDEPENDENT_CROSS_CHECK_REQUIRED: 'Λείπει ανεξάρτητη διασταύρωση.',
-  }[reason] || String(reason || '').replace(/_/g, ' ').toLowerCase();
+  return technicalReasonLabel(reason);
 }
 
 function purchaseNextGateLabel(gate) {
@@ -937,7 +977,7 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
           <Section title="Έτοιμα για τελικό έλεγχο" subtitle="Πλήρεις φάκελοι που δεν έχουν ακόμη δημοσιευτεί" items={feed.reviewReady || []} decisionContext={decisionContext} />
           <Section title="Έρευνα σε εξέλιξη" subtitle="Το σύστημα δείχνει καθαρά τι λείπει και δεν επιτρέπει πρόωρη κατεύθυνση αγοράς ή πώλησης" items={feed.research || []} decisionContext={decisionContext} />
           {!feed.published?.length && !feed.reviewReady?.length && !feed.research?.length && !feed.opportunityPurchaseDecisions?.length ? <View style={styles.empty}><Text style={styles.emptyTitle}>Η σύνδεση λειτουργεί, αλλά η τρέχουσα ροή δεν περιέχει ακόμη εταιρικούς φακέλους.</Text><Text style={styles.emptyText}>Αυτό είναι ασφαλέστερο από το να εμφανιστεί μη τεκμηριωμένη πρόταση. Η επόμενη επιτυχής ημερήσια εκτέλεση θα ενημερώσει αυτόματα την οθόνη.</Text></View> : null}
-          <Text style={styles.disclosure}>{feed.disclosure}</Text>
+          <Text style={styles.disclosure}>{userFacingAnalysisText(feed.disclosure)}</Text>
           <Pressable style={styles.secondary} onPress={importFeed} disabled={importing}><Text style={styles.secondaryText}>Εφεδρική εισαγωγή αρχείου</Text></Pressable>
           <Pressable style={styles.clearButton} onPress={clear}><Text style={styles.clearText}>Διαγραφή μόνο της ροής έρευνας</Text></Pressable>
         </>
