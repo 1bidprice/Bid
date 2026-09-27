@@ -138,7 +138,7 @@ function IntelligenceCard({ item, decisionContext }) {
           {item.risks?.length ? <><Text style={styles.detailTitle}>Κίνδυνοι</Text>{item.risks.map((entry, index) => <Text key={'r-' + index} style={styles.bullet}>• {userFacingAnalysisText(claimText(entry))}</Text>)}</> : null}
           {item.blockerLabels?.length ? <View style={styles.blockers}><Text style={styles.blockerTitle}>Γιατί δεν είναι ακόμη τελική πρόταση</Text>{item.blockerLabels.map((label, index) => <Text key={'b-' + index} style={styles.blockerText}>• {technicalReasonLabel(label)}</Text>)}</View> : null}
           <Text style={styles.detailTitle}>Πηγές</Text>
-          {item.sources?.length ? item.sources.map((sourceItem, index) => <Pressable key={sourceItem.sourceUrl + '-' + index} style={styles.sourceRow} onPress={() => Linking.openURL(sourceItem.sourceUrl).catch(() => Alert.alert('Πηγή', 'Δεν ήταν δυνατό να ανοίξει ο σύνδεσμος.'))}><View style={styles.grow}><Text style={styles.sourceName}>{sourceItem.sourceName}</Text><Text style={styles.sourceTitle}>{sourceItem.title}</Text></View><Text style={styles.sourceState}>{sourceItem.reviewed ? 'Ελεγμένη' : 'Εντοπίστηκε'}</Text></Pressable>) : <Text style={styles.muted}>Δεν υπάρχουν διαθέσιμες πηγές στην τρέχουσα ροή.</Text>}
+          {item.sources?.length ? item.sources.map((sourceItem, index) => <Pressable key={sourceItem.sourceUrl + '-' + index} style={styles.sourceRow} onPress={() => Linking.openURL(sourceItem.sourceUrl).catch(() => Alert.alert('Πηγή', 'Δεν ήταν δυνατό να ανοίξει ο σύνδεσμος.'))}><View style={styles.grow}><Text style={styles.sourceName}>{sourceItem.sourceName}</Text><Text style={styles.sourceTitle}>{sourceTitleLabel(sourceItem.title)}</Text></View><Text style={styles.sourceState}>{sourceItem.reviewed ? 'Ελεγμένη' : 'Εντοπίστηκε'}</Text></Pressable>) : <Text style={styles.muted}>Δεν υπάρχουν διαθέσιμες πηγές στην τρέχουσα ροή.</Text>}
         </View>
       ) : null}
     </View>
@@ -197,6 +197,15 @@ function userFacingAnalysisText(value) {
     .replace(/symbol/gi, 'κωδικό μετοχής')
     .replace(/τελική\s+τελική αξιολόγηση MINBEIS/gi, 'τελική αξιολόγηση MINBEIS')
     .replace(/επαληθευμένη\s+επαληθευμένη/gi, 'επαληθευμένη');
+}
+
+function sourceTitleLabel(value) {
+  return String(value || '')
+    .replace(/SCHEDULE 13G filing/gi, 'Κατάθεση Schedule 13G')
+    .replace(/SCHEDULE 13D filing/gi, 'Κατάθεση Schedule 13D')
+    .replace(/Verified structured fundamentals/gi, 'Επαληθευμένα δομημένα θεμελιώδη στοιχεία')
+    .replace(/Verified market state/gi, 'Επαληθευμένη κατάσταση αγοράς')
+    .replace(/Common Stock/gi, 'Κοινή μετοχή');
 }
 
 function technicalReasonLabel(value) {
