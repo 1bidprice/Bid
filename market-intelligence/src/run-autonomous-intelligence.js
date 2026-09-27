@@ -6,7 +6,7 @@ import { discoverAutonomousCandidates } from './autonomous-discovery.js';
 import { applyAutonomousPublicationPolicy, FINAL_ACTION_POLICY_VERSION } from './final-action-policy.js';
 import { buildOpportunitiesFeed } from './opportunities-feed.js';
 import { buildInstrumentProfile } from './instrument-profile.js';
-import { extractEquityOpportunityRawSignals, buildOpportunityFactorsForUniverse } from './opportunity-factor-engine.js';
+import { extractEquityOpportunityRawSignals, buildOpportunityFactorsForUniverse, buildVerifiedOpportunityCapabilities } from './opportunity-factor-engine.js';
 import { scanOpportunityUniverse } from './opportunity-universe-scanner.js';
 import { createNasdaqUsListedUniverseProvider } from './adapters/nasdaq-symbol-directory-universe.js';
 import { buildSecFramesBroadEquityScreen } from './adapters/sec-frames-broad-equity-screen.js';
@@ -285,6 +285,7 @@ function buildAnalysedOpportunitySeeds(expandedUniverse, baseReport, options = {
     executionQualityScore: record.executionQualityScore,
     contradictionCount: record.contradictionCount,
     severeRiskFlags: record.severeRiskFlags,
+    capabilities: buildVerifiedOpportunityCapabilities(record),
   }));
   return [...factorized, ...passthrough];
 }
