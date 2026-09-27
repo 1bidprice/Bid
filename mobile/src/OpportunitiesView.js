@@ -94,7 +94,7 @@ function StatusBadge({ item }) {
   const published = item.status === 'PUBLISHED';
   return (
     <View style={[styles.badge, review && styles.badgeReview, published && styles.badgePublished]}>
-      <Text style={[styles.badgeText, review && styles.badgeReviewText, published && styles.badgePublishedText]}>{item.statusLabel}</Text>
+      <Text style={[styles.badgeText, review && styles.badgeReviewText, published && styles.badgePublishedText]}>{statusLabelForUser(item)}</Text>
     </View>
   );
 }
@@ -264,6 +264,27 @@ function intelligenceCategoryLabel(value) {
     DETERIORATION: 'ΕΠΙΔΕΙΝΩΣΗ',
     OPPORTUNITY: 'ΕΥΚΑΙΡΙΑ',
   }[normalized] || String(value || '').replace(/_/g, ' ');
+}
+
+function statusLabelForUser(item) {
+  const status = String(item?.status || '').toUpperCase();
+  const label = String(item?.statusLabel || '').trim();
+  return {
+    PUBLISHED: 'ΔΗΜΟΣΙΕΥΜΕΝΗ ΑΝΑΛΥΣΗ',
+    REVIEW_READY: 'ΕΤΟΙΜΟ ΓΙΑ ΤΕΛΙΚΟ ΕΛΕΓΧΟ',
+    RESEARCH: 'ΕΡΕΥΝΑ ΣΕ ΕΞΕΛΙΞΗ',
+    BLOCKED: 'ΧΡΕΙΑΖΕΤΑΙ ΕΠΙΒΕΒΑΙΩΣΗ',
+  }[status] || userFacingAnalysisText(label || status);
+}
+
+function opportunityTierLabel(value) {
+  const normalized = String(value || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+  return {
+    HIGH_OPPORTUNITY: 'ΥΨΗΛΗ ΠΡΟΤΕΡΑΙΟΤΗΤΑ',
+    SUPER_OPPORTUNITY: 'ΠΟΛΥ ΥΨΗΛΗ ΠΡΟΤΕΡΑΙΟΤΗΤΑ',
+    WATCH: 'ΠΑΡΑΚΟΛΟΥΘΗΣΗ',
+    REJECTED: 'ΑΠΟΡΡΙΦΘΗΚΕ',
+  }[normalized] || userFacingAnalysisText(String(value || '').replace(/_/g, ' '));
 }
 
 function HistoricalContextCard({ context }) {
@@ -595,7 +616,7 @@ function MinbeisDashboard({ dashboard, sourceDecisionCount = 0, decisionContext 
   const noTradeCount = Number(assessmentCounts.NO_TRADE || 0);
   const confirmCount = Number(assessmentCounts.CONFIRMATION_REQUIRED || 0);
   const headline = setupCount > 0
-    ? `${setupCount} επιβεβαιωμένη υποψήφια αγορά${setupCount === 1 ? '' : 's'} τώρα`
+    ? `${setupCount} ${setupCount === 1 ? 'υποψήφια αγορά' : 'υποψήφιες αγορές'} τώρα`
     : trapCount > 0
       ? `${trapCount} πιθανή παγίδα${trapCount === 1 ? '' : 'ες'} χρειάζεται προσοχή`
       : rows.length
@@ -696,7 +717,7 @@ function OpportunityPurchaseCard({ item, portfolioPositions = [], portfolioPolic
       <View style={styles.rowTop}>
         <View style={styles.grow}>
           <Text style={styles.company}>{item.companyName || item.symbol || item.instrumentId || 'Επενδυτική ευκαιρία'}</Text>
-          <Text style={styles.symbol}>{item.symbol || item.assetClass || '—'} · {item.tier || '—'}</Text>
+          <Text style={styles.symbol}>{item.symbol || item.assetClass || '—'} · {opportunityTierLabel(item.tier) || '—'}</Text>
         </View>
         <View style={[styles.badge, confirmed && styles.badgePublished, waiting && styles.badgeReview]}>
           <Text style={[styles.badgeText, confirmed && styles.badgePublishedText, waiting && styles.badgeReviewText]}>{item.statusLabel || item.status}</Text>
@@ -966,7 +987,7 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
           <MinbeisDashboard dashboard={minbeisDashboard} sourceDecisionCount={(feed.decisions || []).length} decisionContext={decisionContext} />
           <MinbeisProductFeedback feedback={clarityFeedback} summary={productMetrics} onFeedback={submitClarityFeedback} />
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryHeadline}>{feed.today?.headline || 'Ημερήσια σύνοψη'}</Text>
+            <Text style={styles.summaryHeadline}>{userFacingAnalysisText(feed.today?.headline || 'Ημερήσια σύνοψη')}</Text>
             <Text style={styles.updated}>Έγκυρη ροή: {when(feed.generatedAt)}</Text>
             <View style={styles.countRow}>
               <View style={styles.countBox}><Text style={styles.countValue}>{personalizedCounts.buyNowCount || 0}</Text><Text style={styles.countLabel}>ΑΓΟΡΑ ΤΩΡΑ</Text></View>
