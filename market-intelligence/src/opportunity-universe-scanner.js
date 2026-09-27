@@ -50,6 +50,26 @@ function factorCapability(capabilities) {
   return factors;
 }
 
+function opportunityRiskCapability(capabilities, evaluation) {
+  const raw = capabilities?.capabilities?.OPPORTUNITY_RISK;
+  const explicitScore = raw?.verified === true && Number.isFinite(Number(raw.score))
+    ? Math.max(0, Math.min(100, Number(raw.score)))
+    : null;
+  const evaluatedScore = evaluation?.riskScore !== null
+    && evaluation?.riskScore !== undefined
+    && Number.isFinite(Number(evaluation.riskScore))
+      ? Math.max(0, Math.min(100, Number(evaluation.riskScore)))
+      : null;
+  const flags = raw?.verified === true && Array.isArray(raw.flags)
+    ? raw.flags
+    : (Array.isArray(evaluation?.riskFlags) ? evaluation.riskFlags : []);
+  return {
+    score: explicitScore ?? evaluatedScore ?? 100,
+    flags: [...new Set(flags.filter(Boolean))],
+    source: explicitScore !== null ? 'VERIFIED_OPPORTUNITY_RISK' : evaluatedScore !== null ? 'MODEL_EVALUATION' : 'FAIL_CLOSED_DEFAULT',
+  };
+}
+
 function scoreFromLiquidity(capabilities) {
   const liquidity = capabilities?.capabilities?.LIQUIDITY;
   if (!liquidity || liquidity.verified !== true) return 0;
@@ -147,7 +167,7 @@ export async function scanOpportunityUniverse(options = {}) {
       continue;
     }
 
-    const riskScore = Number(evaluation.riskScore);
+    const riskContext = opportunityRiskCapability(capabilities, evaluation);
     const executionQualityScore = scoreFromLiquidity(capabilities);
     const evidenceQualityScore = evidenceQuality(capabilities, evaluation);
     const contradictionCapability = capabilities?.capabilities?.CONTRADICTIONS;
@@ -159,17 +179,18 @@ export async function scanOpportunityUniverse(options = {}) {
       displayName: profile.displayName,
       profile,
       factors,
-      riskScore: Number.isFinite(riskScore) ? riskScore : 100,
+      riskScore: riskContext.score,
       liquidityScore: executionQualityScore,
       executionQualityScore,
       evidenceQualityScore,
       contradictionCount,
-      severeRiskFlags: [...new Set((evaluation.riskFlags || []).filter((flag) => /^SEVERE_|^EXTREME_|DISTRESS|SOLVENCY|DEFAULT/.test(String(flag))))],
+      severeRiskFlags: riskContext.flags.filter((flag) => /^SEVERE_|^EXTREME_|DISTRESS|SOLVENCY|DEFAULT/.test(String(flag))),
       strategyContextVerified: evaluation.strategyContextReady === true,
       source: {
         universeProviderId: instrument.universeProviderId || 'SEED_UNIVERSE',
         capabilityProviderCount: capabilities.providerCount,
         opportunityFactorsVerified: true,
+        opportunityRiskSource: riskContext.source,
         rawSeedScoresIgnored: true,
       },
     });
