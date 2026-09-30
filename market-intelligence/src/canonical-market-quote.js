@@ -1,7 +1,7 @@
 import { evaluateSourceCandidate, PURPOSES, SOURCE_ROLES } from './source-governor.js';
 import { evaluateMarketSession, evaluateClosedMarketCarry, MARKET_SESSION_POLICY_VERSION } from './market-session.js';
 
-export const CANONICAL_QUOTE_CONTRACT_VERSION = '2026-08-08.2';
+export const CANONICAL_QUOTE_CONTRACT_VERSION = '2026-09-30.1';
 
 function finite(value) {
   const number = Number(value);
