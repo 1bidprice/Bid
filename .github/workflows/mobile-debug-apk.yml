@@ -46,6 +46,9 @@ jobs:
       - name: Verify v1.7 mobile release identity
         run: npm run test:release-identity
 
+      - name: Verify Product Recovery privacy data and history
+        run: npm run test:local-data-ownership && npm run test:portfolio-history && npm run test:portfolio-data-flow
+
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean --non-interactive
 
