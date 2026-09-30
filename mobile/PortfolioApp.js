@@ -275,12 +275,12 @@ function lotShortDate(value) {
 }
 
 function PositionPerformanceLine({ label, value, stale, primary = false }) {
-  const numeric = Number(value);
-  const valueStyle = numeric < 0 ? styles.red : numeric > 0 ? styles.green : styles.muted;
+  const numeric = valid(value) ? Number(value) : null;
+  const valueStyle = numeric !== null && numeric < 0 ? styles.red : numeric !== null && numeric > 0 ? styles.green : styles.muted;
   return (
     <View style={styles.performanceLine}>
       <Text style={styles.performanceLabel} numberOfLines={1}>{label}</Text>
-      <Text style={[styles.performanceValue, primary && styles.performanceValuePrimary, valueStyle]}>{stale || !Number.isFinite(numeric) ? '—' : pct(numeric)}</Text>
+      <Text style={[styles.performanceValue, primary && styles.performanceValuePrimary, valueStyle]}>{stale || numeric === null ? '—' : pct(numeric)}</Text>
     </View>
   );
 }
@@ -359,10 +359,10 @@ function quoteHeadlineLabel(quote) {
 }
 
 function PositionCard({ item, compact, expanded, onToggle, onAlert }) {
-  const stale = item.quote && !item.quote.usable;
-  const dayChangeVerified = item.quote?.dayChangeVerified !== false;
-  const dayChange = dayChangeVerified ? Number(item.quote?.changePct) : null;
-  const positionChange = Number(item.nativePct);
+  const stale = !item.quote || item.quote.usable !== true || item.valuationEligible !== true;
+  const dayChangeVerified = item.quote?.dayChangeVerified === true;
+  const dayChange = dayChangeVerified && valid(item.quote?.changePct) ? Number(item.quote.changePct) : null;
+  const positionChange = valid(item.nativePct) ? Number(item.nativePct) : null;
   const currentSession = marketSessionAt(item.symbol);
   const openLots = Array.isArray(item.lots) ? item.lots : [];
   return (
@@ -414,6 +414,7 @@ function PositionCard({ item, compact, expanded, onToggle, onAlert }) {
           <Metric compact={compact} label="Κέρδος / Ζημία" value={cash(item.nativePnl, item.currency)} negative={item.nativePnl < 0} positiveValue={item.nativePnl > 0} />
           <Metric compact={compact} label="Μέση τιμή με έξοδα" value={quotePrice(item.average, item.currency, 4)} />
         </View>
+        {!item.valuationEligible ? <Text style={styles.warning}>{item.instrumentIntegrityWarning || 'Η θέση δεν αποτιμάται μέχρι να υπάρχει επαληθευμένη και χρησιμοποιήσιμη τιμή.'}</Text> : null}
       </Pressable>
       {expanded ? (
         <View style={styles.detailPanel}>
