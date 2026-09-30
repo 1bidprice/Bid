@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-na
 import Svg, { Line, Path } from 'react-native-svg';
 import { portfolioHistoryPointsForRange } from './portfolio-history';
 
-const RANGES = ['1D', '1W', '1M', '6M', '1Y'];
+const RANGES = ['1H', '1D', '1W', '1M', '6M', '1Y'];
 
 function cash(value) {
   return Number.isFinite(Number(value))
