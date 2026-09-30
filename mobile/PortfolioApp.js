@@ -57,6 +57,13 @@ import {
 } from './src/instrument-entry';
 import { buildPortfolioSnapshot } from './src/portfolio-engine';
 import {
+  INSTALLATION_ID_SECURE_KEY,
+  LEGACY_PORTFOLIO_QUARANTINE_KEY,
+  attachLocalPortfolioOwner,
+  classifyLocalPortfolioState,
+  createInstallationId,
+} from './src/local-data-ownership';
+import {
   allInPrice,
   buildTransaction,
   normalizeTransactions,
@@ -121,7 +128,8 @@ function normalizeMinbeisPolicy(value) {
 }
 
 const EMPTY_STATE = {
-  schemaVersion: 5,
+  schemaVersion: 6,
+  ownerInstallationId: null,
   transactions: [],
   prices: {},
   meta: { lastCheckedAt: null, errors: [], accountingVersion: 2 },
@@ -183,10 +191,11 @@ const pct = (value) => valid(value)
 
 const when = (value) => value ? new Date(value).toLocaleString('el-GR') : '—';
 
-function normalizeState(raw) {
-  if (!raw || typeof raw !== 'object') return { ...EMPTY_STATE };
+function normalizeState(raw, installationId = null) {
+  if (!raw || typeof raw !== 'object') return attachLocalPortfolioOwner({ ...EMPTY_STATE }, installationId);
   return {
-    schemaVersion: 5,
+    schemaVersion: 6,
+    ownerInstallationId: installationId || raw.ownerInstallationId || null,
     transactions: normalizeTransactions(raw.transactions),
     prices: raw.prices && typeof raw.prices === 'object' ? raw.prices : {},
     meta: {
@@ -738,7 +747,9 @@ function MainApp({ onOpenDecisionGate }) {
   const [legalAccepted, setLegalAccepted] = useState(null);
   const [minbeisHomeFeed, setMinbeisHomeFeed] = useState(null);
   const [minbeisHomeSyncing, setMinbeisHomeSyncing] = useState(false);
+  const [legacyDataAvailable, setLegacyDataAvailable] = useState(false);
   const tokenRef = useRef('');
+  const installationIdRef = useRef(null);
   const appState = useRef(AppState.currentState);
   const onboardingAttemptedRef = useRef(new Set());
   const minbeisHomeSyncingRef = useRef(false);
@@ -779,7 +790,12 @@ function MainApp({ onOpenDecisionGate }) {
   }, [loading, refreshMinbeisHomeFeed]);
 
   const persist = useCallback(async (nextInput) => {
-    const normalized = normalizeState(nextInput);
+    const installationId = installationIdRef.current;
+    if (!installationId) throw new Error('Δεν έχει αρχικοποιηθεί η τοπική ταυτότητα εγκατάστασης.');
+    const normalized = normalizeState(
+      attachLocalPortfolioOwner(nextInput, installationId),
+      installationId,
+    );
     stateRef.current = normalized;
     setState(normalized);
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
@@ -788,9 +804,38 @@ function MainApp({ onOpenDecisionGate }) {
 
   useEffect(() => { (async () => {
     try {
-      const [saved, secret, permission] = await Promise.all([AsyncStorage.getItem(STORAGE_KEY), SecureStore.getItemAsync(FINNHUB_TOKEN_KEY), configureNotificationsAsync({ request: false })]);
-      const next = normalizeState(saved ? JSON.parse(saved) : null);
-      stateRef.current = next; setState(next); tokenRef.current = secret || ''; setToken(secret || ''); setNotificationStatus(permission);
+      const [saved, storedInstallationId, secret, permission] = await Promise.all([
+        AsyncStorage.getItem(STORAGE_KEY),
+        SecureStore.getItemAsync(INSTALLATION_ID_SECURE_KEY),
+        SecureStore.getItemAsync(FINNHUB_TOKEN_KEY),
+        configureNotificationsAsync({ request: false }),
+      ]);
+      const installationId = storedInstallationId || createInstallationId();
+      if (!storedInstallationId) {
+        await SecureStore.setItemAsync(INSTALLATION_ID_SECURE_KEY, installationId);
+      }
+      installationIdRef.current = installationId;
+
+      let next = attachLocalPortfolioOwner({ ...EMPTY_STATE }, installationId);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const ownership = classifyLocalPortfolioState(parsed, installationId);
+        if (ownership.status === 'OWNED') {
+          next = normalizeState(parsed, installationId);
+        } else {
+          await AsyncStorage.setItem(LEGACY_PORTFOLIO_QUARANTINE_KEY, saved);
+          await AsyncStorage.removeItem(STORAGE_KEY);
+          setLegacyDataAvailable(true);
+        }
+      } else {
+        setLegacyDataAvailable(Boolean(await AsyncStorage.getItem(LEGACY_PORTFOLIO_QUARANTINE_KEY)));
+      }
+
+      stateRef.current = next;
+      setState(next);
+      tokenRef.current = secret || '';
+      setToken(secret || '');
+      setNotificationStatus(permission);
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       setBackgroundRegistered(await syncBackgroundAlertTask(next.alerts.backgroundEnabled));
     } catch (error) { Alert.alert('Εκκίνηση', `Δεν φορτώθηκαν σωστά τα τοπικά δεδομένα.\n${error.message}`); }
@@ -1058,7 +1103,38 @@ function MainApp({ onOpenDecisionGate }) {
   const saveToken = async () => { const clean = token.trim(); if (clean) await SecureStore.setItemAsync(FINNHUB_TOKEN_KEY, clean); else await SecureStore.deleteItemAsync(FINNHUB_TOKEN_KEY); tokenRef.current = clean; Alert.alert('Αποθηκεύτηκε', 'Το Finnhub token παραμένει κρυπτογραφημένο μόνο σε αυτή τη συσκευή.'); refresh(); };
   const exportBackup = async () => { try { await exportBackupAsync(stateRef.current, VERSION); } catch (error) { Alert.alert('Αντίγραφο ασφαλείας', error.message); } };
   const importBackup = async () => { try { const payload = await pickBackupAsync(); if (!payload) return; Alert.alert('Επαναφορά αντιγράφου', `Θα αντικατασταθούν οι ${stateRef.current.transactions.length} τωρινές συναλλαγές με ${payload.data.transactions.length} συναλλαγές του αντιγράφου.`, [{ text: 'Άκυρο', style: 'cancel' }, { text: 'Επαναφορά', onPress: async () => { const restoredAlerts = normalizeAlerts({ ...payload.data.alerts, backgroundEnabled: false, runtime: {} }); await syncBackgroundAlertTask(false); setBackgroundRegistered(false); await persist({ transactions: payload.data.transactions, prices: {}, meta: { lastCheckedAt: null, errors: [], accountingVersion: 2 }, alerts: restoredAlerts }); setTab('summary'); refresh({ silent: true }); } }]); } catch (error) { Alert.alert('Μη έγκυρο αντίγραφο', error.message); } };
-  const resetLocalData = () => Alert.alert('Διαγραφή όλων των δεδομένων', 'Η ενέργεια δεν αναιρείται. Πάρε πρώτα αντίγραφο ασφαλείας.', [{ text: 'Άκυρο', style: 'cancel' }, { text: 'Οριστική διαγραφή', style: 'destructive', onPress: async () => { await syncBackgroundAlertTask(false).catch(() => {}); await Promise.all([AsyncStorage.removeItem(STORAGE_KEY), SecureStore.deleteItemAsync(FINNHUB_TOKEN_KEY)]); tokenRef.current = ''; setToken(''); setBackgroundRegistered(false); await persist(EMPTY_STATE); } }]);
+  const recoverQuarantinedPortfolio = async () => {
+    try {
+      const raw = await AsyncStorage.getItem(LEGACY_PORTFOLIO_QUARANTINE_KEY);
+      if (!raw) {
+        setLegacyDataAvailable(false);
+        Alert.alert('Δεν υπάρχουν παλιά δεδομένα', 'Δεν βρέθηκε παλιό τοπικό χαρτοφυλάκιο για ανάκτηση.');
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      const recovered = normalizeState(parsed, installationIdRef.current);
+      Alert.alert(
+        'Ανάκτηση παλιών τοπικών δεδομένων',
+        `Βρέθηκαν ${recovered.transactions.length} συναλλαγές από προηγούμενη δοκιμαστική έκδοση. Θα φορτωθούν μόνο αν επιβεβαιώσεις ότι ανήκουν σε εσένα.`,
+        [
+          { text: 'Άκυρο', style: 'cancel' },
+          {
+            text: 'Ανήκουν σε εμένα',
+            onPress: async () => {
+              await persist(recovered);
+              await AsyncStorage.removeItem(LEGACY_PORTFOLIO_QUARANTINE_KEY);
+              setLegacyDataAvailable(false);
+              setTab('summary');
+              refresh({ silent: true });
+            },
+          },
+        ],
+      );
+    } catch (error) {
+      Alert.alert('Ανάκτηση', `Δεν ήταν δυνατή η ασφαλής ανάκτηση.\n${error.message}`);
+    }
+  };
+  const resetLocalData = () => Alert.alert('Διαγραφή όλων των δεδομένων', 'Η ενέργεια δεν αναιρείται. Πάρε πρώτα αντίγραφο ασφαλείας.', [{ text: 'Άκυρο', style: 'cancel' }, { text: 'Οριστική διαγραφή', style: 'destructive', onPress: async () => { await syncBackgroundAlertTask(false).catch(() => {}); await Promise.all([AsyncStorage.removeItem(STORAGE_KEY), AsyncStorage.removeItem(LEGACY_PORTFOLIO_QUARANTINE_KEY), SecureStore.deleteItemAsync(FINNHUB_TOKEN_KEY)]); tokenRef.current = ''; setToken(''); setLegacyDataAvailable(false); setBackgroundRegistered(false); await persist(EMPTY_STATE); } }]);
 
   if (loading || legalAccepted === null) return <SafeAreaView style={styles.center} edges={['top', 'bottom', 'left', 'right']}><ActivityIndicator size="large" color="#0B66FF" /><Text style={styles.muted}>Έλεγχος και αναβάθμιση τοπικών δεδομένων…</Text></SafeAreaView>;
 
@@ -1153,8 +1229,8 @@ function MainApp({ onOpenDecisionGate }) {
             <ReviewLine label="Ειδοποιήσεις συγκέντρωσης" value="Ανενεργά από προεπιλογή" />
             <Text style={styles.privacyNotice}>Ακόμη και στο «Χωρίς όριο», το app μπορεί να δείξει ότι μια θέση είναι πολύ συγκεντρωμένη, αλλά δεν θα μειώνει ή θα μπλοκάρει τη δική σου επιλογή.</Text>
           </View>
-          <View style={styles.card}><Text style={styles.cardTitle}>Ιδιωτικότητα δεδομένων</Text><Text style={styles.note}>Συναλλαγές, όρια και ιστορικό αποθηκεύονται μόνο στη συγκεκριμένη συσκευή. Δεν υπάρχει κοινός λογαριασμός ή πρόσβαση διαχειριστή.</Text><ReviewLine label="Αποθήκευση" value="Μόνο στη συσκευή" /><ReviewLine label="Cloud συγχρονισμός" value="Ανενεργός" /></View>
-          <View style={styles.card}><Text style={styles.cardTitle}>Ακρίβεια συναλλαγών</Text><Text style={styles.note}>Κάθε συναλλαγή κρατά χωριστά τιμή εντολής, μέση τιμή εκτέλεσης, αξία συναλλαγής, αναλυτικά έξοδα και τελικό κόστος.</Text><ReviewLine label="Λογιστικό μοντέλο" value="v2 ενεργό" /><ReviewLine label="Σχήμα δεδομένων" value="v5" /></View>
+          <View style={styles.card}><Text style={styles.cardTitle}>Ιδιωτικότητα δεδομένων</Text><Text style={styles.note}>Συναλλαγές, όρια και ιστορικό αποθηκεύονται μόνο στη συγκεκριμένη εγκατάσταση. Το MINBEIS δεν φορτώνει σιωπηρά παλιό ή μη ταυτοποιημένο portfolio state.</Text><ReviewLine label="Αποθήκευση" value="Μόνο στη συσκευή" /><ReviewLine label="Cloud συγχρονισμός" value="Ανενεργός" /><ReviewLine label="Τοπική απομόνωση" value="Ενεργή" />{legacyDataAvailable ? <><Text style={styles.warning}>Βρέθηκαν παλιά δεδομένα από προηγούμενη δοκιμαστική έκδοση και δεν φορτώθηκαν αυτόματα.</Text><Pressable style={styles.secondaryActionFull} onPress={recoverQuarantinedPortfolio}><Text style={styles.secondaryStrong}>Έλεγχος παλιών τοπικών δεδομένων</Text></Pressable></> : null}</View>
+          <View style={styles.card}><Text style={styles.cardTitle}>Ακρίβεια συναλλαγών</Text><Text style={styles.note}>Κάθε συναλλαγή κρατά χωριστά τιμή εντολής, μέση τιμή εκτέλεσης, αξία συναλλαγής, αναλυτικά έξοδα και τελικό κόστος.</Text><ReviewLine label="Λογιστικό μοντέλο" value="v2 ενεργό" /><ReviewLine label="Σχήμα δεδομένων" value="v6" /></View>
           <View style={styles.card}><Text style={styles.cardTitle}>Αντίγραφο ασφαλείας</Text><Text style={styles.note}>Το αντίγραφο ασφαλείας περιλαμβάνει συναλλαγές και όρια. Δεν περιλαμβάνει προσωπικά κλειδιά υπηρεσιών.</Text><Pressable style={styles.primary} onPress={exportBackup}><Text style={styles.whiteStrong}>Εξαγωγή αντιγράφου ασφαλείας</Text></Pressable><Pressable style={styles.secondaryActionFull} onPress={importBackup}><Text style={styles.secondaryStrong}>Επαναφορά αντιγράφου</Text></Pressable></View>
           <View style={styles.card}><Text style={styles.cardTitle}>Διαχειριζόμενες πηγές δεδομένων</Text><Text style={styles.note}>Οι εγκεκριμένες τιμές και η έρευνα ενημερώνονται από την κεντρική ροή της εφαρμογής. Δεν απαιτείται προσωπικό κλειδί υπηρεσίας. Εφεδρικές ή μη επαληθευμένες τιμές εμφανίζονται μόνο πληροφοριακά και δεν ενεργοποιούν τελική απόφαση ή ειδοποίηση.</Text><ReviewLine label="Επίσημες ελληνικές πηγές" value="Euronext Athens" /><ReviewLine label="Αμερικανικά δεδομένα" value="Εγκεκριμένος πάροχος + SEC" /><ReviewLine label="Προσωπικό κλειδί υπηρεσίας" value="Δεν απαιτείται" /><Text style={styles.privacyNotice}>Για την ανάκτηση τιμής μπορεί να αποστέλλεται στον πάροχο μόνο το σύμβολο της μετοχής. Ποσότητες, κόστος, κέρδος/ζημία και σημειώσεις δεν αποστέλλονται.</Text></View>
           <View style={styles.card}><Text style={styles.cardTitle}>Νομικά και υποστήριξη</Text><Text style={styles.note}>Η εφαρμογή δεν εκτελεί συναλλαγές και δεν εγγυάται απόδοση. Κάθε επενδυτική απόφαση και η εκτέλεσή της παραμένει αποκλειστικά στον χρήστη.</Text><Pressable style={styles.secondaryActionFull} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}><Text style={styles.secondaryStrong}>Πολιτική απορρήτου</Text></Pressable><Pressable style={styles.secondaryActionFull} onPress={() => Linking.openURL(TERMS_URL)}><Text style={styles.secondaryStrong}>Όροι χρήσης</Text></Pressable><Pressable style={styles.secondaryActionFull} onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=MINBEIS%20Support`)}><Text style={styles.secondaryStrong}>Επικοινωνία υποστήριξης</Text></Pressable></View><View style={styles.card}><Text style={styles.cardTitle}>Τοπικά δεδομένα</Text><Text style={styles.note}>Η διαγραφή αφορά μόνο αυτή τη συσκευή και δεν αναιρείται. Η αποδοχή της νομικής ενημέρωσης διατηρείται χωριστά για λόγους διαφάνειας.</Text><Pressable style={styles.dangerActionFull} onPress={resetLocalData}><Text style={styles.dangerStrong}>Διαγραφή όλων των τοπικών δεδομένων</Text></Pressable></View>
