@@ -2,6 +2,7 @@ export const PORTFOLIO_HISTORY_STORAGE_KEY = 'minbeis.portfolio-history.v1';
 export const PORTFOLIO_HISTORY_VERSION = 1;
 
 export const PORTFOLIO_HISTORY_RANGES = Object.freeze({
+  '1H': 60 * 60 * 1000,
   '1D': 24 * 60 * 60 * 1000,
   '1W': 7 * 24 * 60 * 60 * 1000,
   '1M': 31 * 24 * 60 * 60 * 1000,
