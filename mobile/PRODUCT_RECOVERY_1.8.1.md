@@ -30,7 +30,7 @@ For market-data/research requests, the app can send:
 
 The in-app legal/privacy wording and the Greek privacy-policy draft now match this behavior.
 
-The public privacy-policy page has NOT been replaced by this recovery branch. Publication remains a separate release action and must not claim unverified server-log retention/deletion facts.
+The public privacy-policy page was corrected on the `gh-pages` branch on 2026-09-30 (commit `2b54e405d7e4b1bfdffe8e8c6891b0ed0cfcdd70`) so it no longer claims that only the ticker is transmitted. It now discloses the pseudonymous technical identifier, network metadata, research-queue storage and current Cloudflare Workers Logs retention limits.
 
 ## Portfolio data correctness
 
@@ -86,6 +86,6 @@ The standalone APK is not allowed to proceed past the gate when any of these fai
 4. Second-install/device QA demonstrating no cross-install portfolio leakage.
 5. Real transaction QA confirming value, cost and P/L on at least one US and one Euronext Athens holding.
 6. Chart observation QA after multiple real samples.
-7. Public privacy-policy publication only after the public wording and server-side retention facts are reviewed.
+7. Verify the GitHub Pages deployment serves the updated 2026-09-30 privacy page from the published `gh-pages` commit.
 
 No PR merge or Play production/closed-testing submission is authorized by this document.
