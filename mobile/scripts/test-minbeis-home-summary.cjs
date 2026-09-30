@@ -31,27 +31,27 @@ const feed = {
     decisionEngineStatus: 'READY',
   },
   published: [{
-    symbol: 'SPCE',
+    symbol: 'AAA',
     minbeisAssessment: { classification: 'TRAP' },
     finalAction: { status: 'FINAL', holderAction: 'HOLD', validUntil: '2026-09-24T18:00:00Z' },
   }],
   reviewReady: [{
-    symbol: 'CREDIA',
+    symbol: 'BBB',
     minbeisAssessment: { classification: 'CONFIRMATION_REQUIRED' },
     finalAction: { status: 'BLOCKED', blockers: ['REFERENCE_PRICE_TIMESTAMP_NOT_VERIFIED'] },
   }],
   research: [],
 };
 const positions = [
-  { symbol: 'SPCE.US', quantity: 10 },
-  { symbol: 'CREDIA.GR', quantity: 20 },
-  { symbol: 'ALWN.GR', quantity: 5 },
+  { symbol: 'AAA.US', quantity: 10 },
+  { symbol: 'BBB.GR', quantity: 20 },
+  { symbol: 'CCC.GR', quantity: 5 },
 ];
 
 const summary = buildMinbeisHomeSummary(feed, positions, {
   now,
   instrumentCapabilities: {
-    'ALWN.GR': {
+    'CCC.GR': {
       onboardingStatus: 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED',
       queueStatus: 'QUEUED',
     },
@@ -62,10 +62,10 @@ assert.equal(summary.attentionCount, 2);
 assert.equal(summary.coveredPositionCount, 2);
 assert.equal(summary.pendingPositionCount, 1);
 assert.equal(summary.queuedResearchCount, 1);
-assert.deepEqual(summary.queuedResearchSymbols, ['ALWN']);
-assert.ok(summary.attentionSymbols.includes('SPCE'));
-assert.ok(summary.attentionSymbols.includes('CREDIA'));
-assert.deepEqual(summary.pendingSymbols, ['ALWN']);
+assert.deepEqual(summary.queuedResearchSymbols, ['CCC']);
+assert.ok(summary.attentionSymbols.includes('AAA'));
+assert.ok(summary.attentionSymbols.includes('BBB'));
+assert.deepEqual(summary.pendingSymbols, ['CCC']);
 
 const stale = buildMinbeisHomeSummary({ ...feed, generatedAt: '2026-09-22T10:00:00Z' }, positions, { now });
 assert.equal(stale.state, 'STALE');
