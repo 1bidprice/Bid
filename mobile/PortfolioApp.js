@@ -716,7 +716,7 @@ function LegalNoticeModal({ visible, onAccept }) {
           <Text style={styles.legalTitle}>Σημαντική ενημέρωση πριν τη χρήση</Text>
           <Text style={styles.legalBody}>Η εφαρμογή είναι εργαλείο προσωπικής καταγραφής χαρτοφυλακίου και αυτοματοποιημένης επενδυτικής έρευνας. Δεν είναι χρηματιστηριακή εταιρεία, δεν κρατά χρήματα και δεν στέλνει εντολές αγοράς ή πώλησης σε broker.</Text>
           <Text style={styles.legalBody}>Οι ενδείξεις ΑΓΟΡΑ, ΠΩΛΗΣΗ, ΚΡΑΤΗΣΕ ή ΑΠΟΦΥΓΕ βασίζονται σε αυτοματοποιημένους κανόνες και διαθέσιμα δεδομένα. Μπορεί να είναι ελλιπείς, καθυστερημένες ή λανθασμένες. Δεν αποτελούν εγγύηση απόδοσης ούτε εξατομικευμένη επενδυτική συμβουλή.</Text>
-          <Text style={styles.legalBody}>Οι συναλλαγές, ποσότητες, κόστη και σημειώσεις αποθηκεύονται τοπικά στη συσκευή. Για ανάκτηση τιμών μπορεί να αποστέλλεται σε παρόχους μόνο το χρηματιστηριακό σύμβολο. Δεν αποστέλλονται ποσότητες, κόστος κτήσης ή προσωπικές σημειώσεις.</Text>
+          <Text style={styles.legalBody}>Οι συναλλαγές, ποσότητες, κόστη και σημειώσεις αποθηκεύονται τοπικά στη συσκευή. Για ανάκτηση τιμών η εφαρμογή στέλνει το χρηματιστηριακό σύμβολο και ένα ψευδωνυμικό τεχνικό αναγνωριστικό εγκατάστασης/πελάτη. Δεν αποστέλλονται ποσότητες, κόστος κτήσης, κέρδος/ζημία ή προσωπικές σημειώσεις.</Text>
           <View style={styles.legalLinks}>
             <Pressable style={styles.secondaryActionFull} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}><Text style={styles.secondaryStrong}>Πολιτική απορρήτου</Text></Pressable>
             <Pressable style={styles.secondaryActionFull} onPress={() => Linking.openURL(TERMS_URL)}><Text style={styles.secondaryStrong}>Όροι χρήσης</Text></Pressable>
@@ -869,8 +869,28 @@ function MainApp({ onOpenDecisionGate }) {
     const interval = setInterval(() => refresh({ silent: true }), MARKET_REFRESH_MS);
     const subscription = AppState.addEventListener('change', async (nextState) => {
       if (appState.current.match(/inactive|background/) && nextState === 'active') {
-        const saved = await AsyncStorage.getItem(STORAGE_KEY);
-        if (saved) { const restored = normalizeState(JSON.parse(saved)); stateRef.current = restored; setState(restored); }
+        try {
+          const installationId = installationIdRef.current;
+          const saved = await AsyncStorage.getItem(STORAGE_KEY);
+          if (saved && installationId) {
+            const parsed = JSON.parse(saved);
+            const ownership = classifyLocalPortfolioState(parsed, installationId);
+            if (ownership.status === 'OWNED') {
+              const restored = normalizeState(parsed, installationId);
+              stateRef.current = restored;
+              setState(restored);
+            } else {
+              await AsyncStorage.setItem(LEGACY_PORTFOLIO_QUARANTINE_KEY, saved);
+              await AsyncStorage.removeItem(STORAGE_KEY);
+              const clean = attachLocalPortfolioOwner({ ...EMPTY_STATE }, installationId);
+              stateRef.current = clean;
+              setState(clean);
+              setLegacyDataAvailable(true);
+            }
+          }
+        } catch (error) {
+          console.warn('MINBEIS portfolio resume ownership check failed', error);
+        }
         refresh({ silent: true });
       }
       appState.current = nextState;
@@ -1134,7 +1154,20 @@ function MainApp({ onOpenDecisionGate }) {
       Alert.alert('Ανάκτηση', `Δεν ήταν δυνατή η ασφαλής ανάκτηση.\n${error.message}`);
     }
   };
-  const resetLocalData = () => Alert.alert('Διαγραφή όλων των δεδομένων', 'Η ενέργεια δεν αναιρείται. Πάρε πρώτα αντίγραφο ασφαλείας.', [{ text: 'Άκυρο', style: 'cancel' }, { text: 'Οριστική διαγραφή', style: 'destructive', onPress: async () => { await syncBackgroundAlertTask(false).catch(() => {}); await Promise.all([AsyncStorage.removeItem(STORAGE_KEY), AsyncStorage.removeItem(LEGACY_PORTFOLIO_QUARANTINE_KEY), SecureStore.deleteItemAsync(FINNHUB_TOKEN_KEY)]); tokenRef.current = ''; setToken(''); setLegacyDataAvailable(false); setBackgroundRegistered(false); await persist(EMPTY_STATE); } }]);
+  const resetLocalData = () => Alert.alert('Διαγραφή όλων των δεδομένων', 'Η ενέργεια δεν αναιρείται. Πάρε πρώτα αντίγραφο ασφαλείας.', [{ text: 'Άκυρο', style: 'cancel' }, { text: 'Οριστική διαγραφή', style: 'destructive', onPress: async () => {
+    await syncBackgroundAlertTask(false).catch(() => {});
+    await AsyncStorage.clear();
+    await SecureStore.deleteItemAsync(FINNHUB_TOKEN_KEY);
+    const replacementInstallationId = createInstallationId();
+    await SecureStore.setItemAsync(INSTALLATION_ID_SECURE_KEY, replacementInstallationId);
+    installationIdRef.current = replacementInstallationId;
+    tokenRef.current = '';
+    setToken('');
+    setLegacyDataAvailable(false);
+    setBackgroundRegistered(false);
+    setLegalAccepted(false);
+    await persist(EMPTY_STATE);
+  } }]);
 
   if (loading || legalAccepted === null) return <SafeAreaView style={styles.center} edges={['top', 'bottom', 'left', 'right']}><ActivityIndicator size="large" color="#0B66FF" /><Text style={styles.muted}>Έλεγχος και αναβάθμιση τοπικών δεδομένων…</Text></SafeAreaView>;
 
@@ -1240,7 +1273,7 @@ function MainApp({ onOpenDecisionGate }) {
           <View style={styles.card}><Text style={styles.cardTitle}>Ιδιωτικότητα δεδομένων</Text><Text style={styles.note}>Συναλλαγές, όρια και ιστορικό αποθηκεύονται μόνο στη συγκεκριμένη εγκατάσταση. Το MINBEIS δεν φορτώνει σιωπηρά παλιό ή μη ταυτοποιημένο portfolio state.</Text><ReviewLine label="Αποθήκευση" value="Μόνο στη συσκευή" /><ReviewLine label="Cloud συγχρονισμός" value="Ανενεργός" /><ReviewLine label="Τοπική απομόνωση" value="Ενεργή" />{legacyDataAvailable ? <><Text style={styles.warning}>Βρέθηκαν παλιά δεδομένα από προηγούμενη δοκιμαστική έκδοση και δεν φορτώθηκαν αυτόματα.</Text><Pressable style={styles.secondaryActionFull} onPress={recoverQuarantinedPortfolio}><Text style={styles.secondaryStrong}>Έλεγχος παλιών τοπικών δεδομένων</Text></Pressable></> : null}</View>
           <View style={styles.card}><Text style={styles.cardTitle}>Ακρίβεια συναλλαγών</Text><Text style={styles.note}>Κάθε συναλλαγή κρατά χωριστά τιμή εντολής, μέση τιμή εκτέλεσης, αξία συναλλαγής, αναλυτικά έξοδα και τελικό κόστος.</Text><ReviewLine label="Λογιστικό μοντέλο" value="v2 ενεργό" /><ReviewLine label="Σχήμα δεδομένων" value="v6" /></View>
           <View style={styles.card}><Text style={styles.cardTitle}>Αντίγραφο ασφαλείας</Text><Text style={styles.note}>Το αντίγραφο ασφαλείας περιλαμβάνει συναλλαγές και όρια. Δεν περιλαμβάνει προσωπικά κλειδιά υπηρεσιών.</Text><Pressable style={styles.primary} onPress={exportBackup}><Text style={styles.whiteStrong}>Εξαγωγή αντιγράφου ασφαλείας</Text></Pressable><Pressable style={styles.secondaryActionFull} onPress={importBackup}><Text style={styles.secondaryStrong}>Επαναφορά αντιγράφου</Text></Pressable></View>
-          <View style={styles.card}><Text style={styles.cardTitle}>Διαχειριζόμενες πηγές δεδομένων</Text><Text style={styles.note}>Οι εγκεκριμένες τιμές και η έρευνα ενημερώνονται από την κεντρική ροή της εφαρμογής. Δεν απαιτείται προσωπικό κλειδί υπηρεσίας. Εφεδρικές ή μη επαληθευμένες τιμές εμφανίζονται μόνο πληροφοριακά και δεν ενεργοποιούν τελική απόφαση ή ειδοποίηση.</Text><ReviewLine label="Επίσημες ελληνικές πηγές" value="Euronext Athens" /><ReviewLine label="Αμερικανικά δεδομένα" value="Εγκεκριμένος πάροχος + SEC" /><ReviewLine label="Προσωπικό κλειδί υπηρεσίας" value="Δεν απαιτείται" /><Text style={styles.privacyNotice}>Για την ανάκτηση τιμής μπορεί να αποστέλλεται στον πάροχο μόνο το σύμβολο της μετοχής. Ποσότητες, κόστος, κέρδος/ζημία και σημειώσεις δεν αποστέλλονται.</Text></View>
+          <View style={styles.card}><Text style={styles.cardTitle}>Διαχειριζόμενες πηγές δεδομένων</Text><Text style={styles.note}>Οι εγκεκριμένες τιμές και η έρευνα ενημερώνονται από την κεντρική ροή της εφαρμογής. Δεν απαιτείται προσωπικό κλειδί υπηρεσίας. Εφεδρικές ή μη επαληθευμένες τιμές εμφανίζονται μόνο πληροφοριακά και δεν ενεργοποιούν τελική απόφαση ή ειδοποίηση.</Text><ReviewLine label="Επίσημες ελληνικές πηγές" value="Euronext Athens" /><ReviewLine label="Αμερικανικά δεδομένα" value="Εγκεκριμένος πάροχος + SEC" /><ReviewLine label="Προσωπικό κλειδί υπηρεσίας" value="Δεν απαιτείται" /><Text style={styles.privacyNotice}>Για την ανάκτηση τιμής αποστέλλονται το σύμβολο της μετοχής και ψευδωνυμικό τεχνικό αναγνωριστικό εγκατάστασης/πελάτη. Ποσότητες, κόστος, κέρδος/ζημία και σημειώσεις δεν αποστέλλονται.</Text></View>
           <View style={styles.card}><Text style={styles.cardTitle}>Νομικά και υποστήριξη</Text><Text style={styles.note}>Η εφαρμογή δεν εκτελεί συναλλαγές και δεν εγγυάται απόδοση. Κάθε επενδυτική απόφαση και η εκτέλεσή της παραμένει αποκλειστικά στον χρήστη.</Text><Pressable style={styles.secondaryActionFull} onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}><Text style={styles.secondaryStrong}>Πολιτική απορρήτου</Text></Pressable><Pressable style={styles.secondaryActionFull} onPress={() => Linking.openURL(TERMS_URL)}><Text style={styles.secondaryStrong}>Όροι χρήσης</Text></Pressable><Pressable style={styles.secondaryActionFull} onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=MINBEIS%20Support`)}><Text style={styles.secondaryStrong}>Επικοινωνία υποστήριξης</Text></Pressable></View><View style={styles.card}><Text style={styles.cardTitle}>Τοπικά δεδομένα</Text><Text style={styles.note}>Η διαγραφή αφορά μόνο αυτή τη συσκευή και δεν αναιρείται. Η αποδοχή της νομικής ενημέρωσης διατηρείται χωριστά για λόγους διαφάνειας.</Text><Pressable style={styles.dangerActionFull} onPress={resetLocalData}><Text style={styles.dangerStrong}>Διαγραφή όλων των τοπικών δεδομένων</Text></Pressable></View>
         </> : null}
       </ScrollView>
