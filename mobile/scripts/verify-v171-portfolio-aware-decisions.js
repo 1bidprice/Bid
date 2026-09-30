@@ -31,14 +31,14 @@ function effective(item, held) {
   return held.has(canonical(item.symbol)) ? finalAction.holderAction : finalAction.nonHolderAction;
 }
 
-assert(canonical('SPCE.US') === canonical('SPCE'), 'SPCE symbol bridge failed');
-assert(canonical('ALWN.GR') === canonical('ALWN'), 'ALWN symbol bridge failed');
-assert(canonical('CREDIA.GR') === canonical('CREDIA'), 'CREDIA symbol bridge failed');
+assert(canonical('AAA.US') === canonical('AAA'), 'AAA symbol bridge failed');
+assert(canonical('BBB.GR') === canonical('BBB'), 'BBB symbol bridge failed');
+assert(canonical('CCC.GR') === canonical('CCC'), 'CCC symbol bridge failed');
 
-const held = new Set(['SPCE.US', 'ALWN.GR', 'CREDIA.GR'].map(canonical));
-const spce = { symbol: 'SPCE', finalAction: { status: 'FINAL', holderAction: 'SELL_NOW', nonHolderAction: 'AVOID' } };
+const held = new Set(['AAA.US', 'BBB.GR', 'CCC.GR'].map(canonical));
+const spce = { symbol: 'AAA', finalAction: { status: 'FINAL', holderAction: 'SELL_NOW', nonHolderAction: 'AVOID' } };
 const vctr = { symbol: 'VCTR', finalAction: { status: 'FINAL', holderAction: 'HOLD', nonHolderAction: 'BUY_NOW' } };
-assert(effective(spce, held) === 'SELL_NOW', 'SPCE holder must receive SELL_NOW');
+assert(effective(spce, held) === 'SELL_NOW', 'AAA holder must receive SELL_NOW');
 assert(effective(vctr, held) === 'BUY_NOW', 'VCTR non-holder must receive BUY_NOW');
 const actions = [spce, vctr].map((item) => effective(item, held));
 assert(actions.filter((code) => code === 'BUY_NOW').length === 1, 'personalized BUY count mismatch');
@@ -47,7 +47,7 @@ assert(actions.filter((code) => code === 'SELL_NOW').length === 1, 'personalized
 assert(currency({ value: 111.08, currency: null }, { symbol: 'VCTR', exchange: 'Nasdaq' }) === 'USD', 'VCTR currency must infer USD');
 assert(currency({ value: 36.13, currency: null }, { symbol: 'RDN', exchange: 'New York Stock Exchange' }) === 'USD', 'RDN currency must infer USD');
 assert(currency({ value: 74.58, currency: null }, { symbol: 'UHAL', exchange: 'New York Stock Exchange' }) === 'USD', 'UHAL currency must infer USD');
-assert(currency({ value: 13.535, currency: null }, { symbol: 'ALWN', exchange: 'Euronext Athens' }) === 'EUR', 'ALWN currency must infer EUR');
+assert(currency({ value: 13.535, currency: null }, { symbol: 'BBB', exchange: 'Euronext Athens' }) === 'EUR', 'BBB currency must infer EUR');
 assert(currency({ value: 1, currency: null }, { symbol: 'UNKNOWN', exchange: 'Unknown' }) === null, 'unknown currency must not default to EUR');
 
 const finalCard = read('src/FinalDecisionCard.js');
