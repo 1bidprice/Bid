@@ -157,5 +157,7 @@ const appSource = read('PortfolioApp.js');
 for (const label of ['Αξία θέσης', 'Κέρδος / Ζημία', 'Αξία χαρτοφυλακίου']) {
   assert.ok(appSource.includes(label), `UI must render ${label}`);
 }
+assert.ok(appSource.includes("const stale = !item.quote || item.quote.usable !== true || item.valuationEligible !== true;"), 'Missing quote must be treated as unavailable');
+assert.ok(appSource.includes("const numeric = valid(value) ? Number(value) : null;"), 'Null performance must not be coerced to zero');
 
 console.log('MINBEIS gateway -> quote contract -> portfolio value/P&L -> UI regression verified');
