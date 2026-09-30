@@ -150,7 +150,10 @@ const hostileLegacy = assertInvariant({
   company: { name: 'Synthetic Instrument' },
   date: { iso: '2026-01-20' },
   quantity: '40',
-  currency: '
+  currency: '',
+  executionPrice: '2.5',
+  fees: '0',
+  total: '100',
   broker: { name: 'legacy broker' },
   orderReference: { value: 123 },
   notes: { text: 'legacy note' },
@@ -211,67 +214,3 @@ for (const transaction of normalizedBatch) {
 }
 
 console.log(`Accounting invariants PASS: synthetic cash reconciliation + render-safe fail-closed legacy ledger + generic idempotent normalization + ${synthetic.length} synthetic transactions.`);
-,
-  executionPrice: '2.5',
-  fees: '0',
-  total: '100',
-  broker: { name: 'legacy broker' },
-  orderReference: { value: 123 },
-  notes: { text: 'legacy note' },
-}, 'Malformed legacy render safety');
-assert.equal(hostileLegacy.symbol, 'SPCE.US');
-assert.equal(hostileLegacy.currency, null);
-assert.equal(hostileLegacy.company, 'SPCE.US');
-assert.equal(hostileLegacy.date, '');
-for (const key of ['id', 'symbol', 'company', 'date', 'broker', 'orderReference', 'settlementReference', 'notes', 'migrationNote', 'createdAt', 'updatedAt']) {
-  assert.equal(typeof hostileLegacy[key], 'string', `render field ${key} must be a string`);
-}
-assert.doesNotThrow(() => new Intl.NumberFormat('el-GR', {
-  style: 'currency',
-  currency: hostileLegacy.currency || 'EUR',
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-}).format(hostileLegacy.total));
-assert.deepEqual(normalizeTransaction(hostileLegacy), hostileLegacy);
-
-// Synthetic coverage: every normalized transaction must satisfy the same equations,
-// regardless of symbol, currency, side, quantity, fees, or intentionally rounded price.
-let seed = 0x1a2b3c4d;
-function random() {
-  seed = (1664525 * seed + 1013904223) >>> 0;
-  return seed / 0x100000000;
-}
-
-const synthetic = [];
-for (let i = 0; i < 2000; i += 1) {
-  const type = random() > 0.35 ? 'buy' : 'sell';
-  const quantity = 1 + Math.floor(random() * 5000);
-  const exactPrice = 0.1 + random() * 500;
-  const gross = roundMoney(quantity * exactPrice);
-  const fees = roundMoney(random() * 30);
-  const total = type === 'sell' ? roundMoney(Math.max(0, gross - fees)) : roundMoney(gross + fees);
-  const displayedPrice = Number(exactPrice.toFixed(random() > 0.5 ? 2 : 4));
-  synthetic.push({
-    id: `synthetic-${i}`,
-    type,
-    symbol: i % 2 ? `SYN${i}.US` : `SYN${i}.GR`,
-    quantity,
-    currency: i % 2 ? 'USD' : 'EUR',
-    executionPrice: displayedPrice,
-    fees,
-    total,
-  });
-}
-
-for (const transaction of synthetic) assertInvariant(transaction, transaction.id);
-const normalizedBatch = normalizeTransactions(synthetic);
-assert.equal(normalizedBatch.length, synthetic.length);
-for (const transaction of normalizedBatch) {
-  const twice = normalizeTransaction(transaction);
-  assert.equal(twice.grossAmount, transaction.grossAmount);
-  assert.equal(twice.total, transaction.total);
-  assertClose(twice.executionPrice, transaction.executionPrice, 1e-12, `${transaction.id} idempotent price`);
-  assert.equal(accountingInvariantReport(twice).ok, true);
-}
-
-console.log(`Accounting invariants PASS: SPCE live regression + render-safe fail-closed legacy ledger + Allwyn migration + ${synthetic.length} synthetic transactions.`);
