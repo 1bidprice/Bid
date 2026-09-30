@@ -45,6 +45,9 @@ jobs:
       - name: Verify v1.7.2 quote timing transparency
         run: npm run test:quote-transparency
 
+      - name: Verify Product Recovery privacy data and history
+        run: npm run test:local-data-ownership && npm run test:portfolio-history && npm run test:portfolio-data-flow
+
       - name: Check Expo package compatibility
         run: npx expo install --check 2>&1 | tee package-check.log
 
