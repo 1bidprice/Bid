@@ -73,25 +73,25 @@ function verifiedQuote(nativePrice, currency, extra = {}) {
 
 const transactions = [
   {
-    id: 'alwn', type: 'buy', symbol: 'ALWN.GR', company: 'Allwyn', quantity: 193, currency: 'EUR',
-    executionPrice: 13.565, grossAmount: 2618.05,
-    feeBreakdown: { commission: 9.16, transfer: 1.57, clearing: 0.72, exchange: 0.5 },
-    total: 2630.0, date: '2026-07-14',
+    id: 'alpha-gr', type: 'buy', symbol: 'ALPHA.GR', company: 'Synthetic Alpha', quantity: 100, currency: 'EUR',
+    executionPrice: 10, grossAmount: 1000,
+    feeBreakdown: { commission: 3, transfer: 1, clearing: 0.5, exchange: 0.5 },
+    total: 1005, date: '2026-01-10',
   },
   {
-    id: 'credia', type: 'buy', symbol: 'CREDIA.GR', company: 'CrediaBank (CR)', quantity: 15, currency: 'EUR',
-    executionPrice: 1.65, fees: 0, total: 24.75, date: '2025-10-06',
+    id: 'beta-gr', type: 'buy', symbol: 'BETA.GR', company: 'Synthetic Beta', quantity: 20, currency: 'EUR',
+    executionPrice: 2, fees: 0, total: 40, date: '2026-01-11',
   },
   {
-    id: 'spce', type: 'buy', symbol: 'SPCE.US', company: 'Virgin Galactic Holdings', quantity: 720, currency: 'USD',
-    executionPrice: 3.17, fees: 0, total: 2282.72, date: '2026-03-03',
+    id: 'gamma-us', type: 'buy', symbol: 'GAMMA.US', company: 'Synthetic Gamma', quantity: 50, currency: 'USD',
+    executionPrice: 5, fees: 0, total: 250, date: '2026-01-12',
   },
 ];
 
 const prices = {
-  'ALWN.GR': verifiedQuote(14.22, 'EUR'),
-  'CREDIA.GR': verifiedQuote(0.986, 'EUR'),
-  'SPCE.US': verifiedQuote(3.08, 'USD', { fxRate: 1.1666666666666667, price: 9999 }),
+  'ALPHA.GR': verifiedQuote(12, 'EUR'),
+  'BETA.GR': verifiedQuote(1.5, 'EUR'),
+  'GAMMA.US': verifiedQuote(6, 'USD', { fxRate: 1.2, price: 9999 }),
 };
 
 const snapshot = buildPortfolioSnapshot(transactions, prices);
@@ -100,26 +100,26 @@ assert.equal(snapshot.summary.valuationCoverage, '3/3');
 assert.equal(snapshot.summary.valuesReady, true);
 assert.equal(snapshot.summary.costsReady, true);
 
-const allwyn = snapshot.positions.find((position) => position.symbol === 'ALWN.GR');
-close(allwyn.nativeValue, 2744.46, 1e-8, 'Allwyn value');
-close(allwyn.cost, 2630.0, 1e-8, 'Allwyn cost');
-close(allwyn.nativePnl, 114.46, 1e-8, 'Allwyn P/L');
-close(allwyn.average, 2630 / 193, 1e-12, 'Allwyn all-in');
-assert.equal(allwyn.positionCurrencyVerified, true);
+const alpha = snapshot.positions.find((position) => position.symbol === 'ALPHA.GR');
+close(alpha.nativeValue, 1200, 1e-8, 'Synthetic Alpha value');
+close(alpha.cost, 1005, 1e-8, 'Synthetic Alpha cost');
+close(alpha.nativePnl, 195, 1e-8, 'Synthetic Alpha P/L');
+close(alpha.average, 10.05, 1e-12, 'Synthetic Alpha all-in');
+assert.equal(alpha.positionCurrencyVerified, true);
 
-const credia = snapshot.positions.find((position) => position.symbol === 'CREDIA.GR');
-close(credia.nativeValue, 14.79, 1e-8, 'Credia value');
-close(credia.nativePnl, -9.96, 1e-8, 'Credia P/L');
-close(credia.average, 1.65, 1e-12, 'Credia all-in');
+const beta = snapshot.positions.find((position) => position.symbol === 'BETA.GR');
+close(beta.nativeValue, 30, 1e-8, 'Synthetic Beta value');
+close(beta.nativePnl, -10, 1e-8, 'Synthetic Beta P/L');
+close(beta.average, 2, 1e-12, 'Synthetic Beta all-in');
 
-const spce = snapshot.positions.find((position) => position.symbol === 'SPCE.US');
-close(spce.nativeValue, 2217.6, 1e-8, 'SPCE value');
-close(spce.cost, 2282.72, 1e-8, 'SPCE cost');
-close(spce.nativePnl, -65.12, 1e-8, 'SPCE P/L');
-close(spce.average, 2282.72 / 720, 1e-12, 'SPCE all-in');
-close(spce.lots[0].executionPrice, 2282.72 / 720, 1e-12, 'SPCE reconciled execution price');
-close(spce.eurPrice, 3.08 / prices['SPCE.US'].fxRate, 1e-12, 'SPCE EUR price derives from native + FX');
-assert.notEqual(spce.eurPrice, prices['SPCE.US'].price, 'portfolio engine must not trust a second independent quote.price truth');
+const gamma = snapshot.positions.find((position) => position.symbol === 'GAMMA.US');
+close(gamma.nativeValue, 300, 1e-8, 'Synthetic Gamma value');
+close(gamma.cost, 250, 1e-8, 'Synthetic Gamma cost');
+close(gamma.nativePnl, 50, 1e-8, 'Synthetic Gamma P/L');
+close(gamma.average, 5, 1e-12, 'Synthetic Gamma all-in');
+close(gamma.lots[0].executionPrice, 5, 1e-12, 'Synthetic Gamma execution price');
+close(gamma.eurPrice, 5, 1e-12, 'Synthetic Gamma EUR price derives from native + FX');
+assert.notEqual(gamma.eurPrice, prices['GAMMA.US'].price, 'portfolio engine must not trust a second independent quote.price truth');
 
 const wrongCurrency = buildPortfolioPositions([
   { type: 'buy', symbol: 'ABC.US', quantity: 10, currency: 'EUR', executionPrice: 10, total: 100 },
@@ -146,10 +146,10 @@ const noFx = buildPortfolioPositions([
 assert.equal(noFx.valuationEligible, false);
 assert.ok(noFx.valuationBlockers.includes('FX_RATE_MISSING'));
 
-const partial = buildPortfolioSummary([allwyn, { ...spce, eurValue: null, eurCost: null }]);
+const partial = buildPortfolioSummary([alpha, { ...gamma, eurValue: null, eurCost: null }]);
 assert.equal(partial.valuationCoverage, '1/2');
 assert.equal(partial.valuesReady, false);
-assert.deepEqual([...partial.missingValuationSymbols], ['SPCE.US']);
+assert.deepEqual([...partial.missingValuationSymbols], ['GAMMA.US']);
 
 const fifoLedger = buildOpenPositionLedger([
   { id: 'b1', type: 'buy', symbol: 'FIFO.GR', currency: 'EUR', quantity: 10, executionPrice: 10, total: 100, date: '2026-01-01' },
@@ -186,4 +186,4 @@ for (let i = 0; i < 500; i += 1) {
   if (market === 'US') close(result.eurValue, result.nativeValue / fxRate, 1e-7, `${symbol} EUR value`);
 }
 
-console.log('Portfolio engine PASS: live 3-position regression, fail-closed integrity cases, FIFO/average-cost ledger and 500 synthetic positions.');
+console.log('Portfolio engine PASS: synthetic 3-position valuation regression, fail-closed integrity cases, FIFO/average-cost ledger and 500 synthetic positions.');
