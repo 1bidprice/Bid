@@ -56,6 +56,13 @@ import {
   instrumentEntryFromTransaction,
 } from './src/instrument-entry';
 import { buildPortfolioSnapshot } from './src/portfolio-engine';
+import PortfolioHistoryChart from './src/PortfolioHistoryChart';
+import {
+  PORTFOLIO_HISTORY_STORAGE_KEY,
+  createPortfolioHistoryState,
+  normalizePortfolioHistoryState,
+  recordPortfolioHistoryPoint,
+} from './src/portfolio-history';
 import {
   INSTALLATION_ID_SECURE_KEY,
   LEGACY_PORTFOLIO_QUARANTINE_KEY,
@@ -748,6 +755,8 @@ function MainApp({ onOpenDecisionGate }) {
   const [minbeisHomeFeed, setMinbeisHomeFeed] = useState(null);
   const [minbeisHomeSyncing, setMinbeisHomeSyncing] = useState(false);
   const [legacyDataAvailable, setLegacyDataAvailable] = useState(false);
+  const [portfolioHistory, setPortfolioHistory] = useState(createPortfolioHistoryState(''));
+  const portfolioHistoryRef = useRef(createPortfolioHistoryState(''));
   const tokenRef = useRef('');
   const installationIdRef = useRef(null);
   const appState = useRef(AppState.currentState);
@@ -816,6 +825,22 @@ function MainApp({ onOpenDecisionGate }) {
       }
       installationIdRef.current = installationId;
 
+      let historyState = createPortfolioHistoryState(installationId);
+      const rawHistory = await AsyncStorage.getItem(PORTFOLIO_HISTORY_STORAGE_KEY);
+      if (rawHistory) {
+        try {
+          const historyOwnership = normalizePortfolioHistoryState(JSON.parse(rawHistory), installationId);
+          historyState = historyOwnership.state;
+          if (historyOwnership.status !== 'OWNED') {
+            await AsyncStorage.removeItem(PORTFOLIO_HISTORY_STORAGE_KEY);
+          }
+        } catch {
+          await AsyncStorage.removeItem(PORTFOLIO_HISTORY_STORAGE_KEY);
+        }
+      }
+      portfolioHistoryRef.current = historyState;
+      setPortfolioHistory(historyState);
+
       let next = attachLocalPortfolioOwner({ ...EMPTY_STATE }, installationId);
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -846,6 +871,17 @@ function MainApp({ onOpenDecisionGate }) {
     const prices = { ...current.prices, ...quotes };
     const evaluated = evaluateAlerts(current.alerts, prices, { background });
     const next = await persist({ ...current, prices, alerts: evaluated.alerts, meta: { ...current.meta, lastCheckedAt: checkedAt, errors } });
+    const historyUpdate = recordPortfolioHistoryPoint(
+      portfolioHistoryRef.current,
+      installationIdRef.current,
+      buildPortfolioSnapshot(next.transactions, next.prices).summary,
+      Date.now(),
+    );
+    if (historyUpdate.changed) {
+      portfolioHistoryRef.current = historyUpdate.state;
+      setPortfolioHistory(historyUpdate.state);
+      await AsyncStorage.setItem(PORTFOLIO_HISTORY_STORAGE_KEY, JSON.stringify(historyUpdate.state));
+    }
     await presentAlertEvents(evaluated.events);
     if (!silent && errors.length) Alert.alert('Μερική ενημέρωση', errors.join('\n'));
     return next;
@@ -1161,6 +1197,9 @@ function MainApp({ onOpenDecisionGate }) {
     const replacementInstallationId = createInstallationId();
     await SecureStore.setItemAsync(INSTALLATION_ID_SECURE_KEY, replacementInstallationId);
     installationIdRef.current = replacementInstallationId;
+    const cleanHistory = createPortfolioHistoryState(replacementInstallationId);
+    portfolioHistoryRef.current = cleanHistory;
+    setPortfolioHistory(cleanHistory);
     tokenRef.current = '';
     setToken('');
     setLegacyDataAvailable(false);
@@ -1188,6 +1227,7 @@ function MainApp({ onOpenDecisionGate }) {
           ) : <>
           <View style={styles.grid}><Metric compact={compactMetrics} label={valuesReady ? 'Αξία χαρτοφυλακίου' : 'Επιβεβ. αξία'} value={cash(totalValue)} /><Metric compact={compactMetrics} label={costsReady ? 'Καθαρό κόστος' : 'Επιβεβ. κόστος'} value={cash(totalCost)} /><Metric compact={compactMetrics} label={valuesReady ? 'Κέρδος / Ζημία' : 'Επιβεβ. αποτέλεσμα'} value={cash(totalPnl)} negative={totalPnl < 0} positiveValue={totalPnl > 0} /><Metric compact={compactMetrics} label="Κάλυψη τιμών" value={valuationCoverage} /></View>
           {!valuesReady ? <Text style={styles.warning}>Μερική αποτίμηση {valuationCoverage}. Εξαιρούνται από την αξία και το αποτέλεσμα μόνο οι θέσεις χωρίς χρησιμοποιήσιμη τιμή ή ισοτιμία: {missingValuationSymbols.join(', ') || '—'}.</Text> : null}
+          <PortfolioHistoryChart historyState={portfolioHistory} />
           <Pressable style={[styles.minbeisHomeCard, minbeisHomeSummary.state === 'ATTENTION' && styles.minbeisHomeCardAttention]} onPress={() => setTab('opportunities')}>
             <View style={styles.minbeisHomeTop}>
               <View style={styles.grow}>
