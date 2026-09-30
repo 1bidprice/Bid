@@ -37,8 +37,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -n "${EXPO_PUBLIC_MARKET_GATEWAY_URL:-}" || { echo 'Missing repository variable EXPO_PUBLIC_MARKET_GATEWAY_URL. Release APK would disable the canonical gateway.' >&2; exit 1; }
+          test -n "${EXPO_PUBLIC_MARKET_GATEWAY_URL:-}" || { echo 'Missing repository variable EXPO_PUBLIC_MARKET_GATEWAY_URL. Release APK would disable the production gateway.' >&2; exit 1; }
           node -e "const u=new URL(process.env.EXPO_PUBLIC_MARKET_GATEWAY_URL); if(u.protocol!=='https:') process.exit(2); console.log('Gateway build contract: HTTPS URL configured');"
+          curl --fail --silent --show-error --retry 3 --retry-delay 2 "${EXPO_PUBLIC_MARKET_GATEWAY_URL}/health" > gateway-health.json
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('gateway-health.json','utf8'));if(p.status!=='ok'||p.providers?.us!=='configured'||p.providers?.athens!=='official_delayed_15m'||p.providers?.fx!=='ecb_official_daily_reference'||p.providers?.researchQueue!=='configured') process.exit(3);console.log('Gateway live health contract verified');"
+          rm -f gateway-health.json
 
       - name: Verify v1.7 mobile release identity
         run: npm run test:release-identity
