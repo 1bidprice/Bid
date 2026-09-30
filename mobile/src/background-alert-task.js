@@ -14,7 +14,8 @@ export const BACKGROUND_ALERT_TASK = 'investor-control-background-alerts-v1';
 function normalizeState(raw) {
   const source = raw && typeof raw === 'object' ? raw : {};
   return {
-    schemaVersion: 4,
+    schemaVersion: 6,
+    ownerInstallationId: source.ownerInstallationId || null,
     transactions: Array.isArray(source.transactions) ? source.transactions : [],
     prices: source.prices && typeof source.prices === 'object' ? source.prices : {},
     meta: {
