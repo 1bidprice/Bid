@@ -6,6 +6,18 @@ const assert = require('assert');
 const root = path.resolve(__dirname, '..');
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
 
+function versionAtLeast(actual, minimum) {
+  const a = String(actual || '').split('.').map(Number);
+  const b = String(minimum || '').split('.').map(Number);
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    const av = Number.isFinite(a[i]) ? a[i] : 0;
+    const bv = Number.isFinite(b[i]) ? b[i] : 0;
+    if (av > bv) return true;
+    if (av < bv) return false;
+  }
+  return true;
+}
+
 function loadMarketRulesForTest() {
   let source = read('src/market-rules.js');
   const exported = [];
@@ -186,8 +198,8 @@ assert.ok(!portfolio.includes('function positionsFrom(state) {'));
 assert.ok(portfolioEngine.includes('positionCurrencyVerified'));
 assert.ok(portfolioEngine.includes('route.expectedCurrency !== position.currency'));
 assert.ok(portfolio.includes("maxWidth: '48%', flexShrink: 1"));
-assert.equal(app.expo.version, '1.8.0');
-assert.equal(app.expo.android.versionCode, 32);
-assert.equal(pkg.version, '1.8.0');
+assert.ok(versionAtLeast(app.expo.version, '1.8.0'), `app version predates universal integrity baseline: ${app.expo.version}`);
+assert.ok(Number(app.expo.android.versionCode) >= 32, `Android versionCode predates universal integrity baseline: ${app.expo.android.versionCode}`);
+assert.equal(pkg.version, app.expo.version, 'package/app release identity mismatch');
 
-console.log('Investor Control v1.8.0 universal instrument integrity verification passed, including closed-market valuation and mobile badge-width regression coverage.');
+console.log(`Investor Control ${app.expo.version} build ${app.expo.android.versionCode} universal instrument integrity verification passed, including closed-market valuation and mobile badge-width regression coverage.`);
