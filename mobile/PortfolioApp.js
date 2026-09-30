@@ -1146,6 +1146,13 @@ function MainApp({ onOpenDecisionGate }) {
         {tab === 'summary' ? <>
           <View style={styles.refreshCard}><View style={styles.grow}><Text style={styles.muted}>Τελευταίος έλεγχος</Text><Text style={styles.checked}>{when(state.meta.lastCheckedAt)}</Text></View><Pressable style={[styles.primarySmall, refreshing && styles.disabled]} onPress={() => refresh()} disabled={refreshing}>{refreshing ? <ActivityIndicator color="#fff" /> : <Text style={styles.whiteStrong}>Ανανέωση</Text>}</Pressable></View>
           {state.meta.errors?.length ? <Text style={styles.warning}>{state.meta.errors.join('\n')}</Text> : null}
+          {!state.transactions.length ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>Ξεκίνα με το δικό σου χαρτοφυλάκιο</Text>
+              <Text style={styles.note}>Η εφαρμογή δεν περιέχει έτοιμες προσωπικές θέσεις. Πρόσθεσε την πρώτη πραγματική αγορά σου και το MINBEIS θα υπολογίσει κόστος, αξία, κέρδος/ζημία και ανάλυση.</Text>
+              <Pressable style={styles.primary} onPress={openNewTransaction}><Text style={styles.whiteStrong}>＋ Προσθήκη πρώτης αγοράς</Text></Pressable>
+            </View>
+          ) : <>
           <View style={styles.grid}><Metric compact={compactMetrics} label={valuesReady ? 'Αξία χαρτοφυλακίου' : 'Επιβεβ. αξία'} value={cash(totalValue)} /><Metric compact={compactMetrics} label={costsReady ? 'Καθαρό κόστος' : 'Επιβεβ. κόστος'} value={cash(totalCost)} /><Metric compact={compactMetrics} label={valuesReady ? 'Κέρδος / Ζημία' : 'Επιβεβ. αποτέλεσμα'} value={cash(totalPnl)} negative={totalPnl < 0} positiveValue={totalPnl > 0} /><Metric compact={compactMetrics} label="Κάλυψη τιμών" value={valuationCoverage} /></View>
           {!valuesReady ? <Text style={styles.warning}>Μερική αποτίμηση {valuationCoverage}. Εξαιρούνται από την αξία και το αποτέλεσμα μόνο οι θέσεις χωρίς χρησιμοποιήσιμη τιμή ή ισοτιμία: {missingValuationSymbols.join(', ') || '—'}.</Text> : null}
           <Pressable style={[styles.minbeisHomeCard, minbeisHomeSummary.state === 'ATTENTION' && styles.minbeisHomeCardAttention]} onPress={() => setTab('opportunities')}>
@@ -1182,9 +1189,10 @@ function MainApp({ onOpenDecisionGate }) {
             <View style={styles.grow}><Text style={styles.decisionEntryTitle}>Έλεγχος απόφασης</Text><Text style={styles.decisionEntryText}>Πριν από νέα αγορά ή ενίσχυση, έλεγξε όρια, κίνδυνο και πλάνο</Text></View>
             <Text style={styles.decisionEntryArrow}>›</Text>
           </Pressable>
+          </>}
           <View style={styles.quickActions}><Pressable style={styles.primaryQuick} onPress={openNewTransaction}><Text style={styles.whiteStrong}>＋ Νέα συναλλαγή</Text></Pressable><Pressable style={styles.secondaryQuick} onPress={() => setTab('transactions')}><Text style={styles.secondaryStrong}>Ιστορικό</Text></Pressable></View>
           <View style={styles.sectionRow}><View><Text style={styles.section}>Θέσεις</Text><Text style={styles.muted}>{positions.length} ενεργές θέσεις</Text></View></View>
-          {positions.length ? positions.map((position) => <PositionCard key={position.symbol} item={position} compact={compactMetrics} expanded={expandedPosition === position.symbol} onToggle={() => setExpandedPosition((current) => current === position.symbol ? null : position.symbol)} onAlert={() => setAlertPosition(position)} />) : <View style={styles.emptyCard}><Text style={styles.emptyTitle}>Το χαρτοφυλάκιο είναι κενό.</Text><Text style={styles.note}>Πρόσθεσε αγορά σε τρία καθαρά βήματα. Τα δεδομένα μένουν μόνο στη συσκευή.</Text><Pressable style={styles.primary} onPress={openNewTransaction}><Text style={styles.whiteStrong}>Πρώτη συναλλαγή</Text></Pressable></View>}
+          {positions.length ? positions.map((position) => <PositionCard key={position.symbol} item={position} compact={compactMetrics} expanded={expandedPosition === position.symbol} onToggle={() => setExpandedPosition((current) => current === position.symbol ? null : position.symbol)} onAlert={() => setAlertPosition(position)} />) : null}
         </> : null}
         {tab === 'transactions' ? <>
           <View style={styles.sectionRow}><View style={styles.grow}><Text style={styles.section}>Συναλλαγές</Text><Text style={styles.muted}>Αγορά, πώληση και πραγματικό κόστος</Text></View><Pressable style={styles.addSmall} onPress={openNewTransaction} accessibilityLabel="Προσθήκη συναλλαγής"><Text style={styles.addSmallText}>＋</Text></Pressable></View>
