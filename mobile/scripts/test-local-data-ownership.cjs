@@ -33,6 +33,10 @@ const portfolioApp = fs.readFileSync(path.join(__dirname, '..', 'PortfolioApp.js
 if (!/transactions:\s*\[\]/.test(portfolioApp)) throw new Error('First-run portfolio must default to zero transactions');
 if (!portfolioApp.includes('LEGACY_PORTFOLIO_QUARANTINE_KEY')) throw new Error('Legacy data quarantine is not wired into app startup');
 if (!portfolioApp.includes('classifyLocalPortfolioState')) throw new Error('Portfolio startup ownership check is missing');
+if (!/AppState\.addEventListener[\s\S]*classifyLocalPortfolioState/.test(portfolioApp)) throw new Error('Resume path must re-check portfolio ownership');
+if (!portfolioApp.includes('await AsyncStorage.clear()')) throw new Error('Full local reset must clear AsyncStorage privacy state');
+if (!portfolioApp.includes('replacementInstallationId = createInstallationId()')) throw new Error('Full local reset must rotate the installation owner identifier');
+if (!portfolioApp.includes('ψευδωνυμικό τεχνικό αναγνωριστικό εγκατάστασης/πελάτη')) throw new Error('Privacy disclosure must describe the pseudonymous gateway identifier');
 
 const appJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'app.json'), 'utf8'));
 if (appJson?.expo?.android?.allowBackup !== false) throw new Error('Android backup must remain disabled for portfolio privacy');
