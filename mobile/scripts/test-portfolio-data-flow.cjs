@@ -61,6 +61,21 @@ const portfolioSandbox = {
 vm.runInNewContext(portfolioSource, portfolioSandbox, { filename: 'src/portfolio-engine.js' });
 const portfolio = portfolioSandbox.module.exports;
 
+const marketDataSource = read('src/market-data.js');
+assert.ok(
+  marketDataSource.includes('usable: quoteContract.valuationEligible === true'),
+  'Production quote classification must derive usability from the canonical valuation contract',
+);
+
+function productionClassifiedQuote(quote, extra = {}) {
+  assert.equal(quote?.quoteContract?.valuationEligible, true, 'Quote must be valuation-eligible before it is exposed as usable');
+  return {
+    ...quote,
+    ...extra,
+    usable: quote.quoteContract.valuationEligible === true,
+  };
+}
+
 const now = Date.parse('2026-09-30T12:05:00.000Z');
 
 const usRegistry = {
@@ -84,7 +99,7 @@ const usQuote = quoteContract.quoteFromRegistry('SPCE.US', usRegistry, {
   exchangeCalendarVerified: true,
 });
 assert.ok(usQuote, 'US canonical gateway quote must survive mobile quote contract');
-usQuote.fxRate = 1.18;
+const classifiedUsQuote = productionClassifiedQuote(usQuote, { fxRate: 1.18 });
 
 const usSnapshot = portfolio.buildPortfolioSnapshot([
   {
@@ -100,7 +115,7 @@ const usSnapshot = portfolio.buildPortfolioSnapshot([
     total: 302,
     date: '2026-09-29',
   },
-], { 'SPCE.US': usQuote });
+], { 'SPCE.US': classifiedUsQuote });
 
 assert.equal(usSnapshot.summary.valuationCoverage, '1/1');
 assert.equal(usSnapshot.summary.valuesReady, true);
@@ -131,6 +146,7 @@ const grQuote = quoteContract.quoteFromRegistry('ALWN.GR', grRegistry, {
   exchangeCalendarVerified: true,
 });
 assert.ok(grQuote, 'Athens primary-exchange quote must remain valuation eligible even without exact trade timestamp');
+const classifiedGrQuote = productionClassifiedQuote(grQuote, { fxRate: 1 });
 
 const grSnapshot = portfolio.buildPortfolioSnapshot([
   {
@@ -146,7 +162,7 @@ const grSnapshot = portfolio.buildPortfolioSnapshot([
     total: 805,
     date: '2026-09-29',
   },
-], { 'ALWN.GR': grQuote });
+], { 'ALWN.GR': classifiedGrQuote });
 
 assert.equal(grSnapshot.summary.valuationCoverage, '1/1');
 assert.equal(grSnapshot.summary.valuesReady, true);
