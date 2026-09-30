@@ -236,6 +236,7 @@ export function scoreOpportunityCandidate(candidate = {}) {
     discoveryAction: tier === 'SUPER_OPPORTUNITY_CANDIDATE' ? 'DEEP_VERIFY_NOW' : tier === 'HIGH_PRIORITY_CANDIDATE' ? 'DEEP_VERIFY' : 'WATCH',
     finalActionEligible: false,
     finalActionPolicy: 'OPPORTUNITY_SCORE_CAN_PRIORITIZE_RESEARCH_BUT_CAN_NEVER_BYPASS_FINAL_ACTION_POLICY',
+    source: candidate?.source ? { ...candidate.source } : null,
   };
 }
 
