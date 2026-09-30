@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import * as BackgroundTask from 'expo-background-task';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
@@ -13,6 +14,7 @@ import {
 } from './intelligence-notification-policy';
 import { buildOpenPositionLedger } from './portfolio-engine';
 import { PORTFOLIO_STATE_STORAGE_KEY } from './portfolio-state-storage';
+import { INSTALLATION_ID_SECURE_KEY, canBackgroundTaskUsePortfolio } from './local-data-ownership';
 
 export const BACKGROUND_INTELLIGENCE_TASK = 'investor-control-background-intelligence-v1';
 export const INTELLIGENCE_FEED_STORAGE_KEY = 'investor-control.intelligence-feed.v1';
@@ -54,13 +56,20 @@ async function saveNotificationState(feed, lastActions) {
 
 async function loadPortfolioPositions() {
   try {
-    const raw = await AsyncStorage.getItem(PORTFOLIO_STATE_STORAGE_KEY);
+    const [raw, installationId] = await Promise.all([
+      AsyncStorage.getItem(PORTFOLIO_STATE_STORAGE_KEY),
+      SecureStore.getItemAsync(INSTALLATION_ID_SECURE_KEY),
+    ]);
     if (!raw) return { available: true, positions: [] };
+    if (!installationId) return { available: false, positions: [] };
     const parsed = JSON.parse(raw);
+    if (!canBackgroundTaskUsePortfolio(parsed, installationId)) {
+      return { available: false, positions: [] };
+    }
     const transactions = Array.isArray(parsed?.transactions) ? parsed.transactions : [];
     return { available: true, positions: buildOpenPositionLedger(transactions) };
   } catch (error) {
-    console.warn('Investor Control notification ownership state unavailable', error);
+    console.warn('MINBEIS notification ownership state unavailable', error);
     return { available: false, positions: [] };
   }
 }
