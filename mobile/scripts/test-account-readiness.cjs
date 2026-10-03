@@ -9,6 +9,8 @@ const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
 const authSource = fs.readFileSync(path.join(root, 'src', 'firebase-auth-client.js'), 'utf8');
 const accountSource = fs.readFileSync(path.join(root, 'src', 'account-client.js'), 'utf8');
 const accountUiSource = fs.readFileSync(path.join(root, 'src', 'AccountAccessCard.js'), 'utf8');
+const accountDeviceSource = fs.readFileSync(path.join(root, 'src', 'account-device-sync.js'), 'utf8');
+const pushRegistrationSource = fs.readFileSync(path.join(root, 'src', 'push-registration.js'), 'utf8');
 const portfolioAppSource = fs.readFileSync(path.join(root, 'PortfolioApp.js'), 'utf8');
 
 assert.equal(pkg.dependencies?.firebase, '12.19.0', 'Firebase client SDK must remain pinned');
@@ -30,6 +32,12 @@ assert.match(accountUiSource, /Το portfolio παραμένει τοπικά κ
 assert.match(accountUiSource, /δεν ανεβάζει το χαρτοφυλάκιό σου/);
 assert.match(portfolioAppSource, /<AccountAccessCard \/>/, 'settings must mount opt-in account UI');
 assert.doesNotMatch(accountUiSource, /portfolioPositions|transactions|costBasis|totalPnl/, 'account UI must not receive portfolio contents');
+assert.match(accountUiSource, /onPress=\{enableRemotePush\}/, 'remote push must require an explicit user action');
+assert.doesNotMatch(accountUiSource, /useEffect\([\s\S]{0,1200}enableRemotePushForCurrentDevice/, 'remote push must not auto-register from an effect');
+assert.match(accountDeviceSource, /portfolioUploaded: false/);
+assert.doesNotMatch(accountDeviceSource, /transactions|costBasis|totalPnl|quantity/, 'device sync must never include portfolio contents');
+assert.match(pushRegistrationSource, /options\.requestPermission === true/);
+assert.match(pushRegistrationSource, /REMOTE_PUSH_NOT_CONFIGURED/);
 
 const app = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'));
 const serialized = JSON.stringify(app);
