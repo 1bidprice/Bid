@@ -32,7 +32,7 @@ import {
   portfolioSnapshot,
 } from './src/decision-engine';
 
-const VERSION = '1.8.3';
+const VERSION = '1.8.4';
 const SUPPORTED_BACKUP_VERSIONS = [1, DECISION_VERSION];
 
 const parseNum = (value) => {
