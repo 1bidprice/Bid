@@ -58,7 +58,7 @@ function batchPayload(symbols = ['SPCE.US']) {
       return [symbol, {
         appSymbol: symbol,
         currency: 'EUR',
-        quoteContract: { sourceApproved: true, sourceRole: 'PRIMARY_EXCHANGE' },
+        quoteContract: { sourceApproved: true, identityVerified: true, sourceRole: 'PRIMARY_EXCHANGE' },
       }];
     })),
     errors: [],
@@ -219,6 +219,10 @@ async function main() {
     /GATEWAY_US_IDENTITY_NOT_VERIFIED/,
   );
 
+  const invalidAthensIdentity = batchPayload(['ALWN.GR']);
+  invalidAthensIdentity.quoteRegistry['ALWN.GR'].quoteContract.identityVerified = false;
+  assert.equal(validateGatewayBatch(['ALWN.GR'], invalidAthensIdentity), 'GATEWAY_ATHENS_IDENTITY_NOT_VERIFIED');
+
   assert.equal(validateGatewayFx(fxPayload()), null);
   const invalidFx = fxPayload();
   invalidFx.reference.transactionEligible = true;
@@ -293,6 +297,22 @@ async function main() {
   });
   assert.equal(greekOnly.fxReference, null);
   assert.equal(greekOnlyCalls.length, 1);
+
+  const largePortfolioSymbols = Array.from({ length: 101 }, (_, index) => `S${index}.US`);
+  const largeBatchCalls = [];
+  const largeSnapshot = await fetchCanonicalGatewayMarketSnapshot(largePortfolioSymbols, {
+    baseUrl: 'https://quotes.example.com',
+    clientId: firstId,
+    fetchImpl: async (url, init = {}) => {
+      assert.equal(String(url), 'https://quotes.example.com/v1/quotes');
+      const body = JSON.parse(init.body);
+      largeBatchCalls.push(body.symbols);
+      return new Response(JSON.stringify(batchPayload(body.symbols)), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    },
+  });
+  assert.equal(Object.keys(largeSnapshot.quoteRegistry).length, 101);
+  assert.deepEqual(largeBatchCalls.map((symbols) => symbols.length), [50, 50, 1]);
+  assert.equal(largeBatchCalls.flat().length, 101);
 
   const fallbackCalls = [];
   const fallback = await fetchCanonicalGatewayMarketSnapshot(['SPCE.US'], {
