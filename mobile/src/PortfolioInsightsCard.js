@@ -53,7 +53,7 @@ export default function PortfolioInsightsCard({ positions }) {
 
       {pnlItems.length ? <>
         <Text style={styles.section}>Ποια θέση κινεί περισσότερο το αποτέλεσμα</Text>
-        <Text style={styles.helper}>Η μπάρα δείχνει το μερίδιο της κάθε θέσης στο απόλυτο σημερινό κέρδος/ζημία, όχι πρόβλεψη.</Text>
+        <Text style={styles.helper}>Η μπάρα δείχνει το μερίδιο της κάθε θέσης στο απόλυτο συνολικό μη πραγματοποιημένο κέρδος/ζημία του χαρτοφυλακίου — όχι ημερήσια μεταβολή ή πρόβλεψη.</Text>
         {pnlItems.map((item) => (
           <View key={`pnl-${item.symbol}`} style={styles.row}>
             <View style={styles.rowTop}><Text style={styles.symbol}>{item.symbol}</Text><Text style={[styles.rowValue, item.pnl < 0 && styles.negative, item.pnl > 0 && styles.positive]}>{cash(item.pnl)}</Text></View>
