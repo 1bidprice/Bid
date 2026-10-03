@@ -52,6 +52,15 @@ jobs:
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean --non-interactive
 
+      - name: Verify secure signing patch against generated Gradle
+        run: |
+          set -euo pipefail
+          cp android/app/build.gradle android/app/build.gradle.signing-check
+          node scripts/patch-release-signing.cjs android/app/build.gradle.signing-check
+          grep -Fq 'MINBEIS_SECURE_RELEASE_SIGNING' android/app/build.gradle.signing-check
+          grep -Fq 'signingConfig signingConfigs.release' android/app/build.gradle.signing-check
+          rm -f android/app/build.gradle.signing-check
+
       - name: Build standalone release APK
         run: cd android && chmod +x gradlew && ./gradlew assembleRelease --no-daemon
 
