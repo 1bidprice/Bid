@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   ATHENS_TRADING_ISSUERS_URL,
   extractAthensTradingDirectory,
+  fetchAthensCompaniesBySymbols,
 } from '../src/adapters/euronext-athens-discovery.js';
 
 const directoryHtml = `
@@ -24,4 +25,23 @@ test('official trading issuers directory maps issuer names to OASIS stock symbol
   assert.equal(result.records.find((item) => item.issuerName === 'PAPOUTSANIS S.A.').symbol, 'PAP');
   assert.equal(result.diagnostics.length, 0);
   assert.ok(ATHENS_TRADING_ISSUERS_URL.includes('/trading-issuers'));
+});
+
+
+test('symbol resolver uses official ISIN as a stable canonical identity when issuer link is absent', async () => {
+  const result = await fetchAthensCompaniesBySymbols(['QUEST'], {
+    fetchImpl: async (url) => {
+      assert.match(String(url), /trading-products\/trading-issuers/);
+      return { ok: true, text: async () => directoryHtml };
+    },
+    generatedAt: '2026-10-03T12:00:00.000Z',
+    tradingDirectoryFallbackLastPage: 0,
+  });
+  assert.equal(result.companies.length, 1);
+  assert.equal(result.companies[0].companyId, 'company:xath:isin:GRS310003009');
+  assert.equal(result.companies[0].isin, 'GRS310003009');
+  assert.equal(result.companies[0].primaryListing.symbol, 'QUEST');
+  assert.equal(result.companies[0].primaryListing.mic, 'XATH');
+  assert.equal(result.companies[0].activeTradingVerified, true);
+  assert.equal(result.companies[0].identitySource, 'EURONEXT_ATHENS_TRADING_ISSUERS');
 });
