@@ -4,6 +4,7 @@ import {
   createUserWithEmailAndPassword,
   getReactNativePersistence,
   initializeAuth,
+  sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
@@ -76,11 +77,24 @@ export async function minbeisCreateAccount(emailInput, passwordInput, env = proc
   if (!email) throw new Error('ACCOUNT_EMAIL_INVALID');
   if (!password) throw new Error('ACCOUNT_PASSWORD_INVALID');
   const credential = await createUserWithEmailAndPassword(getMinbeisFirebaseAuth(env), email, password);
+  await sendEmailVerification(credential.user);
   return {
     uid: credential.user.uid,
     email: credential.user.email || email,
     emailVerified: credential.user.emailVerified === true,
+    verificationSent: true,
   };
+}
+
+export async function minbeisSendEmailVerification(env = process.env) {
+  const auth = getMinbeisFirebaseAuth(env);
+  if (!auth.currentUser) {
+    const error = new Error('ACCOUNT_NOT_SIGNED_IN');
+    error.code = 'ACCOUNT_NOT_SIGNED_IN';
+    throw error;
+  }
+  await sendEmailVerification(auth.currentUser);
+  return { sent: true };
 }
 
 export async function minbeisSendPasswordReset(emailInput, env = process.env) {
