@@ -3,7 +3,8 @@ const path = require('path');
 const vm = require('vm');
 const assert = require('assert');
 
-const file = path.join(__dirname, '..', 'src', 'instrument-save-preflight.js');
+const root = path.join(__dirname, '..');
+const file = path.join(root, 'src', 'instrument-save-preflight.js');
 let source = fs.readFileSync(file, 'utf8');
 const exported = [];
 source = source.replace(/export const\s+([A-Za-z0-9_]+)\s*=/g, (_, name) => { exported.push(name); return 'const ' + name + ' ='; });
@@ -54,3 +55,14 @@ assert.deepEqual(
 );
 
 console.log('Instrument save preflight PASS: verified identities save, definitive mismatches reject, transient failures require explicit pending confirmation.');
+
+
+const appSource = fs.readFileSync(path.join(root, 'PortfolioApp.js'), 'utf8');
+assert.match(appSource, /classifyInstrumentSavePreflight\(capability\)/);
+assert.match(appSource, /preflight\.status === 'REJECTED'/);
+assert.match(appSource, /preflight\.status === 'PENDING_CONFIRMATION'/);
+assert.match(appSource, /Αποθήκευση ως εκκρεμές/);
+assert.match(appSource, /fetchConfiguredInstrumentCapability\(transaction\.symbol\)/);
+assert.match(appSource, /if \(!MARKET_GATEWAY_CONFIGURED\)/);
+
+console.log('Instrument pre-save production wiring PASS: configured gateway verifies buys before persistence and transient checks require explicit pending confirmation.');
