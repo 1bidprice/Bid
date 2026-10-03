@@ -1,4 +1,4 @@
-import { handleMarketGatewayRequest, parseGatewaySymbol } from './core.js';
+import { handleMarketGatewayRequest, parseGatewaySymbol, resolveDynamicAthensCompanies } from './core.js';
 import { authenticatePrivateRequest } from './auth-boundary.js';
 import { handleAccountApiRequest } from './account-api.js';
 
@@ -183,6 +183,29 @@ export async function handleMarketGatewayEdgeRequest(request, env = {}, ctx = {}
       return response;
     }
 
+    const batchCoreOptions = { ...(options.coreOptions || {}) };
+    const greekSymbols = normalized.symbols
+      .filter((symbol) => symbol.endsWith('.GR'))
+      .map((symbol) => symbol.slice(0, -3));
+    if (greekSymbols.length) {
+      const upstreamLimiter = options.upstreamLimiter || env.MARKET_GATEWAY_UPSTREAM_RATE_LIMITER;
+      if (!upstreamLimiter) {
+        return jsonError(503, 'EDGE_RATE_LIMITER_NOT_CONFIGURED', 'Gateway upstream protection is not configured.');
+      }
+      const identityLimit = await rateLimit(upstreamLimiter, 'upstream:GR_IDENTITY');
+      if (!identityLimit?.success) {
+        const response = jsonError(429, 'UPSTREAM_RATE_LIMITED', 'Athens identity directory protection limit exceeded.');
+        response.headers.set('Retry-After', '60');
+        return response;
+      }
+      const identityResolution = await resolveDynamicAthensCompanies(greekSymbols, {
+        ...batchCoreOptions,
+        fetchImpl: batchCoreOptions.fetchImpl || globalThis.fetch,
+      });
+      batchCoreOptions.dynamicAthensCompanies = identityResolution.companies;
+      batchCoreOptions.athensIdentityResolutionComplete = true;
+    }
+
     const quoteResults = await mapWithConcurrency(
       normalized.symbols,
       MARKET_GATEWAY_BATCH_CONCURRENCY,
@@ -197,6 +220,7 @@ export async function handleMarketGatewayEdgeRequest(request, env = {}, ctx = {}
         });
         const response = await handleMarketGatewayEdgeRequest(subRequest, env, ctx, {
           ...options,
+          coreOptions: batchCoreOptions,
           skipClientRateLimit: true,
         });
         let body = null;
