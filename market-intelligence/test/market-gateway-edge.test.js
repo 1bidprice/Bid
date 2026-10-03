@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MARKET_GATEWAY_CLIENT_HEADER,
+  MARKET_GATEWAY_BATCH_MAX_SYMBOLS,
   gatewayCacheTtlSeconds,
   handleMarketGatewayEdgeRequest,
   normalizeGatewayClientId,
@@ -17,6 +18,17 @@ function quoteRequest(symbol = 'SPCE.US', clientId = CLIENT_ID) {
 function fxRequest(clientId = CLIENT_ID) {
   const headers = clientId === null ? {} : { [MARKET_GATEWAY_CLIENT_HEADER]: clientId };
   return new Request('https://gateway.test/v1/fx?pair=EURUSD', { headers });
+}
+
+function batchRequest(symbols = ['SPCE.US'], clientId = CLIENT_ID, extra = {}) {
+  const headers = clientId === null
+    ? { 'Content-Type': 'application/json' }
+    : { 'Content-Type': 'application/json', [MARKET_GATEWAY_CLIENT_HEADER]: clientId };
+  return new Request('https://gateway.test/v1/quotes', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ symbols, ...extra }),
+  });
 }
 
 function researchQueueRequest(symbol = 'NVDA.US', clientId = CLIENT_ID) {
@@ -268,4 +280,86 @@ test('research queue POST is client-rate-limited before identity or storage work
   assert.equal((await response.json()).error.code, 'CLIENT_RATE_LIMITED');
   assert.equal(queueCalls, 0);
   assert.equal(fetchCalls, 0);
+});
+
+
+test('batch quote route charges client once while preserving per-resource upstream protection', async () => {
+  const clientCalls = [];
+  const upstreamCalls = [];
+  const fetchImpl = async (url, init = {}) => {
+    const value = String(url);
+    if (value.includes('finnhub.io')) {
+      assert.equal(init.headers?.['X-Finnhub-Token'], 'server-secret');
+      return jsonResponse({ c: 3.21, pc: 3.1, o: 3.12, h: 3.25, l: 3.05, d: 0.11, dp: 3.5484, t: 1789052340 });
+    }
+    if (value.includes('ecb.europa.eu')) {
+      return new Response('<?xml version="1.0"?><Cube><Cube time="2026-09-10"><Cube currency="USD" rate="1.1616"/></Cube></Cube>', { status: 200 });
+    }
+    throw new Error('Unexpected batch upstream URL: ' + value);
+  };
+  const response = await handleMarketGatewayEdgeRequest(
+    batchRequest(['SPCE.US']),
+    {
+      FINNHUB_TOKEN: 'server-secret',
+      MARKET_GATEWAY_CLIENT_RATE_LIMITER: limiter(true, clientCalls),
+      MARKET_GATEWAY_UPSTREAM_RATE_LIMITER: limiter(true, upstreamCalls),
+    },
+    {},
+    { coreOptions: { fetchImpl, now: '2026-09-10T15:00:00.000Z' } },
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.format, 'investor-control-market-gateway-batch');
+  assert.deepEqual(body.requestedSymbols, ['SPCE.US']);
+  assert.equal(body.quoteRegistry['SPCE.US'].currency, 'USD');
+  assert.equal(body.fxReference.rate, 1.1616);
+  assert.deepEqual(clientCalls, [`client:${CLIENT_ID}`]);
+  assert.deepEqual(upstreamCalls.sort(), ['upstream:FX', 'upstream:US'].sort());
+  assert.equal(body.privacy.portfolioQuantityRequired, false);
+  assert.equal(body.privacy.portfolioCostRequired, false);
+  assert.equal(body.privacy.pnlRequired, false);
+});
+
+test('batch quote route rejects portfolio fields before provider work', async () => {
+  let limiterCalls = 0;
+  let providerCalls = 0;
+  const response = await handleMarketGatewayEdgeRequest(
+    batchRequest(['SPCE.US'], CLIENT_ID, { quantity: 10 }),
+    {
+      FINNHUB_TOKEN: 'server-secret',
+      MARKET_GATEWAY_CLIENT_RATE_LIMITER: { async limit() { limiterCalls += 1; return { success: true }; } },
+      MARKET_GATEWAY_UPSTREAM_RATE_LIMITER: { async limit() { limiterCalls += 1; return { success: true }; } },
+    },
+    {},
+    { coreOptions: { fetchImpl: async () => { providerCalls += 1; throw new Error('must not run'); } } },
+  );
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'BATCH_PRIVACY_CONTRACT_INVALID');
+  assert.equal(limiterCalls, 0);
+  assert.equal(providerCalls, 0);
+});
+
+test('batch quote route has a hard symbol-count ceiling', async () => {
+  const symbols = Array.from({ length: MARKET_GATEWAY_BATCH_MAX_SYMBOLS + 1 }, (_, index) => `S${index}.US`);
+  const response = await handleMarketGatewayEdgeRequest(
+    batchRequest(symbols),
+    {
+      MARKET_GATEWAY_CLIENT_RATE_LIMITER: limiter(true, []),
+      MARKET_GATEWAY_UPSTREAM_RATE_LIMITER: limiter(true, []),
+    },
+  );
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'BATCH_SYMBOL_LIMIT_EXCEEDED');
+});
+
+test('batch quote route requires opaque client identity', async () => {
+  const response = await handleMarketGatewayEdgeRequest(
+    batchRequest(['SPCE.US'], null),
+    {
+      MARKET_GATEWAY_CLIENT_RATE_LIMITER: limiter(true, []),
+      MARKET_GATEWAY_UPSTREAM_RATE_LIMITER: limiter(true, []),
+    },
+  );
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'CLIENT_ID_REQUIRED');
 });
