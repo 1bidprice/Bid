@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -12,19 +13,24 @@ import {
   getMinbeisFirebaseAuth,
   isFirebaseAccountConfigured,
   minbeisCreateAccount,
+  minbeisDeleteIdentity,
+  prepareMinbeisAccountDeletion,
   minbeisSendEmailVerification,
   minbeisSendPasswordReset,
   minbeisSignIn,
   minbeisSignOut,
 } from './firebase-auth-client';
 import {
+  currentInstallationId,
   disableRemotePushForCurrentDevice,
   enableRemotePushForCurrentDevice,
 } from './account-device-sync';
 import {
   isRemotePushEnabledLocally,
+  setRemotePushEnabledLocally,
   syncAllRemoteAlertRules,
 } from './remote-alert-sync';
+import { deleteMinbeisCloudAccount } from './account-client';
 
 function messageFor(error) {
   const code = String(error?.code || error?.message || '');
@@ -169,6 +175,46 @@ export default function AccountAccessCard({ alertRules = [] }) {
     }
   }
 
+  async function deleteAccountNow() {
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const prepared = await prepareMinbeisAccountDeletion();
+      const installationId = await currentInstallationId();
+
+      await deleteMinbeisCloudAccount({
+        installationId,
+        tokenProvider: async () => prepared.idToken,
+      });
+
+      await setRemotePushEnabledLocally(false);
+      setPushEnabled(false);
+      await minbeisDeleteIdentity();
+      setPassword('');
+      setFeedback({ type: 'ok', text: 'Ο λογαριασμός και τα cloud metadata διαγράφηκαν. Το τοπικό portfolio παρέμεινε στη συσκευή.' });
+    } catch (error) {
+      const code = String(error?.code || error?.gatewayCode || error?.message || '');
+      if (/ACCOUNT_REAUTH_REQUIRED|requires-recent-login/i.test(code)) {
+        setFeedback({ type: 'error', text: 'Για διαγραφή λογαριασμού χρειάζεται πρόσφατη σύνδεση. Κάνε αποσύνδεση, σύνδεση ξανά και επανάλαβε τη διαγραφή.' });
+      } else {
+        setFeedback({ type: 'error', text: 'Η διαγραφή λογαριασμού δεν ολοκληρώθηκε πλήρως. Δεν έγινε καμία διαγραφή του τοπικού portfolio.' });
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function confirmDeleteAccount() {
+    Alert.alert(
+      'Διαγραφή λογαριασμού MINBEIS',
+      'Θα διαγραφούν το cloud account, οι εγγεγραμμένες συσκευές και οι remote κανόνες ειδοποιήσεων. Οι συναλλαγές και το portfolio αυτής της συσκευής ΔΕΝ θα διαγραφούν.',
+      [
+        { text: 'Άκυρο', style: 'cancel' },
+        { text: 'Οριστική διαγραφή', style: 'destructive', onPress: () => { deleteAccountNow().catch(() => {}); } },
+      ],
+    );
+  }
+
   async function signOutNow() {
     setBusy(true);
     setFeedback(null);
@@ -229,6 +275,9 @@ export default function AccountAccessCard({ alertRules = [] }) {
         ) : null}
         <Pressable style={styles.secondary} onPress={signOutNow} disabled={busy}>
           {busy ? <ActivityIndicator /> : <Text style={styles.secondaryText}>Αποσύνδεση</Text>}
+        </Pressable>
+        <Pressable style={styles.danger} onPress={confirmDeleteAccount} disabled={busy}>
+          <Text style={styles.dangerText}>Διαγραφή cloud λογαριασμού</Text>
         </Pressable>
         {feedback ? <Text style={feedback.type === 'error' ? styles.error : styles.ok}>{feedback.text}</Text> : null}
       </View>
@@ -306,6 +355,8 @@ const styles = StyleSheet.create({
   primaryText: { color: '#fff', fontWeight: '900' },
   secondary: { minHeight: 48, borderRadius: 14, borderWidth: 1, borderColor: '#d5dfec', alignItems: 'center', justifyContent: 'center', marginTop: 12 },
   secondaryText: { color: '#16345f', fontWeight: '900' },
+  danger: { minHeight: 48, borderRadius: 14, borderWidth: 1, borderColor: '#d83b4d', alignItems: 'center', justifyContent: 'center', marginTop: 12 },
+  dangerText: { color: '#b42318', fontWeight: '900' },
   linkButton: { alignItems: 'center', paddingVertical: 11 },
   link: { color: '#0B66FF', fontSize: 12, fontWeight: '800' },
   privacyBox: { backgroundColor: '#f5f8fc', borderRadius: 13, padding: 11, marginTop: 12, borderWidth: 1, borderColor: '#e0e7f0' },
