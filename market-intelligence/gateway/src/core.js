@@ -364,22 +364,50 @@ export async function resolveInstrumentCapability(appSymbol, env = {}, options =
     ? CANONICAL_US_COMPANIES[parsed.symbol] || null
     : ATHENS_COMPANIES[parsed.symbol] || null;
 
+  let verifiedAthensCompany = null;
+  let athensIdentityDiagnostics = [];
+  if (parsed.market === 'GR') {
+    const identity = await resolveDynamicAthensCompany(parsed.symbol, options);
+    verifiedAthensCompany = identity.company || null;
+    athensIdentityDiagnostics = identity.diagnostics || [];
+  }
+
   let quoteResult = null;
-  try {
-    quoteResult = await resolveCanonicalGatewayQuote(parsed.appSymbol, env, options);
-  } catch (error) {
+  if (parsed.market === 'GR' && !verifiedAthensCompany) {
     quoteResult = {
-      status: 502,
+      status: 409,
       error: {
-        code: 'QUOTE_CAPABILITY_CHECK_FAILED',
-        message: error instanceof Error ? error.message : String(error),
+        code: 'ATHENS_IDENTITY_NOT_VERIFIED',
+        message: 'Official Athens instrument identity was not verified.',
+        details: { diagnostics: athensIdentityDiagnostics },
       },
     };
+  } else {
+    try {
+      const quoteOptions = parsed.market === 'GR'
+        ? {
+            ...options,
+            dynamicAthensCompanies: new Map([[parsed.symbol, verifiedAthensCompany]]),
+            athensIdentityResolutionComplete: true,
+          }
+        : options;
+      quoteResult = await resolveCanonicalGatewayQuote(parsed.appSymbol, env, quoteOptions);
+    } catch (error) {
+      quoteResult = {
+        status: 502,
+        error: {
+          code: 'QUOTE_CAPABILITY_CHECK_FAILED',
+          message: error instanceof Error ? error.message : String(error),
+        },
+      };
+    }
   }
 
   const quoteSupported = quoteResult?.status === 200;
   const quote = quoteSupported ? quoteResult.body.quote : null;
-  const identityVerified = quote?.quoteContract?.identityVerified === true;
+  const identityVerified = parsed.market === 'GR'
+    ? Boolean(verifiedAthensCompany)
+    : quote?.quoteContract?.identityVerified === true;
 
   const completedEnrollment = canonicalFocus ? null : await completedResearchEnrollment(parsed.appSymbol, env);
   const analysisSupported = Boolean(canonicalFocus || completedEnrollment);
@@ -388,6 +416,7 @@ export async function resolveInstrumentCapability(appSymbol, env = {}, options =
     : identityVerified
       ? 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED'
       : 'IDENTITY_NOT_VERIFIED';
+  const identityCompany = canonicalFocus || verifiedAthensCompany || null;
 
   return {
     status: 200,
@@ -401,9 +430,9 @@ export async function resolveInstrumentCapability(appSymbol, env = {}, options =
       quoteSupported,
       analysisSupported,
       onboardingStatus,
-      canonicalCompanyId: canonicalFocus?.companyId || completedEnrollment?.canonicalCompanyId || quote?.companyId || null,
-      displayName: canonicalFocus?.displayName || completedEnrollment?.displayName || quote?.companyName || parsed.symbol,
-      currency: quote?.currency || canonicalFocus?.currency || completedEnrollment?.currency || null,
+      canonicalCompanyId: identityCompany?.companyId || completedEnrollment?.canonicalCompanyId || quote?.companyId || null,
+      displayName: identityCompany?.displayName || completedEnrollment?.displayName || quote?.companyName || parsed.symbol,
+      currency: identityCompany?.currency || identityCompany?.primaryListing?.currency || quote?.currency || completedEnrollment?.currency || null,
       researchEnrollmentStatus: completedEnrollment ? 'COMPLETED' : canonicalFocus ? 'BUILT_IN' : null,
       quoteContract: quote?.quoteContract || null,
       limitations: analysisSupported
@@ -411,6 +440,7 @@ export async function resolveInstrumentCapability(appSymbol, env = {}, options =
         : identityVerified
           ? ['FULL_MINBEIS_RESEARCH_NOT_YET_CANONICAL']
           : ['CANONICAL_INSTRUMENT_IDENTITY_REQUIRED'],
+      identityDiagnostics: parsed.market === 'GR' ? athensIdentityDiagnostics : [],
       privacy: {
         acceptedInputs: ['symbol'],
         portfolioQuantityRequired: false,
