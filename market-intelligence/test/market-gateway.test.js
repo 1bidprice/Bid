@@ -154,6 +154,7 @@ test('dynamic Athens stock is identity-verified from the official trading direct
     },
     now: '2026-09-10T10:00:00.000Z',
     athensDiscoveryOptions: { tradingDirectoryFallbackLastPage: 0 },
+    athensIdentityCache: new Map(),
     identityNow: Date.parse('2026-09-10T10:00:00.000Z'),
   });
   assert.equal(response.status, 200);
@@ -268,6 +269,7 @@ test('unresolved Athens instrument capability stays fail-closed after official d
       },
       now: '2026-09-10T10:00:00.000Z',
       athensDiscoveryOptions: { tradingDirectoryFallbackLastPage: 0 },
+      athensIdentityCache: new Map(),
     },
   );
   assert.equal(response.status, 200);
@@ -276,6 +278,37 @@ test('unresolved Athens instrument capability stays fail-closed after official d
   assert.equal(body.quoteSupported, false);
   assert.equal(body.analysisSupported, false);
   assert.equal(body.onboardingStatus, 'IDENTITY_NOT_VERIFIED');
+});
+
+test('dynamic Athens capability keeps official identity when the quote page is temporarily unavailable', async () => {
+  const response = await handleMarketGatewayRequest(
+    new Request('https://gateway.test/v1/instrument?symbol=QUEST.GR'),
+    {},
+    {
+      fetchImpl: async (url) => {
+        const value = String(url);
+        if (value.includes('/trading-products/trading-issuers')) {
+          return new Response(ATHENS_DIRECTORY_HTML, { status: 200, headers: { 'Content-Type': 'text/html' } });
+        }
+        if (value.includes('/market-data/instruments/stocks/QUEST')) {
+          return new Response('temporary upstream issue', { status: 503 });
+        }
+        throw new Error('Unexpected URL: ' + value);
+      },
+      now: '2026-09-10T10:00:00.000Z',
+      identityNow: Date.parse('2026-09-10T10:00:00.000Z'),
+      athensIdentityCache: new Map(),
+      athensDiscoveryOptions: { tradingDirectoryFallbackLastPage: 0 },
+    },
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.identityVerified, true);
+  assert.equal(body.quoteSupported, false);
+  assert.equal(body.analysisSupported, false);
+  assert.equal(body.onboardingStatus, 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED');
+  assert.equal(body.canonicalCompanyId, 'company:xath:isin:GRS310003009');
+  assert.equal(body.currency, 'EUR');
 });
 
 test('dynamic Athens capability verifies identity but requires MINBEIS research onboarding', async () => {
