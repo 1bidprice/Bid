@@ -19,6 +19,8 @@ assert.match(authSource, /FIREBASE_ACCOUNT_NOT_CONFIGURED/);
 assert.match(authSource, /EXPO_PUBLIC_FIREBASE_API_KEY/);
 assert.match(authSource, /EXPO_PUBLIC_FIREBASE_PROJECT_ID/);
 assert.match(authSource, /EXPO_PUBLIC_FIREBASE_APP_ID/);
+assert.match(authSource, /sendEmailVerification/);
+assert.match(authSource, /verificationSent: true/);
 assert.doesNotMatch(authSource, /serviceAccount|private_key|client_secret/i, 'mobile auth source must not contain server credentials');
 
 assert.match(accountSource, /Authorization: `Bearer/);
@@ -33,6 +35,9 @@ assert.match(accountUiSource, /δεν ανεβάζει το χαρτοφυλάκ
 assert.match(portfolioAppSource, /<AccountAccessCard \/>/, 'settings must mount opt-in account UI');
 assert.doesNotMatch(accountUiSource, /portfolioPositions|transactions|costBasis|totalPnl/, 'account UI must not receive portfolio contents');
 assert.match(accountUiSource, /onPress=\{enableRemotePush\}/, 'remote push must require an explicit user action');
+assert.match(accountUiSource, /!account\.emailVerified/, 'remote features must remain gated by verified email');
+assert.match(accountUiSource, /Επαναποστολή email επιβεβαίωσης/);
+assert.match(accountUiSource, /disabled=\{pushBusy \|\| pushEnabled \|\| !account\.emailVerified\}/);
 assert.doesNotMatch(accountUiSource, /useEffect\([\s\S]{0,1200}enableRemotePushForCurrentDevice/, 'remote push must not auto-register from an effect');
 assert.match(accountDeviceSource, /portfolioUploaded: false/);
 assert.doesNotMatch(accountDeviceSource, /transactions|costBasis|totalPnl|quantity/, 'device sync must never include portfolio contents');
