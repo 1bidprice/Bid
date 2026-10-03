@@ -11,6 +11,15 @@ function when(value) {
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('el-GR');
 }
 
+function scoreBand(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '—';
+  if (numeric >= 90) return 'Υψηλή';
+  if (numeric >= 75) return 'Καλή';
+  if (numeric >= 60) return 'Μέτρια';
+  return 'Χαμηλή';
+}
+
 function canonicalPositionSymbol(value) {
   return String(value || '').trim().toUpperCase().replace(/\.(US|GR)$/, '');
 }
@@ -116,8 +125,8 @@ export default function FinalDecisionCard({ item, decisionContext = {} }) {
       </View>
       <Text style={styles.action}>{personalized.label}</Text>
       <View style={styles.metrics}>
-        <View style={styles.metric}><Text style={styles.metricLabel}>Εμπιστοσύνη</Text><Text style={styles.metricValue}>{Math.round(Number(finalAction.confidenceScore || 0))}/100</Text></View>
-        <View style={styles.metric}><Text style={styles.metricLabel}>Ποιότητα δεδομένων</Text><Text style={styles.metricValue}>{Math.round(Number(finalAction.dataQualityScore || 0))}/100</Text></View>
+        <View style={styles.metric}><Text style={styles.metricLabel}>Βεβαιότητα αξιολόγησης</Text><Text style={styles.metricValue}>{scoreBand(finalAction.confidenceScore)}</Text></View>
+        <View style={styles.metric}><Text style={styles.metricLabel}>Ποιότητα δεδομένων</Text><Text style={styles.metricValue}>{scoreBand(finalAction.dataQualityScore)}</Text></View>
       </View>
       <Text style={styles.validity}>Ισχύει μέχρι: {when(finalAction.validUntil)} · Πολιτική {finalAction.policyVersion}</Text>
       <Text style={styles.execution}>Δεν εκτελείται εντολή σε χρηματιστηριακή. Η τελική πράξη παραμένει αποκλειστικά δική σου.</Text>
