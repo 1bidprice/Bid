@@ -363,3 +363,45 @@ test('batch quote route requires opaque client identity', async () => {
   assert.equal(response.status, 400);
   assert.equal((await response.json()).error.code, 'CLIENT_ID_REQUIRED');
 });
+
+
+test('private account routes remain dark by default', async () => {
+  const response = await handleMarketGatewayEdgeRequest(
+    new Request('https://gateway.test/v1/account/alerts', {
+      headers: {
+        Authorization: 'Bearer valid-token-012345678901234567890',
+        [MARKET_GATEWAY_CLIENT_HEADER]: CLIENT_ID,
+      },
+    }),
+    {
+      MINBEIS_ACCOUNT_API_ENABLED: 'false',
+    },
+  );
+  assert.equal(response.status, 404);
+  assert.equal((await response.json()).error.code, 'ACCOUNT_API_DISABLED');
+});
+
+test('private account routes fail closed when enabled without account database', async () => {
+  const response = await handleMarketGatewayEdgeRequest(
+    new Request('https://gateway.test/v1/account/alerts', {
+      headers: {
+        Authorization: 'Bearer valid-token-012345678901234567890',
+        [MARKET_GATEWAY_CLIENT_HEADER]: CLIENT_ID,
+      },
+    }),
+    {
+      MINBEIS_ACCOUNT_API_ENABLED: 'true',
+      MINBEIS_TENANT_HMAC_SECRET: '0123456789abcdef0123456789abcdef0123456789abcdef',
+    },
+    {},
+    {
+      verifyIdentityToken: async () => ({
+        verified: true,
+        issuer: 'https://securetoken.google.com/minbeis-test',
+        subject: 'user-123456789',
+      }),
+    },
+  );
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error.code, 'ACCOUNTS_DATABASE_NOT_CONFIGURED');
+});
