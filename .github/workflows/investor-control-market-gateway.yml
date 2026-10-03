@@ -47,6 +47,11 @@ jobs:
           node --check gateway/src/core.js
           node --check gateway/src/edge.js
           node --check gateway/src/index.js
+          node --check gateway/src/tenant-contract.js
+          node --check gateway/src/push-contract.js
+          node --check gateway/src/auth-boundary.js
+          node --check gateway/src/account-repository.js
+          node --check gateway/src/account-api.js
           node -e "JSON.parse(require('fs').readFileSync('gateway/wrangler.jsonc','utf8'))"
 
       - name: Verify canonical source invariant
@@ -55,7 +60,7 @@ jobs:
 
       - name: Run gateway security, edge and market-data contracts
         working-directory: market-intelligence
-        run: node --test test/market-gateway.test.js test/market-gateway-edge.test.js
+        run: node --test test/market-gateway.test.js test/market-gateway-edge.test.js test/tenant-contract.test.js test/push-contract.test.js test/account-api.test.js
 
       - name: Verify deployment workflow is manual-only and CLI-compatible
         shell: bash
