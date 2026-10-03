@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getApp, getApps, initializeApp } from 'firebase/app';
 import {
   createUserWithEmailAndPassword,
+  deleteUser,
   getReactNativePersistence,
   initializeAuth,
   sendEmailVerification,
@@ -128,4 +129,43 @@ export function currentMinbeisAccount(env = process.env) {
     email: user.email || null,
     emailVerified: user.emailVerified === true,
   };
+}
+
+
+export async function prepareMinbeisAccountDeletion(env = process.env, options = {}) {
+  const auth = getMinbeisFirebaseAuth(env);
+  const user = auth.currentUser;
+  if (!user) {
+    const error = new Error('ACCOUNT_NOT_SIGNED_IN');
+    error.code = 'ACCOUNT_NOT_SIGNED_IN';
+    throw error;
+  }
+  const tokenResult = await user.getIdTokenResult(true);
+  const authTime = new Date(tokenResult?.authTime || 0).getTime();
+  const now = Number(options.now || Date.now());
+  const maxAgeMinutes = Number(options.maxAgeMinutes || 5);
+  const ageMinutes = Number.isFinite(authTime) && authTime > 0
+    ? Math.max(0, (now - authTime) / 60_000)
+    : Number.POSITIVE_INFINITY;
+  if (!Number.isFinite(ageMinutes) || ageMinutes > maxAgeMinutes) {
+    const error = new Error('ACCOUNT_REAUTH_REQUIRED');
+    error.code = 'ACCOUNT_REAUTH_REQUIRED';
+    throw error;
+  }
+  return {
+    idToken: tokenResult.token,
+    authTime: tokenResult.authTime,
+    authAgeMinutes: ageMinutes,
+  };
+}
+
+export async function minbeisDeleteIdentity(env = process.env) {
+  const auth = getMinbeisFirebaseAuth(env);
+  if (!auth.currentUser) {
+    const error = new Error('ACCOUNT_NOT_SIGNED_IN');
+    error.code = 'ACCOUNT_NOT_SIGNED_IN';
+    throw error;
+  }
+  await deleteUser(auth.currentUser);
+  return { deleted: true };
 }
