@@ -3,9 +3,11 @@ import pathlib
 import sqlite3
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-SCHEMA = ROOT / "migrations" / "0001_minbeis_accounts.sql"
+MIGRATIONS = sorted((ROOT / "migrations").glob("*.sql"))
+if not MIGRATIONS:
+    raise SystemExit("No account migrations found")
 
-sql = SCHEMA.read_text(encoding="utf-8")
+sql = "\n".join(path.read_text(encoding="utf-8") for path in MIGRATIONS)
 for forbidden in (
     "portfolio_quantity",
     "cost_basis",
@@ -24,7 +26,7 @@ tables = {
     row[0]
     for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
 }
-required = {"tenants", "devices", "alert_rules"}
+required = {"tenants", "devices", "alert_rules", "alert_state", "push_deliveries"}
 missing = required - tables
 if missing:
     raise SystemExit(f"Missing account schema tables: {sorted(missing)}")
@@ -56,6 +58,14 @@ db.execute(
     "INSERT INTO alert_rules (tenant_id,rule_id,symbol,kind,threshold,enabled,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)",
     ("tenant_" + "a"*40, "rule_01234567", "SPCE.US", "PRICE_BELOW", 2.5, 1, "x", "x"),
 )
+db.execute(
+    "INSERT INTO alert_state (tenant_id,rule_id,last_condition,last_observed_value,last_evaluated_at,last_triggered_at) VALUES (?,?,?,?,?,?)",
+    ("tenant_" + "a"*40, "rule_01234567", 0, 3.0, "x", None),
+)
+db.execute(
+    "INSERT INTO push_deliveries (ticket_id,tenant_id,installation_id,rule_id,symbol,kind,status,error_code,created_at,checked_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+    ("ticket_01234567", "tenant_" + "a"*40, "install_0123456789abcdef", "rule_01234567", "SPCE.US", "PRICE_BELOW", "PENDING", None, "x", None),
+)
 
 try:
     db.execute(
@@ -70,7 +80,9 @@ else:
 db.execute("DELETE FROM tenants WHERE tenant_id = ?", ("tenant_" + "a"*40,))
 device_count = db.execute("SELECT COUNT(*) FROM devices").fetchone()[0]
 alert_count = db.execute("SELECT COUNT(*) FROM alert_rules").fetchone()[0]
-if device_count or alert_count:
+state_count = db.execute("SELECT COUNT(*) FROM alert_state").fetchone()[0]
+delivery_count = db.execute("SELECT COUNT(*) FROM push_deliveries").fetchone()[0]
+if device_count or alert_count or state_count or delivery_count:
     raise SystemExit("Tenant cascade deletion failed")
 
-print("Account schema PASS: tenant foreign keys, cascade deletion, alert constraints, and no portfolio holdings/P&L fields.")
+print("Account schema PASS: tenant foreign keys, cascade deletion, alert runtime/push receipt persistence, and no portfolio holdings/P&L fields.")
