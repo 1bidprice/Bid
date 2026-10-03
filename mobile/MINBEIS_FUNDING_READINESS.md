@@ -129,7 +129,22 @@ Market validation and beta evidence are still required.
 The learning governance is implemented; performance superiority remains to be established prospectively.
 
 ### Distribution
-Second-device privacy QA, signing verification and Play testing remain open.
+The funding-readiness build is MINBEIS v1.8.3 build 35 at head `9f0c22f099d9c4478a7259b0be2c75be80775fc8`, with all six CI workflows successful.
+
+APK artifact:
+- GitHub Actions artifact ID: `11281980753`
+- artifact ZIP SHA-256: `c6dccb23bb5f60d7b038646c8e2661b0ec75a25891c56af955849673cae4a528`
+- extracted APK SHA-256: `994828bf3f8812a9a61622b45d020769d3cf80df063a8ad4fc3b7f82634d33b6`
+
+Signing audit:
+- current standalone APK certificate subject: `CN=Android Debug`
+- SHA-256 certificate fingerprint: `FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C`
+- therefore the current APK is **INTERNAL DEMO ONLY**, not production-signed.
+
+Still open:
+- secure upload/release key or Play App Signing path;
+- Play Internal/Closed Testing;
+- second-device privacy QA.
 
 ### Funding materials
 Core technical evidence pack and demo script exist. Public-facing one-pager/pitch deck/landing page and budget remain to be produced.
