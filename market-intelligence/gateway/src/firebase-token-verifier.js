@@ -94,6 +94,8 @@ export async function verifyFirebaseIdToken(idToken, env = {}, options = {}) {
   const authTime = Number(payload?.auth_time);
   if (!Number.isFinite(authTime) || authTime > nowSeconds + 5) throw new Error('FIREBASE_TOKEN_AUTH_TIME_INVALID');
 
+  if (payload?.email_verified !== true) throw new Error('FIREBASE_EMAIL_NOT_VERIFIED');
+
   return {
     verified: true,
     issuer,
