@@ -28,7 +28,8 @@ export async function listEnabledAlertEvaluationRows(db, limit = 500) {
       s.last_condition,
       s.last_observed_value,
       s.last_evaluated_at,
-      s.last_triggered_at
+      s.last_triggered_at,
+      s.last_trigger_signature
     FROM alert_rules r
     INNER JOIN tenants t
       ON t.tenant_id = r.tenant_id
@@ -51,6 +52,7 @@ export async function listEnabledAlertEvaluationRows(db, limit = 500) {
     lastObservedValue: row.last_observed_value === null || row.last_observed_value === undefined ? null : Number(row.last_observed_value),
     lastEvaluatedAt: row.last_evaluated_at || null,
     lastTriggeredAt: row.last_triggered_at || null,
+    lastTriggerSignature: row.last_trigger_signature || null,
   }));
 }
 
@@ -92,16 +94,18 @@ export async function saveAlertEvaluationState(db, input = {}, now = Date.now())
   if (lastObservedValue !== null && !Number.isFinite(lastObservedValue)) throw new Error('ALERT_STATE_VALUE_INVALID');
   const evaluatedAt = input.lastEvaluatedAt || iso(now);
   const triggeredAt = input.lastTriggeredAt || null;
+  const triggerSignature = input.lastTriggerSignature ? String(input.lastTriggerSignature).slice(0, 120) : null;
 
   await run(db.prepare(`
     INSERT INTO alert_state (
-      tenant_id, rule_id, last_condition, last_observed_value, last_evaluated_at, last_triggered_at
-    ) VALUES (?, ?, ?, ?, ?, ?)
+      tenant_id, rule_id, last_condition, last_observed_value, last_evaluated_at, last_triggered_at, last_trigger_signature
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(tenant_id, rule_id) DO UPDATE SET
       last_condition = excluded.last_condition,
       last_observed_value = excluded.last_observed_value,
       last_evaluated_at = excluded.last_evaluated_at,
-      last_triggered_at = excluded.last_triggered_at
+      last_triggered_at = excluded.last_triggered_at,
+      last_trigger_signature = excluded.last_trigger_signature
   `).bind(
     tenantId,
     ruleId,
@@ -109,6 +113,7 @@ export async function saveAlertEvaluationState(db, input = {}, now = Date.now())
     lastObservedValue,
     evaluatedAt,
     triggeredAt,
+    triggerSignature,
   ));
 }
 
