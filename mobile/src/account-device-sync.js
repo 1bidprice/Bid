@@ -15,7 +15,7 @@ function localeNow() {
   }
 }
 
-async function currentInstallationId() {
+export async function currentInstallationId() {
   const installationId = await SecureStore.getItemAsync(INSTALLATION_ID_SECURE_KEY);
   if (!/^[A-Za-z0-9_-]{16,128}$/.test(String(installationId || ''))) {
     const error = new Error('DEVICE_INSTALLATION_ID_UNAVAILABLE');
