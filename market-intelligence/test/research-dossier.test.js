@@ -171,3 +171,27 @@ test('unverified quote timestamp cannot establish active listing integrity', () 
   assert.equal(dossier.listingIntegrity.activeTradingVerified, false);
   assert.equal(dossier.listingIntegrity.verificationSource, null);
 });
+
+
+test('preserves event metadata for historical learning', () => {
+  const input = completeInput();
+  input.catalysts[0] = {
+    ...input.catalysts[0],
+    eventType: 'COMMERCIAL_CONTRACT',
+    category: 'FUNDAMENTAL_CATALYST',
+    eventWindowStart: '2026-08-01T00:00:00Z',
+    eventWindowEnd: '2026-10-01T00:00:00Z',
+  };
+  input.risks[0] = {
+    ...input.risks[0],
+    eventType: 'EXECUTION_DELAY',
+    category: 'EXECUTION_RISK',
+    eventWindowStart: '2026-08-01T00:00:00Z',
+  };
+  const dossier = buildResearchDossier(input);
+  assert.equal(dossier.catalysts[0].eventType, 'COMMERCIAL_CONTRACT');
+  assert.equal(dossier.catalysts[0].category, 'FUNDAMENTAL_CATALYST');
+  assert.equal(dossier.catalysts[0].eventWindowStart, '2026-08-01T00:00:00Z');
+  assert.equal(dossier.risks[0].eventType, 'EXECUTION_DELAY');
+  assert.equal(dossier.risks[0].category, 'EXECUTION_RISK');
+});
