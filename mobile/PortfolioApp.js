@@ -56,6 +56,7 @@ import {
   instrumentEntryFromTransaction,
 } from './src/instrument-entry';
 import { classifyInstrumentSavePreflight } from './src/instrument-save-preflight';
+import { syncRemoteAlertRule } from './src/remote-alert-sync';
 import { buildPortfolioSnapshot } from './src/portfolio-engine';
 import PortfolioHistoryChart from './src/PortfolioHistoryChart';
 import PortfolioInsightsCard from './src/PortfolioInsightsCard';
@@ -1209,7 +1210,27 @@ function MainApp({ onOpenDecisionGate }) {
   };
 
   const deleteTransaction = (transaction) => Alert.alert('Διαγραφή συναλλαγής', `Να διαγραφεί η συναλλαγή ${transaction.company};`, [{ text: 'Άκυρο', style: 'cancel' }, { text: 'Διαγραφή', style: 'destructive', onPress: async () => { await persist({ ...stateRef.current, transactions: stateRef.current.transactions.filter((item) => item.id !== transaction.id) }); setExpandedTransaction(null); refresh({ silent: true }); } }]);
-  const saveAlertRule = async (rule) => { const alerts = upsertRule(stateRef.current.alerts, rule); await persist({ ...stateRef.current, alerts }); const status = await configureNotificationsAsync({ request: true }); setNotificationStatus(status); setAlertPosition(null); if (status !== 'granted') Alert.alert('Χωρίς άδεια', 'Ο κανόνας αποθηκεύτηκε, αλλά το Android δεν θα εμφανίζει ειδοποιήσεις.'); refresh({ silent: true }); };
+  const saveAlertRule = async (rule) => {
+    const alerts = upsertRule(stateRef.current.alerts, rule);
+    await persist({ ...stateRef.current, alerts });
+    const status = await configureNotificationsAsync({ request: true });
+    setNotificationStatus(status);
+    setAlertPosition(null);
+    if (status !== 'granted') {
+      Alert.alert('Χωρίς άδεια', 'Ο κανόνας αποθηκεύτηκε, αλλά το Android δεν θα εμφανίζει ειδοποιήσεις.');
+    }
+    try {
+      await syncRemoteAlertRule(rule, {
+        installationId: installationIdRef.current,
+      });
+    } catch (error) {
+      Alert.alert(
+        'Remote συγχρονισμός εκκρεμεί',
+        `Ο τοπικός κανόνας αποθηκεύτηκε σωστά, αλλά δεν συγχρονίστηκε ακόμη για απομακρυσμένη ειδοποίηση. ${String(error?.gatewayCode || error?.message || '')}`,
+      );
+    }
+    refresh({ silent: true });
+  };
   const requestNotificationPermission = async () => { const status = await configureNotificationsAsync({ request: true }); setNotificationStatus(status); Alert.alert(status === 'granted' ? 'Ενεργές ειδοποιήσεις' : 'Η άδεια δεν δόθηκε', status === 'granted' ? 'Η συσκευή μπορεί να εμφανίζει ειδοποιήσεις τιμών.' : 'Άνοιξε τις ρυθμίσεις Android της εφαρμογής και επίτρεψε ειδοποιήσεις.'); };
   const toggleBackground = async () => {
     const enable = !stateRef.current.alerts.backgroundEnabled;
@@ -1378,7 +1399,7 @@ function MainApp({ onOpenDecisionGate }) {
             <Text style={styles.privacyNotice}>Ακόμη και στο «Χωρίς όριο», το app μπορεί να δείξει ότι μια θέση είναι πολύ συγκεντρωμένη, αλλά δεν θα μειώνει ή θα μπλοκάρει τη δική σου επιλογή.</Text>
           </View>
           <View style={styles.card}><Text style={styles.cardTitle}>Ιδιωτικότητα δεδομένων</Text><Text style={styles.note}>Συναλλαγές, όρια και ιστορικό αποθηκεύονται μόνο στη συγκεκριμένη εγκατάσταση. Το MINBEIS δεν φορτώνει σιωπηρά παλιό ή μη ταυτοποιημένο portfolio state.</Text><ReviewLine label="Αποθήκευση" value="Μόνο στη συσκευή" /><ReviewLine label="Cloud συγχρονισμός" value="Ανενεργός" /><ReviewLine label="Τοπική απομόνωση" value="Ενεργή" />{legacyDataAvailable ? <><Text style={styles.warning}>Βρέθηκαν παλιά δεδομένα από προηγούμενη δοκιμαστική έκδοση και δεν φορτώθηκαν αυτόματα.</Text><Pressable style={styles.secondaryActionFull} onPress={recoverQuarantinedPortfolio}><Text style={styles.secondaryStrong}>Έλεγχος παλιών τοπικών δεδομένων</Text></Pressable></> : null}</View>
-          <AccountAccessCard />
+          <AccountAccessCard alertRules={state.alerts.rules} />
           <View style={styles.card}><Text style={styles.cardTitle}>Ακρίβεια συναλλαγών</Text><Text style={styles.note}>Κάθε συναλλαγή κρατά χωριστά τιμή εντολής, μέση τιμή εκτέλεσης, αξία συναλλαγής, αναλυτικά έξοδα και τελικό κόστος.</Text><ReviewLine label="Λογιστικό μοντέλο" value="v2 ενεργό" /><ReviewLine label="Σχήμα δεδομένων" value="v6" /></View>
           <View style={styles.card}><Text style={styles.cardTitle}>Αντίγραφο ασφαλείας</Text><Text style={styles.note}>Το αντίγραφο ασφαλείας περιλαμβάνει συναλλαγές και όρια. Δεν περιλαμβάνει προσωπικά κλειδιά υπηρεσιών.</Text><Pressable style={styles.primary} onPress={exportBackup}><Text style={styles.whiteStrong}>Εξαγωγή αντιγράφου ασφαλείας</Text></Pressable><Pressable style={styles.secondaryActionFull} onPress={importBackup}><Text style={styles.secondaryStrong}>Επαναφορά αντιγράφου</Text></Pressable></View>
           <View style={styles.card}><Text style={styles.cardTitle}>Διαχειριζόμενες πηγές δεδομένων</Text><Text style={styles.note}>Οι εγκεκριμένες τιμές και η έρευνα ενημερώνονται από την κεντρική ροή της εφαρμογής. Δεν απαιτείται προσωπικό κλειδί υπηρεσίας. Εφεδρικές ή μη επαληθευμένες τιμές εμφανίζονται μόνο πληροφοριακά και δεν ενεργοποιούν τελική απόφαση ή ειδοποίηση.</Text><ReviewLine label="Επίσημες ελληνικές πηγές" value="Euronext Athens" /><ReviewLine label="Αμερικανικά δεδομένα" value="Εγκεκριμένος πάροχος + SEC" /><ReviewLine label="Προσωπικό κλειδί υπηρεσίας" value="Δεν απαιτείται" /><Text style={styles.privacyNotice}>Για την ανάκτηση τιμής αποστέλλονται το σύμβολο της μετοχής και ψευδωνυμικό τεχνικό αναγνωριστικό εγκατάστασης/πελάτη. Ποσότητες, κόστος, κέρδος/ζημία και σημειώσεις δεν αποστέλλονται.</Text></View>
