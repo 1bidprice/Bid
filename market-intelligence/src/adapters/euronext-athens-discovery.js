@@ -659,12 +659,45 @@ export async function fetchAthensCompaniesBySymbols(symbols = [], options = {}) 
       }
 
       const record = matches[0];
+      if (!record.issuerId && !record.isin) {
+        results.push({
+          symbol,
+          status: 'BLOCKED',
+          code: 'ATHENS_STABLE_IDENTITY_REQUIRED',
+        });
+        continue;
+      }
+
+      const baseCompany = record.issuerId
+        ? companyFromIssuer({
+            issuerId: record.issuerId,
+            name: record.issuerName,
+            sourceUrl: record.issuerUrl,
+          }, generatedAt)
+        : {
+            companyId: `company:xath:isin:${record.isin}`,
+            legalName: record.issuerName,
+            displayName: record.issuerName,
+            aliases: [record.issuerName],
+            country: 'GR',
+            issuerId: null,
+            taxonomyTermId: null,
+            cik: null,
+            lei: null,
+            primaryListing: {
+              symbol: null,
+              mic: 'XATH',
+              exchange: 'Euronext Athens',
+              currency: 'EUR',
+            },
+            regulator: 'Euronext Athens / Hellenic Capital Market framework',
+            investorRelationsUrl: record.issuerUrl || null,
+            active: true,
+            discoveredAt: generatedAt,
+          };
+
       const company = {
-        ...companyFromIssuer({
-          issuerId: record.issuerId,
-          name: record.issuerName,
-          sourceUrl: record.issuerUrl,
-        }, generatedAt),
+        ...baseCompany,
         issuerId: record.issuerId ? String(record.issuerId) : null,
         isin: record.isin || null,
         instrumentUrl: record.instrumentUrl || null,
