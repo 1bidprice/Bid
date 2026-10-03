@@ -55,6 +55,10 @@ function normalizeClaims(claims = []) {
       evidenceIds: unique(claim.evidenceIds),
       confidence: Math.max(0, Math.min(1, Number(claim.confidence))),
       inference: claim.inference === true,
+      eventType: claim.eventType || claim.type || null,
+      category: claim.category || null,
+      eventWindowStart: claim.eventWindowStart || null,
+      eventWindowEnd: claim.eventWindowEnd || null,
     }));
 }
 
