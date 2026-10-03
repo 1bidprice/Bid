@@ -6,24 +6,28 @@ function clean(value) {
   return String(value || '').trim();
 }
 
-export function resolveExpoProjectId(constants = {}) {
+export function resolveExpoProjectId(constants = {}, env = process.env) {
   return clean(
     constants?.expoConfig?.extra?.eas?.projectId
     || constants?.easConfig?.projectId
+    || env.EXPO_PUBLIC_EAS_PROJECT_ID
     || '',
   ) || null;
 }
 
 export async function getMinbeisExpoPushRegistration(options = {}) {
   const constants = options.constants || {};
-  const projectId = resolveExpoProjectId(constants);
+  const projectId = resolveExpoProjectId(constants, options.env || process.env);
   if (!projectId) {
     const error = new Error('REMOTE_PUSH_NOT_CONFIGURED');
     error.code = 'REMOTE_PUSH_NOT_CONFIGURED';
     throw error;
   }
 
-  const permissions = await Notifications.getPermissionsAsync();
+  let permissions = await Notifications.getPermissionsAsync();
+  if (permissions.status !== 'granted' && options.requestPermission === true) {
+    permissions = await Notifications.requestPermissionsAsync();
+  }
   if (permissions.status !== 'granted') {
     const error = new Error('PUSH_PERMISSION_NOT_GRANTED');
     error.code = 'PUSH_PERMISSION_NOT_GRANTED';
