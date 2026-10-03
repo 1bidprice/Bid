@@ -129,15 +129,35 @@ export function createNasdaqUsListedUniverseProvider(options = {}) {
         fetchText(fetchImpl, NASDAQ_LISTED_URL),
         fetchText(fetchImpl, OTHER_LISTED_URL),
       ]);
+      const generatedAt = new Date(context.now || Date.now()).toISOString();
       let instruments = [...parseNasdaqListedUniverse(nasdaqText), ...parseOtherListedUniverse(otherText)];
-      instruments = instruments.filter((instrument) => requested.has(instrument.assetClass));
+      instruments = instruments
+        .filter((instrument) => requested.has(instrument.assetClass))
+        .map((instrument) => ({
+          ...instrument,
+          activeTradingVerified: true,
+          listingVerifiedAt: generatedAt,
+          listingVerification: {
+            verified: true,
+            source: 'NASDAQ_TRADER_SYMBOL_DIRECTORY',
+            sourceRole: 'OFFICIAL_EXCHANGE_DIRECTORY',
+            verifiedAt: generatedAt,
+          },
+          primaryListing: {
+            ...(instrument.primaryListing || {}),
+            activeTradingVerified: true,
+            verifiedAt: generatedAt,
+            status: 'ACTIVE',
+            verificationSource: 'NASDAQ_TRADER_SYMBOL_DIRECTORY',
+          },
+        }));
       const limit = Math.max(1, Number(context.limit || options.limit || instruments.length || 1));
       const sliced = instruments.slice(0, limit);
       return {
         format: 'investor-control-universe-provider-result',
         version: 1,
         providerId: this.id,
-        generatedAt: new Date(context.now || Date.now()).toISOString(),
+        generatedAt,
         instruments: sliced,
         totalEligibleCount: instruments.length,
         truncated: sliced.length < instruments.length,

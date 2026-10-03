@@ -600,6 +600,139 @@ async function fetchCompleteAthensTradingDirectory(fetchImpl, firstPageHtml, opt
   };
 }
 
+export async function fetchAthensCompaniesBySymbols(symbols = [], options = {}) {
+  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  const generatedAt = new Date(options.generatedAt || Date.now()).toISOString();
+  const requested = [...new Set((Array.isArray(symbols) ? symbols : [])
+    .map((value) => String(value || '').trim().toUpperCase().replace(/\.GR$/i, ''))
+    .filter((value) => /^[A-Z0-9._-]{1,16}$/.test(value)))];
+
+  if (!requested.length) {
+    return {
+      format: 'investor-control-athens-symbol-resolution',
+      version: 1,
+      generatedAt,
+      requestedSymbols: [],
+      companies: [],
+      results: [],
+      diagnostics: [],
+    };
+  }
+
+  if (typeof fetchImpl !== 'function') {
+    return {
+      format: 'investor-control-athens-symbol-resolution',
+      version: 1,
+      generatedAt,
+      requestedSymbols: requested,
+      companies: [],
+      results: requested.map((symbol) => ({ symbol, status: 'BLOCKED', code: 'ATHENS_DISCOVERY_FETCH_UNAVAILABLE' })),
+      diagnostics: [{ code: 'ATHENS_DISCOVERY_FETCH_UNAVAILABLE' }],
+    };
+  }
+
+  const diagnostics = [];
+  try {
+    const tradingIssuersFirstPage = await fetchText(
+      fetchImpl,
+      options.tradingIssuersUrl || ATHENS_TRADING_ISSUERS_URL,
+      options,
+    );
+    const directoryFetch = await fetchCompleteAthensTradingDirectory(fetchImpl, tradingIssuersFirstPage, options);
+    diagnostics.push(...directoryFetch.diagnostics);
+    const directory = extractAthensTradingDirectory(directoryFetch.html);
+    diagnostics.push(...directory.diagnostics);
+
+    const companies = [];
+    const results = [];
+
+    for (const symbol of requested) {
+      const matches = (directory.records || []).filter((record) => String(record?.symbol || '').trim().toUpperCase() === symbol);
+      if (matches.length !== 1) {
+        results.push({
+          symbol,
+          status: 'BLOCKED',
+          code: matches.length ? 'ATHENS_SYMBOL_IDENTITY_AMBIGUOUS' : 'ATHENS_SYMBOL_IDENTITY_NOT_FOUND',
+          matchCount: matches.length,
+        });
+        continue;
+      }
+
+      const record = matches[0];
+      const company = {
+        ...companyFromIssuer({
+          issuerId: record.issuerId,
+          name: record.issuerName,
+          sourceUrl: record.issuerUrl,
+        }, generatedAt),
+        issuerId: record.issuerId ? String(record.issuerId) : null,
+        isin: record.isin || null,
+        instrumentUrl: record.instrumentUrl || null,
+        investorRelationsUrl: record.issuerUrl || null,
+        aliases: [...new Set([record.issuerName, symbol].filter(Boolean))],
+        primaryListing: {
+          symbol,
+          mic: 'XATH',
+          exchange: 'Euronext Athens',
+          currency: 'EUR',
+          activeTradingVerified: true,
+          verifiedAt: generatedAt,
+        },
+        activeTradingVerified: true,
+        listingVerifiedAt: generatedAt,
+        identitySource: 'EURONEXT_ATHENS_TRADING_ISSUERS',
+      };
+      companies.push(company);
+      results.push({
+        symbol,
+        status: 'RESOLVED',
+        companyId: company.companyId,
+        issuerId: company.issuerId,
+        isin: company.isin,
+        listing: company.primaryListing,
+      });
+    }
+
+    return {
+      format: 'investor-control-athens-symbol-resolution',
+      version: 1,
+      generatedAt,
+      requestedSymbols: requested,
+      tradingDirectoryHealth: {
+        publishedLastPage: directoryFetch.publishedLastPage,
+        selectedLastPage: directoryFetch.selectedLastPage,
+        fallbackPaginationUsed: directoryFetch.fallbackPaginationUsed,
+        requestedPageCount: directoryFetch.requestedPageCount,
+        loadedPageCount: directoryFetch.loadedPageCount,
+        complete: directoryFetch.complete,
+        instrumentCount: directory.records.length,
+      },
+      companies,
+      results,
+      diagnostics,
+    };
+  } catch (error) {
+    return {
+      format: 'investor-control-athens-symbol-resolution',
+      version: 1,
+      generatedAt,
+      requestedSymbols: requested,
+      companies: [],
+      results: requested.map((symbol) => ({
+        symbol,
+        status: 'BLOCKED',
+        code: 'ATHENS_SYMBOL_RESOLUTION_FAILED',
+      })),
+      diagnostics: [{
+        code: 'ATHENS_SYMBOL_RESOLUTION_FAILED',
+        errorClass: String(error?.message || error).startsWith('HTTP')
+          ? String(error.message)
+          : 'NETWORK_OR_PARSE_ERROR',
+      }],
+    };
+  }
+}
+
 export async function fetchAthensDiscovery(options = {}) {
   const fetchImpl = options.fetchImpl || globalThis.fetch;
   const generatedAt = new Date(options.generatedAt || Date.now()).toISOString();

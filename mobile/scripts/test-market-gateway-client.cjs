@@ -10,7 +10,12 @@ const {
   normalizeGatewayBaseUrl,
   createOpaqueInstallationId,
   getOrCreateInstallationId,
+  validateInstrumentCapability,
+  validateResearchQueueStatus,
   validateGatewayFx,
+  fetchInstrumentCapability,
+  requestMinbeisResearch,
+  fetchMinbeisResearchQueueStatus,
   fetchCanonicalGatewayQuote,
   fetchCanonicalGatewayFx,
   fetchCanonicalGatewayQuotes,
@@ -95,6 +100,84 @@ async function main() {
   assert.equal(quoteCalls[0].headers[MARKET_GATEWAY_CLIENT_HEADER], firstId);
   assert.equal(quoteCalls[0].url, 'https://quotes.example.com/v1/quote?symbol=SPCE.US');
   assert.equal(/token=|finnhub/i.test(quoteCalls[0].url), false);
+
+  const capabilityPayload = {
+    format: 'investor-control-instrument-capability',
+    version: 1,
+    requestedSymbol: 'NVDA.US',
+    market: 'US',
+    identityVerified: true,
+    quoteSupported: true,
+    analysisSupported: false,
+    onboardingStatus: 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED',
+    canonicalCompanyId: 'gateway:us:NVDA',
+    displayName: 'NVIDIA Corp',
+    currency: 'USD',
+    limitations: ['FULL_MINBEIS_RESEARCH_NOT_YET_CANONICAL'],
+    privacy: {
+      acceptedInputs: ['symbol'],
+      portfolioQuantityRequired: false,
+      portfolioCostRequired: false,
+      pnlRequired: false,
+    },
+  };
+  assert.equal(validateInstrumentCapability('NVDA.US', capabilityPayload), null);
+  const capabilityCalls = [];
+  const capability = await fetchInstrumentCapability('NVDA.US', {
+    baseUrl: 'https://quotes.example.com',
+    clientId: firstId,
+    fetchImpl: async (url, init = {}) => {
+      capabilityCalls.push({ url: String(url), headers: init.headers || {} });
+      return new Response(JSON.stringify(capabilityPayload), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    },
+  });
+  assert.equal(capability.onboardingStatus, 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED');
+  assert.equal(capabilityCalls[0].url, 'https://quotes.example.com/v1/instrument?symbol=NVDA.US');
+  assert.equal(capabilityCalls[0].headers[MARKET_GATEWAY_CLIENT_HEADER], firstId);
+  assert.equal(JSON.stringify(capability).includes('quantity'), false);
+
+  const researchQueuePayload = {
+    format: 'investor-control-research-queue-status',
+    version: 1,
+    requestedSymbol: 'NVDA.US',
+    queueStatus: 'QUEUED',
+    queued: true,
+    firstRequestedAt: '2026-09-10T15:00:00.000Z',
+    lastRequestedAt: '2026-09-10T15:00:00.000Z',
+    privacy: {
+      acceptedInputs: ['symbol'],
+      portfolioDataStored: false,
+      clientIdentityStored: false,
+    },
+  };
+  assert.equal(validateResearchQueueStatus('NVDA.US', researchQueuePayload), null);
+  const researchCalls = [];
+  const queued = await requestMinbeisResearch('NVDA.US', {
+    baseUrl: 'https://quotes.example.com',
+    clientId: firstId,
+    fetchImpl: async (url, init = {}) => {
+      researchCalls.push({ url: String(url), method: init.method, headers: init.headers || {}, body: init.body });
+      return new Response(JSON.stringify(researchQueuePayload), { status: 202, headers: { 'Content-Type': 'application/json' } });
+    },
+  });
+  assert.equal(queued.queueStatus, 'QUEUED');
+  assert.equal(researchCalls[0].url, 'https://quotes.example.com/v1/research-queue');
+  assert.equal(researchCalls[0].method, 'POST');
+  assert.equal(researchCalls[0].headers[MARKET_GATEWAY_CLIENT_HEADER], firstId);
+  assert.deepEqual(JSON.parse(researchCalls[0].body), { symbol: 'NVDA.US' });
+  assert.equal(JSON.stringify(researchCalls[0].body).includes('quantity'), false);
+  assert.equal(JSON.stringify(researchCalls[0].body).includes('cost'), false);
+
+  const status = await fetchMinbeisResearchQueueStatus('NVDA.US', {
+    baseUrl: 'https://quotes.example.com',
+    clientId: firstId,
+    fetchImpl: async (url, init = {}) => {
+      assert.equal(String(url), 'https://quotes.example.com/v1/research-queue?symbol=NVDA.US');
+      assert.equal(init.method, 'GET');
+      return new Response(JSON.stringify(researchQueuePayload), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    },
+  });
+  assert.equal(status.queueStatus, 'QUEUED');
 
   await assert.rejects(
     fetchCanonicalGatewayQuote('SPCE.US', {

@@ -92,8 +92,8 @@ export function transactionGross(transaction) {
  * Execution price is a derived value whenever the stored price cannot
  * reproduce the authoritative gross amount to currency-cent precision.
  * This preserves a broker-provided price when it is already consistent
- * (for example 193 x 13.565 = 2,618.05 after cent rounding), while repairing
- * rounded legacy values such as 720 x 3.17 != 2,282.72.
+ * with the authoritative gross amount, while repairing rounded legacy
+ * prices that no longer reconcile to the stored settlement cash amount.
  */
 export function transactionExecutionPrice(transaction) {
   const quantity = Number(transaction?.quantity || 0);
@@ -153,54 +153,9 @@ export function accountingInvariantReport(transaction) {
   };
 }
 
-function isKnownAllwynLegacy(transaction) {
-  const symbol = String(transaction?.symbol || '')
-    .trim()
-    .toUpperCase();
-  const quantity = Number(transaction?.quantity || 0);
-  const price = Number(transaction?.price || 0);
-  const fees = Number(transaction?.fees || 0);
-  const total = Number(transaction?.total || 0);
-  return (
-    transaction?.type === 'buy' &&
-    symbol === 'ALWN.GR' &&
-    Math.abs(quantity - 193) < 0.0001 &&
-    Math.abs(price - 13.57) < 0.0001 &&
-    Math.abs(fees - 11.95) < 0.02 &&
-    (!positive(transaction?.executionPrice) || Math.abs(total - 2630.96) < 0.05)
-  );
-}
-
-function migratedAllwyn(transaction) {
-  return {
-    ...transaction,
-    accountingVersion: ACCOUNTING_VERSION,
-    date: '2026-07-14',
-    orderPrice: 13.57,
-    executionPrice: 13.565,
-    price: 13.565,
-    grossAmount: 2618.05,
-    feeBreakdown: {
-      commission: 9.16,
-      transfer: 1.57,
-      clearing: 0.72,
-      exchange: 0.5,
-      taxes: 0,
-      other: 0,
-    },
-    fees: 11.95,
-    total: 2630.0,
-    broker: transaction.broker || 'Τράπεζα Πειραιώς',
-    orderReference: transaction.orderReference || '12016850',
-    settlementReference: transaction.settlementReference || '290743',
-    migrationNote:
-      'Διορθώθηκε από τιμή εντολής 13,5700 € σε μέση τιμή εκτέλεσης 13,5650 €.',
-  };
-}
-
 export function normalizeTransaction(transaction) {
   const initial = transaction && typeof transaction === 'object' && !Array.isArray(transaction) ? transaction : {};
-  const migrated = isKnownAllwynLegacy(initial) ? migratedAllwyn(initial) : initial;
+  const migrated = initial;
   const symbol = safeText(migrated.symbol).toUpperCase();
   const type = canonicalType(migrated.type);
   const quantity = positive(migrated.quantity) ? Number(migrated.quantity) : 0;

@@ -13,6 +13,7 @@ const decision = read('DecisionOverlay.js');
 const finalDecision = read('src/FinalDecisionCard.js');
 const opportunities = read('src/OpportunitiesView.js');
 const decisionValidity = read('src/decision-validity.js');
+const intelligenceReadiness = read('src/intelligence-readiness.js');
 const market = read('src/market-data.js');
 const marketRules = read('src/market-rules.js');
 const quoteContract = read('src/quote-contract.js');
@@ -22,15 +23,26 @@ const accounting = read('src/transaction-accounting.js');
 const postinstall = String(pkg.scripts?.postinstall || '');
 assert.ok(!postinstall.includes('apply-v'), 'production package must not execute historical apply-v patch chain');
 
-assert.equal(pkg.version, '1.7.3');
-assert.equal(app.expo.version, '1.7.3');
-assert.equal(app.expo.android.versionCode, 31);
+const versionAtLeast = (actual, minimum) => {
+  const a = String(actual || '').split('.').map((value) => Number(value));
+  const b = String(minimum || '').split('.').map((value) => Number(value));
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+    const left = Number.isFinite(a[index]) ? a[index] : 0;
+    const right = Number.isFinite(b[index]) ? b[index] : 0;
+    if (left !== right) return left > right;
+  }
+  return true;
+};
+
+assert.equal(pkg.version, app.expo.version, 'package/app version must match');
+assert.ok(versionAtLeast(app.expo.version, '1.8.0'), `canonical mobile version predates MINBEIS v1.8.0: ${app.expo.version}`);
+assert.ok(Number(app.expo.android.versionCode) >= 32, `Android build predates MINBEIS build 32: ${app.expo.android.versionCode}`);
 assert.equal(app.expo.android.package, 'gr.investorcontrol.app');
-assert.ok(portfolio.includes("const VERSION = '1.7.3';"), 'PortfolioApp must be canonical v1.7.3 source');
-assert.ok(decision.includes("const VERSION = '1.7.3';"), 'DecisionOverlay must be canonical v1.7.3 source');
+assert.ok(portfolio.includes(`const VERSION = '${app.expo.version}';`), 'PortfolioApp must match canonical app version');
+assert.ok(decision.includes(`const VERSION = '${app.expo.version}';`), 'DecisionOverlay must match canonical app version');
 
 assert.ok(portfolio.includes('function quoteHeadlineLabel(quote)'), 'quote timing UI must be materialized in canonical source');
-assert.ok(portfolio.includes('<OpportunitiesView portfolioPositions={positions} />'), 'portfolio-aware decision bridge must be canonical source');
+assert.ok(portfolio.includes('<OpportunitiesView portfolioPositions={positions} portfolioPolicy={state.minbeisPolicy} instrumentCapabilities={state.minbeisOnboarding} />'), 'portfolio-aware MINBEIS policy bridge must be canonical source');
 assert.ok(portfolio.includes("maxWidth: '48%', flexShrink: 1"), 'mobile quote badge regression fix must be canonical source');
 
 assert.ok(portfolio.includes("import { buildPortfolioSnapshot } from './src/portfolio-engine';"), 'PortfolioApp must consume canonical portfolio engine');
@@ -62,7 +74,12 @@ assert.ok(finalDecision.includes('if (!decisionValidity.eligible) return null;')
 assert.ok(finalDecision.includes("decisionValidity.reason === 'DECISION_EXPIRED'"), 'expired decision UX missing');
 assert.ok(opportunities.includes("import { finalActionIsCurrent } from './decision-validity';"), 'Research counters must use canonical decision validity');
 assert.ok(opportunities.includes('if (!finalActionIsCurrent(finalAction, decisionContext)) continue;'), 'stale/expired BUY/SELL count gate missing');
-assert.ok(opportunities.includes("operationalHealth?.decisionEngineStatus === 'READY'"), 'decision engine readiness must gate active actions');
+assert.ok(opportunities.includes("import { intelligenceSystemReady } from './intelligence-readiness';"), 'OpportunitiesView must use canonical intelligence readiness');
+assert.ok(opportunities.includes('const systemReady = intelligenceSystemReady(operationalHealth || {});'), 'canonical intelligence readiness must gate active actions');
+assert.ok(intelligenceReadiness.includes("health?.status === 'OPERATIONAL'"), 'overall intelligence health must fail closed');
+assert.ok(intelligenceReadiness.includes("health?.marketDataStatus === 'OPERATIONAL'"), 'market data readiness must fail closed');
+assert.ok(intelligenceReadiness.includes("health?.fundamentalsStatus === 'OPERATIONAL'"), 'fundamentals readiness must fail closed');
+assert.ok(intelligenceReadiness.includes("health?.decisionEngineStatus === 'READY'"), 'decision engine readiness must fail closed');
 assert.ok(opportunities.includes('items={decisionContext.feedFresh && decisionContext.systemReady ? (feed.confirmedBuyOpportunities || []) : []}'), 'stale confirmed BUY opportunities must be hidden');
 assert.ok(!opportunities.includes('decisionContext={decisionContext} decisionContext={decisionContext}'), 'decisionContext prop materialization must remain idempotent');
 
@@ -106,4 +123,4 @@ assert.ok(accounting.includes('function safeText(value, fallback ='), 'legacy tr
 assert.ok(accounting.includes('function canonicalCurrency(value)'), 'canonical transaction currency guard missing');
 assert.ok(accounting.includes("return explicit === 'USD' || explicit === 'EUR' ? explicit : null;"), 'invalid transaction currency must stay missing instead of being inferred');
 
-console.log('Canonical mobile source PASS: patch chain retired; accounting, portfolio, Euronext Athens/US market rules, quote, decision validity and UI responsibilities are separated and guarded, including Transactions runtime, render-safe fail-closed legacy records, closing-print valuation, stale/expired actions and idempotent decision-context materialization.');
+console.log(`Canonical mobile source PASS v${app.expo.version} build ${app.expo.android.versionCode}: accounting, portfolio, market rules, MINBEIS onboarding and decision boundaries are canonical and guarded.`);

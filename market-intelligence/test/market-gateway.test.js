@@ -160,3 +160,180 @@ test('health reports provider configuration without exposing secret value', asyn
   assert.equal(body.providers.fx, 'ecb_official_daily_reference');
   assert.equal(JSON.stringify(body).includes('secret-value'), false);
 });
+
+
+test('dynamic US instrument capability verifies identity without pretending full MINBEIS coverage', async () => {
+  const secret = 'server-only-finnhub-secret';
+  const fetchImpl = async (url, init = {}) => {
+    assert.equal(init.headers?.['X-Finnhub-Token'], secret);
+    if (String(url).includes('/stock/profile2')) return jsonResponse({ ticker: 'NVDA', currency: 'USD', exchange: 'NASDAQ', country: 'US', name: 'NVIDIA Corp' });
+    if (String(url).includes('/quote')) return jsonResponse({ c: 120.5, pc: 119.5, o: 120, h: 122, l: 118, d: 1, dp: 0.8368, t: Math.floor(Date.parse('2026-09-10T14:59:00.000Z') / 1000) });
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const response = await handleMarketGatewayRequest(new Request('https://gateway.test/v1/instrument?symbol=NVDA.US'), { FINNHUB_TOKEN: secret }, { fetchImpl, now: '2026-09-10T15:00:00.000Z' });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.format, 'investor-control-instrument-capability');
+  assert.equal(body.requestedSymbol, 'NVDA.US');
+  assert.equal(body.identityVerified, true);
+  assert.equal(body.quoteSupported, true);
+  assert.equal(body.analysisSupported, false);
+  assert.equal(body.onboardingStatus, 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED');
+  assert.equal(body.privacy.portfolioQuantityRequired, false);
+  assert.equal(body.privacy.portfolioCostRequired, false);
+  assert.equal(body.privacy.pnlRequired, false);
+});
+
+test('canonical focus instrument reports READY for full MINBEIS coverage', async () => {
+  const fetchImpl = async (url) => {
+    if (String(url).includes('/quote')) return jsonResponse({ c: 3.21, pc: 3.10, o: 3.12, h: 3.25, l: 3.05, d: 0.11, dp: 3.5484, t: Math.floor(Date.parse('2026-09-10T14:59:00.000Z') / 1000) });
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const response = await handleMarketGatewayRequest(new Request('https://gateway.test/v1/instrument?symbol=SPCE.US'), { FINNHUB_TOKEN: 'secret' }, { fetchImpl, now: '2026-09-10T15:00:00.000Z' });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.analysisSupported, true);
+  assert.equal(body.onboardingStatus, 'READY');
+  assert.equal(body.canonicalCompanyId, 'company:virgin-galactic-holdings');
+});
+
+test('unsupported Athens instrument fails closed instead of inventing canonical identity', async () => {
+  const response = await handleMarketGatewayRequest(new Request('https://gateway.test/v1/instrument?symbol=UNKNOWN.GR'), {}, { fetchImpl: async () => { throw new Error('should not call provider'); }, now: '2026-09-10T10:00:00.000Z' });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.identityVerified, false);
+  assert.equal(body.quoteSupported, false);
+  assert.equal(body.analysisSupported, false);
+  assert.equal(body.onboardingStatus, 'IDENTITY_NOT_VERIFIED');
+});
+
+
+function fakeKv() {
+  const map = new Map();
+  return {
+    async get(key) { return map.has(key) ? map.get(key) : null; },
+    async put(key, value) { map.set(key, value); },
+    map,
+  };
+}
+
+test('completed dynamic enrollment reports READY through the gateway capability contract', async () => {
+  const kv = fakeKv();
+  await kv.put('research:NVDA.US', JSON.stringify({
+    format: 'minbeis-research-queue-record',
+    version: 1,
+    symbol: 'NVDA.US',
+    market: 'US',
+    canonicalCompanyId: 'company:sec:0001045810',
+    displayName: 'NVIDIA CORP',
+    currency: 'USD',
+    status: 'COMPLETED',
+    firstRequestedAt: '2026-09-10T12:00:00.000Z',
+    lastRequestedAt: '2026-09-10T13:00:00.000Z',
+    privacy: {
+      storesSymbolOnly: true,
+      storesPortfolioData: false,
+      storesClientIdentity: false,
+    },
+  }));
+  const fetchImpl = async (url) => {
+    if (String(url).includes('/stock/profile2')) return jsonResponse({ ticker: 'NVDA', currency: 'USD', exchange: 'NASDAQ', country: 'US', name: 'NVIDIA Corp' });
+    if (String(url).includes('/quote')) return jsonResponse({ c: 120.5, pc: 119.5, o: 120, h: 122, l: 118, d: 1, dp: 0.8368, t: Math.floor(Date.parse('2026-09-10T14:59:00.000Z') / 1000) });
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const response = await handleMarketGatewayRequest(
+    new Request('https://gateway.test/v1/instrument?symbol=NVDA.US'),
+    { FINNHUB_TOKEN: 'secret', MINBEIS_RESEARCH_QUEUE: kv },
+    { fetchImpl, now: '2026-09-10T15:00:00.000Z' },
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.identityVerified, true);
+  assert.equal(body.analysisSupported, true);
+  assert.equal(body.onboardingStatus, 'READY');
+  assert.equal(body.researchEnrollmentStatus, 'COMPLETED');
+  assert.equal(body.canonicalCompanyId, 'company:sec:0001045810');
+});
+
+test('verified new US instrument enters research queue only with persistent storage', async () => {
+  const kv = fakeKv();
+  const fetchImpl = async (url) => {
+    if (String(url).includes('/stock/profile2')) return jsonResponse({ ticker: 'NVDA', currency: 'USD', exchange: 'NASDAQ', country: 'US', name: 'NVIDIA Corp' });
+    if (String(url).includes('/quote')) return jsonResponse({ c: 120.5, pc: 119.5, o: 120, h: 122, l: 118, d: 1, dp: 0.8368, t: Math.floor(Date.parse('2026-09-10T14:59:00.000Z') / 1000) });
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const request = new Request('https://gateway.test/v1/research-queue', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ symbol: 'NVDA.US' }),
+  });
+  const response = await handleMarketGatewayRequest(
+    request,
+    { FINNHUB_TOKEN: 'secret', MINBEIS_RESEARCH_QUEUE: kv },
+    { fetchImpl, now: '2026-09-10T15:00:00.000Z' },
+  );
+  assert.equal(response.status, 202);
+  const body = await response.json();
+  assert.equal(body.requestedSymbol, 'NVDA.US');
+  assert.equal(body.queueStatus, 'QUEUED');
+  assert.equal(body.privacy.portfolioDataStored, false);
+  assert.equal(body.privacy.clientIdentityStored, false);
+  const stored = JSON.parse(await kv.get('research:NVDA.US'));
+  assert.deepEqual(Object.keys(stored.privacy).sort(), ['storesClientIdentity', 'storesPortfolioData', 'storesSymbolOnly']);
+  assert.equal(stored.privacy.storesPortfolioData, false);
+  assert.equal(stored.privacy.storesClientIdentity, false);
+});
+
+test('research queue fails closed when persistent storage is missing', async () => {
+  const fetchImpl = async (url) => {
+    if (String(url).includes('/stock/profile2')) return jsonResponse({ ticker: 'NVDA', currency: 'USD', exchange: 'NASDAQ', country: 'US', name: 'NVIDIA Corp' });
+    if (String(url).includes('/quote')) return jsonResponse({ c: 120.5, pc: 119.5, o: 120, h: 122, l: 118, d: 1, dp: 0.8368, t: Math.floor(Date.parse('2026-09-10T14:59:00.000Z') / 1000) });
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const response = await handleMarketGatewayRequest(
+    new Request('https://gateway.test/v1/research-queue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol: 'NVDA.US' }),
+    }),
+    { FINNHUB_TOKEN: 'secret' },
+    { fetchImpl, now: '2026-09-10T15:00:00.000Z' },
+  );
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error.code, 'RESEARCH_QUEUE_NOT_CONFIGURED');
+});
+
+test('research queue rejects portfolio fields and accepts symbol only', async () => {
+  const response = await handleMarketGatewayRequest(
+    new Request('https://gateway.test/v1/research-queue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol: 'NVDA.US', quantity: 10, cost: 1000 }),
+    }),
+    { FINNHUB_TOKEN: 'secret', MINBEIS_RESEARCH_QUEUE: fakeKv() },
+    { fetchImpl: async () => { throw new Error('provider must not run'); } },
+  );
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'RESEARCH_QUEUE_PRIVACY_CONTRACT_INVALID');
+});
+
+test('already canonical MINBEIS instrument does not consume research queue storage', async () => {
+  const kv = fakeKv();
+  const fetchImpl = async (url) => {
+    if (String(url).includes('/quote')) return jsonResponse({ c: 3.21, pc: 3.10, o: 3.12, h: 3.25, l: 3.05, d: 0.11, dp: 3.5484, t: Math.floor(Date.parse('2026-09-10T14:59:00.000Z') / 1000) });
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const response = await handleMarketGatewayRequest(
+    new Request('https://gateway.test/v1/research-queue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol: 'SPCE.US' }),
+    }),
+    { FINNHUB_TOKEN: 'secret', MINBEIS_RESEARCH_QUEUE: kv },
+    { fetchImpl, now: '2026-09-10T15:00:00.000Z' },
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.queueStatus, 'ALREADY_SUPPORTED');
+  assert.equal(kv.map.size, 0);
+});

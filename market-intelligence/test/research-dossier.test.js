@@ -104,3 +104,94 @@ test('complete evidence-backed dossier becomes review ready before explicit publ
   const published = publishResearchDossier(dossier);
   assert.equal(published.status, 'PUBLISHED');
 });
+
+
+test('decision-grade verified quote can establish active listing integrity without a hard-coded listing flag', () => {
+  const input = completeInput();
+  input.marketSnapshot = {
+    companyId: 'company:test',
+    companyName: 'Test Company',
+    appSymbol: 'TEST.US',
+    currentPrice: 12.75,
+    currency: 'USD',
+    quoteAt: NOW,
+    checkedAt: NOW,
+    source: 'Licensed Quote',
+    sourceUrl: 'https://provider.test/quote',
+    stale: false,
+    quoteContract: {
+      identityVerified: true,
+      sourceApproved: true,
+      timestampVerified: true,
+      valuationEligible: true,
+      analysisReferenceEligible: true,
+      executionFreshnessEligible: true,
+      decisionEligible: true,
+    },
+  };
+  input.company = {
+    ...COMPANY,
+    primaryListing: { exchange: 'NYSE', symbol: 'TEST', mic: 'XNYS', currency: 'USD' },
+  };
+  const dossier = buildResearchDossier(input);
+  assert.equal(dossier.listingIntegrity.activeTradingVerified, true);
+  assert.equal(dossier.listingIntegrity.verificationSource, 'VERIFIED_DECISION_GRADE_MARKET_QUOTE');
+  assert.equal(dossier.listingIntegrity.verifiedAt, NOW);
+  assert.equal(dossier.referencePrice.timestampVerified, true);
+  assert.equal(dossier.referencePrice.decisionEligible, true);
+});
+
+test('unverified quote timestamp cannot establish active listing integrity', () => {
+  const input = completeInput();
+  input.marketSnapshot = {
+    companyId: 'company:test',
+    companyName: 'Test Company',
+    appSymbol: 'TEST.US',
+    currentPrice: 12.75,
+    currency: 'USD',
+    quoteAt: NOW,
+    checkedAt: NOW,
+    source: 'Delayed Quote',
+    stale: false,
+    quoteContract: {
+      identityVerified: true,
+      sourceApproved: true,
+      timestampVerified: false,
+      valuationEligible: true,
+      analysisReferenceEligible: true,
+      executionFreshnessEligible: false,
+      decisionEligible: false,
+    },
+  };
+  input.company = {
+    ...COMPANY,
+    primaryListing: { exchange: 'NYSE', symbol: 'TEST', mic: 'XNYS', currency: 'USD' },
+  };
+  const dossier = buildResearchDossier(input);
+  assert.equal(dossier.listingIntegrity.activeTradingVerified, false);
+  assert.equal(dossier.listingIntegrity.verificationSource, null);
+});
+
+
+test('preserves event metadata for historical learning', () => {
+  const input = completeInput();
+  input.catalysts[0] = {
+    ...input.catalysts[0],
+    eventType: 'COMMERCIAL_CONTRACT',
+    category: 'FUNDAMENTAL_CATALYST',
+    eventWindowStart: '2026-08-01T00:00:00Z',
+    eventWindowEnd: '2026-10-01T00:00:00Z',
+  };
+  input.risks[0] = {
+    ...input.risks[0],
+    eventType: 'EXECUTION_DELAY',
+    category: 'EXECUTION_RISK',
+    eventWindowStart: '2026-08-01T00:00:00Z',
+  };
+  const dossier = buildResearchDossier(input);
+  assert.equal(dossier.catalysts[0].eventType, 'COMMERCIAL_CONTRACT');
+  assert.equal(dossier.catalysts[0].category, 'FUNDAMENTAL_CATALYST');
+  assert.equal(dossier.catalysts[0].eventWindowStart, '2026-08-01T00:00:00Z');
+  assert.equal(dossier.risks[0].eventType, 'EXECUTION_DELAY');
+  assert.equal(dossier.risks[0].category, 'EXECUTION_RISK');
+});

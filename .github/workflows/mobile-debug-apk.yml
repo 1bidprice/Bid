@@ -10,6 +10,8 @@ on:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
+    env:
+      EXPO_PUBLIC_MARKET_GATEWAY_URL: ${{ vars.EXPO_PUBLIC_MARKET_GATEWAY_URL || 'https://investor-control-market-gateway.bidprice-alerts.workers.dev' }}
     defaults:
       run:
         working-directory: mobile
@@ -31,8 +33,21 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Verify production market gateway build contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${EXPO_PUBLIC_MARKET_GATEWAY_URL:-}" || { echo 'Missing repository variable EXPO_PUBLIC_MARKET_GATEWAY_URL. Release APK would disable the production gateway.' >&2; exit 1; }
+          node -e "const u=new URL(process.env.EXPO_PUBLIC_MARKET_GATEWAY_URL); if(u.protocol!=='https:') process.exit(2); console.log('Gateway build contract: HTTPS URL configured');"
+          curl --fail --silent --show-error --retry 3 --retry-delay 2 "${EXPO_PUBLIC_MARKET_GATEWAY_URL}/health" > gateway-health.json
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('gateway-health.json','utf8'));if(p.status!=='ok'||p.providers?.us!=='configured'||p.providers?.athens!=='official_delayed_15m'||p.providers?.fx!=='ecb_official_daily_reference'||p.providers?.researchQueue!=='configured') process.exit(3);console.log('Gateway live health contract verified');"
+          rm -f gateway-health.json
+
       - name: Verify v1.7 mobile release identity
         run: npm run test:release-identity
+
+      - name: Verify Product Recovery privacy data and history
+        run: npm run test:local-data-ownership && npm run test:portfolio-history && npm run test:portfolio-data-flow && npm run test:portfolio-insights
 
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean --non-interactive
@@ -47,9 +62,71 @@ jobs:
           unzip -l "$APK" | tee apk-contents.txt
           grep -Eq 'index\.android\.bundle|assets/.*\.bundle' apk-contents.txt
 
+      - name: Audit APK signing certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          APK="$APK" python <<'PY'
+          from pathlib import Path
+          import os, struct, subprocess
+          apk = Path(os.environ["APK"])
+          data = apk.read_bytes()
+          eocd = data.rfind(b"PK\x05\x06", max(0, len(data) - 70000))
+          if eocd < 0:
+              raise SystemExit("APK signing audit: EOCD not found")
+          cd = struct.unpack_from("<I", data, eocd + 16)[0]
+          if data[cd-16:cd] != b"APK Sig Block 42":
+              raise SystemExit("APK signing audit: APK Signing Block missing")
+          size = struct.unpack_from("<Q", data, cd-24)[0]
+          start = cd - (size + 8)
+          if struct.unpack_from("<Q", data, start)[0] != size:
+              raise SystemExit("APK signing audit: malformed signing block")
+          def lp(buf, off):
+              n = struct.unpack_from("<I", buf, off)[0]
+              off += 4
+              return buf[off:off+n], off+n
+          cur, end = start + 8, cd - 24
+          cert = None
+          while cur < end:
+              pair_size = struct.unpack_from("<Q", data, cur)[0]; cur += 8
+              pair_id = struct.unpack_from("<I", data, cur)[0]; cur += 4
+              value = data[cur:cur+pair_size-4]; cur += pair_size-4
+              if pair_id != 0x7109871a:
+                  continue
+              signers, _ = lp(value, 0)
+              signer, _ = lp(signers, 0)
+              signed_data, _ = lp(signer, 0)
+              _, off = lp(signed_data, 0)
+              certs, _ = lp(signed_data, off)
+              cert, _ = lp(certs, 0)
+              break
+          if not cert:
+              raise SystemExit("APK signing audit: signer certificate unavailable")
+          cert_path = Path("release-cert.der")
+          cert_path.write_bytes(cert)
+          subject = subprocess.check_output(
+              ["openssl","x509","-inform","DER","-in",str(cert_path),"-noout","-subject"],
+              text=True,
+          ).strip()
+          fingerprint = subprocess.check_output(
+              ["openssl","x509","-inform","DER","-in",str(cert_path),"-noout","-fingerprint","-sha256"],
+              text=True,
+          ).strip()
+          Path("apk-signing-audit.txt").write_text(subject + "\n" + fingerprint + "\n")
+          print(subject)
+          print(fingerprint)
+          if "Android Debug" in subject:
+              print("APK signing audit: INTERNAL_DEMO_ONLY_DEBUG_CERTIFICATE")
+          else:
+              print("APK signing audit: NON_DEBUG_CERTIFICATE")
+          PY
+
       - name: Upload standalone APK
         uses: actions/upload-artifact@v4
         with:
           name: investor-control-standalone-release-apk
-          path: mobile/android/app/build/outputs/apk/release/app-release.apk
+          path: |
+            mobile/android/app/build/outputs/apk/release/app-release.apk
+            mobile/apk-signing-audit.txt
           if-no-files-found: error

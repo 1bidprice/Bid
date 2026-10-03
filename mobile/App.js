@@ -9,7 +9,7 @@ export default function App() {
   const [decisionVisible, setDecisionVisible] = useState(false);
   useEffect(() => {
     syncBackgroundIntelligenceTask(true).catch((error) => {
-      console.warn('Investor Control background intelligence registration failed', error);
+      console.warn('MINBEIS background intelligence registration failed', error);
     });
   }, []);
   return (

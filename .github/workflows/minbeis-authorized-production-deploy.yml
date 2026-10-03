@@ -1,0 +1,198 @@
+name: MINBEIS Authorized Production Gateway Deploy
+
+on:
+  push:
+    branches:
+      - investor-control-minbeis-integration-v1
+    paths:
+      - '.github/workflows/minbeis-authorized-production-deploy.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: investor-control-market-gateway-production
+  cancel-in-progress: false
+
+env:
+  AUTHORIZED_SOURCE_SHA: 5e5f926eb4a97a7c56caa6496441d23232b8d220
+  KV_TITLE: investor-control-market-gateway-minbeis-research-queue
+
+jobs:
+  deploy-authorized-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Record explicit deployment authorization
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$AUTHORIZED_SOURCE_SHA" = '5e5f926eb4a97a7c56caa6496441d23232b8d220'
+          echo "Production deployment authorized for exact source $AUTHORIZED_SOURCE_SHA"
+
+      - name: Require production credentials without exposing values
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${CLOUDFLARE_API_TOKEN:-}" || { echo 'Missing CLOUDFLARE_API_TOKEN.' >&2; exit 1; }
+          test -n "${CLOUDFLARE_ACCOUNT_ID:-}" || { echo 'Missing CLOUDFLARE_ACCOUNT_ID.' >&2; exit 1; }
+          test -n "${FINNHUB_TOKEN:-}" || { echo 'Missing FINNHUB_TOKEN.' >&2; exit 1; }
+
+      - name: Checkout exact green application source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.AUTHORIZED_SOURCE_SHA }}
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Re-run gateway and research queue contracts
+        working-directory: market-intelligence
+        run: |
+          set -euo pipefail
+          node --check gateway/src/core.js
+          node --check gateway/src/edge.js
+          node --check gateway/src/index.js
+          node scripts/verify-canonical-source.js
+          node --test test/market-gateway.test.js test/market-gateway-edge.test.js test/research-queue-onboarding.test.js
+
+      - name: Reuse or provision persistent MINBEIS research queue KV
+        id: kv
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          API="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces"
+          KV_ID=""
+          PAGE=1
+          while :; do
+            RESP="$(curl --fail --silent --show-error               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               "$API?page=$PAGE&per_page=100")"
+            printf '%s' "$RESP" | jq -e '.success == true' >/dev/null
+            KV_ID="$(printf '%s' "$RESP" | jq -r --arg title "$KV_TITLE" '.result[] | select(.title == $title) | .id' | head -n 1)"
+            if [ -n "$KV_ID" ] && [ "$KV_ID" != "null" ]; then
+              break
+            fi
+            TOTAL_PAGES="$(printf '%s' "$RESP" | jq -r '.result_info.total_pages // 1')"
+            [ "$PAGE" -lt "$TOTAL_PAGES" ] || break
+            PAGE=$((PAGE + 1))
+          done
+
+          if [ -z "$KV_ID" ] || [ "$KV_ID" = "null" ]; then
+            RESP="$(curl --fail --silent --show-error               -X POST               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               -H "Content-Type: application/json"               --data "$(jq -nc --arg title "$KV_TITLE" '{title:$title}')"               "$API")"
+            printf '%s' "$RESP" | jq -e '.success == true and (.result.id | type == "string")' >/dev/null
+            KV_ID="$(printf '%s' "$RESP" | jq -r '.result.id')"
+            echo "Provisioned persistent research queue namespace."
+          else
+            echo "Reusing existing persistent research queue namespace."
+          fi
+
+          test -n "$KV_ID"
+          KV_ID="$KV_ID" node <<'NODE'
+          const fs = require('fs');
+          const cfg = JSON.parse(fs.readFileSync('market-intelligence/gateway/wrangler.jsonc', 'utf8'));
+          const id = process.env.KV_ID;
+          if (!/^[a-f0-9]{32}$/i.test(id)) throw new Error('Cloudflare KV namespace id is invalid.');
+          const entry = (cfg.kv_namespaces || []).find((item) => item.binding === 'MINBEIS_RESEARCH_QUEUE');
+          if (!entry) throw new Error('MINBEIS_RESEARCH_QUEUE binding is missing from source config.');
+          entry.id = id;
+          fs.writeFileSync('market-intelligence/gateway/wrangler.production.json', JSON.stringify(cfg, null, 2) + '\n');
+          NODE
+
+      - name: Production bundle dry-run with real KV binding
+        working-directory: market-intelligence/gateway
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          npx --yes wrangler@4.129.1 deploy --config wrangler.production.json --dry-run --outdir dist
+          find dist -type f | grep -Eq '\.(js|mjs)$'
+
+      - name: Deploy Worker with persistent queue and encrypted provider secret
+        id: deploy
+        working-directory: market-intelligence/gateway
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          FINNHUB_TOKEN: ${{ secrets.FINNHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          SECRETS_FILE="$(mktemp)"
+          chmod 600 "$SECRETS_FILE"
+          cleanup() { rm -f "$SECRETS_FILE" deployment.log; }
+          trap cleanup EXIT
+          SECRETS_FILE="$SECRETS_FILE" node -e "const fs=require('fs'); const token=process.env.FINNHUB_TOKEN || ''; if(!token) process.exit(2); fs.writeFileSync(process.env.SECRETS_FILE, JSON.stringify({FINNHUB_TOKEN: token}));"
+          npx --yes wrangler@4.129.1 deploy --config wrangler.production.json --secrets-file "$SECRETS_FILE" 2>&1 | tee deployment.log
+          DEPLOYMENT_URL="$(grep -Eo 'https://[A-Za-z0-9._-]+\.workers\.dev' deployment.log | tail -n 1 || true)"
+          test -n "$DEPLOYMENT_URL" || { echo 'Could not verify workers.dev deployment URL.' >&2; exit 1; }
+          echo "deployment_url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Verify live production health contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="${{ steps.deploy.outputs.deployment_url }}"
+          curl --fail --silent --show-error --retry 3 --retry-delay 2 "$URL/health" > health.json
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('health.json','utf8')); if(p.status!=='ok'||p.providers?.us!=='configured'||p.providers?.athens!=='official_delayed_15m'||p.providers?.fx!=='ecb_official_daily_reference'||p.providers?.researchQueue!=='configured') process.exit(1);"
+          rm -f health.json
+
+      - name: Verify authoritative production quote and FX contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="${{ steps.deploy.outputs.deployment_url }}"
+          CLIENT_ID="github_deploy_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          curl --fail --silent --show-error --retry 2 --retry-delay 2             -H "X-Investor-Control-Client: $CLIENT_ID"             "$URL/v1/quote?symbol=SPCE.US" > quote.json
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('quote.json','utf8')); const q=p.quote; if(p.requestedSymbol!=='SPCE.US'||q?.appSymbol!=='SPCE.US'||q?.currency!=='USD'||q?.quoteContract?.sourceApproved!==true||q?.quoteContract?.identityVerified!==true) process.exit(1);"
+          curl --fail --silent --show-error --retry 2 --retry-delay 2             -H "X-Investor-Control-Client: $CLIENT_ID"             "$URL/v1/fx?pair=EURUSD" > fx.json
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('fx.json','utf8')); const r=p.reference; if(r?.pair!=='EURUSD'||r?.sourceQuality!=='OFFICIAL_DAILY_REFERENCE'||!(Number(r?.rate)>0)||r?.valuationReferenceEligible!==true||r?.transactionEligible!==false||r?.decisionEligible!==false) process.exit(1);"
+          rm -f quote.json fx.json
+
+      - name: Prove persistent research queue end to end with NVDA.US
+        id: queue
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="${{ steps.deploy.outputs.deployment_url }}"
+          CLIENT_ID="github_queue_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          CODE="$(curl --silent --show-error --output queue-post.json --write-out '%{http_code}'             -X POST             -H "Content-Type: application/json"             -H "X-Investor-Control-Client: $CLIENT_ID"             --data '{"symbol":"NVDA.US"}'             "$URL/v1/research-queue")"
+          test "$CODE" = "202" || { cat queue-post.json; exit 1; }
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('queue-post.json','utf8')); if(p.requestedSymbol!=='NVDA.US'||p.queueStatus!=='QUEUED'||p.queued!==true||p.privacy?.portfolioDataStored!==false||p.privacy?.clientIdentityStored!==false) process.exit(1);"
+          curl --fail --silent --show-error             -H "X-Investor-Control-Client: $CLIENT_ID"             "$URL/v1/research-queue?symbol=NVDA.US" > queue-get.json
+          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('queue-get.json','utf8')); if(p.requestedSymbol!=='NVDA.US'||p.queueStatus!=='QUEUED'||p.queued!==true) process.exit(1);"
+          rm -f queue-post.json queue-get.json
+
+      - name: Preserve verified production deployment manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL="${{ steps.deploy.outputs.deployment_url }}"
+          cat > gateway-production-deployment.json <<EOF
+          {
+            "format": "minbeis-market-gateway-deployment",
+            "version": 1,
+            "sourceCommit": "$AUTHORIZED_SOURCE_SHA",
+            "deploymentUrl": "$URL",
+            "researchQueueRequired": true,
+            "researchQueueVerified": true,
+            "e2eQueuedSymbol": "NVDA.US",
+            "verified": true,
+            "deployedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+
+      - name: Upload verified production deployment manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: minbeis-market-gateway-production-5e5f926eb4a97a7c56caa6496441d23232b8d220
+          path: gateway-production-deployment.json
+          if-no-files-found: error
+          retention-days: 90
