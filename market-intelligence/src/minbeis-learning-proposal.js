@@ -54,8 +54,14 @@ function proposalFromCohort(dimension, cohort, createdAt, threshold) {
     automaticApplicationAllowed: false,
     requiresExplicitHumanApproval: true,
   };
-  proposal.proposalId = 'learning:' + digest(proposal).slice(0, 28);
   proposal.evidenceHash = digest(proposal.evidence);
+  proposal.proposalId = 'learning:' + digest({
+    proposalType: proposal.proposalType,
+    target: proposal.target,
+    evidenceHash: proposal.evidenceHash,
+    championAction: proposal.championAction,
+    challengerAction: proposal.challengerAction,
+  }).slice(0, 28);
   return proposal;
 }
 
@@ -131,4 +137,35 @@ export function buildMinbeisProposalShadowObservations(proposal, records = [], o
       validationMode: 'PROSPECTIVE_SHADOW_OOS',
     };
   }).filter(Boolean);
+}
+
+
+export function mergeMinbeisLearningProposalArchive(existing = [], proposalSet = {}) {
+  const incoming = Array.isArray(proposalSet) ? proposalSet : (Array.isArray(proposalSet?.proposals) ? proposalSet.proposals : []);
+  const map = new Map();
+  for (const proposal of Array.isArray(existing) ? existing : []) {
+    if (!proposal?.proposalId) continue;
+    map.set(proposal.proposalId, proposal);
+  }
+  let newProposalCount = 0;
+  for (const proposal of incoming) {
+    if (!proposal?.proposalId) continue;
+    if (!map.has(proposal.proposalId)) {
+      map.set(proposal.proposalId, proposal);
+      newProposalCount += 1;
+    }
+  }
+  const proposals = [...map.values()].sort((a,b)=>
+    String(a.createdAt).localeCompare(String(b.createdAt))
+    || String(a.proposalId).localeCompare(String(b.proposalId)));
+  return {
+    format: 'investor-control-minbeis-learning-proposal-archive',
+    version: 1,
+    policyVersion: MINBEIS_LEARNING_PROPOSAL_VERSION,
+    updatedAt: new Date(proposalSet?.generatedAt || Date.now()).toISOString(),
+    proposalCount: proposals.length,
+    newProposalCount,
+    proposals,
+    automaticApplicationAllowed: false,
+  };
 }
