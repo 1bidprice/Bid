@@ -1,9 +1,25 @@
 import { createHash } from 'node:crypto';
 
-export const MINBEIS_DECISION_OUTCOME_LEDGER_VERSION = '2026-09-22.1';
+export const MINBEIS_DECISION_OUTCOME_LEDGER_VERSION = '2026-10-03.1';
 const HORIZONS = Object.freeze([7, 30, 90]);
 const finite = (value) => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
 const round = (value, digits = 4) => Number.isFinite(value) ? Number(value.toFixed(digits)) : null;
+
+function stableValue(value) {
+  if (Array.isArray(value)) return value.map(stableValue);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stableValue(value[key])]));
+}
+
+function immutableContextSnapshot(value) {
+  if (!value || typeof value !== 'object') return null;
+  return JSON.parse(JSON.stringify(stableValue(value)));
+}
+
+function contextHash(value) {
+  if (!value) return null;
+  return createHash('sha256').update(JSON.stringify(stableValue(value))).digest('hex');
+}
 
 function idFor(record) {
   const raw = [record.instrumentId || record.companyId || record.symbol || 'UNKNOWN', record.action, record.decisionAt, record.referencePrice].join('|');
@@ -30,9 +46,15 @@ export function createMinbeisDecisionOutcomeRecord(input = {}) {
     benchmarkSymbol: input.benchmarkSymbol || null,
     confidenceScore: finite(input.confidenceScore) ? Number(input.confidenceScore) : null,
     dataQualityScore: finite(input.dataQualityScore) ? Number(input.dataQualityScore) : null,
+    decisionReason: input.decisionReason || null,
+    sourcePolicyVersion: input.sourcePolicyVersion || null,
+    sourceStatus: input.sourceStatus || null,
+    contextSnapshot: immutableContextSnapshot(input.contextSnapshot),
+    contextHash: null,
     simpleBaselineSnapshot: input.simpleBaselineSnapshot || null,
     horizons: Object.fromEntries(HORIZONS.map((days) => [String(days), { tradingDays: days, status: 'OPEN', evaluatedAt: null, outcomePrice: null, realisedReturnPct: null, benchmarkReturnPct: null, excessReturnPct: null }])),
   };
+  record.contextHash = contextHash(record.contextSnapshot);
   record.decisionId = idFor(record);
   return record;
 }
@@ -64,13 +86,17 @@ export function evaluateMinbeisDecisionOutcome(record, marketSeries = [], benchm
     const outcome = prices[startIndex + days];
     if (!outcome) continue;
     const realised = returnPct(record.referencePrice, outcome.close);
+    const window = prices.slice(startIndex, startIndex + days + 1);
+    const excursions = window.map((item) => returnPct(record.referencePrice, item.close)).filter(Number.isFinite);
+    const maxFavorableExcursionPct = excursions.length ? Math.max(...excursions) : null;
+    const maxAdverseExcursionPct = excursions.length ? Math.min(...excursions) : null;
     let benchmarkReturn = null;
     if (benchmarkStartIndex >= 0 && benchmark[benchmarkStartIndex + days]) {
       const benchmarkStart = benchmark[benchmarkStartIndex]?.close;
       const benchmarkEnd = benchmark[benchmarkStartIndex + days]?.close;
       if (finite(benchmarkStart) && finite(benchmarkEnd)) benchmarkReturn = returnPct(benchmarkStart, benchmarkEnd);
     }
-    nextHorizons[key] = { tradingDays: days, status: 'MATURED', evaluatedAt, outcomePrice: outcome.close, realisedReturnPct: round(realised), benchmarkReturnPct: benchmarkReturn === null ? null : round(benchmarkReturn), excessReturnPct: benchmarkReturn === null ? null : round(realised - benchmarkReturn) };
+    nextHorizons[key] = { tradingDays: days, status: 'MATURED', evaluatedAt, outcomePrice: outcome.close, realisedReturnPct: round(realised), benchmarkReturnPct: benchmarkReturn === null ? null : round(benchmarkReturn), excessReturnPct: benchmarkReturn === null ? null : round(realised - benchmarkReturn), maxFavorableExcursionPct: round(maxFavorableExcursionPct), maxAdverseExcursionPct: round(maxAdverseExcursionPct) };
   }
   return { ...record, horizons: nextHorizons };
 }
@@ -106,6 +132,11 @@ export function mergeMinbeisDecisionOutcomeLedger(existing = [], incoming = []) 
     map.set(record.decisionId, {
       ...current,
       ...record,
+      decisionReason: current.decisionReason || record.decisionReason || null,
+      sourcePolicyVersion: current.sourcePolicyVersion || record.sourcePolicyVersion || null,
+      sourceStatus: current.sourceStatus || record.sourceStatus || null,
+      contextSnapshot: current.contextSnapshot || record.contextSnapshot || null,
+      contextHash: current.contextHash || record.contextHash || null,
       simpleBaselineSnapshot: current.simpleBaselineSnapshot || record.simpleBaselineSnapshot || null,
       horizons: mergedHorizons,
     });
