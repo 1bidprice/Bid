@@ -143,6 +143,13 @@ export async function resolveDynamicAthensCompany(symbolInput, options = {}) {
   if (validDynamicAthensCompany(supplied, symbol)) {
     return { company: supplied, diagnostics: [], source: 'PRE_RESOLVED' };
   }
+  if (options.athensIdentityResolutionComplete === true && options.dynamicAthensCompanies) {
+    return {
+      company: null,
+      diagnostics: [{ code: 'ATHENS_IDENTITY_NOT_VERIFIED', symbol }],
+      source: 'PRE_RESOLVED_BLOCKED',
+    };
+  }
 
   const now = Number(options.identityNow ?? Date.now());
   const identityCache = options.athensIdentityCache instanceof Map
