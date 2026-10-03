@@ -38,6 +38,17 @@ jobs:
             *) echo "Deployment is restricted to controlled Investor Control release branches." >&2; exit 1 ;;
           esac
 
+      - name: Prevent accidental account-backend downgrade
+        shell: bash
+        env:
+          ACCOUNT_PRODUCTION_ENABLED: ${{ vars.MINBEIS_ACCOUNT_PRODUCTION_ENABLED || 'false' }}
+        run: |
+          set -euo pipefail
+          test "$ACCOUNT_PRODUCTION_ENABLED" != 'true' || {
+            echo 'Account backend is marked active. Use MINBEIS Account Backend Production Activation workflow to preserve account bindings.' >&2
+            exit 1
+          }
+
       - name: Require deployment credentials without exposing values
         shell: bash
         env:
