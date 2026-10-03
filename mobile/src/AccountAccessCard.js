@@ -16,6 +16,10 @@ import {
   minbeisSignIn,
   minbeisSignOut,
 } from './firebase-auth-client';
+import {
+  disableRemotePushForCurrentDevice,
+  enableRemotePushForCurrentDevice,
+} from './account-device-sync';
 
 function messageFor(error) {
   const code = String(error?.code || error?.message || '');
@@ -35,6 +39,8 @@ export default function AccountAccessCard() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
   useEffect(() => {
@@ -73,6 +79,41 @@ export default function AccountAccessCard() {
     }
   }
 
+  async function enableRemotePush() {
+    setPushBusy(true);
+    setFeedback(null);
+    try {
+      const result = await enableRemotePushForCurrentDevice();
+      setPushEnabled(result.enabled === true);
+      setFeedback({ type: 'ok', text: 'Οι απομακρυσμένες ειδοποιήσεις ενεργοποιήθηκαν για αυτή τη συσκευή.' });
+    } catch (error) {
+      const code = String(error?.gatewayCode || error?.code || error?.message || '');
+      if (/ACCOUNT_API_DISABLED|ACCOUNTS_DATABASE_NOT_CONFIGURED|REMOTE_PUSH_NOT_CONFIGURED/.test(code)) {
+        setFeedback({ type: 'error', text: 'Η υπηρεσία απομακρυσμένων ειδοποιήσεων δεν έχει ενεργοποιηθεί ακόμη στο production backend.' });
+      } else if (/PUSH_PERMISSION_NOT_GRANTED/.test(code)) {
+        setFeedback({ type: 'error', text: 'Δεν δόθηκε άδεια ειδοποιήσεων στη συσκευή.' });
+      } else {
+        setFeedback({ type: 'error', text: 'Δεν ολοκληρώθηκε η ενεργοποίηση απομακρυσμένων ειδοποιήσεων.' });
+      }
+    } finally {
+      setPushBusy(false);
+    }
+  }
+
+  async function disableRemotePush() {
+    setPushBusy(true);
+    setFeedback(null);
+    try {
+      await disableRemotePushForCurrentDevice();
+      setPushEnabled(false);
+      setFeedback({ type: 'ok', text: 'Οι απομακρυσμένες ειδοποιήσεις απενεργοποιήθηκαν για αυτή τη συσκευή.' });
+    } catch {
+      setFeedback({ type: 'error', text: 'Δεν ολοκληρώθηκε η απενεργοποίηση αυτής της συσκευής.' });
+    } finally {
+      setPushBusy(false);
+    }
+  }
+
   async function signOutNow() {
     setBusy(true);
     setFeedback(null);
@@ -99,6 +140,14 @@ export default function AccountAccessCard() {
           <Text style={styles.privacyStrong}>Cloud portfolio sync: Ανενεργός</Text>
           <Text style={styles.privacyText}>Η είσοδος στον λογαριασμό δεν ανεβάζει το χαρτοφυλάκιό σου.</Text>
         </View>
+        <Pressable style={styles.primary} onPress={enableRemotePush} disabled={pushBusy || pushEnabled}>
+          {pushBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>{pushEnabled ? 'Remote ειδοποιήσεις ενεργές' : 'Ενεργοποίηση remote ειδοποιήσεων'}</Text>}
+        </Pressable>
+        {pushEnabled ? (
+          <Pressable style={styles.secondary} onPress={disableRemotePush} disabled={pushBusy}>
+            <Text style={styles.secondaryText}>Απενεργοποίηση σε αυτή τη συσκευή</Text>
+          </Pressable>
+        ) : null}
         <Pressable style={styles.secondary} onPress={signOutNow} disabled={busy}>
           {busy ? <ActivityIndicator /> : <Text style={styles.secondaryText}>Αποσύνδεση</Text>}
         </Pressable>
