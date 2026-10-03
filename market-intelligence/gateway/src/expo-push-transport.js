@@ -9,6 +9,8 @@ export const EXPO_RECEIPT_BATCH_SIZE = 1000;
 const clean = (value) => String(value || '').trim();
 
 function safeData(data = {}) {
+  const allowed = new Set(['symbol', 'kind']);
+  if (Object.keys(data || {}).some((key) => !allowed.has(key))) throw new Error('PUSH_DATA_PRIVACY_CONTRACT_INVALID');
   const symbol = clean(data.symbol).toUpperCase();
   const kind = clean(data.kind).toUpperCase();
   if (!/^([A-Z0-9][A-Z0-9.-]{0,19})\.(US|GR)$/.test(symbol)) throw new Error('PUSH_DATA_SYMBOL_INVALID');
