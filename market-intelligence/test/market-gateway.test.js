@@ -21,6 +21,23 @@ function jsonResponse(payload, status = 200) {
 
 const ECB_XML = `<?xml version="1.0" encoding="UTF-8"?><gesmes:Envelope><Cube><Cube time="2026-09-10"><Cube currency="USD" rate="1.1616"/><Cube currency="JPY" rate="179.09"/></Cube></Cube></gesmes:Envelope>`;
 
+const ATHENS_DIRECTORY_HTML = `
+<table>
+  <thead><tr><th>Issuer</th><th>ISIN Code</th><th>OASIS Code</th><th>Market</th><th>MIFID</th><th>Market Segment</th><th>Product</th><th>Product Name</th></tr></thead>
+  <tbody>
+    <tr><td>QUEST HOLDINGS S.A.</td><td>GRS310003009</td><td><a href="/en/market-data/instruments/stocks/QUEST">QUEST</a></td><td>ATHEX</td><td>SHRS</td><td>MAIN MARKET</td><td>Stock</td><td>QUEST HOLDINGS</td></tr>
+  </tbody>
+</table>`;
+
+const ATHENS_QUEST_QUOTE_HTML = `<html><body>
+  <div>Last Traded Price 7,25</div>
+  <div>Previous Close 7,10</div>
+  <div>Opening Price 7,15</div>
+  <div>Daily High Price 7,30</div>
+  <div>Daily Low Price 7,05</div>
+  <div>Total Volume 12.345</div>
+</body></html>`;
+
 test('gateway parses canonical app symbols and rejects ambiguous raw tickers', () => {
   assert.deepEqual(parseGatewaySymbol('spce.us'), { symbol: 'SPCE', market: 'US', appSymbol: 'SPCE.US' });
   assert.deepEqual(parseGatewaySymbol('brk.b.us'), { symbol: 'BRK.B', market: 'US', appSymbol: 'BRK.B.US' });
@@ -100,14 +117,55 @@ test('Athens quote stays official delayed analysis-only and retains EUR', async 
   assert.equal(body.quote.quoteContract.decisionEligible, false);
 });
 
-test('unknown Athens symbol is rejected before any external request', async () => {
-  let called = false;
-  const response = await handleMarketGatewayRequest(request('UNKNOWN.GR'), {}, { fetchImpl: async () => { called = true; throw new Error('should not run'); }, now: '2026-09-10T10:00:00.000Z' });
-  assert.equal(response.status, 400);
+test('unknown Athens symbol performs official identity lookup but never requests a quote without an exact stock identity', async () => {
+  const calls = [];
+  const response = await handleMarketGatewayRequest(request('UNKNOWN.GR'), {}, {
+    fetchImpl: async (url) => {
+      calls.push(String(url));
+      if (String(url).includes('/trading-products/trading-issuers')) {
+        return new Response(ATHENS_DIRECTORY_HTML, { status: 200, headers: { 'Content-Type': 'text/html' } });
+      }
+      throw new Error('quote endpoint must not run for unresolved Athens identity');
+    },
+    now: '2026-09-10T10:00:00.000Z',
+    athensDiscoveryOptions: { tradingDirectoryFallbackLastPage: 0 },
+  });
+  assert.equal(response.status, 409);
   const body = await response.json();
-  assert.equal(body.error.code, 'ATHENS_SYMBOL_NOT_ALLOWED');
-  assert.deepEqual(body.error.details.allowedSymbols, ['ALWN.GR', 'CREDIA.GR']);
-  assert.equal(called, false);
+  assert.equal(body.error.code, 'ATHENS_IDENTITY_NOT_VERIFIED');
+  assert.equal(calls.length, 1);
+  assert.match(calls[0], /trading-products\/trading-issuers/);
+  assert.equal(calls.some((url) => url.includes('/instruments/stocks/UNKNOWN')), false);
+});
+
+test('dynamic Athens stock is identity-verified from the official trading directory before quote use', async () => {
+  const calls = [];
+  const response = await handleMarketGatewayRequest(request('QUEST.GR'), {}, {
+    fetchImpl: async (url) => {
+      const value = String(url);
+      calls.push(value);
+      if (value.includes('/trading-products/trading-issuers')) {
+        return new Response(ATHENS_DIRECTORY_HTML, { status: 200, headers: { 'Content-Type': 'text/html' } });
+      }
+      if (value.includes('/market-data/instruments/stocks/QUEST')) {
+        return new Response(ATHENS_QUEST_QUOTE_HTML, { status: 200, headers: { 'Content-Type': 'text/html' } });
+      }
+      throw new Error('Unexpected URL: ' + value);
+    },
+    now: '2026-09-10T10:00:00.000Z',
+    athensDiscoveryOptions: { tradingDirectoryFallbackLastPage: 0 },
+    identityNow: Date.parse('2026-09-10T10:00:00.000Z'),
+  });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.requestedSymbol, 'QUEST.GR');
+  assert.equal(body.quote.appSymbol, 'QUEST.GR');
+  assert.equal(body.quote.currency, 'EUR');
+  assert.equal(body.quote.isin, 'GRS310003009');
+  assert.equal(body.quote.identitySource, 'EURONEXT_ATHENS_TRADING_ISSUERS');
+  assert.equal(body.quote.quoteContract.identityVerified, true);
+  assert.equal(body.quote.quoteContract.sourceRole, 'PRIMARY_EXCHANGE');
+  assert.equal(calls.filter((url) => url.includes('/trading-products/trading-issuers')).length, 1);
 });
 
 test('ECB XML parser verifies both reference date and USD-per-EUR rate', () => {
@@ -197,14 +255,57 @@ test('canonical focus instrument reports READY for full MINBEIS coverage', async
   assert.equal(body.canonicalCompanyId, 'company:virgin-galactic-holdings');
 });
 
-test('unsupported Athens instrument fails closed instead of inventing canonical identity', async () => {
-  const response = await handleMarketGatewayRequest(new Request('https://gateway.test/v1/instrument?symbol=UNKNOWN.GR'), {}, { fetchImpl: async () => { throw new Error('should not call provider'); }, now: '2026-09-10T10:00:00.000Z' });
+test('unresolved Athens instrument capability stays fail-closed after official directory lookup', async () => {
+  const response = await handleMarketGatewayRequest(
+    new Request('https://gateway.test/v1/instrument?symbol=UNKNOWN.GR'),
+    {},
+    {
+      fetchImpl: async (url) => {
+        if (String(url).includes('/trading-products/trading-issuers')) {
+          return new Response(ATHENS_DIRECTORY_HTML, { status: 200, headers: { 'Content-Type': 'text/html' } });
+        }
+        throw new Error('quote endpoint must not run');
+      },
+      now: '2026-09-10T10:00:00.000Z',
+      athensDiscoveryOptions: { tradingDirectoryFallbackLastPage: 0 },
+    },
+  );
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.equal(body.identityVerified, false);
   assert.equal(body.quoteSupported, false);
   assert.equal(body.analysisSupported, false);
   assert.equal(body.onboardingStatus, 'IDENTITY_NOT_VERIFIED');
+});
+
+test('dynamic Athens capability verifies identity but requires MINBEIS research onboarding', async () => {
+  const response = await handleMarketGatewayRequest(
+    new Request('https://gateway.test/v1/instrument?symbol=QUEST.GR'),
+    {},
+    {
+      fetchImpl: async (url) => {
+        const value = String(url);
+        if (value.includes('/trading-products/trading-issuers')) {
+          return new Response(ATHENS_DIRECTORY_HTML, { status: 200, headers: { 'Content-Type': 'text/html' } });
+        }
+        if (value.includes('/market-data/instruments/stocks/QUEST')) {
+          return new Response(ATHENS_QUEST_QUOTE_HTML, { status: 200, headers: { 'Content-Type': 'text/html' } });
+        }
+        throw new Error('Unexpected URL: ' + value);
+      },
+      now: '2026-09-10T10:00:00.000Z',
+      athensDiscoveryOptions: { tradingDirectoryFallbackLastPage: 0 },
+      identityNow: Date.parse('2026-09-10T10:00:00.000Z'),
+    },
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.identityVerified, true);
+  assert.equal(body.quoteSupported, true);
+  assert.equal(body.analysisSupported, false);
+  assert.equal(body.onboardingStatus, 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED');
+  assert.equal(body.canonicalCompanyId, 'company:xath:isin:GRS310003009');
+  assert.equal(body.currency, 'EUR');
 });
 
 
