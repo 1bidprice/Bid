@@ -502,11 +502,11 @@ function PositionClarityCard({ clarity }) {
       </View>
       <View style={styles.positionClarityRow}>
         <Text style={styles.positionClarityLabel}>ΓΙΑΤΙ</Text>
-        <Text style={styles.positionClarityText}>{clarity.why}</Text>
+        <Text style={styles.positionClarityText}>{userFacingAnalysisText(clarity.why)}</Text>
       </View>
       <View style={styles.positionClarityRow}>
         <Text style={styles.positionClarityLabel}>ΤΙ ΘΑ ΑΛΛΑΞΕΙ ΤΗΝ ΕΙΚΟΝΑ</Text>
-        <Text style={styles.positionClarityText}>{clarity.change}</Text>
+        <Text style={styles.positionClarityText}>{userFacingAnalysisText(clarity.change)}</Text>
       </View>
     </View>
   );
