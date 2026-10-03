@@ -186,4 +186,47 @@ for (let i = 0; i < 500; i += 1) {
   if (market === 'US') close(result.eurValue, result.nativeValue / fxRate, 1e-7, `${symbol} EUR value`);
 }
 
-console.log('Portfolio engine PASS: synthetic 3-position valuation regression, fail-closed integrity cases, FIFO/average-cost ledger and 500 synthetic positions.');
+const scaleTransactions = [];
+const scalePrices = {};
+let expectedScaleValueEur = 0;
+let expectedScaleCostEur = 0;
+for (let i = 0; i < 1000; i += 1) {
+  const market = i % 2 ? 'US' : 'GR';
+  const currency = market === 'US' ? 'USD' : 'EUR';
+  const symbol = `LOAD${i}.${market}`;
+  const quantity = 1 + (i % 25);
+  const executionPrice = 10 + (i % 17);
+  const nativePrice = executionPrice + 1;
+  const total = quantity * executionPrice;
+  const fxRate = market === 'US' ? 1.1 : 1;
+  scaleTransactions.push({
+    id: `load-${i}`,
+    type: 'buy',
+    symbol,
+    company: `Load ${i}`,
+    quantity,
+    currency,
+    executionPrice,
+    total,
+    date: '2026-01-01',
+  });
+  scalePrices[symbol] = verifiedQuote(nativePrice, currency, { fxRate });
+  expectedScaleValueEur += market === 'US' ? (quantity * nativePrice) / fxRate : quantity * nativePrice;
+  expectedScaleCostEur += market === 'US' ? total / fxRate : total;
+}
+const scaleStarted = Date.now();
+const scaleSnapshot = buildPortfolioSnapshot(scaleTransactions, scalePrices);
+const scaleElapsedMs = Date.now() - scaleStarted;
+assert.equal(scaleSnapshot.positions.length, 1000, '1000-position combined portfolio must preserve every position');
+assert.equal(scaleSnapshot.summary.valuationCoverage, '1000/1000');
+assert.equal(scaleSnapshot.summary.valuesReady, true);
+assert.equal(scaleSnapshot.summary.costsReady, true);
+close(scaleSnapshot.summary.totalValue, expectedScaleValueEur, 1e-6, '1000-position total value');
+close(scaleSnapshot.summary.totalCost, expectedScaleCostEur, 1e-6, '1000-position total cost');
+
+const portfolioAppSource = read('PortfolioApp.js');
+assert.match(portfolioAppSource, /positions\.slice\(0, positionVisibleCount\)\.map/, 'position cards must be windowed');
+assert.match(portfolioAppSource, /slice\(0, transactionVisibleCount\)\.map/, 'transaction cards must be windowed');
+assert.match(portfolioAppSource, /POSITION_PAGE_SIZE = 50/, 'position UI page size must remain bounded');
+
+console.log(`Portfolio engine PASS: synthetic valuation/integrity regressions, 500 randomized positions, and 1000-position combined portfolio in ${scaleElapsedMs}ms with windowed UI.`);
