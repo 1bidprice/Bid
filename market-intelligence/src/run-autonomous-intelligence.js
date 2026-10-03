@@ -134,19 +134,76 @@ function byCompanyId(items = []) {
   return new Map(items.filter((item) => item?.companyId).map((item) => [item.companyId, item]));
 }
 
+function compactDecisionJournalContext(dossier, purchase, decision, decisionAt) {
+  const finalAction = dossier?.finalAction || null;
+  const market = dossier?.metrics?.market || null;
+  const eventTypes = (items = []) => [...new Set((Array.isArray(items) ? items : [])
+    .map((item) => item?.eventType || item?.type || null)
+    .filter(Boolean)
+    .map((value) => String(value)))].sort();
+
+  return {
+    format: 'minbeis-decision-context-snapshot',
+    version: 1,
+    capturedAt: decisionAt,
+    scope: 'AUTONOMOUS_NON_HOLDER_RESEARCH',
+    decision: {
+      action: decision?.action || null,
+      allocationPct: Number.isFinite(Number(decision?.allocationPct)) ? Number(decision.allocationPct) : 0,
+      reason: decision?.reason || null,
+      confidenceScore: Number.isFinite(Number(decision?.confidenceScore)) ? Number(decision.confidenceScore) : null,
+      dataQualityScore: Number.isFinite(Number(decision?.dataQualityScore)) ? Number(decision.dataQualityScore) : null,
+      blockers: Array.isArray(decision?.blockers) ? [...decision.blockers] : [],
+    },
+    finalAction: finalAction ? {
+      status: finalAction.status || null,
+      policyVersion: finalAction.policyVersion || null,
+      marketAction: finalAction.marketAction || null,
+      holderAction: finalAction.holderAction || null,
+      nonHolderAction: finalAction.nonHolderAction || null,
+      confidenceScore: Number.isFinite(Number(finalAction.confidenceScore)) ? Number(finalAction.confidenceScore) : null,
+      dataQualityScore: Number.isFinite(Number(finalAction.dataQualityScore)) ? Number(finalAction.dataQualityScore) : null,
+      blockers: Array.isArray(finalAction.blockers) ? [...finalAction.blockers] : [],
+      generatedAt: finalAction.generatedAt || null,
+    } : null,
+    purchaseReconciliation: purchase ? {
+      status: purchase.status || null,
+      buyNowEligible: purchase.buyNowEligible === true,
+      opportunityScore: Number.isFinite(Number(purchase.opportunityScore)) ? Number(purchase.opportunityScore) : null,
+      blockers: Array.isArray(purchase.blockers) ? [...purchase.blockers] : [],
+    } : null,
+    research: {
+      dossierId: dossier?.dossierId || null,
+      companyId: dossier?.companyId || null,
+      decisionBasis: dossier?.decisionBasis || null,
+      category: dossier?.category || null,
+      timeHorizon: dossier?.timeHorizon || null,
+      proposedAction: dossier?.proposedAction || null,
+      catalystEventTypes: eventTypes(dossier?.catalysts),
+      riskEventTypes: eventTypes(dossier?.risks),
+      leadEventType: dossier?.metrics?.leadClaim?.eventType || null,
+      marketRegimeSnapshot: market?.marketRegimeSnapshot || market?.regime || null,
+      marketAsOf: market?.latestTimestamp ? new Date(Number(market.latestTimestamp) * 1000).toISOString() : null,
+    },
+  };
+}
+
 function createCurrentMinbeisOutcomeRecords(purchaseReconciliation, dossiers, historicalSeriesCollector, generatedAt) {
-  const byDossierId = new Map((Array.isArray(dossiers) ? dossiers : []).filter((item) => item?.dossierId).map((item) => [item.dossierId, item]));
-  const byCompany = dossierMap(Array.isArray(dossiers) ? dossiers : []);
+  const purchases = Array.isArray(purchaseReconciliation?.decisions) ? purchaseReconciliation.decisions : [];
+  const purchaseByDossier = new Map(purchases.filter((item) => item?.dossierId).map((item) => [item.dossierId, item]));
+  const purchaseByCompany = new Map(purchases.filter((item) => item?.companyId || item?.instrumentId).map((item) => [item.companyId || item.instrumentId, item]));
   const records = [];
-  for (const purchase of purchaseReconciliation?.decisions || []) {
-    const dossier = (purchase?.dossierId && byDossierId.get(purchase.dossierId)) || byCompany.get(purchase?.companyId || purchase?.instrumentId) || null;
-    if (!dossier) continue;
+
+  for (const dossier of (Array.isArray(dossiers) ? dossiers : [])) {
+    if (dossier?.finalAction?.status !== 'FINAL') continue;
+    const purchase = (dossier?.dossierId && purchaseByDossier.get(dossier.dossierId))
+      || purchaseByCompany.get(dossier?.companyId)
+      || null;
     const decision = buildMinbeisDecision({
-      finalAction: dossier.finalAction || null,
+      finalAction: dossier.finalAction,
       opportunityPurchase: purchase,
       hasPosition: false,
     });
-    if (!['BUY_PROBE', 'BUY_STARTER', 'BUY_CORE'].includes(decision.action)) continue;
     const referencePrice = Number(dossier?.referencePrice?.value);
     if (!Number.isFinite(referencePrice) || referencePrice <= 0) continue;
     const decisionAt = finalActionDecisionTimestamp(dossier.finalAction, generatedAt);
@@ -155,9 +212,9 @@ function createCurrentMinbeisOutcomeRecords(purchaseReconciliation, dossiers, hi
       ? buildMinbeisSimpleBaselineSnapshot(marketSeries, decisionAt)
       : null;
     records.push(createMinbeisDecisionOutcomeRecord({
-      instrumentId: purchase.instrumentId || purchase.companyId || dossier.companyId,
-      companyId: purchase.companyId || dossier.companyId || null,
-      symbol: purchase.symbol || dossier?.listing?.symbol || dossier?.symbol || null,
+      instrumentId: purchase?.instrumentId || purchase?.companyId || dossier.companyId,
+      companyId: purchase?.companyId || dossier.companyId || null,
+      symbol: purchase?.symbol || dossier?.listing?.symbol || dossier?.symbol || null,
       action: decision.action,
       allocationPct: decision.allocationPct,
       decisionAt,
@@ -166,6 +223,10 @@ function createCurrentMinbeisOutcomeRecords(purchaseReconciliation, dossiers, hi
       benchmarkSymbol: dossier?.metrics?.market?.benchmarkSymbol || null,
       confidenceScore: decision.confidenceScore,
       dataQualityScore: decision.dataQualityScore,
+      decisionReason: decision.reason,
+      sourcePolicyVersion: decision.sourcePolicyVersion,
+      sourceStatus: decision.sourceStatus,
+      contextSnapshot: compactDecisionJournalContext(dossier, purchase, decision, decisionAt),
       simpleBaselineSnapshot,
     }));
   }
