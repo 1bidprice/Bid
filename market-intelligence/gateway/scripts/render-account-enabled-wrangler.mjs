@@ -32,14 +32,26 @@ export function buildAccountEnabledWranglerConfig(baseConfig, input = {}) {
 
   const existingD1 = Array.isArray(baseConfig.d1_databases) ? baseConfig.d1_databases : [];
   const retained = existingD1.filter((item) => item?.binding !== 'MINBEIS_ACCOUNTS_DB');
+  const remoteAlertsEnabled = input.remoteAlertsEnabled === true;
+  const remoteAlertCron = clean(input.remoteAlertCron || '*/5 * * * *');
+  if (remoteAlertsEnabled && remoteAlertCron !== '*/5 * * * *') {
+    throw new Error('MINBEIS_REMOTE_ALERT_CRON_INVALID');
+  }
 
   return {
     ...baseConfig,
     vars: {
       ...(baseConfig.vars || {}),
       MINBEIS_ACCOUNT_API_ENABLED: 'true',
+      MINBEIS_REMOTE_ALERTS_ENABLED: remoteAlertsEnabled ? 'true' : 'false',
       FIREBASE_PROJECT_ID: firebaseProjectId,
     },
+    ...(remoteAlertsEnabled ? {
+      triggers: {
+        ...(baseConfig.triggers || {}),
+        crons: [remoteAlertCron],
+      },
+    } : {}),
     d1_databases: [
       ...retained,
       {
@@ -59,6 +71,8 @@ async function main() {
     firebaseProjectId: process.env.FIREBASE_PROJECT_ID,
     databaseId: process.env.MINBEIS_ACCOUNTS_DB_ID,
     databaseName: process.env.MINBEIS_ACCOUNTS_DB_NAME || 'minbeis-accounts',
+    remoteAlertsEnabled: String(process.env.MINBEIS_REMOTE_ALERTS_ENABLED || '').toLowerCase() === 'true',
+    remoteAlertCron: process.env.MINBEIS_REMOTE_ALERT_CRON || '*/5 * * * *',
   });
   await writeFile(outputPath, `${JSON.stringify(rendered, null, 2)}\n`, 'utf8');
   console.log(`Rendered account-enabled Wrangler config to ${outputPath}`);
