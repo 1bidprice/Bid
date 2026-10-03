@@ -1,4 +1,5 @@
 import { fetchEuronextAthensQuote } from '../../src/adapters/euronext-athens-quote.js';
+import { fetchAthensCompaniesBySymbols } from '../../src/adapters/euronext-athens-discovery.js';
 import { fetchFinnhubQuote } from '../../src/adapters/finnhub-quote.js';
 import { buildCanonicalQuoteRegistry, canonicalizeMarketSnapshot } from '../../src/canonical-market-quote.js';
 import { fetchEcbEurUsdReference } from './ecb-reference-fx.js';
@@ -11,16 +12,106 @@ const ATHENS_COMPANIES = Object.freeze({
     displayName: 'Allwyn',
     country: 'GR',
     currency: 'EUR',
-    primaryListing: Object.freeze({ symbol: 'ALWN', mic: 'XATH', exchange: 'Euronext Athens', currency: 'EUR' }),
+    activeTradingVerified: true,
+    identitySource: 'BUILT_IN_CANONICAL_EURONEXT_ATHENS',
+    primaryListing: Object.freeze({ symbol: 'ALWN', mic: 'XATH', exchange: 'Euronext Athens', currency: 'EUR', activeTradingVerified: true }),
   }),
   CREDIA: Object.freeze({
     companyId: 'company:crediabank',
     displayName: 'CrediaBank',
     country: 'GR',
     currency: 'EUR',
-    primaryListing: Object.freeze({ symbol: 'CREDIA', mic: 'XATH', exchange: 'Euronext Athens', currency: 'EUR' }),
+    activeTradingVerified: true,
+    identitySource: 'BUILT_IN_CANONICAL_EURONEXT_ATHENS',
+    primaryListing: Object.freeze({ symbol: 'CREDIA', mic: 'XATH', exchange: 'Euronext Athens', currency: 'EUR', activeTradingVerified: true }),
   }),
 });
+
+
+const ATHENS_IDENTITY_CACHE = new Map();
+const ATHENS_IDENTITY_CACHE_TTL_MS = 60 * 60 * 1000;
+
+function validDynamicAthensCompany(company, symbol) {
+  if (!company || typeof company !== 'object') return false;
+  if (String(company.primaryListing?.symbol || '').trim().toUpperCase() !== symbol) return false;
+  if (String(company.primaryListing?.mic || '').trim().toUpperCase() !== 'XATH') return false;
+  if (String(company.primaryListing?.currency || company.currency || '').trim().toUpperCase() !== 'EUR') return false;
+  if (company.activeTradingVerified !== true) return false;
+  if (String(company.identitySource || '') !== 'EURONEXT_ATHENS_TRADING_ISSUERS') return false;
+  if (!company.issuerId && !company.isin) return false;
+  return true;
+}
+
+function suppliedDynamicAthensCompany(symbol, options = {}) {
+  const supplied = options.dynamicAthensCompanies;
+  if (supplied instanceof Map) return supplied.get(symbol) || supplied.get(`${symbol}.GR`) || null;
+  if (supplied && typeof supplied === 'object') return supplied[symbol] || supplied[`${symbol}.GR`] || null;
+  return null;
+}
+
+export async function resolveDynamicAthensCompany(symbolInput, options = {}) {
+  const symbol = String(symbolInput || '').trim().toUpperCase().replace(/\.GR$/i, '');
+  if (!/^[A-Z0-9._-]{1,16}$/.test(symbol)) {
+    return { company: null, diagnostics: [{ code: 'ATHENS_SYMBOL_INVALID' }] };
+  }
+
+  const builtIn = ATHENS_COMPANIES[symbol] || null;
+  if (builtIn) return { company: builtIn, diagnostics: [], source: 'BUILT_IN' };
+
+  const supplied = suppliedDynamicAthensCompany(symbol, options);
+  if (validDynamicAthensCompany(supplied, symbol)) {
+    return { company: supplied, diagnostics: [], source: 'PRE_RESOLVED' };
+  }
+
+  const now = Number(options.identityNow ?? Date.now());
+  const cached = ATHENS_IDENTITY_CACHE.get(symbol);
+  if (cached && cached.expiresAt > now && validDynamicAthensCompany(cached.company, symbol)) {
+    return { company: cached.company, diagnostics: [], source: 'CACHE' };
+  }
+
+  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  if (typeof fetchImpl !== 'function') {
+    return { company: null, diagnostics: [{ code: 'ATHENS_DISCOVERY_FETCH_UNAVAILABLE' }] };
+  }
+
+  const discovery = await fetchAthensCompaniesBySymbols([symbol], {
+    fetchImpl,
+    generatedAt: options.generatedAt || options.now || new Date(now).toISOString(),
+    ...(options.athensDiscoveryOptions || {}),
+  });
+  const resolution = (discovery.results || []).find((item) => item.symbol === symbol) || null;
+  const company = (discovery.companies || []).find(
+    (item) => String(item?.primaryListing?.symbol || '').trim().toUpperCase() === symbol,
+  ) || null;
+
+  if (resolution?.status !== 'RESOLVED' || !validDynamicAthensCompany(company, symbol)) {
+    return {
+      company: null,
+      diagnostics: [
+        ...(discovery.diagnostics || []),
+        {
+          code: resolution?.code || 'ATHENS_IDENTITY_NOT_VERIFIED',
+          symbol,
+          matchCount: resolution?.matchCount ?? null,
+        },
+      ],
+      source: 'OFFICIAL_DIRECTORY',
+    };
+  }
+
+  ATHENS_IDENTITY_CACHE.set(symbol, {
+    company,
+    expiresAt: now + Math.max(
+      5 * 60 * 1000,
+      Number(options.athensIdentityCacheTtlMs || ATHENS_IDENTITY_CACHE_TTL_MS),
+    ),
+  });
+  return {
+    company,
+    diagnostics: discovery.diagnostics || [],
+    source: 'OFFICIAL_DIRECTORY',
+  };
+}
 
 const CORS_HEADERS = 'Content-Type, X-Investor-Control-Client';
 
@@ -94,6 +185,7 @@ function validateCanonicalQuote(quote, parsed) {
     return { ok: false, code: 'CANONICAL_US_IDENTITY_NOT_VERIFIED' };
   }
   if (parsed.market === 'GR') {
+    if (quote.quoteContract?.identityVerified !== true) return { ok: false, code: 'CANONICAL_ATHENS_IDENTITY_NOT_VERIFIED' };
     if (quote.currency !== 'EUR') return { ok: false, code: 'CANONICAL_ATHENS_CURRENCY_INVALID' };
     if (quote.quoteContract?.sourceRole !== 'PRIMARY_EXCHANGE') return { ok: false, code: 'CANONICAL_ATHENS_SOURCE_INVALID' };
     if (Number(quote.quoteContract?.advertisedDelayMinutes || 0) < 15) {
@@ -132,19 +224,27 @@ export async function resolveCanonicalGatewayQuote(appSymbol, env = {}, options 
       };
     }
   } else {
-    company = ATHENS_COMPANIES[parsed.symbol] || null;
+    const resolvedIdentity = await resolveDynamicAthensCompany(parsed.symbol, {
+      ...options,
+      fetchImpl,
+      generatedAt,
+    });
+    company = resolvedIdentity.company;
     if (!company) {
       return {
-        status: 400,
+        status: 409,
         error: {
-          code: 'ATHENS_SYMBOL_NOT_ALLOWED',
-          message: 'Athens gateway v1 only serves exchange identities that are explicitly canonicalized.',
-          details: { allowedSymbols: Object.keys(ATHENS_COMPANIES).map((symbol) => `${symbol}.GR`) },
+          code: 'ATHENS_IDENTITY_NOT_VERIFIED',
+          message: 'The Athens instrument was not found as one unambiguous stock identity in the official Euronext Athens Trading Issuers directory.',
+          details: { diagnostics: resolvedIdentity.diagnostics || [] },
         },
       };
     }
     try {
       result = await fetchEuronextAthensQuote(company, { fetchImpl, generatedAt });
+      if (result?.diagnostics && resolvedIdentity.diagnostics?.length) {
+        result = { ...result, diagnostics: [...resolvedIdentity.diagnostics, ...result.diagnostics] };
+      }
     } catch (error) {
       return {
         status: 502,
@@ -219,8 +319,7 @@ export async function resolveInstrumentCapability(appSymbol, env = {}, options =
 
   const quoteSupported = quoteResult?.status === 200;
   const quote = quoteSupported ? quoteResult.body.quote : null;
-  const identityVerified = quote?.quoteContract?.identityVerified === true
-    || (parsed.market === 'GR' && quote?.quoteContract?.sourceRole === 'PRIMARY_EXCHANGE');
+  const identityVerified = quote?.quoteContract?.identityVerified === true;
 
   const completedEnrollment = canonicalFocus ? null : await completedResearchEnrollment(parsed.appSymbol, env);
   const analysisSupported = Boolean(canonicalFocus || completedEnrollment);
