@@ -320,6 +320,60 @@ test('batch quote route charges client once while preserving per-resource upstre
   assert.equal(body.privacy.pnlRequired, false);
 });
 
+test('batch resolves multiple dynamic Athens identities with one official directory fetch', async () => {
+  const clientCalls = [];
+  const upstreamCalls = [];
+  const fetchCalls = [];
+  const directoryHtml = `
+    <table><tbody>
+      <tr><td>QUEST HOLDINGS S.A.</td><td>GRS310003009</td><td><a href="/en/market-data/instruments/stocks/QUEST">QUEST</a></td><td>ATHEX</td><td>SHRS</td><td>MAIN MARKET</td><td>Stock</td><td>QUEST HOLDINGS</td></tr>
+      <tr><td>CENERGY HOLDINGS S.A.</td><td>BE0974303357</td><td><a href="/en/market-data/instruments/stocks/CENER">CENER</a></td><td>ATHEX</td><td>SHRS</td><td>MAIN MARKET</td><td>Stock</td><td>CENERGY HOLDINGS</td></tr>
+    </tbody></table>`;
+  const quoteHtml = `<html><body><div>Last Traded Price 7,25</div><div>Previous Close 7,10</div><div>Opening Price 7,15</div><div>Daily High Price 7,30</div><div>Daily Low Price 7,05</div><div>Total Volume 12.345</div></body></html>`;
+  const fetchImpl = async (url) => {
+    const value = String(url);
+    fetchCalls.push(value);
+    if (value.includes('/trading-products/trading-issuers')) {
+      return new Response(directoryHtml, { status: 200, headers: { 'Content-Type': 'text/html' } });
+    }
+    if (value.includes('/market-data/instruments/stocks/QUEST') || value.includes('/market-data/instruments/stocks/CENER')) {
+      return new Response(quoteHtml, { status: 200, headers: { 'Content-Type': 'text/html' } });
+    }
+    throw new Error('Unexpected Athens batch URL: ' + value);
+  };
+
+  const response = await handleMarketGatewayEdgeRequest(
+    batchRequest(['QUEST.GR', 'CENER.GR']),
+    {
+      MARKET_GATEWAY_CLIENT_RATE_LIMITER: limiter(true, clientCalls),
+      MARKET_GATEWAY_UPSTREAM_RATE_LIMITER: limiter(true, upstreamCalls),
+    },
+    {},
+    {
+      coreOptions: {
+        fetchImpl,
+        now: '2026-09-10T10:00:00.000Z',
+        identityNow: Date.parse('2026-09-10T10:00:00.000Z'),
+        athensIdentityCache: new Map(),
+        athensDiscoveryOptions: { tradingDirectoryFallbackLastPage: 0 },
+      },
+    },
+  );
+
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.quoteRegistry['QUEST.GR'].isin, 'GRS310003009');
+  assert.equal(body.quoteRegistry['CENER.GR'].isin, 'BE0974303357');
+  assert.equal(body.quoteRegistry['QUEST.GR'].quoteContract.identityVerified, true);
+  assert.equal(body.quoteRegistry['CENER.GR'].quoteContract.identityVerified, true);
+  assert.equal(fetchCalls.filter((url) => url.includes('/trading-products/trading-issuers')).length, 1);
+  assert.equal(fetchCalls.filter((url) => url.includes('/market-data/instruments/stocks/QUEST')).length, 1);
+  assert.equal(fetchCalls.filter((url) => url.includes('/market-data/instruments/stocks/CENER')).length, 1);
+  assert.deepEqual(clientCalls, [`client:${CLIENT_ID}`]);
+  assert.deepEqual(upstreamCalls.sort(), ['upstream:GR', 'upstream:GR', 'upstream:GR_IDENTITY'].sort());
+  assert.equal(body.errors.length, 0);
+});
+
 test('batch quote route rejects portfolio fields before provider work', async () => {
   let limiterCalls = 0;
   let providerCalls = 0;
