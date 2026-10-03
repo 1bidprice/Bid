@@ -38,6 +38,7 @@ import { reconcileOpportunityPurchaseDecisions } from './opportunity-purchase-re
 import { buildOperationalHealth } from './operational-health.js';
 import { buildMinbeisDecision } from './minbeis-decision-layer.js';
 import { createMinbeisDecisionOutcomeRecord, evaluateMinbeisDecisionOutcome, mergeMinbeisDecisionOutcomeLedger, summarizeMinbeisDecisionOutcomes } from './minbeis-decision-outcome-ledger.js';
+import { summarizeMinbeisDecisionLearningReviews } from './minbeis-decision-learning-review.js';
 import { buildMinbeisSimpleBaselineSnapshot, summarizeMinbeisBaselineComparison } from './minbeis-simple-baseline.js';
 import { resolveQueuedResearchUniverse } from './research-queue-onboarding.js';
 
@@ -519,14 +520,16 @@ export async function runAutonomousIntelligence(options = {}) {
   const mergedMinbeisOutcomeRecords = mergeMinbeisDecisionOutcomeLedger(options.minbeisDecisionOutcomeRecords || [], currentMinbeisOutcomeRecords);
   const minbeisDecisionOutcomeRecords = evaluateCurrentMinbeisOutcomeLedger(mergedMinbeisOutcomeRecords, historicalSeriesCollector, benchmarkSeriesCollector, generatedAt);
   const minbeisDecisionOutcomeSummary = summarizeMinbeisDecisionOutcomes(minbeisDecisionOutcomeRecords);
+  const minbeisDecisionLearningReview = summarizeMinbeisDecisionLearningReviews(minbeisDecisionOutcomeRecords, { horizon: '30' });
   const minbeisSimpleBaselineComparison = summarizeMinbeisBaselineComparison(minbeisDecisionOutcomeRecords);
   if (typeof options.minbeisDecisionOutcomeLedgerSink === 'function') {
     await options.minbeisDecisionOutcomeLedgerSink({
       format: 'investor-control-minbeis-decision-outcome-archive',
-      version: 1,
+      version: 2,
       updatedAt: generatedAt,
       records: minbeisDecisionOutcomeRecords,
       summary: minbeisDecisionOutcomeSummary,
+      learningReview: minbeisDecisionLearningReview,
       simpleBaselineComparison: minbeisSimpleBaselineComparison,
     });
   }
@@ -691,6 +694,7 @@ const operationalHealth = buildOperationalHealth({
     opportunityDeepVerificationQueue,
     opportunityPurchaseReconciliation,
     minbeisDecisionOutcomeSummary,
+    minbeisDecisionLearningReview,
     minbeisSimpleBaselineComparison,
     minbeisDecisionOutcomeRecordCount: minbeisDecisionOutcomeRecords.length,
     researchDossiers,
