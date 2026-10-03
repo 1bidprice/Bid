@@ -40,6 +40,10 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Install pinned gateway dependency
+        working-directory: market-intelligence
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+
       - name: Verify gateway source syntax
         working-directory: market-intelligence
         run: |
@@ -53,6 +57,7 @@ jobs:
           node --check gateway/src/account-repository.js
           node --check gateway/src/account-api.js
           node --check gateway/src/expo-push-transport.js
+          node --check gateway/src/firebase-token-verifier.js
           node -e "JSON.parse(require('fs').readFileSync('gateway/wrangler.jsonc','utf8'))"
 
       - name: Verify canonical source invariant
@@ -61,7 +66,7 @@ jobs:
 
       - name: Run gateway security, edge and market-data contracts
         working-directory: market-intelligence
-        run: node --test test/market-gateway.test.js test/market-gateway-edge.test.js test/tenant-contract.test.js test/push-contract.test.js test/account-api.test.js test/expo-push-transport.test.js
+        run: node --test test/market-gateway.test.js test/market-gateway-edge.test.js test/tenant-contract.test.js test/push-contract.test.js test/account-api.test.js test/expo-push-transport.test.js gateway/test/firebase-token-verifier.contract.mjs
 
       - name: Verify deployment workflow is manual-only and CLI-compatible
         shell: bash
