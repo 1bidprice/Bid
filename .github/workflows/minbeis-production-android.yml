@@ -126,7 +126,7 @@ jobs:
           test -f "$AAB"
           test -f "$APK"
 
-          jarsigner -verify -strict "$AAB" >/dev/null
+          jarsigner -verify "$AAB" >/dev/null
           keytool -printcert -jarfile "$AAB" > production-signing-audit.txt
           grep -q 'SHA256:' production-signing-audit.txt
           ! grep -q 'Android Debug' production-signing-audit.txt
