@@ -66,7 +66,7 @@ jobs:
 
       - name: Run gateway security, edge and market-data contracts
         working-directory: market-intelligence
-        run: node --test test/market-gateway.test.js test/market-gateway-edge.test.js test/tenant-contract.test.js test/push-contract.test.js test/account-api.test.js test/expo-push-transport.test.js gateway/test/firebase-token-verifier.contract.mjs
+        run: node --test test/market-gateway.test.js test/market-gateway-edge.test.js test/tenant-contract.test.js test/push-contract.test.js test/account-api.test.js test/expo-push-transport.test.js gateway/contracts/firebase-token-verifier.contract.mjs
 
       - name: Verify deployment workflow is manual-only and CLI-compatible
         shell: bash
