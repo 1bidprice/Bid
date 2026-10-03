@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { INSTALLATION_ID_SECURE_KEY } from './local-data-ownership';
 import { getMinbeisExpoPushRegistration } from './push-registration';
 import { registerMinbeisDevice, revokeMinbeisDevice } from './account-client';
+import { setRemotePushEnabledLocally } from './remote-alert-sync';
 
 export const MINBEIS_DEVICE_SYNC_VERSION = '2026-10-03.1';
 
@@ -42,6 +43,7 @@ export async function enableRemotePushForCurrentDevice(options = {}) {
     fetchImpl: options.fetchImpl,
     baseUrl: options.baseUrl,
   });
+  await setRemotePushEnabledLocally(true, options.storage);
   return {
     enabled: true,
     installationId,
@@ -59,6 +61,7 @@ export async function disableRemotePushForCurrentDevice(options = {}) {
     fetchImpl: options.fetchImpl,
     baseUrl: options.baseUrl,
   });
+  await setRemotePushEnabledLocally(false, options.storage);
   return {
     enabled: false,
     installationId,
