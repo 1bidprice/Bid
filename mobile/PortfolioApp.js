@@ -57,6 +57,7 @@ import {
 } from './src/instrument-entry';
 import { buildPortfolioSnapshot } from './src/portfolio-engine';
 import PortfolioHistoryChart from './src/PortfolioHistoryChart';
+import PortfolioInsightsCard from './src/PortfolioInsightsCard';
 import {
   PORTFOLIO_HISTORY_STORAGE_KEY,
   createPortfolioHistoryState,
@@ -1229,6 +1230,7 @@ function MainApp({ onOpenDecisionGate }) {
           <View style={styles.grid}><Metric compact={compactMetrics} label={valuesReady ? 'Αξία χαρτοφυλακίου' : 'Επιβεβ. αξία'} value={cash(totalValue)} /><Metric compact={compactMetrics} label={costsReady ? 'Καθαρό κόστος' : 'Επιβεβ. κόστος'} value={cash(totalCost)} /><Metric compact={compactMetrics} label={valuesReady ? 'Κέρδος / Ζημία' : 'Επιβεβ. αποτέλεσμα'} value={cash(totalPnl)} negative={totalPnl < 0} positiveValue={totalPnl > 0} /><Metric compact={compactMetrics} label="Κάλυψη τιμών" value={valuationCoverage} /></View>
           {!valuesReady ? <Text style={styles.warning}>Μερική αποτίμηση {valuationCoverage}. Εξαιρούνται από την αξία και το αποτέλεσμα μόνο οι θέσεις χωρίς χρησιμοποιήσιμη τιμή ή ισοτιμία: {missingValuationSymbols.join(', ') || '—'}.</Text> : null}
           <PortfolioHistoryChart historyState={portfolioHistory} />
+          <PortfolioInsightsCard positions={positions} />
           <Pressable style={[styles.minbeisHomeCard, minbeisHomeSummary.state === 'ATTENTION' && styles.minbeisHomeCardAttention]} onPress={() => setTab('opportunities')}>
             <View style={styles.minbeisHomeTop}>
               <View style={styles.grow}>
