@@ -67,14 +67,19 @@ jobs:
           node --check gateway/src/core.js
           node --check gateway/src/edge.js
           node --check gateway/src/index.js
+          node --check gateway/src/tenant-contract.js
+          node --check gateway/src/push-contract.js
+          node --check gateway/src/auth-boundary.js
+          node --check gateway/src/account-repository.js
+          node --check gateway/src/account-api.js
           node scripts/verify-canonical-source.js
-          node --test test/market-gateway.test.js test/market-gateway-edge.test.js
+          node --test test/market-gateway.test.js test/market-gateway-edge.test.js test/tenant-contract.test.js test/push-contract.test.js test/account-api.test.js
 
       - name: Verify MINBEIS research queue contract
         working-directory: market-intelligence
         run: |
           set -euo pipefail
-          node --test test/research-queue-onboarding.test.js test/market-gateway.test.js test/market-gateway-edge.test.js
+          node --test test/research-queue-onboarding.test.js test/market-gateway.test.js test/market-gateway-edge.test.js test/tenant-contract.test.js test/push-contract.test.js test/account-api.test.js
           grep -q '"binding": "MINBEIS_RESEARCH_QUEUE"' gateway/wrangler.jsonc
 
       - name: Production bundle dry-run before deployment
