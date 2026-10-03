@@ -20,6 +20,8 @@ assert.match(authSource, /EXPO_PUBLIC_FIREBASE_API_KEY/);
 assert.match(authSource, /EXPO_PUBLIC_FIREBASE_PROJECT_ID/);
 assert.match(authSource, /EXPO_PUBLIC_FIREBASE_APP_ID/);
 assert.match(authSource, /sendEmailVerification/);
+assert.match(authSource, /prepareMinbeisAccountDeletion/);
+assert.match(authSource, /deleteUser/);
 assert.match(authSource, /verificationSent: true/);
 assert.doesNotMatch(authSource, /serviceAccount|private_key|client_secret/i, 'mobile auth source must not contain server credentials');
 
@@ -28,6 +30,7 @@ assert.match(accountSource, /X-Investor-Control-Client/);
 assert.match(accountSource, /\/v1\/account\/device/);
 assert.match(accountSource, /\/v1\/account\/alerts/);
 assert.doesNotMatch(accountSource, /quantity|costBasis|pnl/i, 'cloud account client must not transport portfolio holdings or P/L');
+assert.match(accountSource, /deleteMinbeisCloudAccount/);
 
 assert.match(accountUiSource, /if \(!configured\) return null;/, 'account UI must stay hidden without Firebase config');
 assert.match(accountUiSource, /Το portfolio παραμένει τοπικά και δεν ανεβαίνει στο cloud/);
@@ -49,3 +52,15 @@ const serialized = JSON.stringify(app);
 assert.doesNotMatch(serialized, /FIREBASE_API_KEY|private_key|client_secret/i, 'Firebase config must not be hard-coded into app.json');
 
 console.log('Account readiness PASS: pinned Firebase auth adapter is opt-in, React Native persistent, private API authenticated, and portfolio data remains outside cloud account transport.');
+
+
+assert.match(accountUiSource, /Διαγραφή cloud λογαριασμού/);
+assert.match(accountUiSource, /prepareMinbeisAccountDeletion/);
+assert.match(accountUiSource, /deleteMinbeisCloudAccount/);
+assert.match(accountUiSource, /minbeisDeleteIdentity/);
+assert.match(accountUiSource, /τοπικό portfolio/);
+assert.match(accountUiSource, /disableRemotePushForCurrentDevice/);
+assert.match(deviceSyncSource, /setRemotePushEnabledLocally\(true/);
+assert.match(deviceSyncSource, /setRemotePushEnabledLocally\(false/);
+assert.match(remoteSyncSource, /REMOTE_PUSH_ENABLED_STORAGE_KEY/);
+assert.doesNotMatch(remoteSyncSource, /quantity|costBasis|pnl/i, 'remote alert sync must stay portfolio-minimal');
