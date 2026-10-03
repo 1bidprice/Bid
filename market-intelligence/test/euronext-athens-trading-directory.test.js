@@ -45,3 +45,33 @@ test('symbol resolver uses official ISIN as a stable canonical identity when iss
   assert.equal(result.companies[0].activeTradingVerified, true);
   assert.equal(result.companies[0].identitySource, 'EURONEXT_ATHENS_TRADING_ISSUERS');
 });
+
+
+test('trading directory preserves multiple official stock identities for the same issuer', () => {
+  const html = `
+  <table><tbody>
+    <tr><td>EXAMPLE HOLDINGS S.A.</td><td>GRS000000001</td><td><a href="/en/market-data/instruments/stocks/EXA">EXA</a></td><td>ATHEX</td><td>SHRS</td><td>MAIN MARKET</td><td>Stock</td><td>EXAMPLE A</td></tr>
+    <tr><td>EXAMPLE HOLDINGS S.A.</td><td>GRS000000019</td><td><a href="/en/market-data/instruments/stocks/EXB">EXB</a></td><td>ATHEX</td><td>SHRS</td><td>MAIN MARKET</td><td>Stock</td><td>EXAMPLE B</td></tr>
+  </tbody></table>`;
+  const result = extractAthensTradingDirectory(html);
+  assert.equal(result.records.length, 2);
+  assert.deepEqual(result.records.map((x) => x.symbol).sort(), ['EXA', 'EXB']);
+  assert.deepEqual(result.records.map((x) => x.isin).sort(), ['GRS000000001', 'GRS000000019']);
+});
+
+test('symbol resolver selects the exact instrument when one issuer has multiple stock symbols', async () => {
+  const html = `
+  <table><tbody>
+    <tr><td>EXAMPLE HOLDINGS S.A.</td><td>GRS000000001</td><td><a href="/en/market-data/instruments/stocks/EXA">EXA</a></td><td>ATHEX</td><td>SHRS</td><td>MAIN MARKET</td><td>Stock</td><td>EXAMPLE A</td></tr>
+    <tr><td>EXAMPLE HOLDINGS S.A.</td><td>GRS000000019</td><td><a href="/en/market-data/instruments/stocks/EXB">EXB</a></td><td>ATHEX</td><td>SHRS</td><td>MAIN MARKET</td><td>Stock</td><td>EXAMPLE B</td></tr>
+  </tbody></table>`;
+  const result = await fetchAthensCompaniesBySymbols(['EXB'], {
+    fetchImpl: async () => ({ ok: true, text: async () => html }),
+    generatedAt: '2026-10-03T12:00:00.000Z',
+    tradingDirectoryFallbackLastPage: 0,
+  });
+  assert.equal(result.companies.length, 1);
+  assert.equal(result.companies[0].primaryListing.symbol, 'EXB');
+  assert.equal(result.companies[0].isin, 'GRS000000019');
+  assert.equal(result.companies[0].companyId, 'company:xath:isin:GRS000000019');
+});
