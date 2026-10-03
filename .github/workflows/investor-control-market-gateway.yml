@@ -87,6 +87,28 @@ jobs:
           grep -Fq 'wrangler@4.129.1 deploy --secrets-file' "$WF"
           npx --yes wrangler@4.129.1 deploy --help | grep -F -- '--secrets-file'
 
+      - name: Verify account activation workflow is manual-only and guarded
+        shell: bash
+        run: |
+          set -euo pipefail
+          WF='.github/workflows/minbeis-account-backend-activate.yml'
+          test -f "$WF"
+          grep -q '^  workflow_dispatch:' "$WF"
+          ! grep -Eq '^  (push|pull_request|schedule):' "$WF"
+          grep -Fq 'ENABLE_ACCOUNTS' "$WF"
+          grep -Fq 'expected_sha' "$WF"
+          grep -Fq 'MINBEIS_ACCOUNT_PRODUCTION_ENABLED' "$WF"
+          grep -Fq 'MINBEIS_TENANT_HMAC_SECRET' "$WF"
+          grep -Fq 'MINBEIS_ACCOUNTS_DB_ID' "$WF"
+          grep -Fq 'FIREBASE_PROJECT_ID' "$WF"
+          grep -Fq 'render-account-enabled-wrangler.mjs' "$WF"
+          grep -Fq 'd1 execute MINBEIS_ACCOUNTS_DB' "$WF"
+          grep -Fq 'portfolioCloudSync' "$WF"
+
+          LEGACY='.github/workflows/investor-control-market-gateway-deploy.yml'
+          grep -Fq 'Prevent accidental account-backend downgrade' "$LEGACY"
+          grep -Fq 'MINBEIS_ACCOUNT_PRODUCTION_ENABLED' "$LEGACY"
+
       - name: Wrangler production bundle dry-run only
         working-directory: market-intelligence/gateway
         run: |
