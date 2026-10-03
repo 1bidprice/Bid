@@ -73,8 +73,9 @@ jobs:
           node --check gateway/src/account-repository.js
           node --check gateway/src/account-api.js
           node --check gateway/src/expo-push-transport.js
+          node --check gateway/src/firebase-token-verifier.js
           node scripts/verify-canonical-source.js
-          node --test test/market-gateway.test.js test/market-gateway-edge.test.js test/tenant-contract.test.js test/push-contract.test.js test/account-api.test.js test/expo-push-transport.test.js
+          node --test test/market-gateway.test.js test/market-gateway-edge.test.js test/tenant-contract.test.js test/push-contract.test.js test/account-api.test.js test/expo-push-transport.test.js gateway/test/firebase-token-verifier.contract.mjs
 
       - name: Verify MINBEIS research queue contract
         working-directory: market-intelligence
