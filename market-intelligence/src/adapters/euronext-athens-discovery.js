@@ -308,7 +308,7 @@ function validOasisSymbol(value) {
 export function extractAthensTradingDirectory(html) {
   const records = [];
   const diagnostics = [];
-  const byName = new Map();
+  const byInstrument = new Map();
 
   for (const row of tableRows(html)) {
     const values = cells(row);
@@ -339,15 +339,15 @@ export function extractAthensTradingDirectory(html) {
       sourceUrl: ATHENS_TRADING_ISSUERS_URL,
     };
 
-    const existing = byName.get(record.normalizedIssuerName);
+    const identityKey = `${record.symbol}|${record.isin || ''}`;
+    const existing = byInstrument.get(identityKey);
     const score = (linked ? 4 : 0) + (/stock|share|common/i.test(rowText) ? 2 : 0) + (isin ? 1 : 0);
     if (!existing || score > existing._score) {
-      const selected = { ...record, _score: score };
-      byName.set(record.normalizedIssuerName, selected);
+      byInstrument.set(identityKey, { ...record, _score: score });
     }
   }
 
-  for (const item of byName.values()) {
+  for (const item of byInstrument.values()) {
     const { _score, ...record } = item;
     records.push(record);
   }
@@ -359,10 +359,22 @@ function matchTradingDirectory(company, directory) {
   const records = Array.isArray(directory?.records) ? directory.records : [];
   const target = normalizedName(company?.displayName || company?.legalName);
   if (!target) return null;
-  const exact = records.find((item) => item.normalizedIssuerName === target);
-  if (exact) return exact;
+  const requestedSymbol = String(company?.primaryListing?.symbol || '').trim().toUpperCase();
+
+  const exact = records.filter((item) => item.normalizedIssuerName === target);
+  if (requestedSymbol) {
+    const symbolExact = exact.filter((item) => item.symbol === requestedSymbol);
+    if (symbolExact.length === 1) return symbolExact[0];
+  }
+  if (exact.length === 1) return exact[0];
+  if (exact.length > 1) return null;
+
   const candidates = records.filter((item) => item.normalizedIssuerName
     && (item.normalizedIssuerName.includes(target) || target.includes(item.normalizedIssuerName)));
+  if (requestedSymbol) {
+    const symbolCandidate = candidates.filter((item) => item.symbol === requestedSymbol);
+    if (symbolCandidate.length === 1) return symbolCandidate[0];
+  }
   return candidates.length === 1 ? candidates[0] : null;
 }
 
