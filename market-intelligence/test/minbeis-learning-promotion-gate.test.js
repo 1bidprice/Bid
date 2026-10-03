@@ -3,9 +3,14 @@ import assert from 'node:assert/strict';
 import { evaluateMinbeisLearningPromotionGate } from '../src/minbeis-learning-promotion-gate.js';
 
 function rows(n, delta=2){
+  const base=Date.parse('2026-01-01T00:00:00Z');
   return Array.from({length:n},(_,i)=>({
-    proposalId:'p1',decisionId:'d'+i,decisionAt:`2026-${String((i%6)+1).padStart(2,'0')}-${String((i%27)+1).padStart(2,'0')}T00:00:00Z`,
-    instrumentId:'c'+(i%12),challengerDeltaPct:delta,validationMode:'PROSPECTIVE_SHADOW_OOS'
+    proposalId:'p1',
+    decisionId:'d'+i,
+    decisionAt:new Date(base + i*86_400_000).toISOString(),
+    instrumentId:'c'+(i%12),
+    challengerDeltaPct:delta,
+    validationMode:'PROSPECTIVE_SHADOW_OOS'
   }));
 }
 
