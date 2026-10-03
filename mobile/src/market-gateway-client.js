@@ -52,6 +52,7 @@ function validateGatewayQuote(appSymbol, payload) {
   if (!/^[A-Z]{3}$/.test(String(quote.currency || ''))) return 'GATEWAY_CURRENCY_INVALID';
   if (quote?.quoteContract?.sourceApproved !== true) return 'GATEWAY_SOURCE_NOT_APPROVED';
   if (appSymbol.endsWith('.US') && quote?.quoteContract?.identityVerified !== true) return 'GATEWAY_US_IDENTITY_NOT_VERIFIED';
+  if (appSymbol.endsWith('.GR') && quote?.quoteContract?.identityVerified !== true) return 'GATEWAY_ATHENS_IDENTITY_NOT_VERIFIED';
   if (appSymbol.endsWith('.GR') && quote?.quoteContract?.sourceRole !== 'PRIMARY_EXCHANGE') return 'GATEWAY_ATHENS_SOURCE_INVALID';
   return null;
 }
