@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Svg, { Line, Path } from 'react-native-svg';
-import { portfolioHistoryPointsForRange } from './portfolio-history';
+import { PORTFOLIO_HISTORY_RANGES, portfolioHistoryPointsForRange } from './portfolio-history';
 
 const RANGES = ['1H', '1D', '1W', '1M', '6M', '1Y'];
 
@@ -20,6 +20,17 @@ function pct(value) {
   if (!Number.isFinite(Number(value))) return '—';
   const numeric = Number(value);
   return `${numeric > 0 ? '+' : ''}${numeric.toFixed(2)}%`;
+}
+
+function coverageText(milliseconds) {
+  if (!Number.isFinite(milliseconds) || milliseconds <= 0) return 'λιγότερο από 1 ώρα';
+  const hours = milliseconds / (60 * 60 * 1000);
+  if (hours < 24) return `${Math.max(1, Math.round(hours))} ώρες`;
+  const days = hours / 24;
+  if (days < 62) return `${Math.max(1, Math.round(days))} ημέρες`;
+  const months = days / 30.44;
+  if (months < 18) return `${Math.max(1, Math.round(months))} μήνες`;
+  return `${(days / 365.25).toFixed(1)} έτη`;
 }
 
 function pathFor(points, width, height) {
@@ -53,6 +64,19 @@ export default function PortfolioHistoryChart({ historyState }) {
   const changePct = first && last && Number(first.value) !== 0 ? (change / Number(first.value)) * 100 : null;
   const positive = Number(change) > 0;
   const negative = Number(change) < 0;
+  const allPoints = Array.isArray(historyState?.points)
+    ? historyState.points
+        .filter((point) => point?.capturedAt && Number.isFinite(Number(point?.value)))
+        .slice()
+        .sort((a, b) => new Date(a.capturedAt).getTime() - new Date(b.capturedAt).getTime())
+    : [];
+  const firstAvailable = allPoints[0] || null;
+  const lastAvailable = allPoints[allPoints.length - 1] || null;
+  const availableSpanMs = firstAvailable && lastAvailable
+    ? Math.max(0, new Date(lastAvailable.capturedAt).getTime() - new Date(firstAvailable.capturedAt).getTime())
+    : 0;
+  const requestedSpanMs = PORTFOLIO_HISTORY_RANGES[range] || PORTFOLIO_HISTORY_RANGES['1W'];
+  const partialCoverage = allPoints.length > 0 && availableSpanMs < requestedSpanMs * 0.9;
 
   return (
     <View style={styles.card}>
@@ -73,6 +97,12 @@ export default function PortfolioHistoryChart({ historyState }) {
           </Pressable>
         ))}
       </View>
+      {partialCoverage ? (
+        <View style={styles.coverageNotice}>
+          <Text style={styles.coverageTitle}>Μερική κάλυψη ιστορικού</Text>
+          <Text style={styles.coverageText}>Το {range} προβάλλει μόνο το πραγματικά διαθέσιμο ιστορικό ({coverageText(availableSpanMs)}). Δεν δημιουργούνται παλιότερες τιμές τεχνητά.</Text>
+        </View>
+      ) : null}
 
       {points.length >= 2 ? (
         <View style={styles.chartWrap}>
@@ -111,6 +141,9 @@ const styles = StyleSheet.create({
   rangeActive: { backgroundColor: '#0B66FF' },
   rangeText: { color: '#60728b', fontSize: 11, fontWeight: '900' },
   rangeTextActive: { color: '#fff' },
+  coverageNotice: { backgroundColor: '#f5f8fc', borderRadius: 14, padding: 11, marginBottom: 10, borderWidth: 1, borderColor: '#e0e7f0' },
+  coverageTitle: { color: '#40536f', fontSize: 11, fontWeight: '900' },
+  coverageText: { color: '#7b889d', fontSize: 11, lineHeight: 16, marginTop: 3 },
   chartWrap: { marginTop: 2, alignItems: 'center' },
   chartFooter: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', marginTop: 5 },
   caption: { color: '#8a96a7', fontSize: 10, fontWeight: '700' },
