@@ -1,4 +1,6 @@
 import { handleMarketGatewayRequest, parseGatewaySymbol } from './core.js';
+import { authenticatePrivateRequest } from './auth-boundary.js';
+import { handleAccountApiRequest } from './account-api.js';
 
 export const MARKET_GATEWAY_CLIENT_HEADER = 'X-Investor-Control-Client';
 export const MARKET_GATEWAY_EDGE_VERSION = '2026-10-03.2';
@@ -129,6 +131,26 @@ function normalizeBatchSymbols(values) {
 
 export async function handleMarketGatewayEdgeRequest(request, env = {}, ctx = {}, options = {}) {
   const url = new URL(request.url);
+
+  if (url.pathname === '/v1/account' || url.pathname.startsWith('/v1/account/')) {
+    if (String(env.MINBEIS_ACCOUNT_API_ENABLED || '').toLowerCase() !== 'true') {
+      return jsonError(404, 'ACCOUNT_API_DISABLED', 'Private account API is not enabled.');
+    }
+
+    const verifyIdentityToken = options.verifyIdentityToken || (await import('./firebase-token-verifier.js')).verifyFirebaseIdToken;
+    const auth = await authenticatePrivateRequest(request, env, {
+      ...options.authOptions,
+      verifyIdentityToken,
+    });
+    if (!auth.ok) {
+      return jsonError(auth.status || 401, auth.code || 'AUTH_FAILED', 'Private account authentication failed.');
+    }
+
+    return handleAccountApiRequest(request, auth, env, {
+      db: options.accountsDb || env.MINBEIS_ACCOUNTS_DB,
+      now: options.now,
+    });
+  }
 
   if (url.pathname === '/v1/quotes' && request.method === 'POST') {
     const clientId = normalizeGatewayClientId(request.headers.get(MARKET_GATEWAY_CLIENT_HEADER));
