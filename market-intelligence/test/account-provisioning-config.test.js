@@ -50,3 +50,34 @@ test('renderer replaces only account binding and preserves unrelated bindings',(
   assert.equal(rendered.d1_databases.find((x)=>x.binding==='OTHER_DB').database_name,'other');
   assert.equal(rendered.d1_databases.find((x)=>x.binding==='MINBEIS_ACCOUNTS_DB').database_id,'cccccccc-cccc-cccc-cccc-cccccccccccc');
 });
+
+
+test('account-only renderer keeps remote scheduler disabled and adds no cron',()=>{
+  const rendered=buildAccountEnabledWranglerConfig(base,{
+    firebaseProjectId:'minbeis-prod-1234',
+    databaseId:'12345678-1234-1234-1234-123456789abc',
+  });
+  assert.equal(rendered.vars.MINBEIS_REMOTE_ALERTS_ENABLED,'false');
+  assert.equal(rendered.triggers,undefined);
+});
+
+test('remote alert activation adds only the approved cron and explicit flag',()=>{
+  const rendered=buildAccountEnabledWranglerConfig(base,{
+    firebaseProjectId:'minbeis-prod-1234',
+    databaseId:'12345678-1234-1234-1234-123456789abc',
+    remoteAlertsEnabled:true,
+    remoteAlertCron:'*/5 * * * *',
+  });
+  assert.equal(rendered.vars.MINBEIS_ACCOUNT_API_ENABLED,'true');
+  assert.equal(rendered.vars.MINBEIS_REMOTE_ALERTS_ENABLED,'true');
+  assert.deepEqual(rendered.triggers.crons,['*/5 * * * *']);
+});
+
+test('remote alert renderer rejects unapproved cron cadence',()=>{
+  assert.throws(()=>buildAccountEnabledWranglerConfig(base,{
+    firebaseProjectId:'minbeis-prod-1234',
+    databaseId:'12345678-1234-1234-1234-123456789abc',
+    remoteAlertsEnabled:true,
+    remoteAlertCron:'* * * * *',
+  }),/MINBEIS_REMOTE_ALERT_CRON_INVALID/);
+});
