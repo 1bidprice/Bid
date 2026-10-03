@@ -435,6 +435,11 @@ export async function resolveInstrumentCapability(appSymbol, env = {}, options =
       currency: identityCompany?.currency || identityCompany?.primaryListing?.currency || quote?.currency || completedEnrollment?.currency || null,
       researchEnrollmentStatus: completedEnrollment ? 'COMPLETED' : canonicalFocus ? 'BUILT_IN' : null,
       quoteContract: quote?.quoteContract || null,
+      identityStatusReason: identityVerified
+        ? (parsed.market === 'GR' ? 'OFFICIAL_EXCHANGE_IDENTITY' : 'LICENSED_PROVIDER_IDENTITY')
+        : parsed.market === 'GR'
+          ? String(athensIdentityDiagnostics?.[0]?.code || quoteResult?.error?.code || 'ATHENS_IDENTITY_NOT_VERIFIED')
+          : String(quoteResult?.error?.details?.diagnostics?.[0]?.code || quoteResult?.error?.code || 'US_IDENTITY_NOT_VERIFIED'),
       limitations: analysisSupported
         ? []
         : identityVerified
