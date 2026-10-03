@@ -17,6 +17,7 @@ async function fixture(overrides = {}) {
     iat:NOW_S-60,
     exp:NOW_S+3600,
     auth_time:NOW_S-120,
+    email_verified:true,
     ...overrides,
   };
   const token=await new SignJWT(payload)
@@ -70,5 +71,14 @@ test('fails closed when Firebase project id is absent',async()=>{
   await assert.rejects(
     verifyFirebaseIdToken(token,{}, {now:NOW,keyResolver:async()=>publicKey}),
     /FIREBASE_PROJECT_ID_NOT_CONFIGURED/,
+  );
+});
+
+
+test('rejects unverified email identities',async()=>{
+  const {token,publicKey}=await fixture({email_verified:false});
+  await assert.rejects(
+    verifyFirebaseIdToken(token,{FIREBASE_PROJECT_ID:PROJECT},{now:NOW,keyResolver:async()=>publicKey}),
+    /FIREBASE_EMAIL_NOT_VERIFIED/,
   );
 });
