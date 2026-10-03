@@ -330,7 +330,7 @@ function HistoricalContextCard({ context }) {
 function minbeisAssessmentLabel(classification) {
   return {
     SETUP: 'ΥΠΟΨΗΦΙΑ ΑΓΟΡΑ',
-    TRAP: 'ΠΙΘΑΝΗ ΠΑΓΙΔΑ',
+    TRAP: 'ΑΥΞΗΜΕΝΟΣ ΚΙΝΔΥΝΟΣ',
     NO_TRADE: 'ΑΠΟΧΗ',
     CONFIRMATION_REQUIRED: 'ΧΡΕΙΑΖΕΤΑΙ ΕΠΙΒΕΒΑΙΩΣΗ',
   }[classification] || classification || '—';
@@ -637,7 +637,7 @@ function MinbeisDashboard({ dashboard, sourceDecisionCount = 0, decisionContext 
   const headline = setupCount > 0
     ? `${setupCount} ${setupCount === 1 ? 'υποψήφια αγορά' : 'υποψήφιες αγορές'} τώρα`
     : trapCount > 0
-      ? `${trapCount} πιθανή παγίδα${trapCount === 1 ? '' : 'ες'} χρειάζεται προσοχή`
+      ? `${trapCount} ${trapCount === 1 ? 'ιδέα έχει' : 'ιδέες έχουν'} αυξημένο κίνδυνο`
       : rows.length
         ? 'Δεν υπάρχει επιβεβαιωμένη υποψήφια αγορά για νέα είσοδο τώρα'
         : sourceDecisionCount > 0
@@ -652,7 +652,7 @@ function MinbeisDashboard({ dashboard, sourceDecisionCount = 0, decisionContext 
         <Text style={styles.minbeisHeroText}>Αυτή η ενότητα αφορά νέες ιδέες εκτός του χαρτοφυλακίου σου. Οι δικές σου θέσεις εμφανίζονται ξεχωριστά παραπάνω. Δεν εκτελούνται συναλλαγές.</Text>
         <View style={styles.minbeisCountRow}>
           <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{setupCount}</Text><Text style={styles.minbeisCountLabel}>ΥΠΟΨΗΦΙΑ</Text></View>
-          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{trapCount}</Text><Text style={styles.minbeisCountLabel}>ΠΑΓΙΔΑ</Text></View>
+          <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{trapCount}</Text><Text style={styles.minbeisCountLabel}>ΚΙΝΔΥΝΟΣ</Text></View>
           <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{noTradeCount}</Text><Text style={styles.minbeisCountLabel}>ΑΠΟΧΗ</Text></View>
           <View style={styles.minbeisCountBox}><Text style={styles.minbeisCountValue}>{confirmCount}</Text><Text style={styles.minbeisCountLabel}>ΕΛΕΓΧΟΣ</Text></View>
         </View>
@@ -975,7 +975,7 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
         <View style={styles.sourcePolicyBox}><Text style={styles.sourcePolicyTitle}>Ποιος επιλέγει τις πηγές;</Text><Text style={styles.sourcePolicyText}>Έκδοση πολιτικής: {feed?.sourceSelection?.version || '—'}. Οι πηγές επιλέγονται από κλειδωμένη πολιτική κώδικα και επιτρεπόμενη λίστα, όχι αυθαίρετα από το AI.</Text></View>
         <View style={[styles.productionHealth, productionReady ? styles.productionHealthGood : styles.productionHealthLimited]}>
           <View style={styles.productionHealthTop}><View style={styles.grow}><Text style={styles.productionHealthEyebrow}>ΚΑΤΑΣΤΑΣΗ ΠΑΡΑΓΩΓΙΚΟΥ ΣΥΣΤΗΜΑΤΟΣ</Text><Text style={styles.productionHealthTitle}>{productionReady ? (historicalAnalyticsPartial ? 'Κανονική λειτουργία · μερική ιστορική κάλυψη' : 'Πλήρης ροή δεδομένων και ελέγχων') : 'Περιορισμένη λειτουργία — χωρίς αυθαίρετα σήματα'}</Text></View><View style={[styles.productionHealthBadge, productionReady && styles.productionHealthBadgeGood]}><Text style={[styles.productionHealthBadgeText, productionReady && styles.productionHealthBadgeTextGood]}>{productionReady ? 'ΕΝΕΡΓΟ' : 'ΠΕΡΙΟΡΙΣΜΕΝΟ'}</Text></View></View>
-          <Text style={styles.productionHealthText}>{productionReady ? (historicalAnalyticsPartial ? 'Η ροή είναι πρόσφατη και οι τρέχοντες έλεγχοι αγοράς και θεμελιωδών λειτουργούν. Η ιστορική ανάλυση είναι διαθέσιμη μόνο όπου έχει επαρκή και επαληθευμένα δεδομένα· οι υπόλοιποι φάκελοι παραμένουν μπλοκαρισμένοι.' : 'Η ροή είναι πρόσφατη και οι υποχρεωτικοί έλεγχοι αγοράς, ιστορικού και θεμελιωδών λειτουργούν. Η τελική επενδυτική πράξη παραμένει πάντα στον χρήστη.') : 'Το σύστημα συνεχίζει να συλλέγει και να ελέγχει δεδομένα, αλλά δεν εγκρίνει αγορά ή πώληση όταν λείπει πηγή, ιστορικό, benchmark, θεμελιώδη ή διασταύρωση.'}</Text>
+          <Text style={styles.productionHealthText}>{productionReady ? (historicalAnalyticsPartial ? 'Η ροή είναι πρόσφατη και οι τρέχοντες έλεγχοι αγοράς και θεμελιωδών λειτουργούν. Η ιστορική ανάλυση είναι διαθέσιμη μόνο όπου έχει επαρκή και επαληθευμένα δεδομένα· οι υπόλοιποι φάκελοι παραμένουν μπλοκαρισμένοι.' : 'Η ροή είναι πρόσφατη και οι υποχρεωτικοί έλεγχοι αγοράς, ιστορικού και θεμελιωδών λειτουργούν. Η μηχανή αξιολόγησης είναι διαθέσιμη, αλλά μεμονωμένες θέσεις ή ιδέες μπορεί να παραμένουν προσωρινές ή μπλοκαρισμένες. Η τελική επενδυτική πράξη παραμένει πάντα στον χρήστη.') : 'Το σύστημα συνεχίζει να συλλέγει και να ελέγχει δεδομένα, αλλά δεν εγκρίνει αγορά ή πώληση όταν λείπει πηγή, ιστορικό, benchmark, θεμελιώδη ή διασταύρωση.'}</Text>
           <Text style={styles.healthSplitText}>Υποδομή: {operationalStatusLabel(operationalHealth?.infrastructureStatus)} · Τρέχουσα αγορά: {operationalStatusLabel(operationalHealth?.marketDataStatus)} · Ιστορική ανάλυση: {operationalStatusLabel(historicalAnalyticsStatus)} · Θεμελιώδη: {operationalStatusLabel(operationalHealth?.fundamentalsStatus)} · Μηχανή αξιολόγησης: {operationalStatusLabel(operationalHealth?.decisionEngineStatus)}</Text>
           <View style={styles.productionMetrics}>
             <View style={styles.productionMetric}><Text style={styles.productionMetricValue}>{sourceHealth?.marketSnapshotCount || 0}</Text><Text style={styles.productionMetricLabel}>Τρέχουσες τιμές</Text></View>
