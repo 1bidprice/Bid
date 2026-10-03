@@ -49,6 +49,87 @@ function suppliedDynamicAthensCompany(symbol, options = {}) {
   return null;
 }
 
+export async function resolveDynamicAthensCompanies(symbolInputs = [], options = {}) {
+  const requested = [...new Set((Array.isArray(symbolInputs) ? symbolInputs : [])
+    .map((value) => String(value || '').trim().toUpperCase().replace(/\.GR$/i, ''))
+    .filter((value) => /^[A-Z0-9._-]{1,16}$/.test(value)))];
+
+  const companies = new Map();
+  const diagnostics = [];
+  const unresolved = [];
+  const now = Number(options.identityNow ?? Date.now());
+  const identityCache = options.athensIdentityCache instanceof Map
+    ? options.athensIdentityCache
+    : ATHENS_IDENTITY_CACHE;
+
+  for (const symbol of requested) {
+    const builtIn = ATHENS_COMPANIES[symbol] || null;
+    if (builtIn) {
+      companies.set(symbol, builtIn);
+      continue;
+    }
+    const supplied = suppliedDynamicAthensCompany(symbol, options);
+    if (validDynamicAthensCompany(supplied, symbol)) {
+      companies.set(symbol, supplied);
+      continue;
+    }
+    const cached = identityCache.get(symbol);
+    if (cached && cached.expiresAt > now && validDynamicAthensCompany(cached.company, symbol)) {
+      companies.set(symbol, cached.company);
+      continue;
+    }
+    unresolved.push(symbol);
+  }
+
+  if (!unresolved.length) return { companies, diagnostics, unresolvedSymbols: [] };
+
+  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  if (typeof fetchImpl !== 'function') {
+    return {
+      companies,
+      diagnostics: unresolved.map((symbol) => ({ code: 'ATHENS_DISCOVERY_FETCH_UNAVAILABLE', symbol })),
+      unresolvedSymbols: unresolved,
+    };
+  }
+
+  const discovery = await fetchAthensCompaniesBySymbols(unresolved, {
+    fetchImpl,
+    generatedAt: options.generatedAt || options.now || new Date(now).toISOString(),
+    ...(options.athensDiscoveryOptions || {}),
+  });
+  diagnostics.push(...(discovery.diagnostics || []));
+
+  const resultsBySymbol = new Map((discovery.results || []).map((item) => [item.symbol, item]));
+  for (const symbol of unresolved) {
+    const resolution = resultsBySymbol.get(symbol) || null;
+    const company = (discovery.companies || []).find(
+      (item) => String(item?.primaryListing?.symbol || '').trim().toUpperCase() === symbol,
+    ) || null;
+    if (resolution?.status === 'RESOLVED' && validDynamicAthensCompany(company, symbol)) {
+      companies.set(symbol, company);
+      identityCache.set(symbol, {
+        company,
+        expiresAt: now + Math.max(
+          5 * 60 * 1000,
+          Number(options.athensIdentityCacheTtlMs || ATHENS_IDENTITY_CACHE_TTL_MS),
+        ),
+      });
+      continue;
+    }
+    diagnostics.push({
+      code: resolution?.code || 'ATHENS_IDENTITY_NOT_VERIFIED',
+      symbol,
+      matchCount: resolution?.matchCount ?? null,
+    });
+  }
+
+  return {
+    companies,
+    diagnostics,
+    unresolvedSymbols: requested.filter((symbol) => !companies.has(symbol)),
+  };
+}
+
 export async function resolveDynamicAthensCompany(symbolInput, options = {}) {
   const symbol = String(symbolInput || '').trim().toUpperCase().replace(/\.GR$/i, '');
   if (!/^[A-Z0-9._-]{1,16}$/.test(symbol)) {
@@ -64,52 +145,24 @@ export async function resolveDynamicAthensCompany(symbolInput, options = {}) {
   }
 
   const now = Number(options.identityNow ?? Date.now());
-  const cached = ATHENS_IDENTITY_CACHE.get(symbol);
+  const identityCache = options.athensIdentityCache instanceof Map
+    ? options.athensIdentityCache
+    : ATHENS_IDENTITY_CACHE;
+  const cached = identityCache.get(symbol);
   if (cached && cached.expiresAt > now && validDynamicAthensCompany(cached.company, symbol)) {
     return { company: cached.company, diagnostics: [], source: 'CACHE' };
   }
 
-  const fetchImpl = options.fetchImpl || globalThis.fetch;
-  if (typeof fetchImpl !== 'function') {
-    return { company: null, diagnostics: [{ code: 'ATHENS_DISCOVERY_FETCH_UNAVAILABLE' }] };
-  }
-
-  const discovery = await fetchAthensCompaniesBySymbols([symbol], {
-    fetchImpl,
-    generatedAt: options.generatedAt || options.now || new Date(now).toISOString(),
-    ...(options.athensDiscoveryOptions || {}),
+  const resolved = await resolveDynamicAthensCompanies([symbol], {
+    ...options,
+    identityNow: now,
+    athensIdentityCache: identityCache,
   });
-  const resolution = (discovery.results || []).find((item) => item.symbol === symbol) || null;
-  const company = (discovery.companies || []).find(
-    (item) => String(item?.primaryListing?.symbol || '').trim().toUpperCase() === symbol,
-  ) || null;
-
-  if (resolution?.status !== 'RESOLVED' || !validDynamicAthensCompany(company, symbol)) {
-    return {
-      company: null,
-      diagnostics: [
-        ...(discovery.diagnostics || []),
-        {
-          code: resolution?.code || 'ATHENS_IDENTITY_NOT_VERIFIED',
-          symbol,
-          matchCount: resolution?.matchCount ?? null,
-        },
-      ],
-      source: 'OFFICIAL_DIRECTORY',
-    };
-  }
-
-  ATHENS_IDENTITY_CACHE.set(symbol, {
-    company,
-    expiresAt: now + Math.max(
-      5 * 60 * 1000,
-      Number(options.athensIdentityCacheTtlMs || ATHENS_IDENTITY_CACHE_TTL_MS),
-    ),
-  });
+  const company = resolved.companies.get(symbol) || null;
   return {
     company,
-    diagnostics: discovery.diagnostics || [],
-    source: 'OFFICIAL_DIRECTORY',
+    diagnostics: resolved.diagnostics || [],
+    source: company ? 'OFFICIAL_DIRECTORY' : 'OFFICIAL_DIRECTORY_BLOCKED',
   };
 }
 
