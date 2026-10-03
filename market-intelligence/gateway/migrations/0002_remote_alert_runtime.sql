@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS alert_state (
   last_observed_value REAL,
   last_evaluated_at TEXT,
   last_triggered_at TEXT,
+  last_trigger_signature TEXT,
   PRIMARY KEY (tenant_id, rule_id),
   FOREIGN KEY (tenant_id, rule_id)
     REFERENCES alert_rules(tenant_id, rule_id)
