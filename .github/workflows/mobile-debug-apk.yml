@@ -47,7 +47,7 @@ jobs:
         run: npm run test:release-identity
 
       - name: Verify Product Recovery privacy data and history
-        run: npm run test:local-data-ownership && npm run test:portfolio-history && npm run test:portfolio-data-flow
+        run: npm run test:local-data-ownership && npm run test:portfolio-history && npm run test:portfolio-data-flow && npm run test:portfolio-insights
 
       - name: Generate Android project
         run: npx expo prebuild --platform android --clean --non-interactive
