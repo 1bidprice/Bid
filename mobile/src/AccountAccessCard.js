@@ -12,6 +12,7 @@ import {
   getMinbeisFirebaseAuth,
   isFirebaseAccountConfigured,
   minbeisCreateAccount,
+  minbeisSendEmailVerification,
   minbeisSendPasswordReset,
   minbeisSignIn,
   minbeisSignOut,
@@ -35,6 +36,7 @@ function messageFor(error) {
 export default function AccountAccessCard() {
   const configured = isFirebaseAccountConfigured();
   const [account, setAccount] = useState(null);
+  const [accountVersion, setAccountVersion] = useState(0);
   const [mode, setMode] = useState('SIGN_IN');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -56,8 +58,17 @@ export default function AccountAccessCard() {
     setBusy(true);
     setFeedback(null);
     try {
-      if (mode === 'CREATE') await minbeisCreateAccount(email, password);
-      else await minbeisSignIn(email, password);
+      if (mode === 'CREATE') {
+        const result = await minbeisCreateAccount(email, password);
+        if (result.verificationSent) {
+          setFeedback({ type: 'ok', text: 'Ο λογαριασμός δημιουργήθηκε. Στάλθηκε email επιβεβαίωσης.' });
+        }
+      } else {
+        const result = await minbeisSignIn(email, password);
+        if (!result.emailVerified) {
+          setFeedback({ type: 'error', text: 'Συνδέθηκες, αλλά πρέπει πρώτα να επιβεβαιώσεις το email σου για remote λειτουργίες.' });
+        }
+      }
       setPassword('');
     } catch (error) {
       setFeedback({ type: 'error', text: messageFor(error) });
@@ -74,6 +85,37 @@ export default function AccountAccessCard() {
       setFeedback({ type: 'ok', text: 'Στάλθηκε email επαναφοράς κωδικού.' });
     } catch (error) {
       setFeedback({ type: 'error', text: messageFor(error) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resendVerification() {
+    setBusy(true);
+    setFeedback(null);
+    try {
+      await minbeisSendEmailVerification();
+      setFeedback({ type: 'ok', text: 'Στάλθηκε νέο email επιβεβαίωσης.' });
+    } catch (error) {
+      setFeedback({ type: 'error', text: messageFor(error) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function refreshVerification() {
+    setBusy(true);
+    setFeedback(null);
+    try {
+      await account.reload();
+      setAccountVersion((current) => current + 1);
+      if (account.emailVerified) {
+        setFeedback({ type: 'ok', text: 'Το email επιβεβαιώθηκε.' });
+      } else {
+        setFeedback({ type: 'error', text: 'Το email δεν έχει επιβεβαιωθεί ακόμη.' });
+      }
+    } catch {
+      setFeedback({ type: 'error', text: 'Δεν ανανεώθηκε η κατάσταση επιβεβαίωσης.' });
     } finally {
       setBusy(false);
     }
@@ -128,10 +170,14 @@ export default function AccountAccessCard() {
   }
 
   if (account) {
+    void accountVersion;
     return (
       <View style={styles.card}>
         <Text style={styles.title}>Λογαριασμός MINBEIS</Text>
         <Text style={styles.account}>{account.email || 'Συνδεδεμένος χρήστης'}</Text>
+        <Text style={account.emailVerified ? styles.verified : styles.unverified}>
+          {account.emailVerified ? 'Email επιβεβαιωμένο' : 'Απαιτείται επιβεβαίωση email'}
+        </Text>
         <Text style={styles.note}>
           Ο λογαριασμός χρησιμοποιείται για ασφαλή ταυτοποίηση συσκευών και απομακρυσμένες ειδοποιήσεις.
           Οι συναλλαγές, οι ποσότητες, το κόστος και το P/L του χαρτοφυλακίου παραμένουν τοπικά στη συσκευή.
@@ -140,7 +186,17 @@ export default function AccountAccessCard() {
           <Text style={styles.privacyStrong}>Cloud portfolio sync: Ανενεργός</Text>
           <Text style={styles.privacyText}>Η είσοδος στον λογαριασμό δεν ανεβάζει το χαρτοφυλάκιό σου.</Text>
         </View>
-        <Pressable style={styles.primary} onPress={enableRemotePush} disabled={pushBusy || pushEnabled}>
+        {!account.emailVerified ? (
+          <>
+            <Pressable style={styles.secondary} onPress={resendVerification} disabled={busy}>
+              <Text style={styles.secondaryText}>Επαναποστολή email επιβεβαίωσης</Text>
+            </Pressable>
+            <Pressable style={styles.secondary} onPress={refreshVerification} disabled={busy}>
+              <Text style={styles.secondaryText}>Έχω επιβεβαιώσει το email</Text>
+            </Pressable>
+          </>
+        ) : null}
+        <Pressable style={styles.primary} onPress={enableRemotePush} disabled={pushBusy || pushEnabled || !account.emailVerified}>
           {pushBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>{pushEnabled ? 'Remote ειδοποιήσεις ενεργές' : 'Ενεργοποίηση remote ειδοποιήσεων'}</Text>}
         </Pressable>
         {pushEnabled ? (
@@ -214,6 +270,8 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#fff', borderRadius: 22, borderWidth: 1, borderColor: '#d4deeb', padding: 17, marginBottom: 12 },
   title: { color: '#16345f', fontSize: 21, lineHeight: 26, fontWeight: '900' },
   account: { color: '#0B66FF', fontSize: 16, lineHeight: 22, fontWeight: '900', marginTop: 8 },
+  verified: { color: '#078548', fontSize: 11, lineHeight: 16, fontWeight: '900', marginTop: 4 },
+  unverified: { color: '#a66700', fontSize: 11, lineHeight: 16, fontWeight: '900', marginTop: 4 },
   note: { color: '#60728b', fontSize: 13, lineHeight: 20, marginTop: 8 },
   modeRow: { flexDirection: 'row', gap: 8, marginTop: 14 },
   mode: { flex: 1, paddingVertical: 10, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: '#d5dfec', alignItems: 'center' },
