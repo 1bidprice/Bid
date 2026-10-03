@@ -224,6 +224,8 @@ export function buildCanonicalQuoteRegistry(snapshots = []) {
       appSymbol: String(symbol).toUpperCase(),
       companyId: snapshot.companyId || null,
       companyName: snapshot.companyName || null,
+      isin: snapshot.isin || null,
+      identitySource: snapshot.identitySource || null,
       price: positive(snapshot.currentPrice),
       previousClose: positive(snapshot.previousClose),
       currency: snapshot.currency || null,
