@@ -4,94 +4,145 @@ Status date: 2026-10-03
 Branch: `investor-control-minbeis-integration-v1`
 PR: #23 remains draft and MUST NOT be merged without Nikos's explicit approval.
 
-## Goal
+## Readiness levels
 
-Funding-ready does not mean "finished app". It means a credible MVP with:
-- a demonstrable user problem and differentiated product;
-- trustworthy data/accounting/privacy behavior;
-- a repeatable demo on a clean device;
-- enough product evidence to support a grant, incubator or investor conversation;
-- no claims that exceed the actual implementation or data licences.
+### Outreach-ready
+Enough verified product and technical evidence to begin conversations with sponsors, incubators, grant programmes and early investors without overstating product maturity.
+
+### Due-diligence-ready
+All material product, privacy, distribution, data-rights, legal, beta and cost evidence is available for detailed third-party review.
+
+MINBEIS must never present outreach-readiness as due-diligence-readiness.
 
 ## Current verified product proof
 
-- Canonical portfolio accounting with value, cost and P/L.
-- Euronext Athens and US market-data routes with fail-closed valuation rules.
-- Local privacy ownership isolation and quarantine/recovery of legacy data.
-- Android backup disabled to prevent silent portfolio transfer.
-- Public privacy policy aligned with gateway behavior.
-- MINBEIS portfolio/decision layer and market-opportunity workflow.
-- Local portfolio value history with 1H, 1D, 1W, 1M, 6M and 1Y ranges.
-- Automated CI gates for accounting, quote integrity, privacy, history and portfolio data flow.
-- Recovery build v1.8.1 build 33 produced from an all-green CI head.
+Implemented and covered by regression/CI contracts:
+- canonical portfolio accounting with value, cost and P/L;
+- US and Euronext Athens quote/instrument routing with fail-closed integrity;
+- local portfolio ownership isolation, quarantine and explicit recovery;
+- Android backup disabled to prevent silent portfolio transfer;
+- privacy disclosure aligned with gateway behavior;
+- portfolio allocation/concentration and P/L contribution;
+- local total-portfolio history with 1H / 1D / 1W / 1M / 6M / 1Y ranges;
+- MINBEIS decision layer with human approval and no broker execution;
+- immutable decision/outcome journal;
+- 7 / 30 / 90 trading-day outcome maturation;
+- maximum favourable/adverse excursion;
+- decision learning-review queue;
+- context learning by regime/event/reason;
+- append-only historical event archive;
+- strict point-in-time historical replay;
+- historical event outcome learning;
+- prospective learning proposals;
+- shadow challenger observations that exclude pre-proposal decisions;
+- promotion gate with sample/diversity/temporal-stability requirements;
+- automatic production mutation disabled by contract;
+- five-minute funding demo script;
+- sponsor/funding evidence pack;
+- governed-learning technical evidence specification.
 
-## P0 gates before external funding outreach
+## Critical scientific truth
+
+The architecture for self-evaluation and controlled learning is implemented.
+
+MINBEIS does **not** yet have enough matured prospective observations to claim:
+- statistically proven alpha;
+- superior investment returns;
+- causal event-price relationships;
+- production-proven self-improvement.
+
+Those claims remain prohibited until prospective evidence supports them.
+
+## P0 gates before serious due diligence
 
 1. **External-device privacy evidence**
    - clean install on a second physical device;
    - zero inherited transactions/positions;
-   - recovery/import works only after explicit user action.
+   - recovery/import only after explicit user action.
 
-2. **Professional portfolio insight**
-   - allocation/concentration visualization;
-   - P/L contribution by position;
-   - valuation coverage and source transparency.
-
-3. **Historical market-data strategy**
-   - keep local observed portfolio history;
-   - add licensed/approved historical market data for immediate charts;
-   - do not fabricate pre-install portfolio valuations;
-   - document display/redistribution rights for every external market-data source.
-
-4. **Distribution-quality Android build**
-   - verify APK/AAB signing identity;
+2. **Distribution-quality Android**
+   - verify signing certificate identity on the funding-readiness APK/AAB;
    - Play Internal/Closed Testing;
-   - crash-free install/update path;
+   - clean install/update path;
    - no production release without explicit approval.
 
-5. **Beta evidence**
-   - minimum structured external beta cohort;
-   - record install success, portfolio-entry completion, valuation coverage, repeat usage and qualitative feedback;
+3. **Historical market-data product strategy**
+   - retain honest local observed portfolio history;
+   - select licensed/approved historical data source for immediate user-facing charts;
+   - document display/redistribution rights and expected cost;
+   - never fabricate pre-install portfolio valuations.
+
+4. **External beta evidence**
+   - structured beta cohort;
+   - install completion;
+   - portfolio-entry completion;
+   - valuation coverage;
+   - repeat usage;
+   - qualitative problem/solution evidence;
    - no collection of portfolio amounts without explicit consent.
 
-6. **Regulatory/product positioning**
-   - clearly separate information/decision support from execution;
-   - no broker execution;
+5. **Regulatory/product positioning**
+   - information/decision support clearly separated from execution;
    - human approval remains mandatory;
+   - no broker execution;
    - legal review before public claims that could imply regulated investment advice.
+
+6. **Operational evidence**
+   - crash/error telemetry policy;
+   - privacy-safe diagnostics;
+   - uptime/data-source failure handling;
+   - incident and rollback procedure.
 
 ## P1 gates for a strong financing package
 
-- First-run onboarding that explains privacy, data quality and what MINBEIS does.
-- Crash/error telemetry with privacy-safe opt-in or strictly necessary operational diagnostics.
-- Historical-data provider contract/cost model.
-- Product analytics focused on funnel/retention, not portfolio contents.
-- Demo dataset isolated from real user portfolios.
-- Public landing page with product narrative, screenshots, privacy and waitlist/beta CTA.
-- Founder/company profile, ownership/IP documentation and repository provenance.
-- 12-18 month operating budget and market-data/cloud cost model.
-- Competitive matrix based on documented capabilities, not marketing adjectives.
-- One-page product brief, pitch deck, demo script and due-diligence folder.
+- first-run onboarding;
+- public landing page with waitlist/beta CTA;
+- demo dataset isolated from real portfolios;
+- product screenshots/video;
+- 12–18 month operating budget;
+- market-data/cloud cost model;
+- competitor capability matrix;
+- founder/company profile;
+- ownership/IP documentation;
+- one-page product brief;
+- pitch deck;
+- due-diligence folder;
+- external pilot/beta evidence.
 
-## Funding-path implications
+## Current funding narrative
 
-### Elevate Greece
-The official National Startup Registry evaluates innovation and scalability and requires an eligible legal entity. Product evidence should therefore make the standardised/scalable nature of MINBEIS visible, not present it as bespoke consulting.
+The defensible story is not "another portfolio tracker" and not "AI that predicts stocks".
 
-### EIC Accelerator
-This is a later-stage path for high-risk, market-creating innovations around TRL 6-8. MINBEIS should not be positioned as EIC-ready until there is credible external validation/pilot evidence and a defensible innovation case beyond a conventional portfolio tracker.
+It is:
 
-## Current product truth
+> MINBEIS is an auditable investment decision system that records what it knew at the time, measures what happened later, replays historical events without future-information leakage, proposes bounded model changes, and validates those changes prospectively before human-approved promotion.
 
-The v1.8.1 chart is an honest observed-value chart. It starts when this build begins collecting verified complete valuations. It is not yet a licensed historical market chart and must not be marketed as one.
+## Current readiness assessment
+
+### Technically
+The product now has a credible differentiated architecture suitable for early external conversations.
+
+### Commercially
+Market validation and beta evidence are still required.
+
+### Scientifically
+The learning governance is implemented; performance superiority remains to be established prospectively.
+
+### Distribution
+Second-device privacy QA, signing verification and Play testing remain open.
+
+### Funding materials
+Core technical evidence pack and demo script exist. Public-facing one-pager/pitch deck/landing page and budget remain to be produced.
 
 ## Next implementation tranche
 
-Target: v1.8.2 funding-readiness build.
+Target: funding-readiness release after all-green CI.
 
-- portfolio allocation/concentration visualisation;
-- P/L contribution visualisation;
-- historical-market-data contract/interface designed fail-closed;
-- signing verification and closed-testing readiness;
-- beta QA checklist and evidence capture;
-- funding demo pack only after the above passes CI and device QA.
+- lock governed learning proposal archive and promotion evaluation;
+- produce clean funding-readiness APK identity;
+- verify signing certificate;
+- prepare demo-safe dataset;
+- prepare one-page funding brief;
+- prepare pitch deck;
+- prepare cost/budget model;
+- begin structured beta and sponsor/funder outreach only with claims supported by the evidence above.
