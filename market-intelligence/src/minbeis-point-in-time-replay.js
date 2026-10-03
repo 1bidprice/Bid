@@ -135,7 +135,11 @@ export function buildMinbeisPointInTimeReplaySample(input = {}) {
   const asOf = new Date(asOfMs).toISOString();
 
   const evidence = filterEvidenceKnownByAsOf(input.evidence, asOf);
-  const evidenceById = new Map(evidence.known
+  const evidenceById = new Map([
+    ...evidence.known,
+    ...evidence.future,
+    ...evidence.undated,
+  ]
     .filter((record) => record?.id || record?.evidenceId)
     .map((record) => [record.id || record.evidenceId, record]));
   const events = filterEventsKnownByAsOf(input.events, evidenceById, asOf);
