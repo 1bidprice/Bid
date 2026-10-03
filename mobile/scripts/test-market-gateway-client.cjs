@@ -10,6 +10,7 @@ const {
   normalizeGatewayBaseUrl,
   createOpaqueInstallationId,
   getOrCreateInstallationId,
+  validateGatewayBatch,
   validateInstrumentCapability,
   validateResearchQueueStatus,
   validateGatewayFx,
@@ -18,6 +19,7 @@ const {
   fetchMinbeisResearchQueueStatus,
   fetchCanonicalGatewayQuote,
   fetchCanonicalGatewayFx,
+  fetchCanonicalGatewayBatch,
   fetchCanonicalGatewayQuotes,
   fetchCanonicalGatewayMarketSnapshot,
 } = require('../src/market-gateway-client.js');
@@ -41,6 +43,31 @@ function quotePayload() {
         timestampVerified: true,
         valuationEligible: true,
       },
+    },
+  };
+}
+
+function batchPayload(symbols = ['SPCE.US']) {
+  return {
+    format: 'investor-control-market-gateway-batch',
+    version: 1,
+    servedAt: '2026-09-10T15:00:00.000Z',
+    requestedSymbols: symbols,
+    quoteRegistry: Object.fromEntries(symbols.map((symbol) => {
+      if (symbol === 'SPCE.US') return [symbol, quotePayload().quote];
+      return [symbol, {
+        appSymbol: symbol,
+        currency: 'EUR',
+        quoteContract: { sourceApproved: true, sourceRole: 'PRIMARY_EXCHANGE' },
+      }];
+    })),
+    errors: [],
+    fxReference: symbols.some((symbol) => symbol.endsWith('.US')) ? fxPayload().reference : null,
+    privacy: {
+      acceptedInputs: ['symbols'],
+      portfolioQuantityRequired: false,
+      portfolioCostRequired: false,
+      pnlRequired: false,
     },
   };
 }
@@ -224,20 +251,36 @@ async function main() {
   assert.equal(Object.keys(batch.quoteRegistry).length, 1);
   assert.deepEqual(batch.errors, []);
 
+  assert.equal(validateGatewayBatch(['SPCE.US'], batchPayload()), null);
+  const directBatchCalls = [];
+  const directBatch = await fetchCanonicalGatewayBatch(['SPCE.US'], {
+    baseUrl: 'https://quotes.example.com',
+    clientId: firstId,
+    fetchImpl: async (url, init = {}) => {
+      directBatchCalls.push({ url: String(url), method: init.method, body: init.body });
+      return new Response(JSON.stringify(batchPayload()), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    },
+  });
+  assert.equal(directBatch.quoteRegistry['SPCE.US'].currency, 'USD');
+  assert.equal(directBatch.fxReference.rate, 1.1616);
+  assert.equal(directBatchCalls.length, 1);
+  assert.equal(directBatchCalls[0].url, 'https://quotes.example.com/v1/quotes');
+  assert.equal(directBatchCalls[0].method, 'POST');
+  assert.deepEqual(JSON.parse(directBatchCalls[0].body), { symbols: ['SPCE.US'] });
+
   const snapshotCalls = [];
   const snapshot = await fetchCanonicalGatewayMarketSnapshot(['SPCE.US'], {
     baseUrl: 'https://quotes.example.com',
     clientId: firstId,
     fetchImpl: async (url) => {
       snapshotCalls.push(String(url));
-      const payload = String(url).includes('/v1/fx?') ? fxPayload() : quotePayload();
-      return new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify(batchPayload()), { status: 200, headers: { 'Content-Type': 'application/json' } });
     },
   });
   assert.equal(snapshot.quoteRegistry['SPCE.US'].currency, 'USD');
   assert.equal(snapshot.fxReference.rate, 1.1616);
   assert.equal(snapshot.fxError, undefined);
-  assert.equal(snapshotCalls.length, 2);
+  assert.equal(snapshotCalls.length, 1);
 
   const greekOnlyCalls = [];
   const greekOnly = await fetchCanonicalGatewayMarketSnapshot(['ALWN.GR'], {
@@ -245,15 +288,27 @@ async function main() {
     clientId: firstId,
     fetchImpl: async (url) => {
       greekOnlyCalls.push(String(url));
-      return new Response(JSON.stringify({
-        format: 'investor-control-market-gateway-quote',
-        requestedSymbol: 'ALWN.GR',
-        quote: { appSymbol: 'ALWN.GR', currency: 'EUR', quoteContract: { sourceApproved: true, sourceRole: 'PRIMARY_EXCHANGE' } },
-      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify(batchPayload(['ALWN.GR'])), { status: 200, headers: { 'Content-Type': 'application/json' } });
     },
   });
   assert.equal(greekOnly.fxReference, null);
   assert.equal(greekOnlyCalls.length, 1);
+
+  const fallbackCalls = [];
+  const fallback = await fetchCanonicalGatewayMarketSnapshot(['SPCE.US'], {
+    baseUrl: 'https://quotes.example.com',
+    clientId: firstId,
+    fetchImpl: async (url) => {
+      fallbackCalls.push(String(url));
+      if (String(url).endsWith('/v1/quotes')) {
+        return new Response(JSON.stringify({ error: { code: 'METHOD_NOT_ALLOWED' } }), { status: 405, headers: { 'Content-Type': 'application/json' } });
+      }
+      return new Response(JSON.stringify(String(url).includes('/v1/fx?') ? fxPayload() : quotePayload()), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    },
+  });
+  assert.equal(fallback.quoteRegistry['SPCE.US'].currency, 'USD');
+  assert.equal(fallback.fxReference.rate, 1.1616);
+  assert.equal(fallbackCalls.length, 3);
 
   const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'market-gateway-client.js'), 'utf8');
   assert.equal(source.includes('FINNHUB_TOKEN'), false);
