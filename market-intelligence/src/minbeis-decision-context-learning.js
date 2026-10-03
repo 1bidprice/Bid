@@ -34,6 +34,9 @@ function maturedObservation(record, horizon) {
     reason: decision.reason || record.decisionReason || null,
     regime: regimeLabel(research.marketRegimeSnapshot),
     leadEventType: research.leadEventType ? String(research.leadEventType).toUpperCase() : null,
+    actionRegime: record.action && regimeLabel(research.marketRegimeSnapshot) ? `${record.action}|${regimeLabel(research.marketRegimeSnapshot)}` : null,
+    actionLeadEvent: record.action && research.leadEventType ? `${record.action}|${String(research.leadEventType).toUpperCase()}` : null,
+    actionReason: record.action && (decision.reason || record.decisionReason) ? `${record.action}|${decision.reason || record.decisionReason}` : null,
     catalystEventTypes: (Array.isArray(research.catalystEventTypes) ? research.catalystEventTypes : []).map((x) => String(x).toUpperCase()),
     riskEventTypes: (Array.isArray(research.riskEventTypes) ? research.riskEventTypes : []).map((x) => String(x).toUpperCase()),
     realisedReturnPct: realised,
@@ -96,6 +99,9 @@ export function buildMinbeisDecisionContextLearning(records = [], options = {}) 
   const reason = dimensionCohorts(observations, 'reason', options);
   const catalystEvent = eventCohorts(observations, 'catalystEventTypes', options);
   const riskEvent = eventCohorts(observations, 'riskEventTypes', options);
+  const actionRegime = dimensionCohorts(observations, 'actionRegime', options);
+  const actionLeadEvent = dimensionCohorts(observations, 'actionLeadEvent', options);
+  const actionReason = dimensionCohorts(observations, 'actionReason', options);
 
   return {
     format: 'investor-control-minbeis-decision-context-learning',
@@ -103,8 +109,8 @@ export function buildMinbeisDecisionContextLearning(records = [], options = {}) 
     policyVersion: MINBEIS_DECISION_CONTEXT_LEARNING_VERSION,
     horizon,
     maturedObservationCount: observations.length,
-    cohorts: { regime, leadEvent, action, reason, catalystEvent, riskEvent },
-    evidenceReadyCohortCount: [regime, leadEvent, action, reason, catalystEvent, riskEvent].flat().filter((item) => item.evidenceReady).length,
+    cohorts: { regime, leadEvent, action, reason, actionRegime, actionLeadEvent, actionReason, catalystEvent, riskEvent },
+    evidenceReadyCohortCount: [regime, leadEvent, action, reason, actionRegime, actionLeadEvent, actionReason, catalystEvent, riskEvent].flat().filter((item) => item.evidenceReady).length,
     automaticPolicyMutationAllowed: false,
     interpretation: 'Decision-aligned cohort statistics are observational associations. They do not establish causality and cannot change production policy without governed validation.',
   };
