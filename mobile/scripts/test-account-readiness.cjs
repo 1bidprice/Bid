@@ -8,6 +8,8 @@ const root = path.resolve(__dirname, '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const authSource = fs.readFileSync(path.join(root, 'src', 'firebase-auth-client.js'), 'utf8');
 const accountSource = fs.readFileSync(path.join(root, 'src', 'account-client.js'), 'utf8');
+const accountUiSource = fs.readFileSync(path.join(root, 'src', 'AccountAccessCard.js'), 'utf8');
+const portfolioAppSource = fs.readFileSync(path.join(root, 'PortfolioApp.js'), 'utf8');
 
 assert.equal(pkg.dependencies?.firebase, '12.19.0', 'Firebase client SDK must remain pinned');
 assert.match(authSource, /getReactNativePersistence\(AsyncStorage\)/);
@@ -22,6 +24,12 @@ assert.match(accountSource, /X-Investor-Control-Client/);
 assert.match(accountSource, /\/v1\/account\/device/);
 assert.match(accountSource, /\/v1\/account\/alerts/);
 assert.doesNotMatch(accountSource, /quantity|costBasis|pnl/i, 'cloud account client must not transport portfolio holdings or P/L');
+
+assert.match(accountUiSource, /if \(!configured\) return null;/, 'account UI must stay hidden without Firebase config');
+assert.match(accountUiSource, /Το portfolio παραμένει τοπικά και δεν ανεβαίνει στο cloud/);
+assert.match(accountUiSource, /δεν ανεβάζει το χαρτοφυλάκιό σου/);
+assert.match(portfolioAppSource, /<AccountAccessCard \/>/, 'settings must mount opt-in account UI');
+assert.doesNotMatch(accountUiSource, /portfolioPositions|transactions|costBasis|totalPnl/, 'account UI must not receive portfolio contents');
 
 const app = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'));
 const serialized = JSON.stringify(app);
