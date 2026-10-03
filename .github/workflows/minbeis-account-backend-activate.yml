@@ -11,6 +11,11 @@ on:
         description: 'Exact commit SHA authorized for account backend deployment'
         required: true
         type: string
+      confirm_remote_alerts:
+        description: 'Type ENABLE_REMOTE_ALERTS to activate scheduled remote alerts, otherwise KEEP_DISABLED'
+        required: true
+        default: 'KEEP_DISABLED'
+        type: string
 
 permissions:
   contents: read
@@ -32,12 +37,16 @@ jobs:
       MINBEIS_ACCOUNTS_DB_ID: ${{ vars.MINBEIS_ACCOUNTS_DB_ID }}
       MINBEIS_ACCOUNTS_DB_NAME: ${{ vars.MINBEIS_ACCOUNTS_DB_NAME || 'minbeis-accounts' }}
       MINBEIS_ACCOUNT_PRODUCTION_ENABLED: ${{ vars.MINBEIS_ACCOUNT_PRODUCTION_ENABLED || 'false' }}
+      MINBEIS_REMOTE_ALERTS_PRODUCTION_ENABLED: ${{ vars.MINBEIS_REMOTE_ALERTS_PRODUCTION_ENABLED || 'false' }}
+      MINBEIS_REMOTE_ALERTS_ENABLED: ${{ inputs.confirm_remote_alerts == 'ENABLE_REMOTE_ALERTS' && 'true' || 'false' }}
+      MINBEIS_REMOTE_ALERT_CRON: '*/5 * * * *'
 
     steps:
       - name: Enforce explicit authorization and exact source
         shell: bash
         env:
           CONFIRM_ACCOUNTS: ${{ inputs.confirm_accounts }}
+          CONFIRM_REMOTE_ALERTS: ${{ inputs.confirm_remote_alerts }}
           EXPECTED_SHA: ${{ inputs.expected_sha }}
         run: |
           set -euo pipefail
@@ -45,6 +54,17 @@ jobs:
           test "$EXPECTED_SHA" = "$GITHUB_SHA" || { echo "Authorized SHA does not match workflow SHA: $GITHUB_SHA" >&2; exit 1; }
           test "$GITHUB_REF_NAME" = 'investor-control-minbeis-integration-v1' || { echo 'Account activation is restricted to the controlled MINBEIS integration branch.' >&2; exit 1; }
           test "$MINBEIS_ACCOUNT_PRODUCTION_ENABLED" = 'true' || { echo 'Repository variable MINBEIS_ACCOUNT_PRODUCTION_ENABLED must be true before activation.' >&2; exit 1; }
+          case "$CONFIRM_REMOTE_ALERTS" in
+            KEEP_DISABLED|ENABLE_REMOTE_ALERTS) ;;
+            *) echo 'Remote alert confirmation must be KEEP_DISABLED or ENABLE_REMOTE_ALERTS.' >&2; exit 1 ;;
+          esac
+          if [ "$MINBEIS_REMOTE_ALERTS_PRODUCTION_ENABLED" = 'true' ] && [ "$CONFIRM_REMOTE_ALERTS" != 'ENABLE_REMOTE_ALERTS' ]; then
+            echo 'Remote alerts are marked production-active; refusing a deploy that would remove the cron.' >&2
+            exit 1
+          fi
+          if [ "$CONFIRM_REMOTE_ALERTS" = 'ENABLE_REMOTE_ALERTS' ]; then
+            test "$MINBEIS_REMOTE_ALERTS_PRODUCTION_ENABLED" = 'true' || { echo 'Repository variable MINBEIS_REMOTE_ALERTS_PRODUCTION_ENABLED must be true before scheduler activation.' >&2; exit 1; }
+          fi
 
       - name: Require production credentials and identifiers
         shell: bash
@@ -85,6 +105,7 @@ jobs:
             test/account-api.test.js \
             test/expo-push-transport.test.js \
             test/account-provisioning-config.test.js \
+            test/remote-alert-scheduler.test.js \
             gateway/contracts/firebase-token-verifier.contract.mjs
 
       - name: Render account-enabled Worker config
@@ -92,7 +113,7 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/render-account-enabled-wrangler.mjs wrangler.jsonc wrangler.accounts.generated.json
-          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('wrangler.accounts.generated.json','utf8'));if(p.vars?.MINBEIS_ACCOUNT_API_ENABLED!=='true'||!p.vars?.FIREBASE_PROJECT_ID||p.d1_databases?.find(x=>x.binding==='MINBEIS_ACCOUNTS_DB')==null)process.exit(2);"
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('wrangler.accounts.generated.json','utf8'));const remote=process.env.MINBEIS_REMOTE_ALERTS_ENABLED==='true';if(p.vars?.MINBEIS_ACCOUNT_API_ENABLED!=='true'||!p.vars?.FIREBASE_PROJECT_ID||p.d1_databases?.find(x=>x.binding==='MINBEIS_ACCOUNTS_DB')==null)process.exit(2);if(remote&&(p.vars?.MINBEIS_REMOTE_ALERTS_ENABLED!=='true'||JSON.stringify(p.triggers?.crons)!==JSON.stringify(['*/5 * * * *'])))process.exit(3);if(!remote&&(p.vars?.MINBEIS_REMOTE_ALERTS_ENABLED!=='false'||(p.triggers?.crons||[]).length))process.exit(4);"
 
       - name: Production bundle dry-run with account backend enabled
         working-directory: market-intelligence/gateway
@@ -183,6 +204,8 @@ jobs:
             "accountApiEnabled": true,
             "firebaseProjectConfigured": true,
             "d1Binding": "MINBEIS_ACCOUNTS_DB",
+            "remoteAlertsEnabled": $MINBEIS_REMOTE_ALERTS_ENABLED,
+            "remoteAlertCron": "*/5 * * * *",
             "tenantIsolation": "HMAC_PSEUDONYMOUS",
             "portfolioCloudSync": false,
             "verifiedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
