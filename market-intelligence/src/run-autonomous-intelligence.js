@@ -44,6 +44,8 @@ import { evaluateMinbeisSimpleBaselineChallenger } from './minbeis-challenger-ev
 import { appendMinbeisHistoricalEventArchive } from './minbeis-historical-event-archive.js';
 import { runMinbeisHistoricalEventReplay } from './minbeis-historical-replay-runner.js';
 import { buildMinbeisHistoricalEventLearning } from './minbeis-historical-event-learning.js';
+import { buildMinbeisLearningProposals, buildMinbeisProposalShadowObservations, mergeMinbeisLearningProposalArchive } from './minbeis-learning-proposal.js';
+import { evaluateMinbeisLearningPromotionGate } from './minbeis-learning-promotion-gate.js';
 import { buildMinbeisSimpleBaselineSnapshot, summarizeMinbeisBaselineComparison } from './minbeis-simple-baseline.js';
 import { resolveQueuedResearchUniverse } from './research-queue-onboarding.js';
 
@@ -554,6 +556,29 @@ export async function runAutonomousIntelligence(options = {}) {
   const minbeisDecisionOutcomeSummary = summarizeMinbeisDecisionOutcomes(minbeisDecisionOutcomeRecords);
   const minbeisDecisionLearningReview = summarizeMinbeisDecisionLearningReviews(minbeisDecisionOutcomeRecords, { horizon: '30' });
   const minbeisDecisionContextLearning = buildMinbeisDecisionContextLearning(minbeisDecisionOutcomeRecords, { horizon: '30' });
+  const generatedMinbeisLearningProposals = buildMinbeisLearningProposals(minbeisDecisionContextLearning, { createdAt: generatedAt });
+  const minbeisLearningProposalBaseArchive = mergeMinbeisLearningProposalArchive(
+    options.minbeisLearningProposalRecords || [],
+    generatedMinbeisLearningProposals,
+  );
+  const minbeisLearningProposalEvaluations = minbeisLearningProposalBaseArchive.proposals.map((proposal) => {
+    const observations = buildMinbeisProposalShadowObservations(proposal, minbeisDecisionOutcomeRecords, { horizon: '30' });
+    const promotionGate = evaluateMinbeisLearningPromotionGate(proposal, observations, options.minbeisLearningPromotionOptions || {});
+    return {
+      proposalId: proposal.proposalId,
+      prospectiveObservationCount: observations.length,
+      promotionGate,
+    };
+  });
+  const minbeisLearningProposalArchive = {
+    ...minbeisLearningProposalBaseArchive,
+    evaluations: minbeisLearningProposalEvaluations,
+    promotionCandidateCount: minbeisLearningProposalEvaluations.filter((item) => item.promotionGate?.promotionCandidate === true).length,
+    shadowResearchOnlyCount: minbeisLearningProposalEvaluations.filter((item) => item.promotionGate?.promotionCandidate !== true).length,
+  };
+  if (typeof options.minbeisLearningProposalArchiveSink === 'function') {
+    await options.minbeisLearningProposalArchiveSink(minbeisLearningProposalArchive);
+  }
   const minbeisChallengerEvaluation = evaluateMinbeisSimpleBaselineChallenger(minbeisDecisionOutcomeRecords, { horizon: '30' });
   const minbeisSimpleBaselineComparison = summarizeMinbeisBaselineComparison(minbeisDecisionOutcomeRecords);
   if (typeof options.minbeisDecisionOutcomeLedgerSink === 'function') {
@@ -771,6 +796,14 @@ const operationalHealth = buildOperationalHealth({
     minbeisHistoricalEventLearning,
     minbeisDecisionLearningReview,
     minbeisDecisionContextLearning,
+    minbeisLearningProposalSummary: {
+      updatedAt: minbeisLearningProposalArchive.updatedAt,
+      proposalCount: minbeisLearningProposalArchive.proposalCount,
+      newProposalCount: minbeisLearningProposalArchive.newProposalCount,
+      promotionCandidateCount: minbeisLearningProposalArchive.promotionCandidateCount,
+      shadowResearchOnlyCount: minbeisLearningProposalArchive.shadowResearchOnlyCount,
+      automaticApplicationAllowed: false,
+    },
     minbeisChallengerEvaluation,
     minbeisSimpleBaselineComparison,
     minbeisDecisionOutcomeRecordCount: minbeisDecisionOutcomeRecords.length,
@@ -822,6 +855,10 @@ async function main() {
     : null;
   const minbeisHistoricalEventArchiveOutputPath = path.resolve(process.cwd(), process.env.MINBEIS_HISTORICAL_EVENT_ARCHIVE_OUTPUT || 'out/minbeis-historical-event-archive.json');
   const minbeisHistoricalReplayOutputPath = path.resolve(process.cwd(), process.env.MINBEIS_HISTORICAL_REPLAY_OUTPUT || 'out/minbeis-historical-replay.json');
+  const minbeisLearningProposalArchiveInputPath = process.env.MINBEIS_LEARNING_PROPOSAL_ARCHIVE_PATH
+    ? path.resolve(process.cwd(), process.env.MINBEIS_LEARNING_PROPOSAL_ARCHIVE_PATH)
+    : null;
+  const minbeisLearningProposalArchiveOutputPath = path.resolve(process.cwd(), process.env.MINBEIS_LEARNING_PROPOSAL_ARCHIVE_OUTPUT || 'out/minbeis-learning-proposal-archive.json');
   const researchQueuePath = process.env.MINBEIS_RESEARCH_QUEUE_PATH
     ? path.resolve(process.cwd(), process.env.MINBEIS_RESEARCH_QUEUE_PATH)
     : null;
@@ -840,6 +877,7 @@ async function main() {
   let forecastOutcomeLedgerRecords = [];
   let minbeisDecisionOutcomeRecords = [];
   let minbeisHistoricalEventRecords = [];
+  let minbeisLearningProposalRecords = [];
   if (researchQueuePath) {
     try {
       const queueInput = JSON.parse(await readFile(researchQueuePath, 'utf8'));
@@ -876,10 +914,19 @@ async function main() {
       if (error?.code !== 'ENOENT') throw error;
     }
   }
+  if (minbeisLearningProposalArchiveInputPath) {
+    try {
+      const existingProposalArchive = JSON.parse(await readFile(minbeisLearningProposalArchiveInputPath, 'utf8'));
+      minbeisLearningProposalRecords = Array.isArray(existingProposalArchive?.proposals) ? existingProposalArchive.proposals : [];
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+  }
   let persistedForecastOutcomeArchive = null;
   let persistedMinbeisDecisionOutcomeArchive = null;
   let persistedMinbeisHistoricalEventArchive = null;
   let persistedMinbeisHistoricalReplay = null;
+  let persistedMinbeisLearningProposalArchive = null;
   const report = await runAutonomousIntelligence({
     queuedResearchCompanies: researchQueueResolution.companies || [],
     researchQueueResolution,
@@ -890,11 +937,14 @@ async function main() {
     minbeisHistoricalEventRecords,
     minbeisHistoricalEventArchiveSink: (archive) => { persistedMinbeisHistoricalEventArchive = archive; },
     minbeisHistoricalReplaySink: (replay) => { persistedMinbeisHistoricalReplay = replay; },
+    minbeisLearningProposalRecords,
+    minbeisLearningProposalArchiveSink: (archive) => { persistedMinbeisLearningProposalArchive = archive; },
   });
   if (!persistedForecastOutcomeArchive) throw new Error('Forecast outcome archive cycle did not produce a persistence payload');
   if (!persistedMinbeisDecisionOutcomeArchive) throw new Error('MINBEIS decision outcome archive cycle did not produce a persistence payload');
   if (!persistedMinbeisHistoricalEventArchive) throw new Error('MINBEIS historical event archive cycle did not produce a persistence payload');
   if (!persistedMinbeisHistoricalReplay) throw new Error('MINBEIS historical replay cycle did not produce a persistence payload');
+  if (!persistedMinbeisLearningProposalArchive) throw new Error('MINBEIS learning proposal archive cycle did not produce a persistence payload');
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   await mkdir(path.dirname(ledgerOutputPath), { recursive: true });
@@ -905,6 +955,8 @@ async function main() {
   await writeFile(minbeisHistoricalEventArchiveOutputPath, `${JSON.stringify(persistedMinbeisHistoricalEventArchive, null, 2)}\n`, 'utf8');
   await mkdir(path.dirname(minbeisHistoricalReplayOutputPath), { recursive: true });
   await writeFile(minbeisHistoricalReplayOutputPath, `${JSON.stringify(persistedMinbeisHistoricalReplay, null, 2)}\n`, 'utf8');
+  await mkdir(path.dirname(minbeisLearningProposalArchiveOutputPath), { recursive: true });
+  await writeFile(minbeisLearningProposalArchiveOutputPath, `${JSON.stringify(persistedMinbeisLearningProposalArchive, null, 2)}\n`, 'utf8');
   console.log(`Wrote autonomous intelligence report to ${outputPath}`);
   console.log(`Research queue: ${report.researchQueueResolution?.resolvedCount || 0}/${report.researchQueueResolution?.requestedCount || 0} queued symbols resolved into focus universe`);
   console.log(`Event discovery: ${report.discovery.candidateCount} candidates, ${report.discovery.deepAnalysisCompanyCount} additions`);
