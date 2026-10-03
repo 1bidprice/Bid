@@ -102,14 +102,17 @@ jobs:
           npx --yes wrangler@4.129.1 deploy --config wrangler.accounts.generated.json --dry-run --outdir dist-accounts
           find dist-accounts -type f | grep -Eq '\.(js|mjs)$'
 
-      - name: Apply idempotent D1 account migration
+      - name: Apply ordered idempotent D1 account migrations
         working-directory: market-intelligence/gateway
         run: |
           set -euo pipefail
-          npx --yes wrangler@4.129.1 d1 execute MINBEIS_ACCOUNTS_DB \
-            --remote \
-            --config wrangler.accounts.generated.json \
-            --file migrations/0001_minbeis_accounts.sql
+          for migration in migrations/*.sql; do
+            echo "Applying $migration"
+            npx --yes wrangler@4.129.1 d1 execute MINBEIS_ACCOUNTS_DB \
+              --remote \
+              --config wrangler.accounts.generated.json \
+              --file "$migration"
+          done
 
       - name: Deploy account-enabled gateway with encrypted secrets
         id: deploy
