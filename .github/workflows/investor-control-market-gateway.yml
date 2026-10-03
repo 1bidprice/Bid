@@ -58,6 +58,8 @@ jobs:
           node --check gateway/src/account-api.js
           node --check gateway/src/expo-push-transport.js
           node --check gateway/src/firebase-token-verifier.js
+          node --check gateway/src/alert-runtime-repository.js
+          node --check gateway/src/remote-alert-scheduler.js
           node --check gateway/scripts/render-account-enabled-wrangler.mjs
           node -e "JSON.parse(require('fs').readFileSync('gateway/wrangler.jsonc','utf8'))"
 
@@ -71,7 +73,7 @@ jobs:
 
       - name: Run gateway security, edge and market-data contracts
         working-directory: market-intelligence
-        run: node --test test/market-gateway.test.js test/market-gateway-edge.test.js test/tenant-contract.test.js test/push-contract.test.js test/account-api.test.js test/expo-push-transport.test.js test/account-provisioning-config.test.js gateway/contracts/firebase-token-verifier.contract.mjs
+        run: node --test test/market-gateway.test.js test/market-gateway-edge.test.js test/tenant-contract.test.js test/push-contract.test.js test/account-api.test.js test/expo-push-transport.test.js test/account-provisioning-config.test.js test/remote-alert-scheduler.test.js gateway/contracts/firebase-token-verifier.contract.mjs
 
       - name: Verify deployment workflow is manual-only and CLI-compatible
         shell: bash
