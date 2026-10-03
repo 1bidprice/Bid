@@ -55,6 +55,7 @@ import {
   instrumentCurrency,
   instrumentEntryFromTransaction,
 } from './src/instrument-entry';
+import { classifyInstrumentSavePreflight } from './src/instrument-save-preflight';
 import { buildPortfolioSnapshot } from './src/portfolio-engine';
 import PortfolioHistoryChart from './src/PortfolioHistoryChart';
 import PortfolioInsightsCard from './src/PortfolioInsightsCard';
@@ -1141,19 +1142,69 @@ function MainApp({ onOpenDecisionGate }) {
 
   const openNewTransaction = () => { setEditingTransaction(null); setTransactionModal(true); };
 
+  const commitTransaction = async (transaction) => {
+    const current = stateRef.current;
+    const transactions = editingTransaction
+      ? current.transactions.map((item) => item.id === editingTransaction.id ? transaction : item)
+      : [...current.transactions, transaction];
+    await persist({ ...current, transactions });
+    setTransactionModal(false);
+    setEditingTransaction(null);
+    setExpandedTransaction(transaction.id);
+    refresh({ silent: true });
+    if (transaction.type === 'buy') syncMinbeisOnboarding(transaction.symbol);
+  };
+
   const saveTransaction = async (transaction) => {
     if (transaction.type === 'sell') {
       const currentPosition = positions.find((position) => position.symbol === transaction.symbol);
       const originalQuantity = editingTransaction?.type === 'sell' && editingTransaction.symbol === transaction.symbol ? Number(editingTransaction.quantity || 0) : 0;
       const available = Number(currentPosition?.quantity || 0) + originalQuantity;
-      if (!currentPosition || transaction.quantity > available) { Alert.alert('Μη έγκυρη πώληση', `Διαθέσιμες μετοχές ${transaction.symbol}: ${available}.`); return; }
+      if (!currentPosition || transaction.quantity > available) {
+        Alert.alert('Μη έγκυρη πώληση', `Διαθέσιμες μετοχές ${transaction.symbol}: ${available}.`);
+        return;
+      }
+      await commitTransaction(transaction);
+      return;
     }
-    const current = stateRef.current;
-    const transactions = editingTransaction ? current.transactions.map((item) => item.id === editingTransaction.id ? transaction : item) : [...current.transactions, transaction];
-    await persist({ ...current, transactions });
-    setTransactionModal(false); setEditingTransaction(null); setExpandedTransaction(transaction.id); refresh({ silent: true });
-    if (transaction.type === 'buy') {
-      syncMinbeisOnboarding(transaction.symbol);
+
+    if (!MARKET_GATEWAY_CONFIGURED) {
+      await commitTransaction(transaction);
+      return;
+    }
+
+    try {
+      const capability = await fetchConfiguredInstrumentCapability(transaction.symbol);
+      const preflight = classifyInstrumentSavePreflight(capability);
+      if (preflight.status === 'REJECTED') {
+        Alert.alert(
+          'Το ticker δεν επαληθεύτηκε',
+          `Δεν βρέθηκε ασφαλής αντιστοίχιση για ${transaction.symbol} στην επιλεγμένη αγορά. Έλεγξε ticker και αγορά πριν το αποθηκεύσεις.`,
+        );
+        return;
+      }
+      if (preflight.status === 'PENDING_CONFIRMATION') {
+        Alert.alert(
+          'Η ταυτότητα δεν επιβεβαιώθηκε ακόμη',
+          'Ο έλεγχος της αγοράς δεν ολοκληρώθηκε με βεβαιότητα. Μπορείς να το κρατήσεις τοπικά ως εκκρεμές, αλλά δεν θα θεωρείται επαληθευμένη θέση ούτε θα αποτιμάται μέχρι να περάσει ο έλεγχος.',
+          [
+            { text: 'Άκυρο', style: 'cancel' },
+            { text: 'Αποθήκευση ως εκκρεμές', onPress: () => { commitTransaction(transaction).catch(() => {}); } },
+          ],
+        );
+        return;
+      }
+      await commitTransaction(transaction);
+    } catch (error) {
+      const preflight = classifyInstrumentSavePreflight(null, error);
+      Alert.alert(
+        'Δεν ολοκληρώθηκε ο έλεγχος προϊόντος',
+        `Η συναλλαγή δεν αποθηκεύτηκε ακόμη ως επαληθευμένη. Αιτία: ${preflight.reason || 'προσωρινή αδυναμία ελέγχου'}. Μπορείς να την κρατήσεις μόνο ως εκκρεμή.`,
+        [
+          { text: 'Άκυρο', style: 'cancel' },
+          { text: 'Αποθήκευση ως εκκρεμές', onPress: () => { commitTransaction(transaction).catch(() => {}); } },
+        ],
+      );
     }
   };
 
