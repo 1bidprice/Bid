@@ -392,9 +392,9 @@ export default function DecisionOverlay({ visible = false, onRequestClose }) {
               </View>
 
               <View style={styles.grid}>
-                <Metric label="Περνούν" value={String(counts.ready)} />
-                <Metric label="Προσοχή" value={String(counts.caution)} danger={counts.caution > 0} />
-                <Metric label="Νέες αγορές μπλοκαρισμένες" value={String(counts.blocked)} danger={counts.blocked > 0} />
+                <Metric label="Πλάνα πλήρη" value={String(counts.ready)} />
+                <Metric label="Πλάνα με προειδοποίηση" value={String(counts.caution)} danger={counts.caution > 0} />
+                <Metric label="Νέα αγορά μπλοκαρισμένη" value={String(counts.blocked)} danger={counts.blocked > 0} />
                 <Metric label="Χαρτοφυλάκιο" value={money(snapshot.totalValueEUR)} />
               </View>
 
