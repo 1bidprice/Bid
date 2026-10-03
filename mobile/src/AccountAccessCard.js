@@ -21,6 +21,10 @@ import {
   disableRemotePushForCurrentDevice,
   enableRemotePushForCurrentDevice,
 } from './account-device-sync';
+import {
+  isRemotePushEnabledLocally,
+  syncAllRemoteAlertRules,
+} from './remote-alert-sync';
 
 function messageFor(error) {
   const code = String(error?.code || error?.message || '');
@@ -33,7 +37,7 @@ function messageFor(error) {
   return 'Η ενέργεια δεν ολοκληρώθηκε. Δοκίμασε ξανά.';
 }
 
-export default function AccountAccessCard() {
+export default function AccountAccessCard({ alertRules = [] }) {
   const configured = isFirebaseAccountConfigured();
   const [account, setAccount] = useState(null);
   const [accountVersion, setAccountVersion] = useState(0);
@@ -49,6 +53,7 @@ export default function AccountAccessCard() {
     if (!configured) return undefined;
     const auth = getMinbeisFirebaseAuth();
     setAccount(auth.currentUser || null);
+    isRemotePushEnabledLocally().then(setPushEnabled).catch(() => setPushEnabled(false));
     return onAuthStateChanged(auth, (user) => setAccount(user || null));
   }, [configured]);
 
@@ -127,7 +132,15 @@ export default function AccountAccessCard() {
     try {
       const result = await enableRemotePushForCurrentDevice();
       setPushEnabled(result.enabled === true);
-      setFeedback({ type: 'ok', text: 'Οι απομακρυσμένες ειδοποιήσεις ενεργοποιήθηκαν για αυτή τη συσκευή.' });
+      try {
+        await syncAllRemoteAlertRules(alertRules, {
+          installationId: result.installationId,
+          remotePushEnabled: true,
+        });
+        setFeedback({ type: 'ok', text: 'Οι απομακρυσμένες ειδοποιήσεις ενεργοποιήθηκαν και οι υπάρχοντες κανόνες συγχρονίστηκαν.' });
+      } catch {
+        setFeedback({ type: 'error', text: 'Η συσκευή ενεργοποιήθηκε για remote ειδοποιήσεις, αλλά κάποιοι υπάρχοντες κανόνες δεν συγχρονίστηκαν ακόμη.' });
+      }
     } catch (error) {
       const code = String(error?.gatewayCode || error?.code || error?.message || '');
       if (/ACCOUNT_API_DISABLED|ACCOUNTS_DATABASE_NOT_CONFIGURED|REMOTE_PUSH_NOT_CONFIGURED/.test(code)) {
@@ -160,6 +173,16 @@ export default function AccountAccessCard() {
     setBusy(true);
     setFeedback(null);
     try {
+      const remoteEnabled = await isRemotePushEnabledLocally();
+      if (remoteEnabled) {
+        try {
+          await disableRemotePushForCurrentDevice();
+          setPushEnabled(false);
+        } catch {
+          setFeedback({ type: 'error', text: 'Δεν έγινε αποσύνδεση, επειδή δεν επιβεβαιώθηκε η απενεργοποίηση remote ειδοποιήσεων για αυτή τη συσκευή.' });
+          return;
+        }
+      }
       await minbeisSignOut();
       setPassword('');
     } catch (error) {
