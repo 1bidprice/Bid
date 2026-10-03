@@ -84,6 +84,15 @@ function when(value) {
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString('el-GR');
 }
 
+function scoreBand(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '—';
+  if (numeric >= 90) return 'Υψηλή';
+  if (numeric >= 75) return 'Καλή';
+  if (numeric >= 60) return 'Μέτρια';
+  return 'Χαμηλή';
+}
+
 function claimText(value) {
   if (typeof value === 'string') return value;
   return value?.text || '';
@@ -580,7 +589,7 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = nu
             <PositionClarityCard clarity={clarity} />
             <View style={styles.positionContextRow}>
               <MinbeisAssessmentStrip assessment={assessment} compact />
-              {row ? <Text style={styles.ageText}>Εμπιστοσύνη {Number.isFinite(Number(row.confidenceScore)) ? Number(row.confidenceScore).toFixed(0) : '—'} · Δεδομένα {Number.isFinite(Number(row.dataQualityScore)) ? Number(row.dataQualityScore).toFixed(0) : '—'}</Text> : blockedDossier ? <Text style={styles.ageText}>Αναμονή μέχρι να ολοκληρωθεί ο υποχρεωτικός έλεγχος</Text> : null}
+              {row ? <Text style={styles.ageText}>Βεβαιότητα αξιολόγησης: {scoreBand(row.confidenceScore)} · Ποιότητα δεδομένων: {scoreBand(row.dataQualityScore)}</Text> : blockedDossier ? <Text style={styles.ageText}>Αναμονή μέχρι να ολοκληρωθεί ο υποχρεωτικός έλεγχος</Text> : null}
             </View>
             <HistoricalContextCard context={historicalContext} />
             {!row && !blockedDossier && capability?.queueStatus === 'QUEUED' && capability?.queuedAt ? <Text style={styles.queueStatusText}>Στην ουρά από {when(capability.queuedAt)}</Text> : null}
@@ -594,10 +603,20 @@ function PortfolioMinbeisSection({ dashboard, portfolioPositions = [], feed = nu
 function buildNewIdeaClarity(row) {
   const assessment = row?.minbeisAssessment || null;
   const action = row?.action || 'WATCH';
+  const classification = assessment?.classification || null;
   const confirmedBuy = ['BUY_PROBE', 'BUY_STARTER', 'BUY_CORE'].includes(action);
+  const reason = classification === 'TRAP'
+    ? 'Η ανάλυση εντοπίζει επαληθευμένο αυξημένο κίνδυνο ή συνθήκες αποφυγής. Δεν επιβεβαιώνεται νέα είσοδος.'
+    : classification === 'NO_TRADE'
+      ? 'Δεν υπάρχει αρκετή επιβεβαιωμένη βάση για νέα είσοδο τώρα.'
+      : classification === 'CONFIRMATION_REQUIRED'
+        ? 'Η ανάλυση δεν έχει ολοκληρώσει όλους τους υποχρεωτικούς ελέγχους για νέα είσοδο.'
+        : confirmedBuy
+          ? 'Η νέα είσοδος έχει περάσει τους ενεργούς ελέγχους αγοράς.'
+          : minbeisReasonText(row);
   return {
     now: confirmedBuy ? minbeisActionLabel(action) : action === 'NO_BUY' ? 'ΟΧΙ ΑΓΟΡΑ ΤΩΡΑ' : 'ΠΕΡΙΜΕΝΕ',
-    why: assessment?.explanation?.summary || minbeisReasonText(row),
+    why: reason,
     change: assessment?.explanation?.whatWouldChange
       || (row?.purchase?.nextGate ? purchaseNextGateLabel(row.purchase.nextGate) : null)
       || 'Νέα επαληθευμένα δεδομένα που περνούν τους αυστηρούς ελέγχους εισόδου.',
@@ -655,7 +674,7 @@ function MinbeisDashboard({ dashboard, sourceDecisionCount = 0, decisionContext 
           <PositionClarityCard clarity={buildNewIdeaClarity(row)} />
           <View style={styles.positionContextRow}>
             <MinbeisAssessmentStrip assessment={row.minbeisAssessment} compact />
-            <Text style={styles.ageText}>Εμπιστοσύνη {Number.isFinite(Number(row.confidenceScore)) ? Number(row.confidenceScore).toFixed(0) : '—'} · Δεδομένα {Number.isFinite(Number(row.dataQualityScore)) ? Number(row.dataQualityScore).toFixed(0) : '—'}</Text>
+            <Text style={styles.ageText}>Βεβαιότητα αξιολόγησης: {scoreBand(row.confidenceScore)} · Ποιότητα δεδομένων: {scoreBand(row.dataQualityScore)}</Text>
           </View>
           <HistoricalContextCard context={row.historicalContext} />
         </View>
@@ -955,9 +974,9 @@ export default function OpportunitiesView({ portfolioPositions = [], portfolioPo
         {showSystemDetails ? <>
         <View style={styles.sourcePolicyBox}><Text style={styles.sourcePolicyTitle}>Ποιος επιλέγει τις πηγές;</Text><Text style={styles.sourcePolicyText}>Έκδοση πολιτικής: {feed?.sourceSelection?.version || '—'}. Οι πηγές επιλέγονται από κλειδωμένη πολιτική κώδικα και επιτρεπόμενη λίστα, όχι αυθαίρετα από το AI.</Text></View>
         <View style={[styles.productionHealth, productionReady ? styles.productionHealthGood : styles.productionHealthLimited]}>
-          <View style={styles.productionHealthTop}><View style={styles.grow}><Text style={styles.productionHealthEyebrow}>ΚΑΤΑΣΤΑΣΗ ΠΑΡΑΓΩΓΙΚΟΥ ΣΥΣΤΗΜΑΤΟΣ</Text><Text style={styles.productionHealthTitle}>{productionReady ? (historicalAnalyticsPartial ? 'Κανονική λειτουργία · μερική ιστορική κάλυψη' : 'Πλήρης αυτοματοποιημένη λειτουργία') : 'Περιορισμένη λειτουργία — χωρίς αυθαίρετα σήματα'}</Text></View><View style={[styles.productionHealthBadge, productionReady && styles.productionHealthBadgeGood]}><Text style={[styles.productionHealthBadgeText, productionReady && styles.productionHealthBadgeTextGood]}>{productionReady ? 'ΕΝΕΡΓΟ' : 'ΠΕΡΙΟΡΙΣΜΕΝΟ'}</Text></View></View>
-          <Text style={styles.productionHealthText}>{productionReady ? (historicalAnalyticsPartial ? 'Η ροή είναι πρόσφατη και οι τρέχοντες έλεγχοι αγοράς και θεμελιωδών λειτουργούν. Η ιστορική ανάλυση είναι διαθέσιμη μόνο όπου έχει επαρκή και επαληθευμένα δεδομένα· οι υπόλοιποι φάκελοι παραμένουν μπλοκαρισμένοι.' : 'Η ροή είναι πρόσφατη και οι υποχρεωτικοί έλεγχοι αγοράς, ιστορικού και θεμελιωδών λειτουργούν.') : 'Το σύστημα συνεχίζει να συλλέγει και να ελέγχει δεδομένα, αλλά δεν εγκρίνει αγορά ή πώληση όταν λείπει πηγή, ιστορικό, benchmark, θεμελιώδη ή διασταύρωση.'}</Text>
-          <Text style={styles.healthSplitText}>Υποδομή: {operationalStatusLabel(operationalHealth?.infrastructureStatus)} · Τρέχουσα αγορά: {operationalStatusLabel(operationalHealth?.marketDataStatus)} · Ιστορική ανάλυση: {operationalStatusLabel(historicalAnalyticsStatus)} · Θεμελιώδη: {operationalStatusLabel(operationalHealth?.fundamentalsStatus)} · Αποφάσεις: {operationalStatusLabel(operationalHealth?.decisionEngineStatus)}</Text>
+          <View style={styles.productionHealthTop}><View style={styles.grow}><Text style={styles.productionHealthEyebrow}>ΚΑΤΑΣΤΑΣΗ ΠΑΡΑΓΩΓΙΚΟΥ ΣΥΣΤΗΜΑΤΟΣ</Text><Text style={styles.productionHealthTitle}>{productionReady ? (historicalAnalyticsPartial ? 'Κανονική λειτουργία · μερική ιστορική κάλυψη' : 'Πλήρης ροή δεδομένων και ελέγχων') : 'Περιορισμένη λειτουργία — χωρίς αυθαίρετα σήματα'}</Text></View><View style={[styles.productionHealthBadge, productionReady && styles.productionHealthBadgeGood]}><Text style={[styles.productionHealthBadgeText, productionReady && styles.productionHealthBadgeTextGood]}>{productionReady ? 'ΕΝΕΡΓΟ' : 'ΠΕΡΙΟΡΙΣΜΕΝΟ'}</Text></View></View>
+          <Text style={styles.productionHealthText}>{productionReady ? (historicalAnalyticsPartial ? 'Η ροή είναι πρόσφατη και οι τρέχοντες έλεγχοι αγοράς και θεμελιωδών λειτουργούν. Η ιστορική ανάλυση είναι διαθέσιμη μόνο όπου έχει επαρκή και επαληθευμένα δεδομένα· οι υπόλοιποι φάκελοι παραμένουν μπλοκαρισμένοι.' : 'Η ροή είναι πρόσφατη και οι υποχρεωτικοί έλεγχοι αγοράς, ιστορικού και θεμελιωδών λειτουργούν. Η τελική επενδυτική πράξη παραμένει πάντα στον χρήστη.') : 'Το σύστημα συνεχίζει να συλλέγει και να ελέγχει δεδομένα, αλλά δεν εγκρίνει αγορά ή πώληση όταν λείπει πηγή, ιστορικό, benchmark, θεμελιώδη ή διασταύρωση.'}</Text>
+          <Text style={styles.healthSplitText}>Υποδομή: {operationalStatusLabel(operationalHealth?.infrastructureStatus)} · Τρέχουσα αγορά: {operationalStatusLabel(operationalHealth?.marketDataStatus)} · Ιστορική ανάλυση: {operationalStatusLabel(historicalAnalyticsStatus)} · Θεμελιώδη: {operationalStatusLabel(operationalHealth?.fundamentalsStatus)} · Μηχανή αξιολόγησης: {operationalStatusLabel(operationalHealth?.decisionEngineStatus)}</Text>
           <View style={styles.productionMetrics}>
             <View style={styles.productionMetric}><Text style={styles.productionMetricValue}>{sourceHealth?.marketSnapshotCount || 0}</Text><Text style={styles.productionMetricLabel}>Τρέχουσες τιμές</Text></View>
             <View style={styles.productionMetric}><Text style={styles.productionMetricValue}>{sourceHealth?.readyHistoricalMarketMetricsCount || 0}/{operationalHealth?.analysedCompanyCount || sourceHealth?.historicalMarketMetricsCount || 0}</Text><Text style={styles.productionMetricLabel}>Ιστορική κάλυψη</Text></View>
