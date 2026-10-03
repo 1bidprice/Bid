@@ -42,6 +42,8 @@ import { summarizeMinbeisDecisionLearningReviews } from './minbeis-decision-lear
 import { buildMinbeisDecisionContextLearning } from './minbeis-decision-context-learning.js';
 import { evaluateMinbeisSimpleBaselineChallenger } from './minbeis-challenger-evaluation.js';
 import { appendMinbeisHistoricalEventArchive } from './minbeis-historical-event-archive.js';
+import { runMinbeisHistoricalEventReplay } from './minbeis-historical-replay-runner.js';
+import { buildMinbeisHistoricalEventLearning } from './minbeis-historical-event-learning.js';
 import { buildMinbeisSimpleBaselineSnapshot, summarizeMinbeisBaselineComparison } from './minbeis-simple-baseline.js';
 import { resolveQueuedResearchUniverse } from './research-queue-onboarding.js';
 
@@ -267,6 +269,25 @@ function dossierMap(items = []) {
     if (!current || (nextReady && !currentReady)) map.set(item.companyId, item);
   }
   return map;
+}
+
+function buildHistoricalReplaySeriesCollector(canonicalCollector, longHistoryCollector) {
+  const output = new Map(canonicalCollector instanceof Map ? canonicalCollector : []);
+  if (!(longHistoryCollector instanceof Map)) return output;
+  for (const [companyId, record] of longHistoryCollector.entries()) {
+    if (
+      record?.status === 'RESEARCH_READY'
+      && record?.researchEligible === true
+      && record?.decisionEligible === false
+      && record?.executionEligible === false
+      && record?.series?.usable === true
+      && Array.isArray(record?.series?.candles)
+      && record.series.candles.length
+    ) {
+      output.set(companyId, record.series);
+    }
+  }
+  return output;
 }
 
 function opportunityDataQuality(fundamentals, marketMetrics, fundamentalRisk, dossier) {
@@ -554,6 +575,26 @@ export async function runAutonomousIntelligence(options = {}) {
     historicalSeriesCollector,
     options: { ...options, generatedAt },
   });
+  const minbeisHistoricalReplaySeries = buildHistoricalReplaySeriesCollector(
+    historicalSeriesCollector,
+    longHistoryResearch.collector,
+  );
+  const minbeisHistoricalReplay = runMinbeisHistoricalEventReplay({
+    generatedAt,
+    eventArchive: minbeisHistoricalEventArchive,
+    historicalSeriesByCompany: minbeisHistoricalReplaySeries,
+    horizons: options.minbeisHistoricalReplayHorizons || [5, 21, 63],
+  });
+  const minbeisHistoricalEventLearning = buildMinbeisHistoricalEventLearning(
+    minbeisHistoricalReplay,
+    options.minbeisHistoricalEventLearningOptions || {},
+  );
+  if (typeof options.minbeisHistoricalReplaySink === 'function') {
+    await options.minbeisHistoricalReplaySink({
+      ...minbeisHistoricalReplay,
+      learning: minbeisHistoricalEventLearning,
+    });
+  }
   const shadowForecasts = buildShadowForecasts({
     generatedAt,
     universe: expandedUniverse,
@@ -717,6 +758,17 @@ const operationalHealth = buildOperationalHealth({
       newRecordCount: minbeisHistoricalEventArchive.newRecordCount,
       observedAgainCount: minbeisHistoricalEventArchive.observedAgainCount,
     },
+    minbeisHistoricalReplaySummary: {
+      generatedAt: minbeisHistoricalReplay.generatedAt,
+      eventArchiveRecordCount: minbeisHistoricalReplay.eventArchiveRecordCount,
+      replayAttemptCount: minbeisHistoricalReplay.replayAttemptCount,
+      replayReadyCount: minbeisHistoricalReplay.replayReadyCount,
+      blockedCount: minbeisHistoricalReplay.blockedCount,
+      horizons: minbeisHistoricalReplay.horizons,
+      lookAheadPolicy: minbeisHistoricalReplay.lookAheadPolicy,
+      futureOutcomeDecisionVisibility: minbeisHistoricalReplay.futureOutcomeDecisionVisibility,
+    },
+    minbeisHistoricalEventLearning,
     minbeisDecisionLearningReview,
     minbeisDecisionContextLearning,
     minbeisChallengerEvaluation,
@@ -769,6 +821,7 @@ async function main() {
     ? path.resolve(process.cwd(), process.env.MINBEIS_HISTORICAL_EVENT_ARCHIVE_PATH)
     : null;
   const minbeisHistoricalEventArchiveOutputPath = path.resolve(process.cwd(), process.env.MINBEIS_HISTORICAL_EVENT_ARCHIVE_OUTPUT || 'out/minbeis-historical-event-archive.json');
+  const minbeisHistoricalReplayOutputPath = path.resolve(process.cwd(), process.env.MINBEIS_HISTORICAL_REPLAY_OUTPUT || 'out/minbeis-historical-replay.json');
   const researchQueuePath = process.env.MINBEIS_RESEARCH_QUEUE_PATH
     ? path.resolve(process.cwd(), process.env.MINBEIS_RESEARCH_QUEUE_PATH)
     : null;
@@ -826,6 +879,7 @@ async function main() {
   let persistedForecastOutcomeArchive = null;
   let persistedMinbeisDecisionOutcomeArchive = null;
   let persistedMinbeisHistoricalEventArchive = null;
+  let persistedMinbeisHistoricalReplay = null;
   const report = await runAutonomousIntelligence({
     queuedResearchCompanies: researchQueueResolution.companies || [],
     researchQueueResolution,
@@ -835,10 +889,12 @@ async function main() {
     minbeisDecisionOutcomeLedgerSink: (archive) => { persistedMinbeisDecisionOutcomeArchive = archive; },
     minbeisHistoricalEventRecords,
     minbeisHistoricalEventArchiveSink: (archive) => { persistedMinbeisHistoricalEventArchive = archive; },
+    minbeisHistoricalReplaySink: (replay) => { persistedMinbeisHistoricalReplay = replay; },
   });
   if (!persistedForecastOutcomeArchive) throw new Error('Forecast outcome archive cycle did not produce a persistence payload');
   if (!persistedMinbeisDecisionOutcomeArchive) throw new Error('MINBEIS decision outcome archive cycle did not produce a persistence payload');
   if (!persistedMinbeisHistoricalEventArchive) throw new Error('MINBEIS historical event archive cycle did not produce a persistence payload');
+  if (!persistedMinbeisHistoricalReplay) throw new Error('MINBEIS historical replay cycle did not produce a persistence payload');
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   await mkdir(path.dirname(ledgerOutputPath), { recursive: true });
@@ -847,6 +903,8 @@ async function main() {
   await writeFile(minbeisLedgerOutputPath, `${JSON.stringify(persistedMinbeisDecisionOutcomeArchive, null, 2)}\n`, 'utf8');
   await mkdir(path.dirname(minbeisHistoricalEventArchiveOutputPath), { recursive: true });
   await writeFile(minbeisHistoricalEventArchiveOutputPath, `${JSON.stringify(persistedMinbeisHistoricalEventArchive, null, 2)}\n`, 'utf8');
+  await mkdir(path.dirname(minbeisHistoricalReplayOutputPath), { recursive: true });
+  await writeFile(minbeisHistoricalReplayOutputPath, `${JSON.stringify(persistedMinbeisHistoricalReplay, null, 2)}\n`, 'utf8');
   console.log(`Wrote autonomous intelligence report to ${outputPath}`);
   console.log(`Research queue: ${report.researchQueueResolution?.resolvedCount || 0}/${report.researchQueueResolution?.requestedCount || 0} queued symbols resolved into focus universe`);
   console.log(`Event discovery: ${report.discovery.candidateCount} candidates, ${report.discovery.deepAnalysisCompanyCount} additions`);
