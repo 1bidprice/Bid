@@ -1,4 +1,6 @@
-export const MINBEIS_ASSESSMENT_VERSION = '2026-09-23.1';
+import { finalActionRiskAssessment } from './minbeis-risk-policy.js';
+
+export const MINBEIS_ASSESSMENT_VERSION = '2026-10-05.1';
 
 export const MINBEIS_ASSESSMENTS = Object.freeze({
   SETUP: 'SETUP',
@@ -10,14 +12,9 @@ export const MINBEIS_ASSESSMENTS = Object.freeze({
 const unique = (items) => [...new Set((Array.isArray(items) ? items : []).filter(Boolean))];
 
 function severeRisk(finalAction) {
-  const reasons = finalAction?.reasons || [];
-  const fundamental = finalAction?.risk?.fundamentalFlags || [];
-  const market = finalAction?.risk?.marketFlags || [];
-  return reasons.includes('SEVERE_RISK_CONFIGURATION')
-    || fundamental.length > 0
-    || market.includes('EXTREME_VOLATILITY')
-    || market.includes('SEVERE_DRAWDOWN')
-    || market.includes('LOW_LIQUIDITY');
+  const canonical = finalActionRiskAssessment(finalAction);
+  return canonical.severe === true
+    || (finalAction?.reasons || []).includes('SEVERE_RISK_CONFIGURATION');
 }
 
 function firstNonEmpty(...values) {
