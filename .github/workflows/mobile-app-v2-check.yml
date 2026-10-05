@@ -65,7 +65,7 @@ jobs:
           grep -Fq 'bundleRelease assembleRelease' "$WF"
           grep -Fq 'debugCertificateRejected' "$WF"
           grep -Fq 'playProductionReleased' "$WF"
-          ! grep -Eqi 'play.*upload|publish.*play|production release' "$WF"
+          ! grep -Eqi 'r0adkll/upload-google-play|gradle-play-publisher|publishBundle|publishReleaseBundle|track:[[:space:]]*production|service_account_json' "$WF"
 
       - name: Check Expo package compatibility
         run: npx expo install --check 2>&1 | tee package-check.log
