@@ -152,7 +152,7 @@ test('mobile feed exposes confirmed, waiting and rejected opportunity purchase s
   assert.equal(feed.confirmedBuyOpportunities[0].automaticBrokerOrder, false);
   assert.equal(feed.waitingEntryOpportunities[0].buyNowEligible, false);
   assert.ok(feed.waitingEntryOpportunities[0].whyNotBuyNow.includes('BUY_SETUP_NOT_CONFIRMED'));
-  assert.match(feed.today.headline, /ευκαιρία αγοράς επιβεβαιώθηκε/);
+  assert.match(feed.today.headline, /setup αγοράς πέρασε όλους τους τελικούς ελέγχους/);
   assert.equal(feed.today.primaryItem.instrumentId, 'company:alpha');
   assert.match(feed.disclosure, /High\/Super Opportunity δεν σημαίνει αγορά/);
 });
@@ -177,11 +177,11 @@ test('waiting opportunity becomes today primary item when no BUY is confirmed', 
   const feed = buildMobileIntelligenceFeed(report([waiting]), { generatedAt });
   assert.equal(feed.summary.confirmedBuyOpportunityCount, 0);
   assert.equal(feed.summary.waitingEntryOpportunityCount, 1);
-  assert.match(feed.today.headline, /ισχυρή ευκαιρία υπό αναμονή επιβεβαίωσης εισόδου/);
+  assert.match(feed.today.headline, /θετική περίπτωση περιμένει τελική επιβεβαίωση εισόδου/);
   assert.equal(feed.today.primaryItem.instrumentId, 'company:wait');
 });
 
-test('today primary item follows a final BUY headline before an unrelated Hunter WAIT candidate', () => {
+test('raw final BUY never outranks a strict WAIT candidate without BUY_CONFIRMED reconciliation', () => {
   const waiting = purchaseDecision({
     instrumentId: 'company:wait',
     companyId: 'company:wait',
@@ -200,13 +200,15 @@ test('today primary item follows a final BUY headline before an unrelated Hunter
   const buy = finalDossier();
 
   const feed = buildMobileIntelligenceFeed(report([waiting], [buy]), { generatedAt });
+  const rawBuyDossier = feed.published.find((item) => item.companyId === 'company:final-buy');
 
   assert.equal(feed.summary.buyNowCount, 1);
   assert.equal(feed.summary.waitingEntryOpportunityCount, 1);
-  assert.match(feed.today.headline, /επιβεβαιωμένο σήμα άμεσης αγοράς/);
-  assert.equal(feed.today.primaryItem.companyId, 'company:final-buy');
-  assert.equal(feed.today.primaryItem.finalAction.marketAction, 'BUY_NOW');
-  assert.notEqual(feed.today.primaryItem.companyId, 'company:wait');
+  assert.equal(rawBuyDossier.nonHolderDecision.action, 'NO_BUY');
+  assert.equal(rawBuyDossier.nonHolderDecision.reason, 'BUY_NOW_REQUIRES_CONFIRMED_PURCHASE_RECONCILIATION');
+  assert.match(feed.today.headline, /θετική περίπτωση περιμένει τελική επιβεβαίωση εισόδου/);
+  assert.equal(feed.today.primaryItem.instrumentId, 'company:wait');
+  assert.notEqual(feed.today.primaryItem.companyId, 'company:final-buy');
 });
 
 
