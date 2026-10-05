@@ -6,7 +6,7 @@ const assert = require('assert');
 const root = path.join(__dirname, '..');
 let source = fs.readFileSync(path.join(root, 'src', 'remote-alert-sync.js'), 'utf8');
 source = source
-  .replace(/^import .*$/gm, '')
+  .replace(/import[\s\S]*?from\s+['"][^'"]+['"];?/g, '')
   .replace(/export const\s+([A-Za-z0-9_]+)\s*=/g, 'const $1 =')
   .replace(/export async function\s+([A-Za-z0-9_]+)\s*\(/g, 'async function $1(')
   .replace(/export function\s+([A-Za-z0-9_]+)\s*\(/g, 'function $1(');
