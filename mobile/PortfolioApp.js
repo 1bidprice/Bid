@@ -86,7 +86,7 @@ import {
   transactionTotal,
 } from './src/transaction-accounting';
 
-const VERSION = '1.8.4';
+const VERSION = '1.8.5';
 const PRIVACY_POLICY_URL = 'https://1bidprice.github.io/Bid/privacy-policy.html';
 const TERMS_URL = 'https://1bidprice.github.io/Bid/terms.html';
 const SUPPORT_EMAIL = 'xrimapp@gmail.com';
