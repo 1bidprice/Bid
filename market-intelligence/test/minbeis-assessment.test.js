@@ -57,3 +57,21 @@ test('blocked canonical decision becomes CONFIRMATION_REQUIRED and preserves blo
   assert.equal(result.classification, 'CONFIRMATION_REQUIRED');
   assert.ok(result.explanation.whyNow.includes('REFERENCE_PRICE_TIMESTAMP_NOT_VERIFIED'));
 });
+
+
+test('non-severe fundamental flags do not become TRAP and cannot contradict a confirmed setup', () => {
+  const result = buildMinbeisAssessment(
+    dossier({
+      marketAction: 'BUY_NOW',
+      reasons: ['BUY_GATES_CONFIRMED'],
+      risk: {
+        riskScore: 32,
+        fundamentalFlags: ['NEGATIVE_FREE_CASH_FLOW'],
+        marketFlags: [],
+      },
+    }),
+    { status: 'BUY_CONFIRMED', buyNowEligible: true },
+  );
+  assert.equal(result.classification, 'SETUP');
+  assert.notEqual(result.classification, 'TRAP');
+});
