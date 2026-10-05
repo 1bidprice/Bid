@@ -66,9 +66,10 @@ function personalizedDecisionCounts(feed, portfolioPositions, decisionContext = 
     const finalAction = item?.finalAction;
     if (!finalActionIsCurrent(finalAction, decisionContext)) continue;
     const hasPosition = held.has(canonicalDecisionSymbol(item?.symbol));
-    const action = hasPosition ? finalAction.holderAction : finalAction.nonHolderAction;
-    if (action === 'BUY_NOW') buyNowCount += 1;
-    if (action === 'SELL_NOW') sellNowCount += 1;
+    const decision = hasPosition ? item?.holderDecision : item?.nonHolderDecision;
+    const action = decision?.action;
+    if (['BUY_PROBE', 'BUY_STARTER', 'BUY_CORE'].includes(action)) buyNowCount += 1;
+    if (action === 'REDUCE') sellNowCount += 1;
   }
   return {
     ...(feed?.summary || {}),
@@ -127,7 +128,7 @@ function IntelligenceCard({ item, decisionContext }) {
         <HistoricalContextCard context={item.historicalContext} />
         <FinalDecisionCard item={item} decisionContext={decisionContext} />
         <View style={styles.actionRow}>
-          <View style={styles.actionBox}><Text style={styles.muted}>Γενική ερευνητική ένδειξη</Text><Text style={[styles.action, risk && styles.riskText]}>{item.actionLabel}</Text><Text style={styles.ageText}>Δεν είναι η προσωπική σου πράξη</Text></View>
+          <View style={styles.actionBox}><Text style={styles.muted}>Ερευνητική κατεύθυνση · όχι τελική πράξη</Text><Text style={[styles.action, risk && styles.riskText]}>{item.actionLabel}</Text><Text style={styles.ageText}>Δεν είναι η προσωπική σου πράξη</Text></View>
           <View style={styles.actionBox}><Text style={styles.muted}>Τιμή αναφοράς</Text><Text style={styles.action}>{money(item.referencePrice, item)}</Text><Text style={styles.ageText}>{Number.isFinite(referenceAge) ? (referenceAge < 1 ? 'πριν από λιγότερο από 1 ώρα' : 'πριν από ' + referenceAge.toFixed(1) + ' ώρες') : 'χωρίς έγκυρη ώρα'}</Text></View>
         </View>
         {item.marketQuote?.quoteContract?.publicMessage ? <View style={styles.marketQuoteContract}><Text style={styles.marketQuoteContractText}>{userFacingAnalysisText(item.marketQuote.quoteContract.publicMessage)}</Text></View> : null}
