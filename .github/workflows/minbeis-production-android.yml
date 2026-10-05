@@ -1,0 +1,178 @@
+name: MINBEIS Production Android Candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_signing:
+        description: 'Type BUILD_SIGNED to authorize a signed production-candidate build'
+        required: true
+        type: string
+      expected_sha:
+        description: 'Exact commit SHA authorized for signing'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: minbeis-production-android-candidate
+  cancel-in-progress: false
+
+jobs:
+  build-signed-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EXPO_PUBLIC_MARKET_GATEWAY_URL: ${{ vars.EXPO_PUBLIC_MARKET_GATEWAY_URL || 'https://investor-control-market-gateway.bidprice-alerts.workers.dev' }}
+      ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+      ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
+      ANDROID_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+      ANDROID_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+
+    steps:
+      - name: Enforce explicit signing authorization
+        shell: bash
+        env:
+          CONFIRM_SIGNING: ${{ inputs.confirm_signing }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          set -euo pipefail
+          test "$CONFIRM_SIGNING" = 'BUILD_SIGNED' || { echo 'Signing confirmation is invalid.' >&2; exit 1; }
+          test "$EXPECTED_SHA" = "$GITHUB_SHA" || { echo "Authorized SHA does not match workflow SHA: $GITHUB_SHA" >&2; exit 1; }
+          test "$GITHUB_REF_NAME" = 'investor-control-minbeis-integration-v1' || { echo 'Signed candidate builds are restricted to the controlled MINBEIS integration branch.' >&2; exit 1; }
+
+      - name: Require signing credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${ANDROID_UPLOAD_KEYSTORE_BASE64:-}" || { echo 'Missing ANDROID_UPLOAD_KEYSTORE_BASE64.' >&2; exit 1; }
+          test -n "${ANDROID_UPLOAD_STORE_PASSWORD:-}" || { echo 'Missing ANDROID_UPLOAD_STORE_PASSWORD.' >&2; exit 1; }
+          test -n "${ANDROID_UPLOAD_KEY_ALIAS:-}" || { echo 'Missing ANDROID_UPLOAD_KEY_ALIAS.' >&2; exit 1; }
+          test -n "${ANDROID_UPLOAD_KEY_PASSWORD:-}" || { echo 'Missing ANDROID_UPLOAD_KEY_PASSWORD.' >&2; exit 1; }
+
+      - name: Checkout exact authorized source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm install --no-audit --no-fund
+
+      - name: Run full mobile regression suite
+        working-directory: mobile
+        run: npm run test:core
+
+      - name: Verify production gateway is reachable
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          node -e "const u=new URL(process.env.EXPO_PUBLIC_MARKET_GATEWAY_URL);if(u.protocol!=='https:')process.exit(2);"
+          curl --fail --silent --show-error --retry 3 --retry-delay 2 "$EXPO_PUBLIC_MARKET_GATEWAY_URL/health" > gateway-health.json
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('gateway-health.json','utf8'));if(p.status!=='ok'||p.providers?.us!=='configured'||p.providers?.athens!=='official_delayed_15m')process.exit(3);"
+          rm -f gateway-health.json
+
+      - name: Generate Android project
+        working-directory: mobile
+        run: npx expo prebuild --platform android --clean --non-interactive
+
+      - name: Decode upload keystore outside repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          KEYSTORE="$RUNNER_TEMP/minbeis-upload-key.jks"
+          printf '%s' "$ANDROID_UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE"
+          chmod 600 "$KEYSTORE"
+          test -s "$KEYSTORE"
+          echo "MINBEIS_RELEASE_STORE_FILE=$KEYSTORE" >> "$GITHUB_ENV"
+          echo "MINBEIS_RELEASE_STORE_PASSWORD=$ANDROID_UPLOAD_STORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "MINBEIS_RELEASE_KEY_ALIAS=$ANDROID_UPLOAD_KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "MINBEIS_RELEASE_KEY_PASSWORD=$ANDROID_UPLOAD_KEY_PASSWORD" >> "$GITHUB_ENV"
+
+      - name: Patch generated Gradle for secure release signing
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          node scripts/patch-release-signing.cjs android/app/build.gradle
+          grep -Fq 'MINBEIS_SECURE_RELEASE_SIGNING' android/app/build.gradle
+          grep -Fq 'signingConfig signingConfigs.release' android/app/build.gradle
+
+      - name: Build signed AAB and APK
+        working-directory: mobile/android
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew bundleRelease assembleRelease --no-daemon
+
+      - name: Verify signed artifacts and certificate identity
+        working-directory: mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          AAB='android/app/build/outputs/bundle/release/app-release.aab'
+          APK='android/app/build/outputs/apk/release/app-release.apk'
+          test -f "$AAB"
+          test -f "$APK"
+
+          jarsigner -verify "$AAB" >/dev/null
+          keytool -printcert -jarfile "$AAB" > production-signing-audit.txt
+          grep -q 'SHA256:' production-signing-audit.txt
+          ! grep -q 'Android Debug' production-signing-audit.txt
+
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee -a production-signing-audit.txt
+          ! grep -q 'Android Debug' production-signing-audit.txt
+
+          sha256sum "$AAB" "$APK" | tee production-artifact-sha256.txt
+
+      - name: Create production-candidate manifest
+        working-directory: mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(node -e "console.log(require('./app.json').expo.version)")"
+          BUILD="$(node -e "console.log(require('./app.json').expo.android.versionCode)")"
+          cat > production-candidate-manifest.json <<EOF
+          {
+            "format": "minbeis-production-android-candidate",
+            "version": 1,
+            "sourceCommit": "$GITHUB_SHA",
+            "appVersion": "$VERSION",
+            "androidVersionCode": $BUILD,
+            "signedWithUploadKey": true,
+            "debugCertificateRejected": true,
+            "playProductionReleased": false,
+            "builtAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+
+      - name: Upload signed candidate artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: minbeis-signed-production-candidate-${{ github.sha }}
+          path: |
+            mobile/android/app/build/outputs/bundle/release/app-release.aab
+            mobile/android/app/build/outputs/apk/release/app-release.apk
+            mobile/production-signing-audit.txt
+            mobile/production-artifact-sha256.txt
+            mobile/production-candidate-manifest.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove upload keystore from runner
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/minbeis-upload-key.jks"

@@ -45,6 +45,7 @@ const capabilityProvider = {
         } },
         EVIDENCE_QUALITY: { verified: true, sourceRole: 'TEST_VERIFIED', score: 92 },
         LIQUIDITY: { verified: true, sourceRole: 'TEST_VERIFIED', score: 91, avgDollarVolume: 90_000_000, bidAskSpreadPct: 0.08 },
+        OPPORTUNITY_RISK: { verified: true, sourceRole: 'TEST_VERIFIED', score: 26, flags: [] },
       } };
     }
     if (profile.assetClass === 'BOND') {
@@ -61,6 +62,7 @@ const capabilityProvider = {
         DURATION: { verified: true, sourceRole: 'TEST_VERIFIED', modifiedDuration: 4.8 },
         CREDIT_QUALITY: { verified: true, sourceRole: 'TEST_VERIFIED', rating: 'A' },
         SPREAD: { verified: true, sourceRole: 'TEST_VERIFIED', spreadBps: 145 },
+        OPPORTUNITY_RISK: { verified: true, sourceRole: 'TEST_VERIFIED', score: 22, flags: [] },
       } };
     }
     return { capabilities: {} };
@@ -132,4 +134,63 @@ test('raw seed opportunity scores cannot enter ranking without verified provider
   assert.equal(result.ranking.items.length, 0);
   assert.equal(result.unsupportedInstrumentCount, 1);
   assert.equal(result.unsupported[0].reason, 'VERIFIED_OPPORTUNITY_FACTORS_REQUIRED');
+});
+
+test('internally attested verified seed capabilities are scorable while raw top-level factors remain blocked', async () => {
+  const verifiedFactors = {
+    valuation: vf(90),
+    quality: vf(88),
+    growth: vf(86),
+    momentum: vf(91),
+    catalyst: vf(82),
+    balanceSheet: vf(89),
+    liquidity: vf(93),
+    diversificationBenefit: vf(78),
+  };
+  const result = await scanOpportunityUniverse({
+    now: '2026-08-09T11:00:00.000Z',
+    instruments: [{
+      instrumentId: 'equity:first-party',
+      displayName: 'First Party Verified Equity',
+      assetClass: 'EQUITY',
+      primaryListing: { symbol: 'FPV', mic: 'XNAS', exchange: 'Nasdaq', currency: 'USD' },
+      capabilities: {
+        OPPORTUNITY_FACTORS: {
+          verified: true,
+          sourceRole: 'FIRST_PARTY_DETERMINISTIC_RESEARCH',
+          factors: verifiedFactors,
+        },
+        OPPORTUNITY_RISK: {
+          verified: true,
+          sourceRole: 'FIRST_PARTY_DETERMINISTIC_RESEARCH',
+          score: 24,
+          flags: [],
+        },
+        EVIDENCE_QUALITY: {
+          verified: true,
+          sourceRole: 'FIRST_PARTY_DETERMINISTIC_RESEARCH',
+          score: 90,
+        },
+        LIQUIDITY: {
+          verified: true,
+          sourceRole: 'LICENSED_MARKET_DATA',
+          score: 90,
+        },
+        CONTRADICTIONS: {
+          verified: true,
+          sourceRole: 'FIRST_PARTY_DETERMINISTIC_RESEARCH',
+          count: 0,
+        },
+      },
+    }],
+    universeProviders: [],
+    capabilityProviders: [],
+    assetClasses: ['EQUITY'],
+  });
+
+  assert.equal(result.scorableInstrumentCount, 1);
+  assert.equal(result.ranking.items.length, 1);
+  assert.equal(result.ranking.items[0].riskScore, 24);
+  assert.equal(result.ranking.items[0].source.opportunityRiskSource, 'VERIFIED_OPPORTUNITY_RISK');
+  assert.equal(result.ranking.items[0].finalActionEligible, false);
 });

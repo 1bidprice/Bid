@@ -52,7 +52,59 @@ function validateGatewayQuote(appSymbol, payload) {
   if (!/^[A-Z]{3}$/.test(String(quote.currency || ''))) return 'GATEWAY_CURRENCY_INVALID';
   if (quote?.quoteContract?.sourceApproved !== true) return 'GATEWAY_SOURCE_NOT_APPROVED';
   if (appSymbol.endsWith('.US') && quote?.quoteContract?.identityVerified !== true) return 'GATEWAY_US_IDENTITY_NOT_VERIFIED';
+  if (appSymbol.endsWith('.GR') && quote?.quoteContract?.identityVerified !== true) return 'GATEWAY_ATHENS_IDENTITY_NOT_VERIFIED';
   if (appSymbol.endsWith('.GR') && quote?.quoteContract?.sourceRole !== 'PRIMARY_EXCHANGE') return 'GATEWAY_ATHENS_SOURCE_INVALID';
+  return null;
+}
+
+function validateInstrumentCapability(appSymbol, payload) {
+  if (payload?.format !== 'investor-control-instrument-capability') return 'GATEWAY_INSTRUMENT_FORMAT_INVALID';
+  if (payload?.requestedSymbol !== appSymbol) return 'GATEWAY_INSTRUMENT_SYMBOL_MISMATCH';
+  if (!['READY', 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED', 'IDENTITY_NOT_VERIFIED'].includes(payload?.onboardingStatus)) {
+    return 'GATEWAY_INSTRUMENT_STATUS_INVALID';
+  }
+  if (payload?.privacy?.portfolioQuantityRequired !== false) return 'GATEWAY_INSTRUMENT_PRIVACY_CONTRACT_INVALID';
+  if (payload?.privacy?.portfolioCostRequired !== false) return 'GATEWAY_INSTRUMENT_PRIVACY_CONTRACT_INVALID';
+  if (payload?.privacy?.pnlRequired !== false) return 'GATEWAY_INSTRUMENT_PRIVACY_CONTRACT_INVALID';
+  return null;
+}
+
+function validateResearchQueueStatus(appSymbol, payload) {
+  if (payload?.format !== 'investor-control-research-queue-status') return 'GATEWAY_RESEARCH_QUEUE_FORMAT_INVALID';
+  if (payload?.requestedSymbol !== appSymbol) return 'GATEWAY_RESEARCH_QUEUE_SYMBOL_MISMATCH';
+  if (!['QUEUED', 'COMPLETED', 'NOT_QUEUED', 'ALREADY_SUPPORTED'].includes(payload?.queueStatus)) {
+    return 'GATEWAY_RESEARCH_QUEUE_STATUS_INVALID';
+  }
+  if (payload?.privacy?.portfolioDataStored !== false) return 'GATEWAY_RESEARCH_QUEUE_PRIVACY_INVALID';
+  if (payload?.privacy?.clientIdentityStored !== false) return 'GATEWAY_RESEARCH_QUEUE_PRIVACY_INVALID';
+  return null;
+}
+
+function validateGatewayBatch(requestedSymbols, payload) {
+  if (payload?.format !== 'investor-control-market-gateway-batch') return 'GATEWAY_BATCH_FORMAT_INVALID';
+  const requested = [...new Set((requestedSymbols || []).map(canonicalSymbol).filter(Boolean))];
+  const echoed = Array.isArray(payload?.requestedSymbols) ? payload.requestedSymbols : [];
+  if (JSON.stringify(echoed) !== JSON.stringify(requested)) return 'GATEWAY_BATCH_SYMBOLS_MISMATCH';
+  const quoteRegistry = payload?.quoteRegistry && typeof payload.quoteRegistry === 'object' ? payload.quoteRegistry : {};
+  for (const [symbol, quote] of Object.entries(quoteRegistry)) {
+    if (!requested.includes(symbol)) return 'GATEWAY_BATCH_UNEXPECTED_SYMBOL';
+    const validationError = validateGatewayQuote(symbol, {
+      format: 'investor-control-market-gateway-quote',
+      requestedSymbol: symbol,
+      quote,
+    });
+    if (validationError) return validationError;
+  }
+  if (payload?.fxReference) {
+    const fxError = validateGatewayFx({
+      format: 'investor-control-market-gateway-fx',
+      reference: payload.fxReference,
+    });
+    if (fxError) return fxError;
+  }
+  if (payload?.privacy?.portfolioQuantityRequired !== false) return 'GATEWAY_BATCH_PRIVACY_INVALID';
+  if (payload?.privacy?.portfolioCostRequired !== false) return 'GATEWAY_BATCH_PRIVACY_INVALID';
+  if (payload?.privacy?.pnlRequired !== false) return 'GATEWAY_BATCH_PRIVACY_INVALID';
   return null;
 }
 
@@ -78,15 +130,19 @@ async function fetchGatewayJson(pathname, options = {}) {
   const fetchImpl = options.fetchImpl || globalThis.fetch;
   if (typeof fetchImpl !== 'function') throw new Error('MARKET_GATEWAY_FETCH_UNAVAILABLE');
 
+  const method = String(options.method || 'GET').toUpperCase();
+  const hasBody = options.body !== undefined;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 10_000));
   try {
     const response = await fetchImpl(`${baseUrl}${pathname}`, {
-      method: 'GET',
+      method,
       headers: {
         Accept: 'application/json',
+        ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
         [MARKET_GATEWAY_CLIENT_HEADER]: clientId,
       },
+      ...(hasBody ? { body: JSON.stringify(options.body) } : {}),
       signal: controller.signal,
     });
     let payload = null;
@@ -102,6 +158,37 @@ async function fetchGatewayJson(pathname, options = {}) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function fetchInstrumentCapability(appSymbol, options = {}) {
+  const symbol = canonicalSymbol(appSymbol);
+  if (!symbol) throw new Error('MARKET_GATEWAY_SYMBOL_INVALID');
+  const payload = await fetchGatewayJson(`/v1/instrument?symbol=${encodeURIComponent(symbol)}`, options);
+  const validationError = validateInstrumentCapability(symbol, payload);
+  if (validationError) throw new Error(validationError);
+  return payload;
+}
+
+async function requestMinbeisResearch(appSymbol, options = {}) {
+  const symbol = canonicalSymbol(appSymbol);
+  if (!symbol) throw new Error('MARKET_GATEWAY_SYMBOL_INVALID');
+  const payload = await fetchGatewayJson('/v1/research-queue', {
+    ...options,
+    method: 'POST',
+    body: { symbol },
+  });
+  const validationError = validateResearchQueueStatus(symbol, payload);
+  if (validationError) throw new Error(validationError);
+  return payload;
+}
+
+async function fetchMinbeisResearchQueueStatus(appSymbol, options = {}) {
+  const symbol = canonicalSymbol(appSymbol);
+  if (!symbol) throw new Error('MARKET_GATEWAY_SYMBOL_INVALID');
+  const payload = await fetchGatewayJson(`/v1/research-queue?symbol=${encodeURIComponent(symbol)}`, options);
+  const validationError = validateResearchQueueStatus(symbol, payload);
+  if (validationError) throw new Error(validationError);
+  return payload;
 }
 
 async function fetchCanonicalGatewayQuote(appSymbol, options = {}) {
@@ -120,6 +207,26 @@ async function fetchCanonicalGatewayFx(options = {}) {
   return payload.reference;
 }
 
+async function fetchCanonicalGatewayBatch(symbols, options = {}) {
+  const clean = [...new Set((symbols || []).map(canonicalSymbol).filter(Boolean))];
+  if (!clean.length) return { quoteRegistry: {}, errors: [], checkedAt: new Date().toISOString(), fxReference: null };
+  if (clean.length > 50) throw new Error('MARKET_GATEWAY_BATCH_SYMBOL_LIMIT_EXCEEDED');
+  const payload = await fetchGatewayJson('/v1/quotes', {
+    ...options,
+    method: 'POST',
+    body: { symbols: clean },
+  });
+  const validationError = validateGatewayBatch(clean, payload);
+  if (validationError) throw new Error(validationError);
+  return {
+    quoteRegistry: payload.quoteRegistry || {},
+    errors: Array.isArray(payload.errors) ? payload.errors : [],
+    checkedAt: payload.servedAt || new Date().toISOString(),
+    fxReference: payload.fxReference || null,
+    ...(payload.fxError ? { fxError: payload.fxError } : {}),
+  };
+}
+
 async function fetchCanonicalGatewayQuotes(symbols, options = {}) {
   const clean = [...new Set((symbols || []).map(canonicalSymbol).filter(Boolean))];
   const quoteRegistry = {};
@@ -136,18 +243,50 @@ async function fetchCanonicalGatewayQuotes(symbols, options = {}) {
 
 async function fetchCanonicalGatewayMarketSnapshot(symbols, options = {}) {
   const clean = [...new Set((symbols || []).map(canonicalSymbol).filter(Boolean))];
-  const quotes = await fetchCanonicalGatewayQuotes(clean, options);
+  if (!clean.length) {
+    return { quoteRegistry: {}, errors: [], checkedAt: new Date().toISOString(), fxReference: null };
+  }
+
+  const chunks = [];
+  for (let index = 0; index < clean.length; index += 50) chunks.push(clean.slice(index, index + 50));
+  const quoteRegistry = {};
+  const errors = [];
   let fxReference = null;
   let fxError = null;
-  if (clean.some((symbol) => symbol.endsWith('.US'))) {
+  let checkedAt = new Date().toISOString();
+
+  for (const chunk of chunks) {
     try {
-      fxReference = await fetchCanonicalGatewayFx(options);
+      const batch = await fetchCanonicalGatewayBatch(chunk, options);
+      Object.assign(quoteRegistry, batch.quoteRegistry || {});
+      errors.push(...(batch.errors || []));
+      checkedAt = batch.checkedAt || checkedAt;
+      if (batch.fxReference) fxReference = batch.fxReference;
+      if (batch.fxError) fxError = batch.fxError;
+      continue;
     } catch (error) {
-      fxError = String(error?.gatewayCode || error?.message || 'MARKET_GATEWAY_FX_REQUEST_FAILED');
+      const unsupported = [404, 405].includes(Number(error?.status))
+        || ['NOT_FOUND', 'METHOD_NOT_ALLOWED', 'HTTP_404', 'HTTP_405'].includes(String(error?.gatewayCode || error?.message || ''));
+      if (!unsupported) throw error;
+    }
+
+    const legacyQuotes = await fetchCanonicalGatewayQuotes(chunk, options);
+    Object.assign(quoteRegistry, legacyQuotes.quoteRegistry || {});
+    errors.push(...(legacyQuotes.errors || []));
+    checkedAt = legacyQuotes.checkedAt || checkedAt;
+    if (!fxReference && chunk.some((symbol) => symbol.endsWith('.US'))) {
+      try {
+        fxReference = await fetchCanonicalGatewayFx(options);
+      } catch (error) {
+        fxError = String(error?.gatewayCode || error?.message || 'MARKET_GATEWAY_FX_REQUEST_FAILED');
+      }
     }
   }
+
   return {
-    ...quotes,
+    quoteRegistry,
+    errors,
+    checkedAt,
     fxReference,
     ...(fxError ? { fxError } : {}),
   };
@@ -162,9 +301,16 @@ module.exports = {
   createOpaqueInstallationId,
   getOrCreateInstallationId,
   validateGatewayQuote,
+  validateGatewayBatch,
+  validateInstrumentCapability,
+  validateResearchQueueStatus,
   validateGatewayFx,
+  fetchInstrumentCapability,
+  requestMinbeisResearch,
+  fetchMinbeisResearchQueueStatus,
   fetchCanonicalGatewayQuote,
   fetchCanonicalGatewayFx,
+  fetchCanonicalGatewayBatch,
   fetchCanonicalGatewayQuotes,
   fetchCanonicalGatewayMarketSnapshot,
 };

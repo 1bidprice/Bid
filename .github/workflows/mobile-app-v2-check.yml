@@ -5,11 +5,14 @@ on:
     paths:
       - 'mobile/**'
       - '.github/workflows/mobile-app-v2-check.yml'
+      - '.github/workflows/minbeis-production-android.yml'
   workflow_dispatch:
 
 jobs:
   validate:
     runs-on: ubuntu-latest
+    env:
+      EXPO_PUBLIC_MARKET_GATEWAY_URL: ${{ vars.EXPO_PUBLIC_MARKET_GATEWAY_URL || 'https://investor-control-market-gateway.bidprice-alerts.workers.dev' }}
     defaults:
       run:
         working-directory: mobile
@@ -25,6 +28,15 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Report market gateway build wiring
+        shell: bash
+        run: |
+          if [ -n "${EXPO_PUBLIC_MARKET_GATEWAY_URL:-}" ]; then
+            node -e "const u=new URL(process.env.EXPO_PUBLIC_MARKET_GATEWAY_URL); if(u.protocol!=='https:') process.exit(2); console.log('Canonical gateway URL is wired into this validation build');"
+          else
+            echo 'Canonical gateway URL is not configured for this validation environment.'
+          fi
+
       - name: Verify v1.7 Opportunity Hunter mobile contract
         run: npm run test:hunter-ui
 
@@ -33,6 +45,12 @@ jobs:
 
       - name: Verify v1.7.2 quote timing transparency
         run: npm run test:quote-transparency
+
+      - name: Verify Product Recovery privacy data and history
+        run: npm run test:local-data-ownership && npm run test:portfolio-history && npm run test:portfolio-data-flow && npm run test:portfolio-insights && npm run test:gateway-client && npm run test:instrument-save-preflight && npm run test:remote-alert-sync
+
+      - name: Verify signed production candidate workflow safety
+        run: node scripts/verify-production-workflow-safety.cjs
 
       - name: Check Expo package compatibility
         run: npx expo install --check 2>&1 | tee package-check.log

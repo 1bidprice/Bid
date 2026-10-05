@@ -308,7 +308,7 @@ function validOasisSymbol(value) {
 export function extractAthensTradingDirectory(html) {
   const records = [];
   const diagnostics = [];
-  const byName = new Map();
+  const byInstrument = new Map();
 
   for (const row of tableRows(html)) {
     const values = cells(row);
@@ -339,15 +339,15 @@ export function extractAthensTradingDirectory(html) {
       sourceUrl: ATHENS_TRADING_ISSUERS_URL,
     };
 
-    const existing = byName.get(record.normalizedIssuerName);
+    const identityKey = `${record.symbol}|${record.isin || ''}`;
+    const existing = byInstrument.get(identityKey);
     const score = (linked ? 4 : 0) + (/stock|share|common/i.test(rowText) ? 2 : 0) + (isin ? 1 : 0);
     if (!existing || score > existing._score) {
-      const selected = { ...record, _score: score };
-      byName.set(record.normalizedIssuerName, selected);
+      byInstrument.set(identityKey, { ...record, _score: score });
     }
   }
 
-  for (const item of byName.values()) {
+  for (const item of byInstrument.values()) {
     const { _score, ...record } = item;
     records.push(record);
   }
@@ -359,10 +359,22 @@ function matchTradingDirectory(company, directory) {
   const records = Array.isArray(directory?.records) ? directory.records : [];
   const target = normalizedName(company?.displayName || company?.legalName);
   if (!target) return null;
-  const exact = records.find((item) => item.normalizedIssuerName === target);
-  if (exact) return exact;
+  const requestedSymbol = String(company?.primaryListing?.symbol || '').trim().toUpperCase();
+
+  const exact = records.filter((item) => item.normalizedIssuerName === target);
+  if (requestedSymbol) {
+    const symbolExact = exact.filter((item) => item.symbol === requestedSymbol);
+    if (symbolExact.length === 1) return symbolExact[0];
+  }
+  if (exact.length === 1) return exact[0];
+  if (exact.length > 1) return null;
+
   const candidates = records.filter((item) => item.normalizedIssuerName
     && (item.normalizedIssuerName.includes(target) || target.includes(item.normalizedIssuerName)));
+  if (requestedSymbol) {
+    const symbolCandidate = candidates.filter((item) => item.symbol === requestedSymbol);
+    if (symbolCandidate.length === 1) return symbolCandidate[0];
+  }
   return candidates.length === 1 ? candidates[0] : null;
 }
 
@@ -598,6 +610,172 @@ async function fetchCompleteAthensTradingDirectory(fetchImpl, firstPageHtml, opt
     loadedPageCount: pages.length,
     complete: diagnostics.length === 0 && pages.length === maxPage + 1,
   };
+}
+
+export async function fetchAthensCompaniesBySymbols(symbols = [], options = {}) {
+  const fetchImpl = options.fetchImpl || globalThis.fetch;
+  const generatedAt = new Date(options.generatedAt || Date.now()).toISOString();
+  const requested = [...new Set((Array.isArray(symbols) ? symbols : [])
+    .map((value) => String(value || '').trim().toUpperCase().replace(/\.GR$/i, ''))
+    .filter((value) => /^[A-Z0-9._-]{1,16}$/.test(value)))];
+
+  if (!requested.length) {
+    return {
+      format: 'investor-control-athens-symbol-resolution',
+      version: 1,
+      generatedAt,
+      requestedSymbols: [],
+      companies: [],
+      results: [],
+      diagnostics: [],
+    };
+  }
+
+  if (typeof fetchImpl !== 'function') {
+    return {
+      format: 'investor-control-athens-symbol-resolution',
+      version: 1,
+      generatedAt,
+      requestedSymbols: requested,
+      companies: [],
+      results: requested.map((symbol) => ({ symbol, status: 'BLOCKED', code: 'ATHENS_DISCOVERY_FETCH_UNAVAILABLE' })),
+      diagnostics: [{ code: 'ATHENS_DISCOVERY_FETCH_UNAVAILABLE' }],
+    };
+  }
+
+  const diagnostics = [];
+  try {
+    const tradingIssuersFirstPage = await fetchText(
+      fetchImpl,
+      options.tradingIssuersUrl || ATHENS_TRADING_ISSUERS_URL,
+      options,
+    );
+    const directoryFetch = await fetchCompleteAthensTradingDirectory(fetchImpl, tradingIssuersFirstPage, options);
+    diagnostics.push(...directoryFetch.diagnostics);
+    const directory = extractAthensTradingDirectory(directoryFetch.html);
+    diagnostics.push(...directory.diagnostics);
+
+    const companies = [];
+    const results = [];
+
+    for (const symbol of requested) {
+      const matches = (directory.records || []).filter((record) => String(record?.symbol || '').trim().toUpperCase() === symbol);
+      if (matches.length !== 1) {
+        results.push({
+          symbol,
+          status: 'BLOCKED',
+          code: matches.length ? 'ATHENS_SYMBOL_IDENTITY_AMBIGUOUS' : 'ATHENS_SYMBOL_IDENTITY_NOT_FOUND',
+          matchCount: matches.length,
+        });
+        continue;
+      }
+
+      const record = matches[0];
+      if (!record.issuerId && !record.isin) {
+        results.push({
+          symbol,
+          status: 'BLOCKED',
+          code: 'ATHENS_STABLE_IDENTITY_REQUIRED',
+        });
+        continue;
+      }
+
+      const baseCompany = record.issuerId
+        ? companyFromIssuer({
+            issuerId: record.issuerId,
+            name: record.issuerName,
+            sourceUrl: record.issuerUrl,
+          }, generatedAt)
+        : {
+            companyId: `company:xath:isin:${record.isin}`,
+            legalName: record.issuerName,
+            displayName: record.issuerName,
+            aliases: [record.issuerName],
+            country: 'GR',
+            issuerId: null,
+            taxonomyTermId: null,
+            cik: null,
+            lei: null,
+            primaryListing: {
+              symbol: null,
+              mic: 'XATH',
+              exchange: 'Euronext Athens',
+              currency: 'EUR',
+            },
+            regulator: 'Euronext Athens / Hellenic Capital Market framework',
+            investorRelationsUrl: record.issuerUrl || null,
+            active: true,
+            discoveredAt: generatedAt,
+          };
+
+      const company = {
+        ...baseCompany,
+        issuerId: record.issuerId ? String(record.issuerId) : null,
+        isin: record.isin || null,
+        instrumentUrl: record.instrumentUrl || null,
+        investorRelationsUrl: record.issuerUrl || null,
+        aliases: [...new Set([record.issuerName, symbol].filter(Boolean))],
+        primaryListing: {
+          symbol,
+          mic: 'XATH',
+          exchange: 'Euronext Athens',
+          currency: 'EUR',
+          activeTradingVerified: true,
+          verifiedAt: generatedAt,
+        },
+        activeTradingVerified: true,
+        listingVerifiedAt: generatedAt,
+        identitySource: 'EURONEXT_ATHENS_TRADING_ISSUERS',
+      };
+      companies.push(company);
+      results.push({
+        symbol,
+        status: 'RESOLVED',
+        companyId: company.companyId,
+        issuerId: company.issuerId,
+        isin: company.isin,
+        listing: company.primaryListing,
+      });
+    }
+
+    return {
+      format: 'investor-control-athens-symbol-resolution',
+      version: 1,
+      generatedAt,
+      requestedSymbols: requested,
+      tradingDirectoryHealth: {
+        publishedLastPage: directoryFetch.publishedLastPage,
+        selectedLastPage: directoryFetch.selectedLastPage,
+        fallbackPaginationUsed: directoryFetch.fallbackPaginationUsed,
+        requestedPageCount: directoryFetch.requestedPageCount,
+        loadedPageCount: directoryFetch.loadedPageCount,
+        complete: directoryFetch.complete,
+        instrumentCount: directory.records.length,
+      },
+      companies,
+      results,
+      diagnostics,
+    };
+  } catch (error) {
+    return {
+      format: 'investor-control-athens-symbol-resolution',
+      version: 1,
+      generatedAt,
+      requestedSymbols: requested,
+      companies: [],
+      results: requested.map((symbol) => ({
+        symbol,
+        status: 'BLOCKED',
+        code: 'ATHENS_SYMBOL_RESOLUTION_FAILED',
+      })),
+      diagnostics: [{
+        code: 'ATHENS_SYMBOL_RESOLUTION_FAILED',
+        errorClass: String(error?.message || error).startsWith('HTTP')
+          ? String(error.message)
+          : 'NETWORK_OR_PARSE_ERROR',
+      }],
+    };
+  }
 }
 
 export async function fetchAthensDiscovery(options = {}) {

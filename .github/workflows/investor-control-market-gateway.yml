@@ -40,6 +40,10 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Install pinned gateway dependency
+        working-directory: market-intelligence
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+
       - name: Verify gateway source syntax
         working-directory: market-intelligence
         run: |
@@ -47,15 +51,29 @@ jobs:
           node --check gateway/src/core.js
           node --check gateway/src/edge.js
           node --check gateway/src/index.js
+          node --check gateway/src/tenant-contract.js
+          node --check gateway/src/push-contract.js
+          node --check gateway/src/auth-boundary.js
+          node --check gateway/src/account-repository.js
+          node --check gateway/src/account-api.js
+          node --check gateway/src/expo-push-transport.js
+          node --check gateway/src/firebase-token-verifier.js
+          node --check gateway/src/alert-runtime-repository.js
+          node --check gateway/src/remote-alert-scheduler.js
+          node --check gateway/scripts/render-account-enabled-wrangler.mjs
           node -e "JSON.parse(require('fs').readFileSync('gateway/wrangler.jsonc','utf8'))"
 
       - name: Verify canonical source invariant
         working-directory: market-intelligence
         run: node scripts/verify-canonical-source.js
 
+      - name: Verify account database schema privacy contract
+        working-directory: market-intelligence
+        run: python3 gateway/scripts/verify-account-schema.py
+
       - name: Run gateway security, edge and market-data contracts
         working-directory: market-intelligence
-        run: node --test test/market-gateway.test.js test/market-gateway-edge.test.js
+        run: node --test test/market-gateway.test.js test/market-gateway-edge.test.js test/tenant-contract.test.js test/push-contract.test.js test/account-api.test.js test/expo-push-transport.test.js test/account-provisioning-config.test.js test/remote-alert-scheduler.test.js gateway/contracts/firebase-token-verifier.contract.mjs
 
       - name: Verify deployment workflow is manual-only and CLI-compatible
         shell: bash
@@ -70,6 +88,28 @@ jobs:
           grep -Fq 'investor-control-core-stabilization-v174' "$WF"
           grep -Fq 'wrangler@4.129.1 deploy --secrets-file' "$WF"
           npx --yes wrangler@4.129.1 deploy --help | grep -F -- '--secrets-file'
+
+      - name: Verify account activation workflow is manual-only and guarded
+        shell: bash
+        run: |
+          set -euo pipefail
+          WF='.github/workflows/minbeis-account-backend-activate.yml'
+          test -f "$WF"
+          grep -q '^  workflow_dispatch:' "$WF"
+          ! grep -Eq '^  (push|pull_request|schedule):' "$WF"
+          grep -Fq 'ENABLE_ACCOUNTS' "$WF"
+          grep -Fq 'expected_sha' "$WF"
+          grep -Fq 'MINBEIS_ACCOUNT_PRODUCTION_ENABLED' "$WF"
+          grep -Fq 'MINBEIS_TENANT_HMAC_SECRET' "$WF"
+          grep -Fq 'MINBEIS_ACCOUNTS_DB_ID' "$WF"
+          grep -Fq 'FIREBASE_PROJECT_ID' "$WF"
+          grep -Fq 'render-account-enabled-wrangler.mjs' "$WF"
+          grep -Fq 'd1 execute MINBEIS_ACCOUNTS_DB' "$WF"
+          grep -Fq 'portfolioCloudSync' "$WF"
+
+          LEGACY='.github/workflows/investor-control-market-gateway-deploy.yml'
+          grep -Fq 'Prevent accidental account-backend downgrade' "$LEGACY"
+          grep -Fq 'MINBEIS_ACCOUNT_PRODUCTION_ENABLED' "$LEGACY"
 
       - name: Wrangler production bundle dry-run only
         working-directory: market-intelligence/gateway

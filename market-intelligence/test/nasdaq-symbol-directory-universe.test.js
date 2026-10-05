@@ -43,5 +43,11 @@ test('provider honors requested asset class and bounded discovery limit', async 
   const result = await provider.discover({ assetClasses: ['ETF'], fetchImpl, now: '2026-08-09T12:00:00.000Z', limit: 1 });
   assert.equal(result.instruments.length, 1);
   assert.equal(result.instruments[0].assetClass, 'ETF');
+  assert.equal(result.instruments[0].activeTradingVerified, true);
+  assert.equal(result.instruments[0].listingVerifiedAt, '2026-08-09T12:00:00.000Z');
+  assert.equal(result.instruments[0].primaryListing.activeTradingVerified, true);
+  assert.equal(result.instruments[0].primaryListing.status, 'ACTIVE');
+  assert.equal(result.instruments[0].primaryListing.verificationSource, 'NASDAQ_TRADER_SYMBOL_DIRECTORY');
+  assert.equal(result.instruments[0].listingVerification.sourceRole, 'OFFICIAL_EXCHANGE_DIRECTORY');
   assert.equal(result.truncated, true);
 });
