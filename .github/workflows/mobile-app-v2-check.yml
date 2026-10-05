@@ -50,22 +50,7 @@ jobs:
         run: npm run test:local-data-ownership && npm run test:portfolio-history && npm run test:portfolio-data-flow && npm run test:portfolio-insights && npm run test:gateway-client && npm run test:instrument-save-preflight && npm run test:remote-alert-sync
 
       - name: Verify signed production candidate workflow safety
-        shell: bash
-        working-directory: ..
-        run: |
-          set -euo pipefail
-          WF='.github/workflows/minbeis-production-android.yml'
-          test -f "$WF"
-          grep -q '^  workflow_dispatch:' "$WF"
-          ! grep -Eq '^  (push|pull_request|schedule):' "$WF"
-          grep -Fq 'BUILD_SIGNED' "$WF"
-          grep -Fq 'expected_sha' "$WF"
-          grep -Fq 'ANDROID_UPLOAD_KEYSTORE_BASE64' "$WF"
-          grep -Fq 'patch-release-signing.cjs' "$WF"
-          grep -Fq 'bundleRelease assembleRelease' "$WF"
-          grep -Fq 'debugCertificateRejected' "$WF"
-          grep -Fq 'playProductionReleased' "$WF"
-          ! grep -Eqi 'r0adkll/upload-google-play|gradle-play-publisher|publishBundle|publishReleaseBundle|track:[[:space:]]*production|service_account_json' "$WF"
+        run: node scripts/verify-production-workflow-safety.cjs
 
       - name: Check Expo package compatibility
         run: npx expo install --check 2>&1 | tee package-check.log
