@@ -66,3 +66,24 @@ test('holder SELL_NOW maps to REDUCE and never opens a new position', () => {
   assert.equal(result.action, MINBEIS_ACTIONS.REDUCE);
   assert.equal(result.allocationPct, 0);
 });
+
+
+test('canonical severe risk defensively blocks a new buy even if upstream raw action says BUY_NOW', () => {
+  const result = buildMinbeisDecision({
+    finalAction: finalAction({
+      risk: {
+        riskScore: 92,
+        fundamentalFlags: ['SEVERE_DILUTION'],
+        marketFlags: [],
+      },
+    }),
+    opportunityPurchase: {
+      status: 'BUY_CONFIRMED',
+      buyNowEligible: true,
+      opportunityScore: 95,
+    },
+  });
+  assert.equal(result.action, MINBEIS_ACTIONS.NO_BUY);
+  assert.equal(result.reason, 'CANONICAL_SEVERE_RISK_BLOCKS_NEW_BUY');
+  assert.equal(result.allocationPct, 0);
+});
