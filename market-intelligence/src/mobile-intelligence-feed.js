@@ -21,11 +21,11 @@ function categoryLabel(category, status) {
 
 function actionLabel(action) {
   return {
-    CONSIDER_BUY: 'Πιθανή αγορά',
-    CONSIDER_REDUCE: 'Εξέταση μείωσης',
-    AVOID: 'Αποφυγή',
-    HOLD: 'Διακράτηση',
-    WATCH: 'Παρακολούθηση',
+    CONSIDER_BUY: 'Θετική κατεύθυνση έρευνας',
+    CONSIDER_REDUCE: 'Αρνητική κατεύθυνση έρευνας',
+    AVOID: 'Ερευνητική ένδειξη αποφυγής',
+    HOLD: 'Ουδέτερη / διακράτηση στην έρευνα',
+    WATCH: 'Παρακολούθηση στην έρευνα',
   }[action] || action;
 }
 
@@ -248,6 +248,16 @@ function compactDossier(dossier, generatedAt, purchase = null, historicalContext
     generatedAt: dossier.generatedAt,
     publicationMode: dossier.publicationMode || null,
     finalAction: dossier.finalAction || null,
+    nonHolderDecision: buildMinbeisDecision({
+      finalAction: dossier.finalAction || null,
+      opportunityPurchase: purchase,
+      hasPosition: false,
+    }),
+    holderDecision: buildMinbeisDecision({
+      finalAction: dossier.finalAction || null,
+      opportunityPurchase: purchase,
+      hasPosition: true,
+    }),
     minbeisAssessment: buildMinbeisAssessment(dossier, purchase),
   };
 }
