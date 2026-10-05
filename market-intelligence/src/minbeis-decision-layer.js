@@ -1,3 +1,5 @@
+import { finalActionRiskAssessment } from './minbeis-risk-policy.js';
+
 export const MINBEIS_ACTIONS = Object.freeze({
   NO_BUY: 'NO_BUY',
   WATCH: 'WATCH',
@@ -48,6 +50,16 @@ export function buildMinbeisDecision({
   const activeAction = hasPosition
     ? finalAction.holderAction
     : finalAction.nonHolderAction;
+
+  const canonicalRisk = finalActionRiskAssessment(finalAction);
+  if (!hasPosition && canonicalRisk.severe === true) {
+    return baseDecision(
+      MINBEIS_ACTIONS.NO_BUY,
+      0,
+      'CANONICAL_SEVERE_RISK_BLOCKS_NEW_BUY',
+      finalAction,
+    );
+  }
 
   if (hasPosition) {
     if (activeAction === 'SELL_NOW') {
