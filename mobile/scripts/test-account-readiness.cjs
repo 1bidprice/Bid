@@ -10,6 +10,7 @@ const authSource = fs.readFileSync(path.join(root, 'src', 'firebase-auth-client.
 const accountSource = fs.readFileSync(path.join(root, 'src', 'account-client.js'), 'utf8');
 const accountUiSource = fs.readFileSync(path.join(root, 'src', 'AccountAccessCard.js'), 'utf8');
 const accountDeviceSource = fs.readFileSync(path.join(root, 'src', 'account-device-sync.js'), 'utf8');
+const remoteSyncSource = fs.readFileSync(path.join(root, 'src', 'remote-alert-sync.js'), 'utf8');
 const pushRegistrationSource = fs.readFileSync(path.join(root, 'src', 'push-registration.js'), 'utf8');
 const portfolioAppSource = fs.readFileSync(path.join(root, 'PortfolioApp.js'), 'utf8');
 
@@ -35,7 +36,7 @@ assert.match(accountSource, /deleteMinbeisCloudAccount/);
 assert.match(accountUiSource, /if \(!configured\) return null;/, 'account UI must stay hidden without Firebase config');
 assert.match(accountUiSource, /Το portfolio παραμένει τοπικά και δεν ανεβαίνει στο cloud/);
 assert.match(accountUiSource, /δεν ανεβάζει το χαρτοφυλάκιό σου/);
-assert.match(portfolioAppSource, /<AccountAccessCard \/>/, 'settings must mount opt-in account UI');
+assert.match(portfolioAppSource, /<AccountAccessCard alertRules=\{state\.alerts\.rules\} \/>/, 'settings must mount opt-in account UI with local alert rules only');
 assert.doesNotMatch(accountUiSource, /portfolioPositions|transactions|costBasis|totalPnl/, 'account UI must not receive portfolio contents');
 assert.match(accountUiSource, /onPress=\{enableRemotePush\}/, 'remote push must require an explicit user action');
 assert.match(accountUiSource, /!account\.emailVerified/, 'remote features must remain gated by verified email');
@@ -60,7 +61,7 @@ assert.match(accountUiSource, /deleteMinbeisCloudAccount/);
 assert.match(accountUiSource, /minbeisDeleteIdentity/);
 assert.match(accountUiSource, /τοπικό portfolio/);
 assert.match(accountUiSource, /disableRemotePushForCurrentDevice/);
-assert.match(deviceSyncSource, /setRemotePushEnabledLocally\(true/);
-assert.match(deviceSyncSource, /setRemotePushEnabledLocally\(false/);
+assert.match(accountDeviceSource, /setRemotePushEnabledLocally\(true/);
+assert.match(accountDeviceSource, /setRemotePushEnabledLocally\(false/);
 assert.match(remoteSyncSource, /REMOTE_PUSH_ENABLED_STORAGE_KEY/);
 assert.doesNotMatch(remoteSyncSource, /quantity|costBasis|pnl/i, 'remote alert sync must stay portfolio-minimal');
