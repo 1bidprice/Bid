@@ -24,16 +24,14 @@ function canonicalPositionSymbol(value) {
   return String(value || '').trim().toUpperCase().replace(/\.(US|GR)$/, '');
 }
 
-function actionLabel(code, finalAction) {
-  if (code === finalAction?.holderAction) return finalAction.holderActionLabel;
-  if (code === finalAction?.nonHolderAction) return finalAction.nonHolderActionLabel;
-  if (code === finalAction?.marketAction) return finalAction.marketActionLabel;
+function actionLabel(code) {
   return {
-    BUY_NOW: 'ΑΜΕΣΗ ΑΓΟΡΑ',
-    SELL_NOW: 'ΑΜΕΣΗ ΠΩΛΗΣΗ / ΜΕΙΩΣΗ',
-    HOLD: 'ΚΡΑΤΑ',
-    DO_NOT_BUY: 'ΜΗΝ ΑΓΟΡΑΣΕΙΣ',
-    AVOID: 'ΑΠΕΦΥΓΕ',
+    BUY_STARTER: 'ΕΠΙΒΕΒΑΙΩΜΕΝΟ SETUP — ΑΡΧΙΚΗ ΘΕΣΗ',
+    BUY_PROBE: 'ΕΠΙΒΕΒΑΙΩΜΕΝΟ SETUP — ΔΟΚΙΜΑΣΤΙΚΗ ΘΕΣΗ',
+    BUY_CORE: 'ΕΠΙΒΕΒΑΙΩΜΕΝΟ SETUP — ΚΥΡΙΑ ΘΕΣΗ',
+    REDUCE: 'ΜΕΙΩΣΗ / ΕΠΑΝΕΞΕΤΑΣΗ ΘΕΣΗΣ',
+    HOLD: 'ΔΙΑΚΡΑΤΗΣΗ',
+    NO_BUY: 'ΜΗΝ ΑΓΟΡΑΣΕΙΣ',
     WATCH: 'ΠΑΡΑΚΟΛΟΥΘΗΣΗ',
   }[code] || code || 'ΠΑΡΑΚΟΛΟΥΘΗΣΗ';
 }
@@ -56,10 +54,10 @@ function blockerLabel(code) {
 }
 
 function tone(code) {
-  if (code === 'BUY_NOW') return 'positive';
+  if (['BUY_STARTER', 'BUY_PROBE', 'BUY_CORE'].includes(code)) return 'positive';
   if (code === 'HOLD') return 'hold';
-  if (['SELL_NOW', 'AVOID'].includes(code)) return 'danger';
-  if (code === 'DO_NOT_BUY') return 'warning';
+  if (code === 'REDUCE') return 'danger';
+  if (code === 'NO_BUY') return 'warning';
   return 'neutral';
 }
 
@@ -93,9 +91,16 @@ export default function FinalDecisionCard({ item, decisionContext = {} }) {
   );
   const personalized = useMemo(() => {
     if (!decisionValidity.eligible) return null;
-    const code = hasPosition ? finalAction.holderAction : finalAction.nonHolderAction;
-    return { code, label: actionLabel(code, finalAction), tone: tone(code) };
-  }, [decisionValidity.eligible, finalAction, hasPosition]);
+    const decision = hasPosition ? item?.holderDecision : item?.nonHolderDecision;
+    if (!decision || typeof decision.action !== 'string') return null;
+    return {
+      code: decision.action,
+      label: actionLabel(decision.action),
+      tone: tone(decision.action),
+      reason: decision.reason || null,
+      allocationPct: Number.isFinite(Number(decision.allocationPct)) ? Number(decision.allocationPct) : null,
+    };
+  }, [decisionValidity.eligible, hasPosition, item?.holderDecision, item?.nonHolderDecision]);
 
   if (!personalized) {
     return (
@@ -121,9 +126,10 @@ export default function FinalDecisionCard({ item, decisionContext = {} }) {
           <Text style={styles.eyebrow}>ΤΕΛΙΚΟ ΣΥΜΠΕΡΑΣΜΑ ΓΙΑ ΕΣΕΝΑ</Text>
           <Text style={styles.positionState}>{hasPosition ? 'Υπάρχει θέση στο χαρτοφυλάκιο' : 'Δεν υπάρχει θέση στο χαρτοφυλάκιο'}</Text>
         </View>
-        <Text style={styles.urgency}>{finalAction.urgencyLabel}</Text>
+        <Text style={styles.urgency}>{personalized.code === 'NO_BUY' ? 'Χωρίς νέα είσοδο' : personalized.code === 'WATCH' ? 'Παρακολούθηση' : finalAction.urgencyLabel}</Text>
       </View>
       <Text style={styles.action}>{personalized.label}</Text>
+      {personalized.reason === 'BUY_NOW_REQUIRES_CONFIRMED_PURCHASE_RECONCILIATION' ? <Text style={styles.execution}>Η ερευνητική κατεύθυνση είναι θετική, αλλά δεν έχει περάσει ακόμη ο τελικός αυστηρός έλεγχος εισόδου.</Text> : null}
       <View style={styles.metrics}>
         <View style={styles.metric}><Text style={styles.metricLabel}>Βεβαιότητα αξιολόγησης</Text><Text style={styles.metricValue}>{scoreBand(finalAction.confidenceScore)}</Text></View>
         <View style={styles.metric}><Text style={styles.metricLabel}>Ποιότητα δεδομένων</Text><Text style={styles.metricValue}>{scoreBand(finalAction.dataQualityScore)}</Text></View>
