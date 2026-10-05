@@ -52,7 +52,7 @@ test('draft directional research is rendered as WATCH with blockers and one next
   assert.equal(feed.summary.researchCount, 1);
   assert.equal(feed.summary.urgentCount, 1);
   assert.equal(feed.research[0].action, 'WATCH');
-  assert.equal(feed.research[0].actionLabel, 'Παρακολούθηση');
+  assert.equal(feed.research[0].actionLabel, 'Παρακολούθηση στην έρευνα');
   assert.equal(feed.research[0].categoryLabel, 'Σημαντικό επερχόμενο ρίσκο');
   assert.ok(feed.research[0].blockerLabels.includes('Λείπει επαρκές ιστορικό τιμής και όγκου'));
   assert.equal(feed.research[0].nextStep, 'Εύρεση και ανάγνωση ανεξάρτητης αξιόπιστης πηγής');
