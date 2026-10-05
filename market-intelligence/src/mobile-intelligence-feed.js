@@ -453,14 +453,12 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
     },
     today: {
       headline: confirmedBuyOpportunities.length
-        ? `${confirmedBuyOpportunities.length} ευκαιρία${confirmedBuyOpportunities.length === 1 ? '' : 'ες'} αγοράς επιβεβαιώθηκε από όλους τους ελέγχους`
+        ? `${confirmedBuyOpportunities.length} setup αγοράς πέρασε όλους τους τελικούς ελέγχους`
         : actionCounts.sellNowCount
-          ? `${actionCounts.sellNowCount} σήμα άμεσης πώλησης ή μείωσης`
-          : actionCounts.buyNowCount
-            ? `${actionCounts.buyNowCount} επιβεβαιωμένο σήμα άμεσης αγοράς`
-            : waitingEntryOpportunities.length
-              ? `${waitingEntryOpportunities.length} ισχυρή ευκαιρία υπό αναμονή επιβεβαίωσης εισόδου`
-              : actionCounts.avoidCount
+          ? `${actionCounts.sellNowCount} περίπτωση απαιτεί άμεση επανεξέταση ή μείωση`
+          : waitingEntryOpportunities.length
+            ? `${waitingEntryOpportunities.length} θετική περίπτωση περιμένει τελική επιβεβαίωση εισόδου`
+            : actionCounts.avoidCount
                 ? `${actionCounts.avoidCount} περίπτωση για αποφυγή`
                 : discoveryRadar.length
                   ? `${discoveryRadar.length} νέες μετοχές εντοπίστηκαν αυτόματα για έλεγχο`
@@ -469,7 +467,7 @@ export function buildMobileIntelligenceFeed(report = {}, options = {}) {
                     : reviewReady.length
                       ? `${reviewReady.length} φάκελο${reviewReady.length === 1 ? 'ς' : 'ι'} έτοιμο για έλεγχο`
                       : 'Δεν υπάρχει ακόμη δημοσιεύσιμη επενδυτική πρόταση',
-      primaryItem: confirmedBuyOpportunities[0] || sellNowDecisions[0] || buyNowDecisions[0] || waitingEntryOpportunities[0] || avoidDecisions[0] || urgent[0] || decisions[0] || reviewReady[0] || research[0] || null,
+      primaryItem: confirmedBuyOpportunities[0] || waitingEntryOpportunities[0] || avoidDecisions[0] || sellNowDecisions[0] || urgent[0] || decisions[0] || reviewReady[0] || research[0] || null,
     },
     opportunityPurchaseDecisions,
     confirmedBuyOpportunities,
