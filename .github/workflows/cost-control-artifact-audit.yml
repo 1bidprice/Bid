@@ -1,0 +1,120 @@
+name: Cost Control - Audit old standalone APK artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'Audit only (default); deletion requires explicit approval and phrase'
+        required: true
+        type: choice
+        default: audit
+        options:
+          - audit
+          - delete
+      approval_phrase:
+        description: 'For delete only: DELETE_OLD_APK_ARTIFACTS'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: cost-control-bid-apk-artifacts
+  cancel-in-progress: false
+
+jobs:
+  audit-old-standalone-apks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Audit and optionally remove old, duplicate standalone APK artifacts
+        uses: actions/github-script@v7
+        env:
+          OPERATION: ${{ inputs.operation }}
+          APPROVAL_PHRASE: ${{ inputs.approval_phrase }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const targetName = 'investor-control-standalone-release-apk';
+            const minimumAgeDays = 7;
+            const keepNewest = 10;
+            const maxPerExecution = 100;
+            const operation = process.env.OPERATION || 'audit';
+            const phrase = process.env.APPROVAL_PHRASE || '';
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Fail before contacting the deletion endpoint unless both controls match.
+            if (!['audit', 'delete'].includes(operation)) {
+              throw new Error('Unsupported operation');
+            }
+            if (operation === 'delete' && phrase !== 'DELETE_OLD_APK_ARTIFACTS') {
+              throw new Error('Deletion blocked: exact approval phrase required');
+            }
+
+            const artifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, {
+              owner, repo, per_page: 100
+            });
+            // Protect only the explicitly named, legacy standalone release APK.
+            // Never delete other artifacts, build logs, workflow runs, or releases.
+            const matching = artifacts
+              .filter(a => a.name === targetName && !a.expired)
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            const protectedIds = new Set(matching.slice(0, keepNewest).map(a => a.id));
+            const cutoff = Date.now() - minimumAgeDays * 86400000;
+            const candidates = matching.filter(a =>
+              !protectedIds.has(a.id) &&
+              new Date(a.created_at).getTime() < cutoff
+            );
+            const batch = candidates.slice(0, maxPerExecution);
+            const sumMiB = items => items.reduce((n, a) => n + (a.size_in_bytes || 0), 0) / 1048576;
+
+            core.info('Operation: ' + operation);
+            core.info('Matching retained artifacts: ' + matching.length);
+            core.info('Protected newest artifacts: ' + Math.min(keepNewest, matching.length));
+            core.info('Eligible older than ' + minimumAgeDays + ' days: ' + candidates.length);
+            core.info('Eligible size estimate: ' + sumMiB(candidates).toFixed(2) + ' MiB');
+            core.info('This run batch: ' + batch.length + ' artifacts / ' + sumMiB(batch).toFixed(2) + ' MiB');
+
+            core.summary
+              .addHeading('Bid standalone APK artifacts — ' + operation)
+              .addRaw('Only artifacts named ' + targetName + ' are in scope. ')
+              .addRaw('Newest ' + keepNewest + ' copies are protected; files under ' + minimumAgeDays + ' days old are excluded. ')
+              .addRaw('Maximum ' + maxPerExecution + ' deletions in one approved execution.')
+              .addTable([
+                [{ data: 'Metric', header: true }, { data: 'Value', header: true }],
+                ['Matching copies', String(matching.length)],
+                ['Protected newest copies', String(Math.min(keepNewest, matching.length))],
+                ['Eligible old copies', String(candidates.length)],
+                ['Eligible storage (MiB)', sumMiB(candidates).toFixed(2)],
+                ['This run batch (MiB)', sumMiB(batch).toFixed(2)]
+              ]);
+            for (const artifact of batch) {
+              core.info(JSON.stringify({
+                id: artifact.id,
+                name: artifact.name,
+                sizeMiB: (artifact.size_in_bytes / 1048576).toFixed(2),
+                createdAt: artifact.created_at,
+                expiresAt: artifact.expires_at
+              }));
+            }
+            if (operation === 'audit') {
+              core.info('AUDIT ONLY: Nothing has been deleted.');
+              core.summary.addRaw('**Audit only: no artifacts were deleted.**');
+              await core.summary.write();
+              return;
+            }
+
+            let deleted = 0;
+            let removedMiB = 0;
+            for (const artifact of batch) {
+              await github.rest.actions.deleteArtifact({ owner, repo, artifact_id: artifact.id });
+              deleted += 1;
+              removedMiB += (artifact.size_in_bytes || 0) / 1048576;
+            }
+            core.info('Deleted: ' + deleted + ' / ' + removedMiB.toFixed(2) + ' MiB');
+            core.summary.addRaw('**Deleted ' + deleted + ' old copies (' + removedMiB.toFixed(2) + ' MiB).**');
+            await core.summary.write();
