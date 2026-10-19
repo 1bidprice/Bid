@@ -3,7 +3,7 @@
   "version": 1,
   "policyVersion": "2026-08-11.1",
   "ledgerPolicyVersion": "2026-08-12.1",
-  "updatedAt": "2026-10-19T04:47:24.419Z",
+  "updatedAt": "2026-10-19T07:50:36.477Z",
   "records": [
     {
       "format": "investor-control-forecast-outcome-record",
@@ -829310,14 +829310,1256 @@
         "horizon": "week1",
         "forecastSampleDate": "2026-10-19"
       }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-12.1",
+      "forecastId": "forecast:534f177b63b17437743de7480ffe",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:xath:term-479",
+      "instrumentId": "company:xath:term-479",
+      "displayName": "EUROBANK S.A.",
+      "symbol": "EUROB",
+      "listing": {
+        "symbol": "EUROB",
+        "mic": "XATH",
+        "exchange": "Euronext Athens",
+        "currency": "EUR"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:xath:term-479",
+        "instrumentId": "company:xath:term-479",
+        "sourceAuthority": "EURONEXT_ATHENS_ISSUER_PROFILE",
+        "sourceUrl": "https://athens.euronext.com/en/market-data/issuers/64",
+        "sourceDocumentId": "EURONEXT_ATHENS_ISSUER_64",
+        "capturedAt": "2026-10-19T07:46:57.018Z",
+        "taxonomy": "FTSE_RUSSELL_ICB",
+        "sector": "Banks",
+        "subSector": "Banks",
+        "description": "Banks / Banks",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "marketRegimeSnapshot": {
+        "contract": "FORECAST_TIME_MARKET_REGIME_SNAPSHOT_V1",
+        "policyVersion": "2026-08-12.1",
+        "capturedAt": "2026-10-19T07:46:57.018Z",
+        "benchmarkAsOf": "2026-10-16T07:30:00.000Z",
+        "benchmarkSymbol": "GD.AT",
+        "benchmarkSource": "Yahoo Finance Chart",
+        "benchmarkSourceQuality": "SECONDARY_VALIDATED",
+        "observationCount": 493,
+        "status": "REGIME_READY",
+        "regimeKey": "NEUTRAL|MIXED_TREND|HIGH_VOLATILITY|MIXED_MOMENTUM",
+        "riskTone": "NEUTRAL",
+        "trendRegime": "MIXED_TREND",
+        "momentumRegime": "MIXED_MOMENTUM",
+        "volatilityRegime": "HIGH_VOLATILITY",
+        "metrics": {
+          "latestClose": 2613.48999,
+          "return20Pct": -1.7965,
+          "return60Pct": 4.8453,
+          "return120Pct": 18.7578,
+          "sma50": 2653.026392,
+          "sma200": 2398.644849,
+          "annualizedVolatility20Pct": 20.1541,
+          "annualizedVolatility60Pct": 14.6835,
+          "volatility20Percentile": 75,
+          "maxDrawdown120Pct": -6.543
+        },
+        "blockers": [],
+        "researchOnly": true,
+        "modelDerived": true,
+        "finalActionEligible": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "day1",
+      "tradingDays": 1,
+      "forecastSampleDate": "2026-10-19",
+      "forecastAt": "2026-10-19T07:46:57.018Z",
+      "referencePrice": {
+        "value": 4.45,
+        "timestamp": "2026-10-19T07:46:57.018Z",
+        "currency": "EUR",
+        "source": "Euronext Athens delayed market data"
+      },
+      "rawProbabilityPositive": 0.5426,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": null,
+      "rawLatentFactorScore": 0.051003,
+      "factorScoreStatus": "RESEARCH_SCORE_BLOCKED",
+      "factorAvailableDomainCount": 4,
+      "factorAvailableWeight": 0.52,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": 0.064416,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": 0,
+          "weight": 0.16,
+          "verifiedDriverCount": 2
+        },
+        {
+          "domain": "RISK",
+          "value": -0.385,
+          "weight": 0.09,
+          "verifiedDriverCount": 4
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.94,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": 0.1592,
+      "distribution": {
+        "p10ReturnPct": -3.6984,
+        "p25ReturnPct": -1.4838,
+        "medianReturnPct": 0.3375,
+        "p75ReturnPct": 1.3206,
+        "p90ReturnPct": 3.6364,
+        "downsideProbabilityPct": 45.74,
+        "bullCaseReturnPct": 3.6364,
+        "baseCaseReturnPct": 0.3375,
+        "bearCaseReturnPct": -3.6984
+      },
+      "patternConfidenceScore": 64.84,
+      "evidenceQualityScore": 20,
+      "regime": "MIXED_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-20.1",
+        "generatedAt": "2026-10-19T07:46:57.018Z",
+        "validUntil": "2026-10-20T07:46:57.018Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 70,
+        "confidenceMeaning": "POLICY_COMPLETENESS_HEURISTIC_NOT_PROBABILITY",
+        "dataQualityScore": 35,
+        "integrity": {
+          "contractVersion": 1,
+          "strict": true,
+          "passed": true,
+          "blockers": [],
+          "companyId": "company:xath:term-479",
+          "listingSymbol": "EUROB",
+          "referenceSymbol": "EUROB",
+          "evidenceCount": 2,
+          "universal": {
+            "format": "investor-control-instrument-integrity",
+            "version": 1,
+            "policyVersion": "2026-08-20.1",
+            "assetClass": "EQUITY",
+            "instrumentId": "company:xath:term-479",
+            "symbol": "EUROB",
+            "mic": "XATH",
+            "currency": "EUR",
+            "purpose": "ROUTING",
+            "identityReady": true,
+            "routingReady": true,
+            "valuationReady": true,
+            "decisionReady": false,
+            "blockers": [],
+            "identityBlockers": [],
+            "routingBlockers": [],
+            "valuationBlockers": [],
+            "decisionBlockers": [
+              "ACTIVE_LISTING_NOT_VERIFIED",
+              "QUOTE_TIMESTAMP_NOT_VERIFIED",
+              "QUOTE_NOT_DECISION_ELIGIBLE"
+            ],
+            "invariant": "SAME_INSTRUMENT_INTEGRITY_RULES_FOR_ALL_USERS_AND_PORTFOLIOS"
+          }
+        },
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 0,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 72.282505,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": null,
+          "fundamentalFlags": [],
+          "marketFlags": [
+            "BELOW_50_DAY_AVERAGE"
+          ]
+        },
+        "controlledPlan": {
+          "status": "AVAILABLE",
+          "level": "INTERIM_RISK_CONTROL",
+          "title": "Πλάνο τώρα",
+          "holderAction": "HOLD",
+          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ",
+          "nonHolderAction": "DO_NOT_BUY",
+          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
+          "marketAction": "WATCH",
+          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+          "newBuyAllowed": false,
+          "sellSignalApproved": false,
+          "confidenceScore": 70,
+          "dataQualityScore": 35,
+          "rationale": "Δεν έχουν ολοκληρωθεί όλοι οι υποχρεωτικοί έλεγχοι για τελική αγορά ή πώληση. Μέχρι τότε η πειθαρχημένη στάση είναι διατήρηση υπάρχουσας θέσης χωρίς νέα ενίσχυση και αποφυγή νέας εισόδου.",
+          "blockers": [
+            "DOSSIER_NOT_PUBLISHABLE",
+            "DOSSIER_NOT_READY",
+            "CROSS_CHECK_NOT_READY",
+            "FUNDAMENTALS_NOT_READY"
+          ],
+          "validUntil": "2026-10-20T07:46:57.018Z"
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:xath:term-479",
+        "instrumentId": "company:xath:term-479",
+        "horizon": "day1",
+        "forecastSampleDate": "2026-10-19"
+      }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-12.1",
+      "forecastId": "forecast:60704176cb3ac833d48fd8e8d615",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:xath:term-438",
+      "instrumentId": "company:xath:term-438",
+      "displayName": "HELLENIC TELECOM. ORG.",
+      "symbol": "HTO",
+      "listing": {
+        "symbol": "HTO",
+        "mic": "XATH",
+        "exchange": "Euronext Athens",
+        "currency": "EUR"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:xath:term-438",
+        "instrumentId": "company:xath:term-438",
+        "sourceAuthority": "EURONEXT_ATHENS_ISSUER_PROFILE",
+        "sourceUrl": "https://athens.euronext.com/en/market-data/issuers/99",
+        "sourceDocumentId": "EURONEXT_ATHENS_ISSUER_99",
+        "capturedAt": "2026-10-19T07:46:57.018Z",
+        "taxonomy": "FTSE_RUSSELL_ICB",
+        "sector": "Telecommunications",
+        "subSector": "Telecommunications Services",
+        "description": "Telecommunications / Telecommunications Services",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "marketRegimeSnapshot": {
+        "contract": "FORECAST_TIME_MARKET_REGIME_SNAPSHOT_V1",
+        "policyVersion": "2026-08-12.1",
+        "capturedAt": "2026-10-19T07:46:57.018Z",
+        "benchmarkAsOf": "2026-10-16T07:30:00.000Z",
+        "benchmarkSymbol": "GD.AT",
+        "benchmarkSource": "Yahoo Finance Chart",
+        "benchmarkSourceQuality": "SECONDARY_VALIDATED",
+        "observationCount": 493,
+        "status": "REGIME_READY",
+        "regimeKey": "NEUTRAL|MIXED_TREND|HIGH_VOLATILITY|MIXED_MOMENTUM",
+        "riskTone": "NEUTRAL",
+        "trendRegime": "MIXED_TREND",
+        "momentumRegime": "MIXED_MOMENTUM",
+        "volatilityRegime": "HIGH_VOLATILITY",
+        "metrics": {
+          "latestClose": 2613.48999,
+          "return20Pct": -1.7965,
+          "return60Pct": 4.8453,
+          "return120Pct": 18.7578,
+          "sma50": 2653.026392,
+          "sma200": 2398.644849,
+          "annualizedVolatility20Pct": 20.1541,
+          "annualizedVolatility60Pct": 14.6835,
+          "volatility20Percentile": 75,
+          "maxDrawdown120Pct": -6.543
+        },
+        "blockers": [],
+        "researchOnly": true,
+        "modelDerived": true,
+        "finalActionEligible": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "day1",
+      "tradingDays": 1,
+      "forecastSampleDate": "2026-10-19",
+      "forecastAt": "2026-10-19T07:46:57.018Z",
+      "referencePrice": {
+        "value": 19.39,
+        "timestamp": "2026-10-19T07:46:57.018Z",
+        "currency": "EUR",
+        "source": "Euronext Athens delayed market data"
+      },
+      "rawProbabilityPositive": 0.5239,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": null,
+      "rawLatentFactorScore": -0.057367,
+      "factorScoreStatus": "RESEARCH_SCORE_BLOCKED",
+      "factorAvailableDomainCount": 4,
+      "factorAvailableWeight": 0.52,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": 0.035905,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": -0.313,
+          "weight": 0.16,
+          "verifiedDriverCount": 2
+        },
+        {
+          "domain": "RISK",
+          "value": -0.385,
+          "weight": 0.09,
+          "verifiedDriverCount": 4
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.94,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": 0.0815,
+      "distribution": {
+        "p10ReturnPct": -1.5854,
+        "p25ReturnPct": -1.1543,
+        "medianReturnPct": 0.0515,
+        "p75ReturnPct": 0.8469,
+        "p90ReturnPct": 1.8686,
+        "downsideProbabilityPct": 47.61,
+        "bullCaseReturnPct": 1.8686,
+        "baseCaseReturnPct": 0.0515,
+        "bearCaseReturnPct": -1.5854
+      },
+      "patternConfidenceScore": 64.86,
+      "evidenceQualityScore": 20,
+      "regime": "MIXED_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-20.1",
+        "generatedAt": "2026-10-19T07:46:57.018Z",
+        "validUntil": "2026-10-20T07:46:57.018Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 70,
+        "confidenceMeaning": "POLICY_COMPLETENESS_HEURISTIC_NOT_PROBABILITY",
+        "dataQualityScore": 35,
+        "integrity": {
+          "contractVersion": 1,
+          "strict": true,
+          "passed": true,
+          "blockers": [],
+          "companyId": "company:xath:term-438",
+          "listingSymbol": "HTO",
+          "referenceSymbol": "HTO",
+          "evidenceCount": 2,
+          "universal": {
+            "format": "investor-control-instrument-integrity",
+            "version": 1,
+            "policyVersion": "2026-08-20.1",
+            "assetClass": "EQUITY",
+            "instrumentId": "company:xath:term-438",
+            "symbol": "HTO",
+            "mic": "XATH",
+            "currency": "EUR",
+            "purpose": "ROUTING",
+            "identityReady": true,
+            "routingReady": true,
+            "valuationReady": true,
+            "decisionReady": false,
+            "blockers": [],
+            "identityBlockers": [],
+            "routingBlockers": [],
+            "valuationBlockers": [],
+            "decisionBlockers": [
+              "ACTIVE_LISTING_NOT_VERIFIED",
+              "QUOTE_TIMESTAMP_NOT_VERIFIED",
+              "QUOTE_NOT_DECISION_ELIGIBLE"
+            ],
+            "invariant": "SAME_INSTRUMENT_INTEGRITY_RULES_FOR_ALL_USERS_AND_PORTFOLIOS"
+          }
+        },
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 0,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 72.282505,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": null,
+          "fundamentalFlags": [],
+          "marketFlags": [
+            "BELOW_50_DAY_AVERAGE"
+          ]
+        },
+        "controlledPlan": {
+          "status": "AVAILABLE",
+          "level": "INTERIM_RISK_CONTROL",
+          "title": "Πλάνο τώρα",
+          "holderAction": "HOLD",
+          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ",
+          "nonHolderAction": "DO_NOT_BUY",
+          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
+          "marketAction": "WATCH",
+          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+          "newBuyAllowed": false,
+          "sellSignalApproved": false,
+          "confidenceScore": 70,
+          "dataQualityScore": 35,
+          "rationale": "Δεν έχουν ολοκληρωθεί όλοι οι υποχρεωτικοί έλεγχοι για τελική αγορά ή πώληση. Μέχρι τότε η πειθαρχημένη στάση είναι διατήρηση υπάρχουσας θέσης χωρίς νέα ενίσχυση και αποφυγή νέας εισόδου.",
+          "blockers": [
+            "DOSSIER_NOT_PUBLISHABLE",
+            "DOSSIER_NOT_READY",
+            "CROSS_CHECK_NOT_READY",
+            "FUNDAMENTALS_NOT_READY"
+          ],
+          "validUntil": "2026-10-20T07:46:57.018Z"
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:xath:term-438",
+        "instrumentId": "company:xath:term-438",
+        "horizon": "day1",
+        "forecastSampleDate": "2026-10-19"
+      }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-12.1",
+      "forecastId": "forecast:65327e556da5eb6c7a8b7d5bba44",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:xath:term-458",
+      "instrumentId": "company:xath:term-458",
+      "displayName": "FOURLIS S.A.",
+      "symbol": "FOYRK",
+      "listing": {
+        "symbol": "FOYRK",
+        "mic": "XATH",
+        "exchange": "Euronext Athens",
+        "currency": "EUR"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:xath:term-458",
+        "instrumentId": "company:xath:term-458",
+        "sourceAuthority": "EURONEXT_ATHENS_ISSUER_PROFILE",
+        "sourceUrl": "https://athens.euronext.com/en/market-data/issuers/188",
+        "sourceDocumentId": "EURONEXT_ATHENS_ISSUER_188",
+        "capturedAt": "2026-10-19T07:46:57.018Z",
+        "taxonomy": "FTSE_RUSSELL_ICB",
+        "sector": "Retail",
+        "subSector": "Diversified Retailers",
+        "description": "Retail / Diversified Retailers",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "marketRegimeSnapshot": {
+        "contract": "FORECAST_TIME_MARKET_REGIME_SNAPSHOT_V1",
+        "policyVersion": "2026-08-12.1",
+        "capturedAt": "2026-10-19T07:46:57.018Z",
+        "benchmarkAsOf": "2026-10-16T07:30:00.000Z",
+        "benchmarkSymbol": "GD.AT",
+        "benchmarkSource": "Yahoo Finance Chart",
+        "benchmarkSourceQuality": "SECONDARY_VALIDATED",
+        "observationCount": 493,
+        "status": "REGIME_READY",
+        "regimeKey": "NEUTRAL|MIXED_TREND|HIGH_VOLATILITY|MIXED_MOMENTUM",
+        "riskTone": "NEUTRAL",
+        "trendRegime": "MIXED_TREND",
+        "momentumRegime": "MIXED_MOMENTUM",
+        "volatilityRegime": "HIGH_VOLATILITY",
+        "metrics": {
+          "latestClose": 2613.48999,
+          "return20Pct": -1.7965,
+          "return60Pct": 4.8453,
+          "return120Pct": 18.7578,
+          "sma50": 2653.026392,
+          "sma200": 2398.644849,
+          "annualizedVolatility20Pct": 20.1541,
+          "annualizedVolatility60Pct": 14.6835,
+          "volatility20Percentile": 75,
+          "maxDrawdown120Pct": -6.543
+        },
+        "blockers": [],
+        "researchOnly": true,
+        "modelDerived": true,
+        "finalActionEligible": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "week1",
+      "tradingDays": 5,
+      "forecastSampleDate": "2026-10-19",
+      "forecastAt": "2026-10-19T07:46:57.018Z",
+      "referencePrice": {
+        "value": 3.945,
+        "timestamp": "2026-10-19T07:46:57.018Z",
+        "currency": "EUR",
+        "source": "Euronext Athens delayed market data"
+      },
+      "rawProbabilityPositive": 0.4257,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": null,
+      "rawLatentFactorScore": -0.225062,
+      "factorScoreStatus": "RESEARCH_SCORE_BLOCKED",
+      "factorAvailableDomainCount": 4,
+      "factorAvailableWeight": 0.52,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": -0.085055,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": -0.636,
+          "weight": 0.16,
+          "verifiedDriverCount": 2
+        },
+        {
+          "domain": "RISK",
+          "value": -0.484,
+          "weight": 0.09,
+          "verifiedDriverCount": 5
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.94,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": 0.633,
+      "distribution": {
+        "p10ReturnPct": -2.2646,
+        "p25ReturnPct": -2.1898,
+        "medianReturnPct": -0.495,
+        "p75ReturnPct": 3.8414,
+        "p90ReturnPct": 8.2614,
+        "downsideProbabilityPct": 57.43,
+        "bullCaseReturnPct": 8.2614,
+        "baseCaseReturnPct": -0.495,
+        "bearCaseReturnPct": -2.2646
+      },
+      "patternConfidenceScore": 46.82,
+      "evidenceQualityScore": 20,
+      "regime": "BEAR_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-20.1",
+        "generatedAt": "2026-10-19T07:46:57.018Z",
+        "validUntil": "2026-10-20T07:46:57.018Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 57,
+        "confidenceMeaning": "POLICY_COMPLETENESS_HEURISTIC_NOT_PROBABILITY",
+        "dataQualityScore": 35,
+        "integrity": {
+          "contractVersion": 1,
+          "strict": true,
+          "passed": true,
+          "blockers": [],
+          "companyId": "company:xath:term-458",
+          "listingSymbol": "FOYRK",
+          "referenceSymbol": "FOYRK",
+          "evidenceCount": 2,
+          "universal": {
+            "format": "investor-control-instrument-integrity",
+            "version": 1,
+            "policyVersion": "2026-08-20.1",
+            "assetClass": "EQUITY",
+            "instrumentId": "company:xath:term-458",
+            "symbol": "FOYRK",
+            "mic": "XATH",
+            "currency": "EUR",
+            "purpose": "ROUTING",
+            "identityReady": true,
+            "routingReady": true,
+            "valuationReady": true,
+            "decisionReady": false,
+            "blockers": [],
+            "identityBlockers": [],
+            "routingBlockers": [],
+            "valuationBlockers": [],
+            "decisionBlockers": [
+              "ACTIVE_LISTING_NOT_VERIFIED",
+              "QUOTE_TIMESTAMP_NOT_VERIFIED",
+              "QUOTE_NOT_DECISION_ELIGIBLE"
+            ],
+            "invariant": "SAME_INSTRUMENT_INTEGRITY_RULES_FOR_ALL_USERS_AND_PORTFOLIOS"
+          }
+        },
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 0,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 72.282505,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": 32,
+          "fundamentalFlags": [
+            "HIGH_LIABILITIES_TO_ASSETS"
+          ],
+          "marketFlags": [
+            "LOW_LIQUIDITY",
+            "BELOW_50_DAY_AVERAGE"
+          ]
+        },
+        "controlledPlan": {
+          "status": "AVAILABLE",
+          "level": "INTERIM_RISK_CONTROL",
+          "title": "Πλάνο τώρα",
+          "holderAction": "HOLD",
+          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ — ΕΠΑΝΕΞΕΤΑΣΗ ΚΙΝΔΥΝΟΥ",
+          "nonHolderAction": "DO_NOT_BUY",
+          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
+          "marketAction": "WATCH",
+          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+          "newBuyAllowed": false,
+          "sellSignalApproved": false,
+          "confidenceScore": 57,
+          "dataQualityScore": 35,
+          "rationale": "Υπάρχουν επαληθευμένες ενδείξεις αυξημένου κινδύνου, αλλά δεν έχουν περάσει ακόμη όλοι οι έλεγχοι που απαιτούνται για τελικό σήμα πώλησης ή μείωσης.",
+          "blockers": [
+            "DOSSIER_NOT_PUBLISHABLE",
+            "DOSSIER_NOT_READY",
+            "CROSS_CHECK_NOT_READY",
+            "FUNDAMENTALS_NOT_READY"
+          ],
+          "validUntil": "2026-10-20T07:46:57.018Z"
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:xath:term-458",
+        "instrumentId": "company:xath:term-458",
+        "horizon": "week1",
+        "forecastSampleDate": "2026-10-19"
+      }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-12.1",
+      "forecastId": "forecast:b0e394d8524dcfb6591480e6310c",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:xath:term-458",
+      "instrumentId": "company:xath:term-458",
+      "displayName": "FOURLIS S.A.",
+      "symbol": "FOYRK",
+      "listing": {
+        "symbol": "FOYRK",
+        "mic": "XATH",
+        "exchange": "Euronext Athens",
+        "currency": "EUR"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:xath:term-458",
+        "instrumentId": "company:xath:term-458",
+        "sourceAuthority": "EURONEXT_ATHENS_ISSUER_PROFILE",
+        "sourceUrl": "https://athens.euronext.com/en/market-data/issuers/188",
+        "sourceDocumentId": "EURONEXT_ATHENS_ISSUER_188",
+        "capturedAt": "2026-10-19T07:46:57.018Z",
+        "taxonomy": "FTSE_RUSSELL_ICB",
+        "sector": "Retail",
+        "subSector": "Diversified Retailers",
+        "description": "Retail / Diversified Retailers",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "marketRegimeSnapshot": {
+        "contract": "FORECAST_TIME_MARKET_REGIME_SNAPSHOT_V1",
+        "policyVersion": "2026-08-12.1",
+        "capturedAt": "2026-10-19T07:46:57.018Z",
+        "benchmarkAsOf": "2026-10-16T07:30:00.000Z",
+        "benchmarkSymbol": "GD.AT",
+        "benchmarkSource": "Yahoo Finance Chart",
+        "benchmarkSourceQuality": "SECONDARY_VALIDATED",
+        "observationCount": 493,
+        "status": "REGIME_READY",
+        "regimeKey": "NEUTRAL|MIXED_TREND|HIGH_VOLATILITY|MIXED_MOMENTUM",
+        "riskTone": "NEUTRAL",
+        "trendRegime": "MIXED_TREND",
+        "momentumRegime": "MIXED_MOMENTUM",
+        "volatilityRegime": "HIGH_VOLATILITY",
+        "metrics": {
+          "latestClose": 2613.48999,
+          "return20Pct": -1.7965,
+          "return60Pct": 4.8453,
+          "return120Pct": 18.7578,
+          "sma50": 2653.026392,
+          "sma200": 2398.644849,
+          "annualizedVolatility20Pct": 20.1541,
+          "annualizedVolatility60Pct": 14.6835,
+          "volatility20Percentile": 75,
+          "maxDrawdown120Pct": -6.543
+        },
+        "blockers": [],
+        "researchOnly": true,
+        "modelDerived": true,
+        "finalActionEligible": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "day1",
+      "tradingDays": 1,
+      "forecastSampleDate": "2026-10-19",
+      "forecastAt": "2026-10-19T07:46:57.018Z",
+      "referencePrice": {
+        "value": 3.945,
+        "timestamp": "2026-10-19T07:46:57.018Z",
+        "currency": "EUR",
+        "source": "Euronext Athens delayed market data"
+      },
+      "rawProbabilityPositive": 0.4954,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": null,
+      "rawLatentFactorScore": -0.190473,
+      "factorScoreStatus": "RESEARCH_SCORE_BLOCKED",
+      "factorAvailableDomainCount": 4,
+      "factorAvailableWeight": 0.52,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": -0.003299,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": -0.636,
+          "weight": 0.16,
+          "verifiedDriverCount": 2
+        },
+        {
+          "domain": "RISK",
+          "value": -0.484,
+          "weight": 0.09,
+          "verifiedDriverCount": 5
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.94,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": 0.1047,
+      "distribution": {
+        "p10ReturnPct": -1.99,
+        "p25ReturnPct": -0.7326,
+        "medianReturnPct": 0,
+        "p75ReturnPct": 1.0204,
+        "p90ReturnPct": 1.9417,
+        "downsideProbabilityPct": 50.46,
+        "bullCaseReturnPct": 1.9417,
+        "baseCaseReturnPct": 0,
+        "bearCaseReturnPct": -1.99
+      },
+      "patternConfidenceScore": 65,
+      "evidenceQualityScore": 20,
+      "regime": "BEAR_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-20.1",
+        "generatedAt": "2026-10-19T07:46:57.018Z",
+        "validUntil": "2026-10-20T07:46:57.018Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 57,
+        "confidenceMeaning": "POLICY_COMPLETENESS_HEURISTIC_NOT_PROBABILITY",
+        "dataQualityScore": 35,
+        "integrity": {
+          "contractVersion": 1,
+          "strict": true,
+          "passed": true,
+          "blockers": [],
+          "companyId": "company:xath:term-458",
+          "listingSymbol": "FOYRK",
+          "referenceSymbol": "FOYRK",
+          "evidenceCount": 2,
+          "universal": {
+            "format": "investor-control-instrument-integrity",
+            "version": 1,
+            "policyVersion": "2026-08-20.1",
+            "assetClass": "EQUITY",
+            "instrumentId": "company:xath:term-458",
+            "symbol": "FOYRK",
+            "mic": "XATH",
+            "currency": "EUR",
+            "purpose": "ROUTING",
+            "identityReady": true,
+            "routingReady": true,
+            "valuationReady": true,
+            "decisionReady": false,
+            "blockers": [],
+            "identityBlockers": [],
+            "routingBlockers": [],
+            "valuationBlockers": [],
+            "decisionBlockers": [
+              "ACTIVE_LISTING_NOT_VERIFIED",
+              "QUOTE_TIMESTAMP_NOT_VERIFIED",
+              "QUOTE_NOT_DECISION_ELIGIBLE"
+            ],
+            "invariant": "SAME_INSTRUMENT_INTEGRITY_RULES_FOR_ALL_USERS_AND_PORTFOLIOS"
+          }
+        },
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 0,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 72.282505,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": 32,
+          "fundamentalFlags": [
+            "HIGH_LIABILITIES_TO_ASSETS"
+          ],
+          "marketFlags": [
+            "LOW_LIQUIDITY",
+            "BELOW_50_DAY_AVERAGE"
+          ]
+        },
+        "controlledPlan": {
+          "status": "AVAILABLE",
+          "level": "INTERIM_RISK_CONTROL",
+          "title": "Πλάνο τώρα",
+          "holderAction": "HOLD",
+          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ — ΕΠΑΝΕΞΕΤΑΣΗ ΚΙΝΔΥΝΟΥ",
+          "nonHolderAction": "DO_NOT_BUY",
+          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
+          "marketAction": "WATCH",
+          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+          "newBuyAllowed": false,
+          "sellSignalApproved": false,
+          "confidenceScore": 57,
+          "dataQualityScore": 35,
+          "rationale": "Υπάρχουν επαληθευμένες ενδείξεις αυξημένου κινδύνου, αλλά δεν έχουν περάσει ακόμη όλοι οι έλεγχοι που απαιτούνται για τελικό σήμα πώλησης ή μείωσης.",
+          "blockers": [
+            "DOSSIER_NOT_PUBLISHABLE",
+            "DOSSIER_NOT_READY",
+            "CROSS_CHECK_NOT_READY",
+            "FUNDAMENTALS_NOT_READY"
+          ],
+          "validUntil": "2026-10-20T07:46:57.018Z"
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:xath:term-458",
+        "instrumentId": "company:xath:term-458",
+        "horizon": "day1",
+        "forecastSampleDate": "2026-10-19"
+      }
+    },
+    {
+      "format": "investor-control-forecast-outcome-record",
+      "version": 1,
+      "ledgerPolicyVersion": "2026-08-12.1",
+      "forecastId": "forecast:b1951d3315441d72645331478a51",
+      "validationMode": "LIVE_SHADOW_OOS",
+      "forecastPolicyVersion": "2026-08-11.2",
+      "historicalPatternPolicyVersion": "2026-08-11.1",
+      "factorScorePolicyVersion": "2026-08-11.1",
+      "factorFeatureVectorPolicyVersion": "2026-08-11.1",
+      "companyId": "company:xath:term-447",
+      "instrumentId": "company:xath:term-447",
+      "displayName": "ELVALHALCOR HELLENIC COPPER AND ALUMINIUM INDUSTRY S.A.",
+      "symbol": "ELHA",
+      "listing": {
+        "symbol": "ELHA",
+        "mic": "XATH",
+        "exchange": "Euronext Athens",
+        "currency": "EUR"
+      },
+      "classificationSnapshot": {
+        "contract": "FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1",
+        "policyVersion": "2026-08-11.1",
+        "companyId": "company:xath:term-447",
+        "instrumentId": "company:xath:term-447",
+        "sourceAuthority": "EURONEXT_ATHENS_ISSUER_PROFILE",
+        "sourceUrl": "https://athens.euronext.com/en/market-data/issuers/377",
+        "sourceDocumentId": "EURONEXT_ATHENS_ISSUER_377",
+        "capturedAt": "2026-10-19T07:46:57.018Z",
+        "taxonomy": "FTSE_RUSSELL_ICB",
+        "sector": "Basic Resources",
+        "subSector": "Metal Fabricating",
+        "description": "Basic Resources / Metal Fabricating",
+        "inferenceUsed": false,
+        "decisionImpact": "NONE"
+      },
+      "marketRegimeSnapshot": {
+        "contract": "FORECAST_TIME_MARKET_REGIME_SNAPSHOT_V1",
+        "policyVersion": "2026-08-12.1",
+        "capturedAt": "2026-10-19T07:46:57.018Z",
+        "benchmarkAsOf": "2026-10-16T07:30:00.000Z",
+        "benchmarkSymbol": "GD.AT",
+        "benchmarkSource": "Yahoo Finance Chart",
+        "benchmarkSourceQuality": "SECONDARY_VALIDATED",
+        "observationCount": 493,
+        "status": "REGIME_READY",
+        "regimeKey": "NEUTRAL|MIXED_TREND|HIGH_VOLATILITY|MIXED_MOMENTUM",
+        "riskTone": "NEUTRAL",
+        "trendRegime": "MIXED_TREND",
+        "momentumRegime": "MIXED_MOMENTUM",
+        "volatilityRegime": "HIGH_VOLATILITY",
+        "metrics": {
+          "latestClose": 2613.48999,
+          "return20Pct": -1.7965,
+          "return60Pct": 4.8453,
+          "return120Pct": 18.7578,
+          "sma50": 2653.026392,
+          "sma200": 2398.644849,
+          "annualizedVolatility20Pct": 20.1541,
+          "annualizedVolatility60Pct": 14.6835,
+          "volatility20Percentile": 75,
+          "maxDrawdown120Pct": -6.543
+        },
+        "blockers": [],
+        "researchOnly": true,
+        "modelDerived": true,
+        "finalActionEligible": false,
+        "decisionImpact": "NONE"
+      },
+      "assetClass": "EQUITY",
+      "horizon": "day1",
+      "tradingDays": 1,
+      "forecastSampleDate": "2026-10-19",
+      "forecastAt": "2026-10-19T07:46:57.018Z",
+      "referencePrice": {
+        "value": 3.455,
+        "timestamp": "2026-10-19T07:46:57.018Z",
+        "currency": "EUR",
+        "source": "Euronext Athens delayed market data"
+      },
+      "rawProbabilityPositive": 0.3395,
+      "calibratedProbabilityPositive": null,
+      "latentFactorScore": null,
+      "rawLatentFactorScore": -0.333211,
+      "factorScoreStatus": "RESEARCH_SCORE_BLOCKED",
+      "factorAvailableDomainCount": 4,
+      "factorAvailableWeight": 0.52,
+      "factorDomainSnapshot": [
+        {
+          "domain": "HISTORICAL_PATTERN",
+          "value": -0.226149,
+          "weight": 0.22,
+          "verifiedDriverCount": 1
+        },
+        {
+          "domain": "MOMENTUM",
+          "value": -0.7437,
+          "weight": 0.16,
+          "verifiedDriverCount": 2
+        },
+        {
+          "domain": "RISK",
+          "value": -0.5725,
+          "weight": 0.09,
+          "verifiedDriverCount": 4
+        },
+        {
+          "domain": "CATALYST",
+          "value": 0.94,
+          "weight": 0.05,
+          "verifiedDriverCount": 1
+        }
+      ],
+      "expectedReturnPct": -0.0483,
+      "distribution": {
+        "p10ReturnPct": -1.6216,
+        "p25ReturnPct": -0.9346,
+        "medianReturnPct": -0.266,
+        "p75ReturnPct": 1.6129,
+        "p90ReturnPct": 2.681,
+        "downsideProbabilityPct": 66.05,
+        "bullCaseReturnPct": 2.681,
+        "baseCaseReturnPct": -0.266,
+        "bearCaseReturnPct": -1.6216
+      },
+      "patternConfidenceScore": 62.19,
+      "evidenceQualityScore": 20,
+      "regime": "BEAR_TREND",
+      "existingFinalActionSnapshot": {
+        "format": "investor-control-final-action",
+        "version": 2,
+        "policyVersion": "2026-08-20.1",
+        "generatedAt": "2026-10-19T07:46:57.018Z",
+        "validUntil": "2026-10-20T07:46:57.018Z",
+        "status": "BLOCKED",
+        "marketAction": "WATCH",
+        "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "holderAction": "WATCH",
+        "holderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "nonHolderAction": "WATCH",
+        "nonHolderActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+        "urgency": "NONE",
+        "urgencyLabel": "Χωρίς τελική ενέργεια",
+        "confidenceScore": 70,
+        "confidenceMeaning": "POLICY_COMPLETENESS_HEURISTIC_NOT_PROBABILITY",
+        "dataQualityScore": 35,
+        "integrity": {
+          "contractVersion": 1,
+          "strict": true,
+          "passed": true,
+          "blockers": [],
+          "companyId": "company:xath:term-447",
+          "listingSymbol": "ELHA",
+          "referenceSymbol": "ELHA",
+          "evidenceCount": 2,
+          "universal": {
+            "format": "investor-control-instrument-integrity",
+            "version": 1,
+            "policyVersion": "2026-08-20.1",
+            "assetClass": "EQUITY",
+            "instrumentId": "company:xath:term-447",
+            "symbol": "ELHA",
+            "mic": "XATH",
+            "currency": "EUR",
+            "purpose": "ROUTING",
+            "identityReady": true,
+            "routingReady": true,
+            "valuationReady": true,
+            "decisionReady": false,
+            "blockers": [],
+            "identityBlockers": [],
+            "routingBlockers": [],
+            "valuationBlockers": [],
+            "decisionBlockers": [
+              "ACTIVE_LISTING_NOT_VERIFIED",
+              "QUOTE_TIMESTAMP_NOT_VERIFIED",
+              "QUOTE_NOT_DECISION_ELIGIBLE"
+            ],
+            "invariant": "SAME_INSTRUMENT_INTEGRITY_RULES_FOR_ALL_USERS_AND_PORTFOLIOS"
+          }
+        },
+        "reasons": [
+          "FINAL_ACTION_BLOCKED"
+        ],
+        "blockers": [
+          "DOSSIER_NOT_PUBLISHABLE",
+          "DOSSIER_NOT_READY",
+          "CROSS_CHECK_NOT_READY",
+          "FUNDAMENTALS_NOT_READY"
+        ],
+        "freshness": {
+          "referencePriceAgeHours": 0,
+          "dossierAgeHours": 0,
+          "latestMarketAgeHours": 72.282505,
+          "referencePricePurpose": "ANALYSIS_REFERENCE",
+          "referencePriceFreshnessModel": "OFFICIAL_BOUNDED_DELAY_ANALYSIS_ONLY",
+          "executionFreshnessEligible": false
+        },
+        "risk": {
+          "riskScore": 20,
+          "fundamentalFlags": [],
+          "marketFlags": [
+            "MATERIAL_DRAWDOWN",
+            "BELOW_50_DAY_AVERAGE"
+          ]
+        },
+        "controlledPlan": {
+          "status": "AVAILABLE",
+          "level": "INTERIM_RISK_CONTROL",
+          "title": "Πλάνο τώρα",
+          "holderAction": "HOLD",
+          "holderActionLabel": "ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ",
+          "nonHolderAction": "DO_NOT_BUY",
+          "nonHolderActionLabel": "ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ",
+          "marketAction": "WATCH",
+          "marketActionLabel": "ΠΑΡΑΚΟΛΟΥΘΗΣΗ",
+          "newBuyAllowed": false,
+          "sellSignalApproved": false,
+          "confidenceScore": 70,
+          "dataQualityScore": 35,
+          "rationale": "Δεν έχουν ολοκληρωθεί όλοι οι υποχρεωτικοί έλεγχοι για τελική αγορά ή πώληση. Μέχρι τότε η πειθαρχημένη στάση είναι διατήρηση υπάρχουσας θέσης χωρίς νέα ενίσχυση και αποφυγή νέας εισόδου.",
+          "blockers": [
+            "DOSSIER_NOT_PUBLISHABLE",
+            "DOSSIER_NOT_READY",
+            "CROSS_CHECK_NOT_READY",
+            "FUNDAMENTALS_NOT_READY"
+          ],
+          "validUntil": "2026-10-20T07:46:57.018Z"
+        },
+        "execution": {
+          "automaticBrokerOrder": false,
+          "requiresUserExecution": true
+        }
+      },
+      "decisionImpact": "NONE",
+      "realisedOutcome": null,
+      "positiveOutcome": null,
+      "outcomeEvaluatedAt": null,
+      "status": "OPEN",
+      "appendOnlyIdentity": {
+        "policyVersion": "2026-08-11.2",
+        "historicalPatternPolicyVersion": "2026-08-11.1",
+        "companyId": "company:xath:term-447",
+        "instrumentId": "company:xath:term-447",
+        "horizon": "day1",
+        "forecastSampleDate": "2026-10-19"
+      }
     }
   ],
   "summary": {
     "format": "investor-control-forecast-outcome-ledger-summary",
     "version": 1,
     "policyVersion": "2026-08-12.1",
-    "recordCount": 3671,
-    "openCount": 171,
+    "recordCount": 3676,
+    "openCount": 176,
     "maturedCount": 3500,
     "groups": [
       {
@@ -829532,7 +830774,7 @@
   },
   "evaluation": {
     "baseRecordCount": 3671,
-    "incomingRecordCount": 3671,
-    "mergedRecordCount": 3671
+    "incomingRecordCount": 3676,
+    "mergedRecordCount": 3676
   }
 }
