@@ -1,6 +1,11 @@
 name: Cost Control - Audit old standalone APK artifacts
 
 on:
+  # A changed audit workflow on main gets one automatic AUDIT-only run.
+  # No cron; this path-scoped push cannot invoke deletion.
+  push:
+    branches: [main]
+    paths: [.github/workflows/cost-control-artifact-audit.yml]
   workflow_dispatch:
     inputs:
       operation:
@@ -61,6 +66,9 @@ jobs:
             }
             if (operation === 'delete' && phrase !== 'DELETE_OLD_APK_ARTIFACTS') {
               throw new Error('Deletion blocked: exact approval phrase required');
+            }
+            if (operation === 'delete' && context.eventName !== 'workflow_dispatch') {
+              throw new Error('Deletion blocked: explicit manual workflow_dispatch required');
             }
 
             const artifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, {
