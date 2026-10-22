@@ -16,6 +16,11 @@ on:
         required: false
         type: string
         default: ''
+      approved_manifest_sha256:
+        description: 'Delete only: exact SHA-256 from an approved prior audit run'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -35,6 +40,7 @@ jobs:
         env:
           OPERATION: ${{ inputs.operation }}
           APPROVAL_PHRASE: ${{ inputs.approval_phrase }}
+          APPROVED_MANIFEST_SHA256: ${{ inputs.approved_manifest_sha256 }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -44,6 +50,8 @@ jobs:
             const maxPerExecution = 100;
             const operation = process.env.OPERATION || 'audit';
             const phrase = process.env.APPROVAL_PHRASE || '';
+            const approvedHash = (process.env.APPROVED_MANIFEST_SHA256 || '').toLowerCase();
+            const crypto = require('crypto');
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
@@ -63,34 +71,49 @@ jobs:
             const matching = artifacts
               .filter(a => a.name === targetName && !a.expired)
               .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            const protectedIds = new Set(matching.slice(0, keepNewest).map(a => a.id));
+            // Preserve known reference/rollback artifacts independently of age.
+            // 11360477178: source of the existing Drive ZIP; 10869007216: older reference copy.
+            const knownKeepIds = new Set([11360477178, 10869007216]);
+            const protectedIds = new Set([...matching.slice(0, keepNewest).map(a => a.id), ...knownKeepIds]);
             const cutoff = Date.now() - minimumAgeDays * 86400000;
             const candidates = matching.filter(a =>
               !protectedIds.has(a.id) &&
               new Date(a.created_at).getTime() < cutoff
-            );
+            ).sort((a, b) =>
+              new Date(a.created_at).getTime() - new Date(b.created_at).getTime() || a.id - b.id
+            ); // OLDEST eligible first, never newest eligible first.
             const batch = candidates.slice(0, maxPerExecution);
             const sumMiB = items => items.reduce((n, a) => n + (a.size_in_bytes || 0), 0) / 1048576;
+            const manifest = batch.map(a =>
+              [a.id, a.name, a.size_in_bytes, a.created_at, a.expires_at].join('|')
+            ).join('\\n');
+            const manifestSha256 = crypto.createHash('sha256').update(manifest).digest('hex');
 
             core.info('Operation: ' + operation);
             core.info('Matching retained artifacts: ' + matching.length);
             core.info('Protected newest artifacts: ' + Math.min(keepNewest, matching.length));
             core.info('Eligible older than ' + minimumAgeDays + ' days: ' + candidates.length);
             core.info('Eligible size estimate: ' + sumMiB(candidates).toFixed(2) + ' MiB');
-            core.info('This run batch: ' + batch.length + ' artifacts / ' + sumMiB(batch).toFixed(2) + ' MiB');
+            core.info('This run batch (OLDEST-FIRST): ' + batch.length + ' artifacts / ' + sumMiB(batch).toFixed(2) + ' MiB');
+            core.info('Exact candidate manifest SHA-256: ' + manifestSha256);
+            core.info('Known protected reference artifact IDs: ' + [...knownKeepIds].join(', '));
 
             core.summary
               .addHeading('Bid standalone APK artifacts — ' + operation)
               .addRaw('Only artifacts named ' + targetName + ' are in scope. ')
               .addRaw('Newest ' + keepNewest + ' copies are protected; files under ' + minimumAgeDays + ' days old are excluded. ')
-              .addRaw('Maximum ' + maxPerExecution + ' deletions in one approved execution.')
+              .addRaw('Maximum ' + maxPerExecution + ' deletions in one separately approved execution. ')
+              .addRaw('The candidate list is OLDEST-FIRST. Two known reference artifact IDs are permanently excluded. ')
+              .addRaw('Deletion also requires the EXACT SHA-256 manifest from a reviewed audit run.')
               .addTable([
                 [{ data: 'Metric', header: true }, { data: 'Value', header: true }],
                 ['Matching copies', String(matching.length)],
                 ['Protected newest copies', String(Math.min(keepNewest, matching.length))],
                 ['Eligible old copies', String(candidates.length)],
                 ['Eligible storage (MiB)', sumMiB(candidates).toFixed(2)],
-                ['This run batch (MiB)', sumMiB(batch).toFixed(2)]
+                ['This run batch (MiB)', sumMiB(batch).toFixed(2)],
+                ['Batch manifest SHA-256', manifestSha256],
+                ['Known reference IDs protected', [...knownKeepIds].join(', ')]
               ]);
             for (const artifact of batch) {
               core.info(JSON.stringify({
@@ -108,6 +131,14 @@ jobs:
               return;
             }
 
+            // A manual 'delete' selection alone is never sufficient.
+            // If the candidate batch changes after its audit, the hash changes and deletion aborts.
+            if (context.ref !== 'refs/heads/main') {
+              throw new Error('Deletion blocked: run only on default main branch');
+            }
+            if (batch.length === 0 || !/^[a-f0-9]{64}$/.test(approvedHash) || approvedHash !== manifestSha256) {
+              throw new Error('Deletion blocked: exact reviewed audit manifest SHA-256 is required');
+            }
             let deleted = 0;
             let removedMiB = 0;
             for (const artifact of batch) {
