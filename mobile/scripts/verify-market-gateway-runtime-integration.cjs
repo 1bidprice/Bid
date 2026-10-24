@@ -12,6 +12,8 @@ const portfolio = fs.readFileSync(path.join(root, "PortfolioApp.js"), "utf8");
 const background = fs.readFileSync(path.join(root, "src", "background-alert-task.js"), "utf8");
 
 assert.match(runtime, /process\.env\.EXPO_PUBLIC_MARKET_GATEWAY_URL/);
+assert.match(runtime, /DEFAULT_MARKET_GATEWAY_URL = 'https:\/\/investor-control-market-gateway\.bidprice-alerts\.workers\.dev'/);
+assert.match(runtime, /process\.env\.EXPO_PUBLIC_MARKET_GATEWAY_URL \|\| DEFAULT_MARKET_GATEWAY_URL/);
 assert.equal(runtime.includes("EXPO_PUBLIC_FINNHUB"), false);
 assert.equal(runtime.includes("FINNHUB_TOKEN"), false);
 assert.match(marketData, /const gatewayEnabled = isMarketGatewayConfigured\(\);/);
@@ -27,4 +29,4 @@ assert.match(marketData, /if \(gatewayEnabled\)[\s\S]*?\} else \{[\s\S]*?fetchNa
 assert.match(portfolio, /const MARKET_GATEWAY_CONFIGURED = isMarketGatewayConfigured\(\);/);
 assert.match(portfolio, /if \(loading \|\| MARKET_GATEWAY_CONFIGURED \|\| token\.trim\(\)\.length < 20 \|\| !liveUsProviderSymbols\.length\) return undefined;/);
 assert.match(background, /const token = isMarketGatewayConfigured\(\) \? '' : await SecureStore\.getItemAsync\(FINNHUB_TOKEN_KEY\);/);
-console.log("market gateway dormant runtime integration invariant: PASS");
+console.log("market gateway canonical runtime integration invariant: PASS");

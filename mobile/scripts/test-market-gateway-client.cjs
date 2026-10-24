@@ -10,9 +10,16 @@ const {
   normalizeGatewayBaseUrl,
   createOpaqueInstallationId,
   getOrCreateInstallationId,
+  validateGatewayBatch,
+  validateInstrumentCapability,
+  validateResearchQueueStatus,
   validateGatewayFx,
+  fetchInstrumentCapability,
+  requestMinbeisResearch,
+  fetchMinbeisResearchQueueStatus,
   fetchCanonicalGatewayQuote,
   fetchCanonicalGatewayFx,
+  fetchCanonicalGatewayBatch,
   fetchCanonicalGatewayQuotes,
   fetchCanonicalGatewayMarketSnapshot,
 } = require('../src/market-gateway-client.js');
@@ -36,6 +43,31 @@ function quotePayload() {
         timestampVerified: true,
         valuationEligible: true,
       },
+    },
+  };
+}
+
+function batchPayload(symbols = ['SPCE.US']) {
+  return {
+    format: 'investor-control-market-gateway-batch',
+    version: 1,
+    servedAt: '2026-09-10T15:00:00.000Z',
+    requestedSymbols: symbols,
+    quoteRegistry: Object.fromEntries(symbols.map((symbol) => {
+      if (symbol === 'SPCE.US') return [symbol, quotePayload().quote];
+      return [symbol, {
+        appSymbol: symbol,
+        currency: 'EUR',
+        quoteContract: { sourceApproved: true, identityVerified: true, sourceRole: 'PRIMARY_EXCHANGE' },
+      }];
+    })),
+    errors: [],
+    fxReference: symbols.some((symbol) => symbol.endsWith('.US')) ? fxPayload().reference : null,
+    privacy: {
+      acceptedInputs: ['symbols'],
+      portfolioQuantityRequired: false,
+      portfolioCostRequired: false,
+      pnlRequired: false,
     },
   };
 }
@@ -96,6 +128,84 @@ async function main() {
   assert.equal(quoteCalls[0].url, 'https://quotes.example.com/v1/quote?symbol=SPCE.US');
   assert.equal(/token=|finnhub/i.test(quoteCalls[0].url), false);
 
+  const capabilityPayload = {
+    format: 'investor-control-instrument-capability',
+    version: 1,
+    requestedSymbol: 'NVDA.US',
+    market: 'US',
+    identityVerified: true,
+    quoteSupported: true,
+    analysisSupported: false,
+    onboardingStatus: 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED',
+    canonicalCompanyId: 'gateway:us:NVDA',
+    displayName: 'NVIDIA Corp',
+    currency: 'USD',
+    limitations: ['FULL_MINBEIS_RESEARCH_NOT_YET_CANONICAL'],
+    privacy: {
+      acceptedInputs: ['symbol'],
+      portfolioQuantityRequired: false,
+      portfolioCostRequired: false,
+      pnlRequired: false,
+    },
+  };
+  assert.equal(validateInstrumentCapability('NVDA.US', capabilityPayload), null);
+  const capabilityCalls = [];
+  const capability = await fetchInstrumentCapability('NVDA.US', {
+    baseUrl: 'https://quotes.example.com',
+    clientId: firstId,
+    fetchImpl: async (url, init = {}) => {
+      capabilityCalls.push({ url: String(url), headers: init.headers || {} });
+      return new Response(JSON.stringify(capabilityPayload), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    },
+  });
+  assert.equal(capability.onboardingStatus, 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED');
+  assert.equal(capabilityCalls[0].url, 'https://quotes.example.com/v1/instrument?symbol=NVDA.US');
+  assert.equal(capabilityCalls[0].headers[MARKET_GATEWAY_CLIENT_HEADER], firstId);
+  assert.equal(JSON.stringify(capability).includes('quantity'), false);
+
+  const researchQueuePayload = {
+    format: 'investor-control-research-queue-status',
+    version: 1,
+    requestedSymbol: 'NVDA.US',
+    queueStatus: 'QUEUED',
+    queued: true,
+    firstRequestedAt: '2026-09-10T15:00:00.000Z',
+    lastRequestedAt: '2026-09-10T15:00:00.000Z',
+    privacy: {
+      acceptedInputs: ['symbol'],
+      portfolioDataStored: false,
+      clientIdentityStored: false,
+    },
+  };
+  assert.equal(validateResearchQueueStatus('NVDA.US', researchQueuePayload), null);
+  const researchCalls = [];
+  const queued = await requestMinbeisResearch('NVDA.US', {
+    baseUrl: 'https://quotes.example.com',
+    clientId: firstId,
+    fetchImpl: async (url, init = {}) => {
+      researchCalls.push({ url: String(url), method: init.method, headers: init.headers || {}, body: init.body });
+      return new Response(JSON.stringify(researchQueuePayload), { status: 202, headers: { 'Content-Type': 'application/json' } });
+    },
+  });
+  assert.equal(queued.queueStatus, 'QUEUED');
+  assert.equal(researchCalls[0].url, 'https://quotes.example.com/v1/research-queue');
+  assert.equal(researchCalls[0].method, 'POST');
+  assert.equal(researchCalls[0].headers[MARKET_GATEWAY_CLIENT_HEADER], firstId);
+  assert.deepEqual(JSON.parse(researchCalls[0].body), { symbol: 'NVDA.US' });
+  assert.equal(JSON.stringify(researchCalls[0].body).includes('quantity'), false);
+  assert.equal(JSON.stringify(researchCalls[0].body).includes('cost'), false);
+
+  const status = await fetchMinbeisResearchQueueStatus('NVDA.US', {
+    baseUrl: 'https://quotes.example.com',
+    clientId: firstId,
+    fetchImpl: async (url, init = {}) => {
+      assert.equal(String(url), 'https://quotes.example.com/v1/research-queue?symbol=NVDA.US');
+      assert.equal(init.method, 'GET');
+      return new Response(JSON.stringify(researchQueuePayload), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    },
+  });
+  assert.equal(status.queueStatus, 'QUEUED');
+
   await assert.rejects(
     fetchCanonicalGatewayQuote('SPCE.US', {
       baseUrl: 'https://quotes.example.com',
@@ -108,6 +218,10 @@ async function main() {
     }),
     /GATEWAY_US_IDENTITY_NOT_VERIFIED/,
   );
+
+  const invalidAthensIdentity = batchPayload(['ALWN.GR']);
+  invalidAthensIdentity.quoteRegistry['ALWN.GR'].quoteContract.identityVerified = false;
+  assert.equal(validateGatewayBatch(['ALWN.GR'], invalidAthensIdentity), 'GATEWAY_ATHENS_IDENTITY_NOT_VERIFIED');
 
   assert.equal(validateGatewayFx(fxPayload()), null);
   const invalidFx = fxPayload();
@@ -141,20 +255,36 @@ async function main() {
   assert.equal(Object.keys(batch.quoteRegistry).length, 1);
   assert.deepEqual(batch.errors, []);
 
+  assert.equal(validateGatewayBatch(['SPCE.US'], batchPayload()), null);
+  const directBatchCalls = [];
+  const directBatch = await fetchCanonicalGatewayBatch(['SPCE.US'], {
+    baseUrl: 'https://quotes.example.com',
+    clientId: firstId,
+    fetchImpl: async (url, init = {}) => {
+      directBatchCalls.push({ url: String(url), method: init.method, body: init.body });
+      return new Response(JSON.stringify(batchPayload()), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    },
+  });
+  assert.equal(directBatch.quoteRegistry['SPCE.US'].currency, 'USD');
+  assert.equal(directBatch.fxReference.rate, 1.1616);
+  assert.equal(directBatchCalls.length, 1);
+  assert.equal(directBatchCalls[0].url, 'https://quotes.example.com/v1/quotes');
+  assert.equal(directBatchCalls[0].method, 'POST');
+  assert.deepEqual(JSON.parse(directBatchCalls[0].body), { symbols: ['SPCE.US'] });
+
   const snapshotCalls = [];
   const snapshot = await fetchCanonicalGatewayMarketSnapshot(['SPCE.US'], {
     baseUrl: 'https://quotes.example.com',
     clientId: firstId,
     fetchImpl: async (url) => {
       snapshotCalls.push(String(url));
-      const payload = String(url).includes('/v1/fx?') ? fxPayload() : quotePayload();
-      return new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify(batchPayload()), { status: 200, headers: { 'Content-Type': 'application/json' } });
     },
   });
   assert.equal(snapshot.quoteRegistry['SPCE.US'].currency, 'USD');
   assert.equal(snapshot.fxReference.rate, 1.1616);
   assert.equal(snapshot.fxError, undefined);
-  assert.equal(snapshotCalls.length, 2);
+  assert.equal(snapshotCalls.length, 1);
 
   const greekOnlyCalls = [];
   const greekOnly = await fetchCanonicalGatewayMarketSnapshot(['ALWN.GR'], {
@@ -162,15 +292,43 @@ async function main() {
     clientId: firstId,
     fetchImpl: async (url) => {
       greekOnlyCalls.push(String(url));
-      return new Response(JSON.stringify({
-        format: 'investor-control-market-gateway-quote',
-        requestedSymbol: 'ALWN.GR',
-        quote: { appSymbol: 'ALWN.GR', currency: 'EUR', quoteContract: { sourceApproved: true, sourceRole: 'PRIMARY_EXCHANGE' } },
-      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify(batchPayload(['ALWN.GR'])), { status: 200, headers: { 'Content-Type': 'application/json' } });
     },
   });
   assert.equal(greekOnly.fxReference, null);
   assert.equal(greekOnlyCalls.length, 1);
+
+  const largePortfolioSymbols = Array.from({ length: 101 }, (_, index) => `S${index}.US`);
+  const largeBatchCalls = [];
+  const largeSnapshot = await fetchCanonicalGatewayMarketSnapshot(largePortfolioSymbols, {
+    baseUrl: 'https://quotes.example.com',
+    clientId: firstId,
+    fetchImpl: async (url, init = {}) => {
+      assert.equal(String(url), 'https://quotes.example.com/v1/quotes');
+      const body = JSON.parse(init.body);
+      largeBatchCalls.push(body.symbols);
+      return new Response(JSON.stringify(batchPayload(body.symbols)), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    },
+  });
+  assert.equal(Object.keys(largeSnapshot.quoteRegistry).length, 101);
+  assert.deepEqual(largeBatchCalls.map((symbols) => symbols.length), [50, 50, 1]);
+  assert.equal(largeBatchCalls.flat().length, 101);
+
+  const fallbackCalls = [];
+  const fallback = await fetchCanonicalGatewayMarketSnapshot(['SPCE.US'], {
+    baseUrl: 'https://quotes.example.com',
+    clientId: firstId,
+    fetchImpl: async (url) => {
+      fallbackCalls.push(String(url));
+      if (String(url).endsWith('/v1/quotes')) {
+        return new Response(JSON.stringify({ error: { code: 'METHOD_NOT_ALLOWED' } }), { status: 405, headers: { 'Content-Type': 'application/json' } });
+      }
+      return new Response(JSON.stringify(String(url).includes('/v1/fx?') ? fxPayload() : quotePayload()), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    },
+  });
+  assert.equal(fallback.quoteRegistry['SPCE.US'].currency, 'USD');
+  assert.equal(fallback.fxReference.rate, 1.1616);
+  assert.equal(fallbackCalls.length, 3);
 
   const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'market-gateway-client.js'), 'utf8');
   assert.equal(source.includes('FINNHUB_TOKEN'), false);

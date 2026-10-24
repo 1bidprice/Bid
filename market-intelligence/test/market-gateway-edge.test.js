@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MARKET_GATEWAY_CLIENT_HEADER,
+  MARKET_GATEWAY_BATCH_MAX_SYMBOLS,
   gatewayCacheTtlSeconds,
   handleMarketGatewayEdgeRequest,
   normalizeGatewayClientId,
@@ -17,6 +18,28 @@ function quoteRequest(symbol = 'SPCE.US', clientId = CLIENT_ID) {
 function fxRequest(clientId = CLIENT_ID) {
   const headers = clientId === null ? {} : { [MARKET_GATEWAY_CLIENT_HEADER]: clientId };
   return new Request('https://gateway.test/v1/fx?pair=EURUSD', { headers });
+}
+
+function batchRequest(symbols = ['SPCE.US'], clientId = CLIENT_ID, extra = {}) {
+  const headers = clientId === null
+    ? { 'Content-Type': 'application/json' }
+    : { 'Content-Type': 'application/json', [MARKET_GATEWAY_CLIENT_HEADER]: clientId };
+  return new Request('https://gateway.test/v1/quotes', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ symbols, ...extra }),
+  });
+}
+
+function researchQueueRequest(symbol = 'NVDA.US', clientId = CLIENT_ID) {
+  const headers = clientId === null
+    ? { 'Content-Type': 'application/json' }
+    : { 'Content-Type': 'application/json', [MARKET_GATEWAY_CLIENT_HEADER]: clientId };
+  return new Request('https://gateway.test/v1/research-queue', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ symbol }),
+  });
 }
 
 function jsonResponse(payload, status = 200) {
@@ -178,4 +201,261 @@ test('missing edge rate-limit bindings fail closed rather than silently disablin
   const response = await handleMarketGatewayEdgeRequest(quoteRequest(), { FINNHUB_TOKEN: 'server-secret' }, {}, { cache: memoryCache(), coreOptions: { fetchImpl: liveUsFetch() } });
   assert.equal(response.status, 503);
   assert.equal((await response.json()).error.code, 'EDGE_RATE_LIMITER_NOT_CONFIGURED');
+});
+
+
+test('research queue POST requires client rate limit but never upstream quota', async () => {
+  const clientCalls = [];
+  const upstreamCalls = [];
+  const kv = new Map();
+  const env = {
+    FINNHUB_TOKEN: 'server-secret',
+    MINBEIS_RESEARCH_QUEUE: {
+      async get(key) { return kv.get(key) || null; },
+      async put(key, value) { kv.set(key, value); },
+    },
+    MARKET_GATEWAY_CLIENT_RATE_LIMITER: limiter(true, clientCalls),
+    MARKET_GATEWAY_UPSTREAM_RATE_LIMITER: limiter(true, upstreamCalls),
+  };
+  const fetchImpl = async (url) => {
+    if (String(url).includes('/stock/profile2')) return jsonResponse({ ticker: 'NVDA', currency: 'USD', exchange: 'NASDAQ', country: 'US', name: 'NVIDIA Corp' });
+    if (String(url).includes('/quote')) return jsonResponse({ c: 120.5, pc: 119.5, o: 120, h: 122, l: 118, d: 1, dp: 0.8368, t: 1789052340 });
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const response = await handleMarketGatewayEdgeRequest(
+    researchQueueRequest(),
+    env,
+    {},
+    { coreOptions: { fetchImpl, now: '2026-09-10T15:00:00.000Z' } },
+  );
+  assert.equal(response.status, 202);
+  assert.deepEqual(clientCalls, [`client:${CLIENT_ID}`]);
+  assert.deepEqual(upstreamCalls, []);
+  const body = await response.json();
+  assert.equal(body.queueStatus, 'QUEUED');
+  assert.equal(body.privacy.clientIdentityStored, false);
+  const stored = JSON.parse(kv.get('research:NVDA.US'));
+  assert.equal(JSON.stringify(stored).includes(CLIENT_ID), false);
+});
+
+test('research queue POST without opaque client id fails before queue or provider work', async () => {
+  let queueCalls = 0;
+  let fetchCalls = 0;
+  const response = await handleMarketGatewayEdgeRequest(
+    researchQueueRequest('NVDA.US', null),
+    {
+      FINNHUB_TOKEN: 'server-secret',
+      MINBEIS_RESEARCH_QUEUE: {
+        async get() { queueCalls += 1; return null; },
+        async put() { queueCalls += 1; },
+      },
+      MARKET_GATEWAY_CLIENT_RATE_LIMITER: limiter(true, []),
+    },
+    {},
+    { coreOptions: { fetchImpl: async () => { fetchCalls += 1; throw new Error('must not run'); } } },
+  );
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'CLIENT_ID_REQUIRED');
+  assert.equal(queueCalls, 0);
+  assert.equal(fetchCalls, 0);
+});
+
+test('research queue POST is client-rate-limited before identity or storage work', async () => {
+  let queueCalls = 0;
+  let fetchCalls = 0;
+  const response = await handleMarketGatewayEdgeRequest(
+    researchQueueRequest(),
+    {
+      FINNHUB_TOKEN: 'server-secret',
+      MINBEIS_RESEARCH_QUEUE: {
+        async get() { queueCalls += 1; return null; },
+        async put() { queueCalls += 1; },
+      },
+      MARKET_GATEWAY_CLIENT_RATE_LIMITER: limiter(false, []),
+    },
+    {},
+    { coreOptions: { fetchImpl: async () => { fetchCalls += 1; throw new Error('must not run'); } } },
+  );
+  assert.equal(response.status, 429);
+  assert.equal((await response.json()).error.code, 'CLIENT_RATE_LIMITED');
+  assert.equal(queueCalls, 0);
+  assert.equal(fetchCalls, 0);
+});
+
+
+test('batch quote route charges client once while preserving per-resource upstream protection', async () => {
+  const clientCalls = [];
+  const upstreamCalls = [];
+  const fetchImpl = async (url, init = {}) => {
+    const value = String(url);
+    if (value.includes('finnhub.io')) {
+      assert.equal(init.headers?.['X-Finnhub-Token'], 'server-secret');
+      return jsonResponse({ c: 3.21, pc: 3.1, o: 3.12, h: 3.25, l: 3.05, d: 0.11, dp: 3.5484, t: 1789052340 });
+    }
+    if (value.includes('ecb.europa.eu')) {
+      return new Response('<?xml version="1.0"?><Cube><Cube time="2026-09-10"><Cube currency="USD" rate="1.1616"/></Cube></Cube>', { status: 200 });
+    }
+    throw new Error('Unexpected batch upstream URL: ' + value);
+  };
+  const response = await handleMarketGatewayEdgeRequest(
+    batchRequest(['SPCE.US']),
+    {
+      FINNHUB_TOKEN: 'server-secret',
+      MARKET_GATEWAY_CLIENT_RATE_LIMITER: limiter(true, clientCalls),
+      MARKET_GATEWAY_UPSTREAM_RATE_LIMITER: limiter(true, upstreamCalls),
+    },
+    {},
+    { coreOptions: { fetchImpl, now: '2026-09-10T15:00:00.000Z' } },
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.format, 'investor-control-market-gateway-batch');
+  assert.deepEqual(body.requestedSymbols, ['SPCE.US']);
+  assert.equal(body.quoteRegistry['SPCE.US'].currency, 'USD');
+  assert.equal(body.fxReference.rate, 1.1616);
+  assert.deepEqual(clientCalls, [`client:${CLIENT_ID}`]);
+  assert.deepEqual(upstreamCalls.sort(), ['upstream:FX', 'upstream:US'].sort());
+  assert.equal(body.privacy.portfolioQuantityRequired, false);
+  assert.equal(body.privacy.portfolioCostRequired, false);
+  assert.equal(body.privacy.pnlRequired, false);
+});
+
+test('batch resolves multiple dynamic Athens identities with one official directory fetch', async () => {
+  const clientCalls = [];
+  const upstreamCalls = [];
+  const fetchCalls = [];
+  const directoryHtml = `
+    <table><tbody>
+      <tr><td>QUEST HOLDINGS S.A.</td><td>GRS310003009</td><td><a href="/en/market-data/instruments/stocks/QUEST">QUEST</a></td><td>ATHEX</td><td>SHRS</td><td>MAIN MARKET</td><td>Stock</td><td>QUEST HOLDINGS</td></tr>
+      <tr><td>CENERGY HOLDINGS S.A.</td><td>BE0974303357</td><td><a href="/en/market-data/instruments/stocks/CENER">CENER</a></td><td>ATHEX</td><td>SHRS</td><td>MAIN MARKET</td><td>Stock</td><td>CENERGY HOLDINGS</td></tr>
+    </tbody></table>`;
+  const quoteHtml = `<html><body><div>Last Traded Price 7,25</div><div>Previous Close 7,10</div><div>Opening Price 7,15</div><div>Daily High Price 7,30</div><div>Daily Low Price 7,05</div><div>Total Volume 12.345</div></body></html>`;
+  const fetchImpl = async (url) => {
+    const value = String(url);
+    fetchCalls.push(value);
+    if (value.includes('/trading-products/trading-issuers')) {
+      return new Response(directoryHtml, { status: 200, headers: { 'Content-Type': 'text/html' } });
+    }
+    if (value.includes('/market-data/instruments/stocks/QUEST') || value.includes('/market-data/instruments/stocks/CENER')) {
+      return new Response(quoteHtml, { status: 200, headers: { 'Content-Type': 'text/html' } });
+    }
+    throw new Error('Unexpected Athens batch URL: ' + value);
+  };
+
+  const response = await handleMarketGatewayEdgeRequest(
+    batchRequest(['QUEST.GR', 'CENER.GR']),
+    {
+      MARKET_GATEWAY_CLIENT_RATE_LIMITER: limiter(true, clientCalls),
+      MARKET_GATEWAY_UPSTREAM_RATE_LIMITER: limiter(true, upstreamCalls),
+    },
+    {},
+    {
+      coreOptions: {
+        fetchImpl,
+        now: '2026-09-10T10:00:00.000Z',
+        identityNow: Date.parse('2026-09-10T10:00:00.000Z'),
+        athensIdentityCache: new Map(),
+        athensDiscoveryOptions: { tradingDirectoryFallbackLastPage: 0 },
+      },
+    },
+  );
+
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.quoteRegistry['QUEST.GR'].isin, 'GRS310003009');
+  assert.equal(body.quoteRegistry['CENER.GR'].isin, 'BE0974303357');
+  assert.equal(body.quoteRegistry['QUEST.GR'].quoteContract.identityVerified, true);
+  assert.equal(body.quoteRegistry['CENER.GR'].quoteContract.identityVerified, true);
+  assert.equal(fetchCalls.filter((url) => url.includes('/trading-products/trading-issuers')).length, 1);
+  assert.equal(fetchCalls.filter((url) => url.includes('/market-data/instruments/stocks/QUEST')).length, 1);
+  assert.equal(fetchCalls.filter((url) => url.includes('/market-data/instruments/stocks/CENER')).length, 1);
+  assert.deepEqual(clientCalls, [`client:${CLIENT_ID}`]);
+  assert.deepEqual(upstreamCalls.sort(), ['upstream:GR', 'upstream:GR', 'upstream:GR_IDENTITY'].sort());
+  assert.equal(body.errors.length, 0);
+});
+
+test('batch quote route rejects portfolio fields before provider work', async () => {
+  let limiterCalls = 0;
+  let providerCalls = 0;
+  const response = await handleMarketGatewayEdgeRequest(
+    batchRequest(['SPCE.US'], CLIENT_ID, { quantity: 10 }),
+    {
+      FINNHUB_TOKEN: 'server-secret',
+      MARKET_GATEWAY_CLIENT_RATE_LIMITER: { async limit() { limiterCalls += 1; return { success: true }; } },
+      MARKET_GATEWAY_UPSTREAM_RATE_LIMITER: { async limit() { limiterCalls += 1; return { success: true }; } },
+    },
+    {},
+    { coreOptions: { fetchImpl: async () => { providerCalls += 1; throw new Error('must not run'); } } },
+  );
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'BATCH_PRIVACY_CONTRACT_INVALID');
+  assert.equal(limiterCalls, 0);
+  assert.equal(providerCalls, 0);
+});
+
+test('batch quote route has a hard symbol-count ceiling', async () => {
+  const symbols = Array.from({ length: MARKET_GATEWAY_BATCH_MAX_SYMBOLS + 1 }, (_, index) => `S${index}.US`);
+  const response = await handleMarketGatewayEdgeRequest(
+    batchRequest(symbols),
+    {
+      MARKET_GATEWAY_CLIENT_RATE_LIMITER: limiter(true, []),
+      MARKET_GATEWAY_UPSTREAM_RATE_LIMITER: limiter(true, []),
+    },
+  );
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'BATCH_SYMBOL_LIMIT_EXCEEDED');
+});
+
+test('batch quote route requires opaque client identity', async () => {
+  const response = await handleMarketGatewayEdgeRequest(
+    batchRequest(['SPCE.US'], null),
+    {
+      MARKET_GATEWAY_CLIENT_RATE_LIMITER: limiter(true, []),
+      MARKET_GATEWAY_UPSTREAM_RATE_LIMITER: limiter(true, []),
+    },
+  );
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'CLIENT_ID_REQUIRED');
+});
+
+
+test('private account routes remain dark by default', async () => {
+  const response = await handleMarketGatewayEdgeRequest(
+    new Request('https://gateway.test/v1/account/alerts', {
+      headers: {
+        Authorization: 'Bearer valid-token-012345678901234567890',
+        [MARKET_GATEWAY_CLIENT_HEADER]: CLIENT_ID,
+      },
+    }),
+    {
+      MINBEIS_ACCOUNT_API_ENABLED: 'false',
+    },
+  );
+  assert.equal(response.status, 404);
+  assert.equal((await response.json()).error.code, 'ACCOUNT_API_DISABLED');
+});
+
+test('private account routes fail closed when enabled without account database', async () => {
+  const response = await handleMarketGatewayEdgeRequest(
+    new Request('https://gateway.test/v1/account/alerts', {
+      headers: {
+        Authorization: 'Bearer valid-token-012345678901234567890',
+        [MARKET_GATEWAY_CLIENT_HEADER]: CLIENT_ID,
+      },
+    }),
+    {
+      MINBEIS_ACCOUNT_API_ENABLED: 'true',
+      MINBEIS_TENANT_HMAC_SECRET: '0123456789abcdef0123456789abcdef0123456789abcdef',
+    },
+    {},
+    {
+      verifyIdentityToken: async () => ({
+        verified: true,
+        issuer: 'https://securetoken.google.com/minbeis-test',
+        subject: 'user-123456789',
+      }),
+    },
+  );
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error.code, 'ACCOUNTS_DATABASE_NOT_CONFIGURED');
 });

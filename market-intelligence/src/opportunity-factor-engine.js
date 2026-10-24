@@ -182,3 +182,65 @@ export function buildOpportunityFactorsForUniverse(records = [], options = {}) {
   }
   return output;
 }
+export function buildVerifiedOpportunityCapabilities(record = {}) {
+  const factors = record.opportunityFactors && typeof record.opportunityFactors === 'object'
+    ? record.opportunityFactors
+    : {};
+  const factorEntries = Object.entries(factors);
+  const factorsVerified = factorEntries.length > 0 && factorEntries.every(([, item]) =>
+    item
+    && typeof item === 'object'
+    && item.verified === true
+    && Number.isFinite(Number(item.score))
+    && Number.isFinite(Number(item.sourceCount))
+    && Number(item.sourceCount) >= 1
+  );
+
+  const sourceRole = 'FIRST_PARTY_DETERMINISTIC_RESEARCH';
+  const capabilities = {};
+
+  if (factorsVerified) {
+    capabilities.OPPORTUNITY_FACTORS = {
+      verified: true,
+      sourceRole,
+      policyVersion: OPPORTUNITY_FACTOR_ENGINE_VERSION,
+      factors,
+      peerNormalization: record.peerNormalization || null,
+    };
+  }
+
+  if (Number.isFinite(Number(record.evidenceQualityScore))) {
+    capabilities.EVIDENCE_QUALITY = {
+      verified: true,
+      sourceRole,
+      score: clamp(record.evidenceQualityScore),
+    };
+  }
+
+  if (Number.isFinite(Number(record.executionQualityScore))) {
+    capabilities.LIQUIDITY = {
+      verified: true,
+      sourceRole: 'LICENSED_MARKET_DATA',
+      score: clamp(record.executionQualityScore),
+    };
+  }
+
+  if (Number.isFinite(Number(record.contradictionCount))) {
+    capabilities.CONTRADICTIONS = {
+      verified: true,
+      sourceRole,
+      count: Math.max(0, Number(record.contradictionCount)),
+    };
+  }
+
+  if (Number.isFinite(Number(record.opportunityRiskScore))) {
+    capabilities.OPPORTUNITY_RISK = {
+      verified: true,
+      sourceRole,
+      score: clamp(record.opportunityRiskScore),
+      flags: Array.isArray(record.severeRiskFlags) ? [...new Set(record.severeRiskFlags.filter(Boolean))] : [],
+    };
+  }
+
+  return capabilities;
+}

@@ -1,25 +1,8 @@
 name: Investor Control v1836 V2 Chained Prospective Session Capture
 
 on:
-  push:
-    branches:
-      - investor-control-v1-market-intelligence-foundation
-    paths:
-      - '.github/workflows/run-v1836-prospective-holdout-v2-session-capture.yml'
-      - 'market-intelligence/scripts/run-prospective-holdout-v2-session-capture-v1836.js'
-      - 'market-intelligence/scripts/run-prospective-holdout-v2-first-capture-v1835.js'
-      - 'market-intelligence/src/forecast-prospective-holdout-protocol-v2.js'
-      - 'market-intelligence/src/forecast-prospective-target-builder.js'
-      - 'market-intelligence/src/forecast-prospective-training-corpus.js'
-      - 'market-intelligence/src/forecast-prospective-frozen-stack-bridge.js'
-      - 'market-intelligence/src/historical-research-validation-universe.js'
-      - 'market-intelligence/src/professional-market-data.js'
-      - 'market-intelligence/src/adapters/yahoo-chart.js'
-      - 'market-intelligence/test/research-prospective-v2-session-capture-v1836.test.js'
+  # TEMPORARY MINBEIS FREEZE 2026-10-24: automatic triggers paused; manual dispatch preserved.
   workflow_dispatch:
-  schedule:
-    - cron: '15 22 * * 1-5'
-
 permissions:
   contents: read
   actions: read

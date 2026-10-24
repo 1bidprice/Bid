@@ -1,6 +1,7 @@
 import { evaluateInstrumentIntegrity } from './instrument-integrity-gate.js';
+import { canonicalRiskAssessment } from './minbeis-risk-policy.js';
 
-export const FINAL_ACTION_POLICY_VERSION = '2026-08-20.1';
+export const FINAL_ACTION_POLICY_VERSION = '2026-10-05.1';
 
 export const FINAL_ACTIONS = Object.freeze({
   BUY_NOW: 'BUY_NOW',
@@ -10,22 +11,6 @@ export const FINAL_ACTIONS = Object.freeze({
   AVOID: 'AVOID',
   WATCH: 'WATCH',
 });
-
-const SEVERE_FUNDAMENTAL_FLAGS = new Set([
-  'CASH_RUNWAY_UNDER_ONE_YEAR',
-  'SEVERE_DILUTION',
-  'NON_POSITIVE_EQUITY',
-  'VERY_HIGH_LIABILITIES_TO_ASSETS',
-  'SEVERE_NEGATIVE_NET_MARGIN',
-  'BANK_CAPITAL_BELOW_REQUIREMENT',
-  'BANK_HIGH_STAGE3_LOANS',
-]);
-
-const SEVERE_MARKET_FLAGS = new Set([
-  'EXTREME_VOLATILITY',
-  'SEVERE_DRAWDOWN',
-  'LOW_LIQUIDITY',
-]);
 
 function finite(value) {
   if (value === null || value === undefined || value === '') return null;
@@ -217,11 +202,21 @@ function riskFlags(dossier) {
   const specializedBank = dossier?.metrics?.fundamentalRisk?.specializedAnalysis?.riskAssessment?.flags || [];
   const fundamental = unique([...genericFundamental, ...specializedBank]);
   const market = dossier?.metrics?.market?.risk?.flags || [];
+  const specializedBankRiskScore = dossier?.metrics?.fundamentalRisk?.specializedAnalysis?.type === 'BANK'
+    ? finite(dossier?.metrics?.fundamentalRisk?.specializedAnalysis?.riskAssessment?.score)
+    : null;
+  const riskScore = dossier?.metrics?.fundamentalRisk?.specializedAnalysis?.type === 'BANK'
+    ? specializedBankRiskScore
+    : finite(dossier?.metrics?.fundamentalRisk?.riskScore);
+  const canonical = canonicalRiskAssessment({
+    fundamentalFlags: fundamental,
+    marketFlags: market,
+    riskScore,
+  });
   return {
+    ...canonical,
     fundamental,
     market,
-    severeFundamental: fundamental.filter((flag) => SEVERE_FUNDAMENTAL_FLAGS.has(flag)),
-    severeMarket: market.filter((flag) => SEVERE_MARKET_FLAGS.has(flag)),
   };
 }
 
@@ -229,8 +224,8 @@ function buildControlledPlan(dossier, blockers, flags, quality, confidence, now)
   const fundamentalRiskReady = dossier?.metrics?.fundamentalRisk?.metricsReady === true;
   const marketRiskReady = dossier?.metrics?.market?.readiness?.marketMetricsReady === true;
   const verifiedElevatedRisk =
-    (fundamentalRiskReady && flags.severeFundamental.length > 0) ||
-    (marketRiskReady && flags.severeMarket.length > 0);
+    (fundamentalRiskReady || marketRiskReady) &&
+    flags.severe === true;
   const holderActionLabel = verifiedElevatedRisk
     ? 'ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ — ΕΠΑΝΕΞΕΤΑΣΗ ΚΙΝΔΥΝΟΥ'
     : 'ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ';
@@ -261,19 +256,14 @@ function determineActions(dossier, flags, confidence, now, options) {
   const proposed = dossier?.proposedAction || 'WATCH';
   const market = dossier?.metrics?.market || {};
   const fundamentalRisk = dossier?.metrics?.fundamentalRisk || {};
-  const specializedBankRiskScore = fundamentalRisk?.specializedAnalysis?.type === 'BANK'
-    ? finite(fundamentalRisk?.specializedAnalysis?.riskAssessment?.score)
-    : null;
-  const riskScore = fundamentalRisk?.specializedAnalysis?.type === 'BANK'
-    ? (specializedBankRiskScore ?? 100)
-    : (finite(fundamentalRisk?.riskScore) ?? 100);
+  const riskScore = flags.riskScore ?? 100;
   const liquidityScore = finite(market?.liquidity?.score) ?? 0;
   const relativeStrength = finite(market?.relativeStrength?.excessReturnPct);
   const distance50 = finite(market?.trend?.distanceFromSma50Pct);
   const distance200 = finite(market?.trend?.distanceFromSma200Pct);
   const priceAge = ageHours(now, dossier?.referencePrice?.timestamp);
   const immediateFresh = priceAge !== null && priceAge <= Number(options.immediatePriceAgeHours ?? 2);
-  const severeRisk = flags.severeFundamental.length > 0 || flags.severeMarket.length > 0 || riskScore >= 85;
+  const severeRisk = flags.severe === true;
   const weakTrend = (relativeStrength !== null && relativeStrength < -10) || (distance50 !== null && distance50 < -8);
   const positiveTrend = (relativeStrength ?? -999) > 0 && (distance50 ?? -999) > 0 && (distance200 === null || distance200 > -3);
   const adequateLiquidity = liquidityScore >= Number(options.minimumImmediateLiquidityScore ?? 65);
@@ -399,9 +389,14 @@ export function evaluateFinalAction(dossier, options = {}) {
       executionFreshnessEligible: dossier?.referencePrice?.executionFreshnessEligible === true,
     },
     risk: {
-      riskScore: finite(dossier?.metrics?.fundamentalRisk?.riskScore),
+      policyVersion: flags.policyVersion,
+      severity: flags.severity,
+      severe: flags.severe,
+      riskScore: flags.riskScore,
       fundamentalFlags: flags.fundamental,
       marketFlags: flags.market,
+      severeFundamentalFlags: flags.severeFundamental,
+      severeMarketFlags: flags.severeMarket,
     },
     controlledPlan,
     execution: {

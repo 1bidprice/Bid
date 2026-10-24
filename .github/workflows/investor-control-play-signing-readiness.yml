@@ -1,24 +1,8 @@
 name: Investor Control Play Signing Readiness
 
 on:
-  push:
-    branches: [investor-control-core-stabilization-v174]
-    paths:
-      - mobile/scripts/VerifyPlaySigning.java
-      - mobile/scripts/verify-play-upload-key.cjs
-      - mobile/scripts/test-play-signing.cjs
-      - .github/workflows/investor-control-play-signing-readiness.yml
-      - .github/workflows/verify-investor-control-play-aab.yml
-  pull_request:
-    branches: [investor-control-v1-market-intelligence-foundation]
-    paths:
-      - mobile/scripts/VerifyPlaySigning.java
-      - mobile/scripts/verify-play-upload-key.cjs
-      - mobile/scripts/test-play-signing.cjs
-      - .github/workflows/investor-control-play-signing-readiness.yml
-      - .github/workflows/verify-investor-control-play-aab.yml
+  # TEMPORARY MINBEIS FREEZE 2026-10-24: automatic triggers paused; manual dispatch preserved.
   workflow_dispatch:
-
 permissions:
   contents: read
 

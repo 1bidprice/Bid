@@ -47,7 +47,7 @@ test('blocked final action overrides a draft buy intent everywhere in the mobile
   const feed = buildMobileIntelligenceFeed({ generatedAt: NOW, researchDossiers: [dossier()], diagnostics: [] });
   const item = feed.reviewReady[0];
   assert.equal(item.action, 'WATCH');
-  assert.equal(item.actionLabel, 'Παρακολούθηση');
+  assert.equal(item.actionLabel, 'Παρακολούθηση στην έρευνα');
   assert.ok(item.blockers.includes('ACTIVE_LISTING_NOT_VERIFIED'));
   assert.ok(item.blockerLabels.includes('Δεν έχει επιβεβαιωθεί ότι η μετοχή διαπραγματεύεται ακόμη ενεργά'));
   assert.equal(item.nextStep, 'Επιβεβαίωση ότι η μετοχή διαπραγματεύεται ακόμη ενεργά');

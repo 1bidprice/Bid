@@ -30,7 +30,7 @@ for (const [needle, label] of [
   ['feed.waitingEntryOpportunities', 'waiting UI lane'],
   ['feed.rejectedOpportunities', 'rejected UI lane'],
   ['feed.blockedOpportunities', 'blocked UI lane'],
-  ['Καμία εντολή broker δεν εκτελείται αυτόματα.', 'manual execution disclosure'],
+  ['Καμία εντολή χρηματιστηριακής δεν εκτελείται αυτόματα.', 'manual execution disclosure'],
 ]) required(opportunities, needle, label);
 
 const start = store.indexOf('const FEED_FORMAT');

@@ -6,7 +6,7 @@ import { discoverAutonomousCandidates } from './autonomous-discovery.js';
 import { applyAutonomousPublicationPolicy, FINAL_ACTION_POLICY_VERSION } from './final-action-policy.js';
 import { buildOpportunitiesFeed } from './opportunities-feed.js';
 import { buildInstrumentProfile } from './instrument-profile.js';
-import { extractEquityOpportunityRawSignals, buildOpportunityFactorsForUniverse } from './opportunity-factor-engine.js';
+import { extractEquityOpportunityRawSignals, buildOpportunityFactorsForUniverse, buildVerifiedOpportunityCapabilities } from './opportunity-factor-engine.js';
 import { scanOpportunityUniverse } from './opportunity-universe-scanner.js';
 import { createNasdaqUsListedUniverseProvider } from './adapters/nasdaq-symbol-directory-universe.js';
 import { buildSecFramesBroadEquityScreen } from './adapters/sec-frames-broad-equity-screen.js';
@@ -36,6 +36,18 @@ import { selectBroadFundamentalCandidates } from './broad-equity-fundamental-sel
 import { screenBroadEquityMarketCandidates } from './broad-equity-market-screen.js';
 import { reconcileOpportunityPurchaseDecisions } from './opportunity-purchase-reconciliation.js';
 import { buildOperationalHealth } from './operational-health.js';
+import { buildMinbeisDecision } from './minbeis-decision-layer.js';
+import { createMinbeisDecisionOutcomeRecord, evaluateMinbeisDecisionOutcome, mergeMinbeisDecisionOutcomeLedger, summarizeMinbeisDecisionOutcomes } from './minbeis-decision-outcome-ledger.js';
+import { summarizeMinbeisDecisionLearningReviews } from './minbeis-decision-learning-review.js';
+import { buildMinbeisDecisionContextLearning } from './minbeis-decision-context-learning.js';
+import { evaluateMinbeisSimpleBaselineChallenger } from './minbeis-challenger-evaluation.js';
+import { appendMinbeisHistoricalEventArchive } from './minbeis-historical-event-archive.js';
+import { runMinbeisHistoricalEventReplay } from './minbeis-historical-replay-runner.js';
+import { buildMinbeisHistoricalEventLearning } from './minbeis-historical-event-learning.js';
+import { buildMinbeisLearningProposals, buildMinbeisProposalShadowObservations, mergeMinbeisLearningProposalArchive } from './minbeis-learning-proposal.js';
+import { evaluateMinbeisLearningPromotionGate } from './minbeis-learning-promotion-gate.js';
+import { buildMinbeisSimpleBaselineSnapshot, summarizeMinbeisBaselineComparison } from './minbeis-simple-baseline.js';
+import { resolveQueuedResearchUniverse } from './research-queue-onboarding.js';
 
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_UNIVERSE_PATH = path.resolve(MODULE_DIR, '../config/universe.seed.json');
@@ -80,7 +92,7 @@ function universeIdentityKeys(company = {}) {
   ].filter(Boolean);
 }
 
-function mergeUniverse(...groups) {
+export function mergeUniverse(...groups) {
   const records = [];
   const keyToIndex = new Map();
   for (const company of groups.flat().filter(Boolean)) {
@@ -98,6 +110,10 @@ function mergeUniverse(...groups) {
     for (const key of keys) keyToIndex.set(key, index);
   }
   return records;
+}
+
+export function buildFocusUniverse(seedUniverse = [], queuedResearchCompanies = []) {
+  return mergeUniverse(seedUniverse, queuedResearchCompanies);
 }
 
 function candidateByListing(items = []) {
@@ -126,6 +142,125 @@ function byCompanyId(items = []) {
   return new Map(items.filter((item) => item?.companyId).map((item) => [item.companyId, item]));
 }
 
+function compactDecisionJournalContext(dossier, purchase, decision, decisionAt) {
+  const finalAction = dossier?.finalAction || null;
+  const market = dossier?.metrics?.market || null;
+  const eventTypes = (items = []) => [...new Set((Array.isArray(items) ? items : [])
+    .map((item) => item?.eventType || item?.type || null)
+    .filter(Boolean)
+    .map((value) => String(value)))].sort();
+
+  return {
+    format: 'minbeis-decision-context-snapshot',
+    version: 1,
+    capturedAt: decisionAt,
+    scope: 'AUTONOMOUS_NON_HOLDER_RESEARCH',
+    decision: {
+      action: decision?.action || null,
+      allocationPct: Number.isFinite(Number(decision?.allocationPct)) ? Number(decision.allocationPct) : 0,
+      reason: decision?.reason || null,
+      confidenceScore: Number.isFinite(Number(decision?.confidenceScore)) ? Number(decision.confidenceScore) : null,
+      dataQualityScore: Number.isFinite(Number(decision?.dataQualityScore)) ? Number(decision.dataQualityScore) : null,
+      blockers: Array.isArray(decision?.blockers) ? [...decision.blockers] : [],
+    },
+    finalAction: finalAction ? {
+      status: finalAction.status || null,
+      policyVersion: finalAction.policyVersion || null,
+      marketAction: finalAction.marketAction || null,
+      holderAction: finalAction.holderAction || null,
+      nonHolderAction: finalAction.nonHolderAction || null,
+      confidenceScore: Number.isFinite(Number(finalAction.confidenceScore)) ? Number(finalAction.confidenceScore) : null,
+      dataQualityScore: Number.isFinite(Number(finalAction.dataQualityScore)) ? Number(finalAction.dataQualityScore) : null,
+      blockers: Array.isArray(finalAction.blockers) ? [...finalAction.blockers] : [],
+      generatedAt: finalAction.generatedAt || null,
+    } : null,
+    purchaseReconciliation: purchase ? {
+      status: purchase.status || null,
+      buyNowEligible: purchase.buyNowEligible === true,
+      opportunityScore: Number.isFinite(Number(purchase.opportunityScore)) ? Number(purchase.opportunityScore) : null,
+      blockers: Array.isArray(purchase.blockers) ? [...purchase.blockers] : [],
+    } : null,
+    research: {
+      dossierId: dossier?.dossierId || null,
+      companyId: dossier?.companyId || null,
+      decisionBasis: dossier?.decisionBasis || null,
+      category: dossier?.category || null,
+      timeHorizon: dossier?.timeHorizon || null,
+      proposedAction: dossier?.proposedAction || null,
+      catalystEventTypes: eventTypes(dossier?.catalysts),
+      riskEventTypes: eventTypes(dossier?.risks),
+      leadEventType: dossier?.metrics?.leadClaim?.eventType || null,
+      marketRegimeSnapshot: market?.marketRegimeSnapshot || market?.regime || null,
+      marketAsOf: market?.latestTimestamp ? new Date(Number(market.latestTimestamp) * 1000).toISOString() : null,
+    },
+  };
+}
+
+function createCurrentMinbeisOutcomeRecords(purchaseReconciliation, dossiers, historicalSeriesCollector, generatedAt) {
+  const purchases = Array.isArray(purchaseReconciliation?.decisions) ? purchaseReconciliation.decisions : [];
+  const purchaseByDossier = new Map(purchases.filter((item) => item?.dossierId).map((item) => [item.dossierId, item]));
+  const purchaseByCompany = new Map(purchases.filter((item) => item?.companyId || item?.instrumentId).map((item) => [item.companyId || item.instrumentId, item]));
+  const records = [];
+
+  for (const dossier of (Array.isArray(dossiers) ? dossiers : [])) {
+    if (dossier?.finalAction?.status !== 'FINAL') continue;
+    const purchase = (dossier?.dossierId && purchaseByDossier.get(dossier.dossierId))
+      || purchaseByCompany.get(dossier?.companyId)
+      || null;
+    const decision = buildMinbeisDecision({
+      finalAction: dossier.finalAction,
+      opportunityPurchase: purchase,
+      hasPosition: false,
+    });
+    const referencePrice = Number(dossier?.referencePrice?.value);
+    if (!Number.isFinite(referencePrice) || referencePrice <= 0) continue;
+    const decisionAt = finalActionDecisionTimestamp(dossier.finalAction, generatedAt);
+    const marketSeries = historicalSeriesCollector?.get(dossier.companyId) || null;
+    const simpleBaselineSnapshot = marketSeries?.usable && Array.isArray(marketSeries?.candles)
+      ? buildMinbeisSimpleBaselineSnapshot(marketSeries, decisionAt)
+      : null;
+    records.push(createMinbeisDecisionOutcomeRecord({
+      instrumentId: purchase?.instrumentId || purchase?.companyId || dossier.companyId,
+      companyId: purchase?.companyId || dossier.companyId || null,
+      symbol: purchase?.symbol || dossier?.listing?.symbol || dossier?.symbol || null,
+      action: decision.action,
+      allocationPct: decision.allocationPct,
+      decisionAt,
+      referencePrice,
+      currency: dossier?.referencePrice?.currency || dossier?.listing?.currency || null,
+      benchmarkSymbol: dossier?.metrics?.market?.benchmarkSymbol || null,
+      confidenceScore: decision.confidenceScore,
+      dataQualityScore: decision.dataQualityScore,
+      decisionReason: decision.reason,
+      sourcePolicyVersion: decision.sourcePolicyVersion,
+      sourceStatus: decision.sourceStatus,
+      contextSnapshot: compactDecisionJournalContext(dossier, purchase, decision, decisionAt),
+      simpleBaselineSnapshot,
+    }));
+  }
+  return records;
+}
+
+function finalActionDecisionTimestamp(finalAction, fallback) {
+  const value = finalAction?.generatedAt || fallback;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? new Date(fallback).toISOString() : date.toISOString();
+}
+
+function evaluateCurrentMinbeisOutcomeLedger(records, historicalSeriesCollector, benchmarkSeriesCollector, generatedAt) {
+  return mergeMinbeisDecisionOutcomeLedger([], records.map((record) => {
+    const marketSeries = historicalSeriesCollector.get(record.companyId) || null;
+    if (!marketSeries?.usable || !Array.isArray(marketSeries?.candles) || !marketSeries.candles.length) return record;
+    const benchmarkSeries = benchmarkSeriesCollector.get(record.companyId) || null;
+    return evaluateMinbeisDecisionOutcome(
+      record,
+      marketSeries.candles,
+      benchmarkSeries?.usable && Array.isArray(benchmarkSeries?.candles) ? benchmarkSeries.candles : [],
+      { evaluatedAt: generatedAt },
+    );
+  }));
+}
+
 function dossierMap(items = []) {
   const map = new Map();
   for (const item of items) {
@@ -136,6 +271,25 @@ function dossierMap(items = []) {
     if (!current || (nextReady && !currentReady)) map.set(item.companyId, item);
   }
   return map;
+}
+
+function buildHistoricalReplaySeriesCollector(canonicalCollector, longHistoryCollector) {
+  const output = new Map(canonicalCollector instanceof Map ? canonicalCollector : []);
+  if (!(longHistoryCollector instanceof Map)) return output;
+  for (const [companyId, record] of longHistoryCollector.entries()) {
+    if (
+      record?.status === 'RESEARCH_READY'
+      && record?.researchEligible === true
+      && record?.decisionEligible === false
+      && record?.executionEligible === false
+      && record?.series?.usable === true
+      && Array.isArray(record?.series?.candles)
+      && record.series.candles.length
+    ) {
+      output.set(companyId, record.series);
+    }
+  }
+  return output;
 }
 
 function opportunityDataQuality(fundamentals, marketMetrics, fundamentalRisk, dossier) {
@@ -219,6 +373,7 @@ function buildAnalysedOpportunitySeeds(expandedUniverse, baseReport, options = {
     executionQualityScore: record.executionQualityScore,
     contradictionCount: record.contradictionCount,
     severeRiskFlags: record.severeRiskFlags,
+    capabilities: buildVerifiedOpportunityCapabilities(record),
   }));
   return [...factorized, ...passthrough];
 }
@@ -335,10 +490,12 @@ function broadCandidatesToCompanies(broadOpportunityScan) {
 export async function runAutonomousIntelligence(options = {}) {
   const generatedAt = new Date(options.now || Date.now()).toISOString();
   const seedUniverse = options.universe || await loadSeedUniverse(options.universePath);
+  const queuedResearchCompanies = Array.isArray(options.queuedResearchCompanies) ? options.queuedResearchCompanies : [];
+  const focusUniverse = buildFocusUniverse(seedUniverse, queuedResearchCompanies);
   const secUserAgent = options.secUserAgent || process.env.SEC_USER_AGENT || '';
   let discovery;
   try {
-    discovery = await discoverAutonomousCandidates({ ...options, now: generatedAt, seedUniverse, secUserAgent });
+    discovery = await discoverAutonomousCandidates({ ...options, now: generatedAt, seedUniverse: focusUniverse, secUserAgent });
   } catch (error) {
     discovery = {
       format: 'investor-control-autonomous-discovery', version: 1, policyVersion: null, generatedAt, sourcePolicy: null,
@@ -349,7 +506,7 @@ export async function runAutonomousIntelligence(options = {}) {
 
   const broadOpportunityScan = await runBroadOpportunityScreen(options, generatedAt, secUserAgent);
   const broadCompanies = broadCandidatesToCompanies(broadOpportunityScan);
-  const expandedUniverse = mergeUniverse(seedUniverse, discovery.discoveredCompanies, broadCompanies);
+  const expandedUniverse = mergeUniverse(focusUniverse, discovery.discoveredCompanies, broadCompanies);
   const historicalSeriesCollector = new Map();
   const benchmarkSeriesCollector = new Map();
   const baseReport = await runDailyIntelligence({ ...options, now: generatedAt, universe: expandedUniverse, historicalSeriesCollector, benchmarkSeriesCollector, classificationSnapshots: discovery.classificationSnapshots || [] });
@@ -376,7 +533,7 @@ export async function runAutonomousIntelligence(options = {}) {
     immediatePriceAgeHours: options.immediatePriceAgeHours,
     minimumImmediateLiquidityScore: options.minimumImmediateLiquidityScore,
   });
-  const researchDossiers = annotateDiscovery(policyDossiers, discovery, broadOpportunityScan, seedUniverse);
+  const researchDossiers = annotateDiscovery(policyDossiers, discovery, broadOpportunityScan, focusUniverse);
   const opportunityPurchaseReconciliation = reconcileOpportunityPurchaseDecisions(opportunityUniverse, researchDossiers, {
     now: generatedAt,
     maxReferencePriceAgeHours: options.maxReferencePriceAgeHours,
@@ -385,12 +542,84 @@ export async function runAutonomousIntelligence(options = {}) {
     immediatePriceAgeHours: options.immediatePriceAgeHours,
     minimumImmediateLiquidityScore: options.minimumImmediateLiquidityScore,
   });
+  const minbeisHistoricalEventArchive = appendMinbeisHistoricalEventArchive(
+    options.minbeisHistoricalEventRecords || [],
+    researchDossiers,
+    generatedAt,
+  );
+  if (typeof options.minbeisHistoricalEventArchiveSink === 'function') {
+    await options.minbeisHistoricalEventArchiveSink(minbeisHistoricalEventArchive);
+  }
+  const currentMinbeisOutcomeRecords = createCurrentMinbeisOutcomeRecords(opportunityPurchaseReconciliation, researchDossiers, historicalSeriesCollector, generatedAt);
+  const mergedMinbeisOutcomeRecords = mergeMinbeisDecisionOutcomeLedger(options.minbeisDecisionOutcomeRecords || [], currentMinbeisOutcomeRecords);
+  const minbeisDecisionOutcomeRecords = evaluateCurrentMinbeisOutcomeLedger(mergedMinbeisOutcomeRecords, historicalSeriesCollector, benchmarkSeriesCollector, generatedAt);
+  const minbeisDecisionOutcomeSummary = summarizeMinbeisDecisionOutcomes(minbeisDecisionOutcomeRecords);
+  const minbeisDecisionLearningReview = summarizeMinbeisDecisionLearningReviews(minbeisDecisionOutcomeRecords, { horizon: '30' });
+  const minbeisDecisionContextLearning = buildMinbeisDecisionContextLearning(minbeisDecisionOutcomeRecords, { horizon: '30' });
+  const generatedMinbeisLearningProposals = buildMinbeisLearningProposals(minbeisDecisionContextLearning, { createdAt: generatedAt });
+  const minbeisLearningProposalBaseArchive = mergeMinbeisLearningProposalArchive(
+    options.minbeisLearningProposalRecords || [],
+    generatedMinbeisLearningProposals,
+  );
+  const minbeisLearningProposalEvaluations = minbeisLearningProposalBaseArchive.proposals.map((proposal) => {
+    const observations = buildMinbeisProposalShadowObservations(proposal, minbeisDecisionOutcomeRecords, { horizon: '30' });
+    const promotionGate = evaluateMinbeisLearningPromotionGate(proposal, observations, options.minbeisLearningPromotionOptions || {});
+    return {
+      proposalId: proposal.proposalId,
+      prospectiveObservationCount: observations.length,
+      promotionGate,
+    };
+  });
+  const minbeisLearningProposalArchive = {
+    ...minbeisLearningProposalBaseArchive,
+    evaluations: minbeisLearningProposalEvaluations,
+    promotionCandidateCount: minbeisLearningProposalEvaluations.filter((item) => item.promotionGate?.promotionCandidate === true).length,
+    shadowResearchOnlyCount: minbeisLearningProposalEvaluations.filter((item) => item.promotionGate?.promotionCandidate !== true).length,
+  };
+  if (typeof options.minbeisLearningProposalArchiveSink === 'function') {
+    await options.minbeisLearningProposalArchiveSink(minbeisLearningProposalArchive);
+  }
+  const minbeisChallengerEvaluation = evaluateMinbeisSimpleBaselineChallenger(minbeisDecisionOutcomeRecords, { horizon: '30' });
+  const minbeisSimpleBaselineComparison = summarizeMinbeisBaselineComparison(minbeisDecisionOutcomeRecords);
+  if (typeof options.minbeisDecisionOutcomeLedgerSink === 'function') {
+    await options.minbeisDecisionOutcomeLedgerSink({
+      format: 'investor-control-minbeis-decision-outcome-archive',
+      version: 2,
+      updatedAt: generatedAt,
+      records: minbeisDecisionOutcomeRecords,
+      summary: minbeisDecisionOutcomeSummary,
+      learningReview: minbeisDecisionLearningReview,
+      contextLearning: minbeisDecisionContextLearning,
+      challengerEvaluation: minbeisChallengerEvaluation,
+      simpleBaselineComparison: minbeisSimpleBaselineComparison,
+    });
+  }
   const longHistoryResearch = await collectLongHistoryResearch({
     universe: expandedUniverse,
     researchDossiers,
     historicalSeriesCollector,
     options: { ...options, generatedAt },
   });
+  const minbeisHistoricalReplaySeries = buildHistoricalReplaySeriesCollector(
+    historicalSeriesCollector,
+    longHistoryResearch.collector,
+  );
+  const minbeisHistoricalReplay = runMinbeisHistoricalEventReplay({
+    generatedAt,
+    eventArchive: minbeisHistoricalEventArchive,
+    historicalSeriesByCompany: minbeisHistoricalReplaySeries,
+    horizons: options.minbeisHistoricalReplayHorizons || [5, 21, 63],
+  });
+  const minbeisHistoricalEventLearning = buildMinbeisHistoricalEventLearning(
+    minbeisHistoricalReplay,
+    options.minbeisHistoricalEventLearningOptions || {},
+  );
+  if (typeof options.minbeisHistoricalReplaySink === 'function') {
+    await options.minbeisHistoricalReplaySink({
+      ...minbeisHistoricalReplay,
+      learning: minbeisHistoricalEventLearning,
+    });
+  }
   const shadowForecasts = buildShadowForecasts({
     generatedAt,
     universe: expandedUniverse,
@@ -520,17 +749,64 @@ const operationalHealth = buildOperationalHealth({
     policyVersion: FINAL_ACTION_POLICY_VERSION,
     universeExpansion: {
       seedCompanyCount: seedUniverse.length,
+      queuedResearchCompanyCount: queuedResearchCompanies.length,
+      focusCompanyCount: focusUniverse.length,
       eventDiscoveredCompanyCount: discovery.discoveredCompanies.length,
       broadScreenCompanyCount: broadCompanies.length,
       analysedCompanyCount: expandedUniverse.length,
       opportunityScannedInstrumentCount: opportunityUniverse.uniqueInstrumentCount,
       opportunityScorableInstrumentCount: opportunityUniverse.scorableInstrumentCount,
     },
+    researchQueueResolution: options.researchQueueResolution || {
+      format: 'minbeis-research-queue-resolution',
+      version: 1,
+      generatedAt,
+      requestedCount: 0,
+      resolvedCount: 0,
+      blockedCount: 0,
+      companies: [],
+      results: [],
+      diagnostics: [],
+      decisionImpact: 'FOCUS_UNIVERSE_ONLY',
+    },
     discovery,
     broadOpportunityScan,
     opportunityUniverse,
     opportunityDeepVerificationQueue,
     opportunityPurchaseReconciliation,
+    minbeisDecisionOutcomeSummary,
+    minbeisHistoricalEventArchiveSummary: {
+      updatedAt: minbeisHistoricalEventArchive.updatedAt,
+      recordCount: minbeisHistoricalEventArchive.recordCount,
+      replayEligibleCount: minbeisHistoricalEventArchive.replayEligibleCount,
+      blockedCount: minbeisHistoricalEventArchive.blockedCount,
+      newRecordCount: minbeisHistoricalEventArchive.newRecordCount,
+      observedAgainCount: minbeisHistoricalEventArchive.observedAgainCount,
+    },
+    minbeisHistoricalReplaySummary: {
+      generatedAt: minbeisHistoricalReplay.generatedAt,
+      eventArchiveRecordCount: minbeisHistoricalReplay.eventArchiveRecordCount,
+      replayAttemptCount: minbeisHistoricalReplay.replayAttemptCount,
+      replayReadyCount: minbeisHistoricalReplay.replayReadyCount,
+      blockedCount: minbeisHistoricalReplay.blockedCount,
+      horizons: minbeisHistoricalReplay.horizons,
+      lookAheadPolicy: minbeisHistoricalReplay.lookAheadPolicy,
+      futureOutcomeDecisionVisibility: minbeisHistoricalReplay.futureOutcomeDecisionVisibility,
+    },
+    minbeisHistoricalEventLearning,
+    minbeisDecisionLearningReview,
+    minbeisDecisionContextLearning,
+    minbeisLearningProposalSummary: {
+      updatedAt: minbeisLearningProposalArchive.updatedAt,
+      proposalCount: minbeisLearningProposalArchive.proposalCount,
+      newProposalCount: minbeisLearningProposalArchive.newProposalCount,
+      promotionCandidateCount: minbeisLearningProposalArchive.promotionCandidateCount,
+      shadowResearchOnlyCount: minbeisLearningProposalArchive.shadowResearchOnlyCount,
+      automaticApplicationAllowed: false,
+    },
+    minbeisChallengerEvaluation,
+    minbeisSimpleBaselineComparison,
+    minbeisDecisionOutcomeRecordCount: minbeisDecisionOutcomeRecords.length,
     researchDossiers,
     longHistoryResearchSummary: longHistoryResearch.summary,
     forecastOutcomeLedgerSummary: forecastOutcomeArchive.summary,
@@ -570,7 +846,50 @@ async function main() {
     ? path.resolve(process.cwd(), process.env.FORECAST_OUTCOME_LEDGER_PATH)
     : null;
   const ledgerOutputPath = path.resolve(process.cwd(), process.env.FORECAST_OUTCOME_LEDGER_OUTPUT || 'out/forecast-outcome-ledger.json');
+  const minbeisLedgerInputPath = process.env.MINBEIS_DECISION_OUTCOME_LEDGER_PATH
+    ? path.resolve(process.cwd(), process.env.MINBEIS_DECISION_OUTCOME_LEDGER_PATH)
+    : null;
+  const minbeisLedgerOutputPath = path.resolve(process.cwd(), process.env.MINBEIS_DECISION_OUTCOME_LEDGER_OUTPUT || 'out/minbeis-decision-outcome-ledger.json');
+  const minbeisHistoricalEventArchiveInputPath = process.env.MINBEIS_HISTORICAL_EVENT_ARCHIVE_PATH
+    ? path.resolve(process.cwd(), process.env.MINBEIS_HISTORICAL_EVENT_ARCHIVE_PATH)
+    : null;
+  const minbeisHistoricalEventArchiveOutputPath = path.resolve(process.cwd(), process.env.MINBEIS_HISTORICAL_EVENT_ARCHIVE_OUTPUT || 'out/minbeis-historical-event-archive.json');
+  const minbeisHistoricalReplayOutputPath = path.resolve(process.cwd(), process.env.MINBEIS_HISTORICAL_REPLAY_OUTPUT || 'out/minbeis-historical-replay.json');
+  const minbeisLearningProposalArchiveInputPath = process.env.MINBEIS_LEARNING_PROPOSAL_ARCHIVE_PATH
+    ? path.resolve(process.cwd(), process.env.MINBEIS_LEARNING_PROPOSAL_ARCHIVE_PATH)
+    : null;
+  const minbeisLearningProposalArchiveOutputPath = path.resolve(process.cwd(), process.env.MINBEIS_LEARNING_PROPOSAL_ARCHIVE_OUTPUT || 'out/minbeis-learning-proposal-archive.json');
+  const researchQueuePath = process.env.MINBEIS_RESEARCH_QUEUE_PATH
+    ? path.resolve(process.cwd(), process.env.MINBEIS_RESEARCH_QUEUE_PATH)
+    : null;
+  let researchQueueResolution = {
+    format: 'minbeis-research-queue-resolution',
+    version: 1,
+    generatedAt: new Date().toISOString(),
+    requestedCount: 0,
+    resolvedCount: 0,
+    blockedCount: 0,
+    companies: [],
+    results: [],
+    diagnostics: [],
+    decisionImpact: 'FOCUS_UNIVERSE_ONLY',
+  };
   let forecastOutcomeLedgerRecords = [];
+  let minbeisDecisionOutcomeRecords = [];
+  let minbeisHistoricalEventRecords = [];
+  let minbeisLearningProposalRecords = [];
+  if (researchQueuePath) {
+    try {
+      const queueInput = JSON.parse(await readFile(researchQueuePath, 'utf8'));
+      researchQueueResolution = await resolveQueuedResearchUniverse(queueInput, {
+        generatedAt: new Date().toISOString(),
+        secUserAgent: process.env.SEC_USER_AGENT || '',
+        fetchImpl: globalThis.fetch,
+      });
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+  }
   if (ledgerInputPath) {
     try {
       const existingArchive = JSON.parse(await readFile(ledgerInputPath, 'utf8'));
@@ -579,23 +898,74 @@ async function main() {
       if (error?.code !== 'ENOENT') throw error;
     }
   }
+  if (minbeisLedgerInputPath) {
+    try {
+      const existingMinbeisArchive = JSON.parse(await readFile(minbeisLedgerInputPath, 'utf8'));
+      minbeisDecisionOutcomeRecords = Array.isArray(existingMinbeisArchive?.records) ? existingMinbeisArchive.records : [];
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+  }
+  if (minbeisHistoricalEventArchiveInputPath) {
+    try {
+      const existingEventArchive = JSON.parse(await readFile(minbeisHistoricalEventArchiveInputPath, 'utf8'));
+      minbeisHistoricalEventRecords = Array.isArray(existingEventArchive?.records) ? existingEventArchive.records : [];
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+  }
+  if (minbeisLearningProposalArchiveInputPath) {
+    try {
+      const existingProposalArchive = JSON.parse(await readFile(minbeisLearningProposalArchiveInputPath, 'utf8'));
+      minbeisLearningProposalRecords = Array.isArray(existingProposalArchive?.proposals) ? existingProposalArchive.proposals : [];
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+  }
   let persistedForecastOutcomeArchive = null;
+  let persistedMinbeisDecisionOutcomeArchive = null;
+  let persistedMinbeisHistoricalEventArchive = null;
+  let persistedMinbeisHistoricalReplay = null;
+  let persistedMinbeisLearningProposalArchive = null;
   const report = await runAutonomousIntelligence({
+    queuedResearchCompanies: researchQueueResolution.companies || [],
+    researchQueueResolution,
     forecastOutcomeLedgerRecords,
     forecastOutcomeLedgerSink: (archive) => { persistedForecastOutcomeArchive = archive; },
+    minbeisDecisionOutcomeRecords,
+    minbeisDecisionOutcomeLedgerSink: (archive) => { persistedMinbeisDecisionOutcomeArchive = archive; },
+    minbeisHistoricalEventRecords,
+    minbeisHistoricalEventArchiveSink: (archive) => { persistedMinbeisHistoricalEventArchive = archive; },
+    minbeisHistoricalReplaySink: (replay) => { persistedMinbeisHistoricalReplay = replay; },
+    minbeisLearningProposalRecords,
+    minbeisLearningProposalArchiveSink: (archive) => { persistedMinbeisLearningProposalArchive = archive; },
   });
   if (!persistedForecastOutcomeArchive) throw new Error('Forecast outcome archive cycle did not produce a persistence payload');
+  if (!persistedMinbeisDecisionOutcomeArchive) throw new Error('MINBEIS decision outcome archive cycle did not produce a persistence payload');
+  if (!persistedMinbeisHistoricalEventArchive) throw new Error('MINBEIS historical event archive cycle did not produce a persistence payload');
+  if (!persistedMinbeisHistoricalReplay) throw new Error('MINBEIS historical replay cycle did not produce a persistence payload');
+  if (!persistedMinbeisLearningProposalArchive) throw new Error('MINBEIS learning proposal archive cycle did not produce a persistence payload');
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   await mkdir(path.dirname(ledgerOutputPath), { recursive: true });
   await writeFile(ledgerOutputPath, `${JSON.stringify(persistedForecastOutcomeArchive, null, 2)}\n`, 'utf8');
+  await mkdir(path.dirname(minbeisLedgerOutputPath), { recursive: true });
+  await writeFile(minbeisLedgerOutputPath, `${JSON.stringify(persistedMinbeisDecisionOutcomeArchive, null, 2)}\n`, 'utf8');
+  await mkdir(path.dirname(minbeisHistoricalEventArchiveOutputPath), { recursive: true });
+  await writeFile(minbeisHistoricalEventArchiveOutputPath, `${JSON.stringify(persistedMinbeisHistoricalEventArchive, null, 2)}\n`, 'utf8');
+  await mkdir(path.dirname(minbeisHistoricalReplayOutputPath), { recursive: true });
+  await writeFile(minbeisHistoricalReplayOutputPath, `${JSON.stringify(persistedMinbeisHistoricalReplay, null, 2)}\n`, 'utf8');
+  await mkdir(path.dirname(minbeisLearningProposalArchiveOutputPath), { recursive: true });
+  await writeFile(minbeisLearningProposalArchiveOutputPath, `${JSON.stringify(persistedMinbeisLearningProposalArchive, null, 2)}\n`, 'utf8');
   console.log(`Wrote autonomous intelligence report to ${outputPath}`);
+  console.log(`Research queue: ${report.researchQueueResolution?.resolvedCount || 0}/${report.researchQueueResolution?.requestedCount || 0} queued symbols resolved into focus universe`);
   console.log(`Event discovery: ${report.discovery.candidateCount} candidates, ${report.discovery.deepAnalysisCompanyCount} additions`);
   console.log(`Broad opportunity screen: ${report.broadOpportunityScan.directoryEligibleCount || 0} eligible, ${report.broadOpportunityScan.candidates?.length || 0} deep-analysis additions`);
   console.log(`Opportunity hunter: ${report.opportunityUniverse.uniqueInstrumentCount} scanned, ${report.opportunityUniverse.scorableInstrumentCount} scorable, ${report.opportunityUniverse.ranking.superOpportunityCount} super candidates`);
   console.log(`Deep verification queue: ${report.opportunityDeepVerificationQueue.length}`);
   console.log(`Final actions: ${JSON.stringify(report.finalActionCounts)}`);
   console.log(`Automatically published dossiers: ${report.autonomousPublicationCount}`);
+  console.log(`MINBEIS decision outcomes: ${report.minbeisDecisionOutcomeRecordCount || 0} tracked records`);
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(path.resolve(process.argv[1])).href : '';

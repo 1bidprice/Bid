@@ -21,6 +21,23 @@ function jsonResponse(payload, status = 200) {
 
 const ECB_XML = `<?xml version="1.0" encoding="UTF-8"?><gesmes:Envelope><Cube><Cube time="2026-09-10"><Cube currency="USD" rate="1.1616"/><Cube currency="JPY" rate="179.09"/></Cube></Cube></gesmes:Envelope>`;
 
+const ATHENS_DIRECTORY_HTML = `
+<table>
+  <thead><tr><th>Issuer</th><th>ISIN Code</th><th>OASIS Code</th><th>Market</th><th>MIFID</th><th>Market Segment</th><th>Product</th><th>Product Name</th></tr></thead>
+  <tbody>
+    <tr><td>QUEST HOLDINGS S.A.</td><td>GRS310003009</td><td><a href="/en/market-data/instruments/stocks/QUEST">QUEST</a></td><td>ATHEX</td><td>SHRS</td><td>MAIN MARKET</td><td>Stock</td><td>QUEST HOLDINGS</td></tr>
+  </tbody>
+</table>`;
+
+const ATHENS_QUEST_QUOTE_HTML = `<html><body>
+  <div>Last Traded Price 7,25</div>
+  <div>Previous Close 7,10</div>
+  <div>Opening Price 7,15</div>
+  <div>Daily High Price 7,30</div>
+  <div>Daily Low Price 7,05</div>
+  <div>Total Volume 12.345</div>
+</body></html>`;
+
 test('gateway parses canonical app symbols and rejects ambiguous raw tickers', () => {
   assert.deepEqual(parseGatewaySymbol('spce.us'), { symbol: 'SPCE', market: 'US', appSymbol: 'SPCE.US' });
   assert.deepEqual(parseGatewaySymbol('brk.b.us'), { symbol: 'BRK.B', market: 'US', appSymbol: 'BRK.B.US' });
@@ -100,14 +117,56 @@ test('Athens quote stays official delayed analysis-only and retains EUR', async 
   assert.equal(body.quote.quoteContract.decisionEligible, false);
 });
 
-test('unknown Athens symbol is rejected before any external request', async () => {
-  let called = false;
-  const response = await handleMarketGatewayRequest(request('UNKNOWN.GR'), {}, { fetchImpl: async () => { called = true; throw new Error('should not run'); }, now: '2026-09-10T10:00:00.000Z' });
-  assert.equal(response.status, 400);
+test('unknown Athens symbol performs official identity lookup but never requests a quote without an exact stock identity', async () => {
+  const calls = [];
+  const response = await handleMarketGatewayRequest(request('UNKNOWN.GR'), {}, {
+    fetchImpl: async (url) => {
+      calls.push(String(url));
+      if (String(url).includes('/trading-products/trading-issuers')) {
+        return new Response(ATHENS_DIRECTORY_HTML, { status: 200, headers: { 'Content-Type': 'text/html' } });
+      }
+      throw new Error('quote endpoint must not run for unresolved Athens identity');
+    },
+    now: '2026-09-10T10:00:00.000Z',
+    athensDiscoveryOptions: { tradingDirectoryFallbackLastPage: 0 },
+  });
+  assert.equal(response.status, 409);
   const body = await response.json();
-  assert.equal(body.error.code, 'ATHENS_SYMBOL_NOT_ALLOWED');
-  assert.deepEqual(body.error.details.allowedSymbols, ['ALWN.GR', 'CREDIA.GR']);
-  assert.equal(called, false);
+  assert.equal(body.error.code, 'ATHENS_IDENTITY_NOT_VERIFIED');
+  assert.equal(calls.length, 1);
+  assert.match(calls[0], /trading-products\/trading-issuers/);
+  assert.equal(calls.some((url) => url.includes('/instruments/stocks/UNKNOWN')), false);
+});
+
+test('dynamic Athens stock is identity-verified from the official trading directory before quote use', async () => {
+  const calls = [];
+  const response = await handleMarketGatewayRequest(request('QUEST.GR'), {}, {
+    fetchImpl: async (url) => {
+      const value = String(url);
+      calls.push(value);
+      if (value.includes('/trading-products/trading-issuers')) {
+        return new Response(ATHENS_DIRECTORY_HTML, { status: 200, headers: { 'Content-Type': 'text/html' } });
+      }
+      if (value.includes('/market-data/instruments/stocks/QUEST')) {
+        return new Response(ATHENS_QUEST_QUOTE_HTML, { status: 200, headers: { 'Content-Type': 'text/html' } });
+      }
+      throw new Error('Unexpected URL: ' + value);
+    },
+    now: '2026-09-10T10:00:00.000Z',
+    athensDiscoveryOptions: { tradingDirectoryFallbackLastPage: 0 },
+    athensIdentityCache: new Map(),
+    identityNow: Date.parse('2026-09-10T10:00:00.000Z'),
+  });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.requestedSymbol, 'QUEST.GR');
+  assert.equal(body.quote.appSymbol, 'QUEST.GR');
+  assert.equal(body.quote.currency, 'EUR');
+  assert.equal(body.quote.isin, 'GRS310003009');
+  assert.equal(body.quote.identitySource, 'EURONEXT_ATHENS_TRADING_ISSUERS');
+  assert.equal(body.quote.quoteContract.identityVerified, true);
+  assert.equal(body.quote.quoteContract.sourceRole, 'PRIMARY_EXCHANGE');
+  assert.equal(calls.filter((url) => url.includes('/trading-products/trading-issuers')).length, 1);
 });
 
 test('ECB XML parser verifies both reference date and USD-per-EUR rate', () => {
@@ -159,4 +218,256 @@ test('health reports provider configuration without exposing secret value', asyn
   assert.equal(body.providers.athens, 'official_delayed_15m');
   assert.equal(body.providers.fx, 'ecb_official_daily_reference');
   assert.equal(JSON.stringify(body).includes('secret-value'), false);
+});
+
+
+test('dynamic US instrument capability verifies identity without pretending full MINBEIS coverage', async () => {
+  const secret = 'server-only-finnhub-secret';
+  const fetchImpl = async (url, init = {}) => {
+    assert.equal(init.headers?.['X-Finnhub-Token'], secret);
+    if (String(url).includes('/stock/profile2')) return jsonResponse({ ticker: 'NVDA', currency: 'USD', exchange: 'NASDAQ', country: 'US', name: 'NVIDIA Corp' });
+    if (String(url).includes('/quote')) return jsonResponse({ c: 120.5, pc: 119.5, o: 120, h: 122, l: 118, d: 1, dp: 0.8368, t: Math.floor(Date.parse('2026-09-10T14:59:00.000Z') / 1000) });
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const response = await handleMarketGatewayRequest(new Request('https://gateway.test/v1/instrument?symbol=NVDA.US'), { FINNHUB_TOKEN: secret }, { fetchImpl, now: '2026-09-10T15:00:00.000Z' });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.format, 'investor-control-instrument-capability');
+  assert.equal(body.requestedSymbol, 'NVDA.US');
+  assert.equal(body.identityVerified, true);
+  assert.equal(body.quoteSupported, true);
+  assert.equal(body.analysisSupported, false);
+  assert.equal(body.onboardingStatus, 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED');
+  assert.equal(body.privacy.portfolioQuantityRequired, false);
+  assert.equal(body.privacy.portfolioCostRequired, false);
+  assert.equal(body.privacy.pnlRequired, false);
+});
+
+test('canonical focus instrument reports READY for full MINBEIS coverage', async () => {
+  const fetchImpl = async (url) => {
+    if (String(url).includes('/quote')) return jsonResponse({ c: 3.21, pc: 3.10, o: 3.12, h: 3.25, l: 3.05, d: 0.11, dp: 3.5484, t: Math.floor(Date.parse('2026-09-10T14:59:00.000Z') / 1000) });
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const response = await handleMarketGatewayRequest(new Request('https://gateway.test/v1/instrument?symbol=SPCE.US'), { FINNHUB_TOKEN: 'secret' }, { fetchImpl, now: '2026-09-10T15:00:00.000Z' });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.analysisSupported, true);
+  assert.equal(body.onboardingStatus, 'READY');
+  assert.equal(body.canonicalCompanyId, 'company:virgin-galactic-holdings');
+});
+
+test('unresolved Athens instrument capability stays fail-closed after official directory lookup', async () => {
+  const response = await handleMarketGatewayRequest(
+    new Request('https://gateway.test/v1/instrument?symbol=UNKNOWN.GR'),
+    {},
+    {
+      fetchImpl: async (url) => {
+        if (String(url).includes('/trading-products/trading-issuers')) {
+          return new Response(ATHENS_DIRECTORY_HTML, { status: 200, headers: { 'Content-Type': 'text/html' } });
+        }
+        throw new Error('quote endpoint must not run');
+      },
+      now: '2026-09-10T10:00:00.000Z',
+      athensDiscoveryOptions: { tradingDirectoryFallbackLastPage: 0 },
+      athensIdentityCache: new Map(),
+    },
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.identityVerified, false);
+  assert.equal(body.quoteSupported, false);
+  assert.equal(body.analysisSupported, false);
+  assert.equal(body.onboardingStatus, 'IDENTITY_NOT_VERIFIED');
+});
+
+test('dynamic Athens capability keeps official identity when the quote page is temporarily unavailable', async () => {
+  const response = await handleMarketGatewayRequest(
+    new Request('https://gateway.test/v1/instrument?symbol=QUEST.GR'),
+    {},
+    {
+      fetchImpl: async (url) => {
+        const value = String(url);
+        if (value.includes('/trading-products/trading-issuers')) {
+          return new Response(ATHENS_DIRECTORY_HTML, { status: 200, headers: { 'Content-Type': 'text/html' } });
+        }
+        if (value.includes('/market-data/instruments/stocks/QUEST')) {
+          return new Response('temporary upstream issue', { status: 503 });
+        }
+        throw new Error('Unexpected URL: ' + value);
+      },
+      now: '2026-09-10T10:00:00.000Z',
+      identityNow: Date.parse('2026-09-10T10:00:00.000Z'),
+      athensIdentityCache: new Map(),
+      athensDiscoveryOptions: { tradingDirectoryFallbackLastPage: 0 },
+    },
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.identityVerified, true);
+  assert.equal(body.quoteSupported, false);
+  assert.equal(body.analysisSupported, false);
+  assert.equal(body.onboardingStatus, 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED');
+  assert.equal(body.canonicalCompanyId, 'company:xath:isin:GRS310003009');
+  assert.equal(body.currency, 'EUR');
+});
+
+test('dynamic Athens capability verifies identity but requires MINBEIS research onboarding', async () => {
+  const response = await handleMarketGatewayRequest(
+    new Request('https://gateway.test/v1/instrument?symbol=QUEST.GR'),
+    {},
+    {
+      fetchImpl: async (url) => {
+        const value = String(url);
+        if (value.includes('/trading-products/trading-issuers')) {
+          return new Response(ATHENS_DIRECTORY_HTML, { status: 200, headers: { 'Content-Type': 'text/html' } });
+        }
+        if (value.includes('/market-data/instruments/stocks/QUEST')) {
+          return new Response(ATHENS_QUEST_QUOTE_HTML, { status: 200, headers: { 'Content-Type': 'text/html' } });
+        }
+        throw new Error('Unexpected URL: ' + value);
+      },
+      now: '2026-09-10T10:00:00.000Z',
+      athensDiscoveryOptions: { tradingDirectoryFallbackLastPage: 0 },
+      identityNow: Date.parse('2026-09-10T10:00:00.000Z'),
+    },
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.identityVerified, true);
+  assert.equal(body.quoteSupported, true);
+  assert.equal(body.analysisSupported, false);
+  assert.equal(body.onboardingStatus, 'IDENTITY_VERIFIED_ANALYSIS_ONBOARDING_REQUIRED');
+  assert.equal(body.canonicalCompanyId, 'company:xath:isin:GRS310003009');
+  assert.equal(body.currency, 'EUR');
+});
+
+
+function fakeKv() {
+  const map = new Map();
+  return {
+    async get(key) { return map.has(key) ? map.get(key) : null; },
+    async put(key, value) { map.set(key, value); },
+    map,
+  };
+}
+
+test('completed dynamic enrollment reports READY through the gateway capability contract', async () => {
+  const kv = fakeKv();
+  await kv.put('research:NVDA.US', JSON.stringify({
+    format: 'minbeis-research-queue-record',
+    version: 1,
+    symbol: 'NVDA.US',
+    market: 'US',
+    canonicalCompanyId: 'company:sec:0001045810',
+    displayName: 'NVIDIA CORP',
+    currency: 'USD',
+    status: 'COMPLETED',
+    firstRequestedAt: '2026-09-10T12:00:00.000Z',
+    lastRequestedAt: '2026-09-10T13:00:00.000Z',
+    privacy: {
+      storesSymbolOnly: true,
+      storesPortfolioData: false,
+      storesClientIdentity: false,
+    },
+  }));
+  const fetchImpl = async (url) => {
+    if (String(url).includes('/stock/profile2')) return jsonResponse({ ticker: 'NVDA', currency: 'USD', exchange: 'NASDAQ', country: 'US', name: 'NVIDIA Corp' });
+    if (String(url).includes('/quote')) return jsonResponse({ c: 120.5, pc: 119.5, o: 120, h: 122, l: 118, d: 1, dp: 0.8368, t: Math.floor(Date.parse('2026-09-10T14:59:00.000Z') / 1000) });
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const response = await handleMarketGatewayRequest(
+    new Request('https://gateway.test/v1/instrument?symbol=NVDA.US'),
+    { FINNHUB_TOKEN: 'secret', MINBEIS_RESEARCH_QUEUE: kv },
+    { fetchImpl, now: '2026-09-10T15:00:00.000Z' },
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.identityVerified, true);
+  assert.equal(body.analysisSupported, true);
+  assert.equal(body.onboardingStatus, 'READY');
+  assert.equal(body.researchEnrollmentStatus, 'COMPLETED');
+  assert.equal(body.canonicalCompanyId, 'company:sec:0001045810');
+});
+
+test('verified new US instrument enters research queue only with persistent storage', async () => {
+  const kv = fakeKv();
+  const fetchImpl = async (url) => {
+    if (String(url).includes('/stock/profile2')) return jsonResponse({ ticker: 'NVDA', currency: 'USD', exchange: 'NASDAQ', country: 'US', name: 'NVIDIA Corp' });
+    if (String(url).includes('/quote')) return jsonResponse({ c: 120.5, pc: 119.5, o: 120, h: 122, l: 118, d: 1, dp: 0.8368, t: Math.floor(Date.parse('2026-09-10T14:59:00.000Z') / 1000) });
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const request = new Request('https://gateway.test/v1/research-queue', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ symbol: 'NVDA.US' }),
+  });
+  const response = await handleMarketGatewayRequest(
+    request,
+    { FINNHUB_TOKEN: 'secret', MINBEIS_RESEARCH_QUEUE: kv },
+    { fetchImpl, now: '2026-09-10T15:00:00.000Z' },
+  );
+  assert.equal(response.status, 202);
+  const body = await response.json();
+  assert.equal(body.requestedSymbol, 'NVDA.US');
+  assert.equal(body.queueStatus, 'QUEUED');
+  assert.equal(body.privacy.portfolioDataStored, false);
+  assert.equal(body.privacy.clientIdentityStored, false);
+  const stored = JSON.parse(await kv.get('research:NVDA.US'));
+  assert.deepEqual(Object.keys(stored.privacy).sort(), ['storesClientIdentity', 'storesPortfolioData', 'storesSymbolOnly']);
+  assert.equal(stored.privacy.storesPortfolioData, false);
+  assert.equal(stored.privacy.storesClientIdentity, false);
+});
+
+test('research queue fails closed when persistent storage is missing', async () => {
+  const fetchImpl = async (url) => {
+    if (String(url).includes('/stock/profile2')) return jsonResponse({ ticker: 'NVDA', currency: 'USD', exchange: 'NASDAQ', country: 'US', name: 'NVIDIA Corp' });
+    if (String(url).includes('/quote')) return jsonResponse({ c: 120.5, pc: 119.5, o: 120, h: 122, l: 118, d: 1, dp: 0.8368, t: Math.floor(Date.parse('2026-09-10T14:59:00.000Z') / 1000) });
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const response = await handleMarketGatewayRequest(
+    new Request('https://gateway.test/v1/research-queue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol: 'NVDA.US' }),
+    }),
+    { FINNHUB_TOKEN: 'secret' },
+    { fetchImpl, now: '2026-09-10T15:00:00.000Z' },
+  );
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error.code, 'RESEARCH_QUEUE_NOT_CONFIGURED');
+});
+
+test('research queue rejects portfolio fields and accepts symbol only', async () => {
+  const response = await handleMarketGatewayRequest(
+    new Request('https://gateway.test/v1/research-queue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol: 'NVDA.US', quantity: 10, cost: 1000 }),
+    }),
+    { FINNHUB_TOKEN: 'secret', MINBEIS_RESEARCH_QUEUE: fakeKv() },
+    { fetchImpl: async () => { throw new Error('provider must not run'); } },
+  );
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'RESEARCH_QUEUE_PRIVACY_CONTRACT_INVALID');
+});
+
+test('already canonical MINBEIS instrument does not consume research queue storage', async () => {
+  const kv = fakeKv();
+  const fetchImpl = async (url) => {
+    if (String(url).includes('/quote')) return jsonResponse({ c: 3.21, pc: 3.10, o: 3.12, h: 3.25, l: 3.05, d: 0.11, dp: 3.5484, t: Math.floor(Date.parse('2026-09-10T14:59:00.000Z') / 1000) });
+    throw new Error('Unexpected URL: ' + url);
+  };
+  const response = await handleMarketGatewayRequest(
+    new Request('https://gateway.test/v1/research-queue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol: 'SPCE.US' }),
+    }),
+    { FINNHUB_TOKEN: 'secret', MINBEIS_RESEARCH_QUEUE: kv },
+    { fetchImpl, now: '2026-09-10T15:00:00.000Z' },
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.queueStatus, 'ALREADY_SUPPORTED');
+  assert.equal(kv.map.size, 0);
 });

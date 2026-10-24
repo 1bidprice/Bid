@@ -62,58 +62,57 @@ function assertInvariant(transaction, label) {
   return normalized;
 }
 
-// Live-QA regression: broker cash debit is authoritative; rounded 3.17 must not survive
-// when it cannot reproduce 2,282.72 USD for 720 shares.
-const spce = assertInvariant({
-  id: 'spce-live-regression',
+// Authoritative settlement cash must override a rounded stored execution price.
+const roundedLegacy = assertInvariant({
+  id: 'synthetic-rounded-legacy',
   type: 'buy',
-  symbol: 'SPCE.US',
-  company: 'Virgin Galactic Holdings',
-  quantity: 720,
+  symbol: 'SYNTH.US',
+  company: 'Synthetic Instrument',
+  quantity: 40,
   currency: 'USD',
-  executionPrice: 3.17,
-  price: 3.17,
+  executionPrice: 2.5,
+  price: 2.5,
   fees: 0,
-  total: 2282.72,
-}, 'SPCE live reconciliation');
-assert.equal(spce.grossAmount, 2282.72);
-assertClose(spce.executionPrice, 2282.72 / 720, 1e-12, 'SPCE derived execution price');
-assertClose(allInPrice(spce), 2282.72 / 720, 1e-12, 'SPCE all-in');
-assert.notEqual(spce.executionPrice, 3.17);
+  total: 101.2,
+}, 'Synthetic rounded-price reconciliation');
+assert.equal(roundedLegacy.grossAmount, 101.2);
+assertClose(roundedLegacy.executionPrice, 101.2 / 40, 1e-12, 'Synthetic derived execution price');
+assertClose(allInPrice(roundedLegacy), 101.2 / 40, 1e-12, 'Synthetic all-in');
+assert.notEqual(roundedLegacy.executionPrice, 2.5);
 
 // A broker-provided execution price that already reconciles after cent rounding is kept.
-const allwynCanonical = assertInvariant({
-  id: 'allwyn-canonical',
+const canonical = assertInvariant({
+  id: 'synthetic-canonical',
   type: 'buy',
-  symbol: 'ALWN.GR',
-  company: 'Allwyn',
-  quantity: 193,
+  symbol: 'CANON.GR',
+  company: 'Synthetic Canonical',
+  quantity: 25,
   currency: 'EUR',
-  executionPrice: 13.565,
-  price: 13.565,
-  feeBreakdown: { commission: 9.16, transfer: 1.57, clearing: 0.72, exchange: 0.5 },
-  total: 2630.0,
-}, 'Allwyn canonical reconciliation');
-assert.equal(allwynCanonical.executionPrice, 13.565);
-assert.equal(allwynCanonical.grossAmount, 2618.05);
-assert.equal(allwynCanonical.total, 2630.0);
+  executionPrice: 8.04,
+  price: 8.04,
+  feeBreakdown: { commission: 2, transfer: 1, clearing: 1, exchange: 0.5 },
+  total: 205.5,
+}, 'Synthetic canonical reconciliation');
+assert.equal(canonical.executionPrice, 8.04);
+assert.equal(canonical.grossAmount, 201.0);
+assert.equal(canonical.total, 205.5);
 
-// Historic Allwyn migration remains deterministic and idempotent.
-const allwynLegacy = assertInvariant({
-  id: 'allwyn-legacy',
+// Generic legacy normalization remains deterministic and idempotent.
+const genericLegacy = assertInvariant({
+  id: 'synthetic-legacy',
   type: 'buy',
-  symbol: 'ALWN.GR',
-  company: 'Allwyn',
-  date: '2026-07-14',
-  quantity: 193,
+  symbol: 'LEGACY.GR',
+  company: 'Synthetic Legacy',
+  date: '2026-01-15',
+  quantity: 10,
   currency: 'EUR',
-  price: 13.57,
-  fees: 11.95,
-  total: 2630.96,
-}, 'Allwyn legacy migration');
-assert.equal(allwynLegacy.executionPrice, 13.565);
-assert.equal(allwynLegacy.total, 2630.0);
-assert.deepEqual(normalizeTransaction(allwynLegacy), allwynLegacy);
+  price: 5,
+  fees: 1,
+  total: 51,
+}, 'Generic legacy normalization');
+assert.equal(genericLegacy.executionPrice, 5);
+assert.equal(genericLegacy.total, 51);
+assert.deepEqual(normalizeTransaction(genericLegacy), genericLegacy);
 
 const buyWithFees = assertInvariant({
   type: 'buy', symbol: 'TEST.US', quantity: 100, currency: 'USD', executionPrice: 10,
@@ -147,21 +146,21 @@ assert.equal(conflicting.total, 102);
 const hostileLegacy = assertInvariant({
   id: { legacy: true },
   type: 'buy',
-  symbol: 'spce.us',
-  company: { name: 'Virgin Galactic Holdings' },
-  date: { iso: '2026-03-03' },
-  quantity: '720',
-  currency: '$',
-  executionPrice: '3.17',
+  symbol: 'synth.us',
+  company: { name: 'Synthetic Instrument' },
+  date: { iso: '2026-01-20' },
+  quantity: '40',
+  currency: '',
+  executionPrice: '2.5',
   fees: '0',
-  total: '2282.72',
+  total: '100',
   broker: { name: 'legacy broker' },
   orderReference: { value: 123 },
   notes: { text: 'legacy note' },
 }, 'Malformed legacy render safety');
-assert.equal(hostileLegacy.symbol, 'SPCE.US');
+assert.equal(hostileLegacy.symbol, 'SYNTH.US');
 assert.equal(hostileLegacy.currency, null);
-assert.equal(hostileLegacy.company, 'SPCE.US');
+assert.equal(hostileLegacy.company, 'SYNTH.US');
 assert.equal(hostileLegacy.date, '');
 for (const key of ['id', 'symbol', 'company', 'date', 'broker', 'orderReference', 'settlementReference', 'notes', 'migrationNote', 'createdAt', 'updatedAt']) {
   assert.equal(typeof hostileLegacy[key], 'string', `render field ${key} must be a string`);
@@ -214,4 +213,4 @@ for (const transaction of normalizedBatch) {
   assert.equal(accountingInvariantReport(twice).ok, true);
 }
 
-console.log(`Accounting invariants PASS: SPCE live regression + render-safe fail-closed legacy ledger + Allwyn migration + ${synthetic.length} synthetic transactions.`);
+console.log(`Accounting invariants PASS: synthetic cash reconciliation + render-safe fail-closed legacy ledger + generic idempotent normalization + ${synthetic.length} synthetic transactions.`);

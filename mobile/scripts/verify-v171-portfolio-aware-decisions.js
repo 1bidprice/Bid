@@ -31,14 +31,14 @@ function effective(item, held) {
   return held.has(canonical(item.symbol)) ? finalAction.holderAction : finalAction.nonHolderAction;
 }
 
-assert(canonical('SPCE.US') === canonical('SPCE'), 'SPCE symbol bridge failed');
-assert(canonical('ALWN.GR') === canonical('ALWN'), 'ALWN symbol bridge failed');
-assert(canonical('CREDIA.GR') === canonical('CREDIA'), 'CREDIA symbol bridge failed');
+assert(canonical('AAA.US') === canonical('AAA'), 'AAA symbol bridge failed');
+assert(canonical('BBB.GR') === canonical('BBB'), 'BBB symbol bridge failed');
+assert(canonical('CCC.GR') === canonical('CCC'), 'CCC symbol bridge failed');
 
-const held = new Set(['SPCE.US', 'ALWN.GR', 'CREDIA.GR'].map(canonical));
-const spce = { symbol: 'SPCE', finalAction: { status: 'FINAL', holderAction: 'SELL_NOW', nonHolderAction: 'AVOID' } };
+const held = new Set(['AAA.US', 'BBB.GR', 'CCC.GR'].map(canonical));
+const spce = { symbol: 'AAA', finalAction: { status: 'FINAL', holderAction: 'SELL_NOW', nonHolderAction: 'AVOID' } };
 const vctr = { symbol: 'VCTR', finalAction: { status: 'FINAL', holderAction: 'HOLD', nonHolderAction: 'BUY_NOW' } };
-assert(effective(spce, held) === 'SELL_NOW', 'SPCE holder must receive SELL_NOW');
+assert(effective(spce, held) === 'SELL_NOW', 'AAA holder must receive SELL_NOW');
 assert(effective(vctr, held) === 'BUY_NOW', 'VCTR non-holder must receive BUY_NOW');
 const actions = [spce, vctr].map((item) => effective(item, held));
 assert(actions.filter((code) => code === 'BUY_NOW').length === 1, 'personalized BUY count mismatch');
@@ -47,7 +47,7 @@ assert(actions.filter((code) => code === 'SELL_NOW').length === 1, 'personalized
 assert(currency({ value: 111.08, currency: null }, { symbol: 'VCTR', exchange: 'Nasdaq' }) === 'USD', 'VCTR currency must infer USD');
 assert(currency({ value: 36.13, currency: null }, { symbol: 'RDN', exchange: 'New York Stock Exchange' }) === 'USD', 'RDN currency must infer USD');
 assert(currency({ value: 74.58, currency: null }, { symbol: 'UHAL', exchange: 'New York Stock Exchange' }) === 'USD', 'UHAL currency must infer USD');
-assert(currency({ value: 13.535, currency: null }, { symbol: 'ALWN', exchange: 'Euronext Athens' }) === 'EUR', 'ALWN currency must infer EUR');
+assert(currency({ value: 13.535, currency: null }, { symbol: 'BBB', exchange: 'Euronext Athens' }) === 'EUR', 'BBB currency must infer EUR');
 assert(currency({ value: 1, currency: null }, { symbol: 'UNKNOWN', exchange: 'Unknown' }) === null, 'unknown currency must not default to EUR');
 
 const finalCard = read('src/FinalDecisionCard.js');
@@ -62,17 +62,33 @@ parser.parse(opportunities, { sourceType: 'module', plugins: ['jsx'] });
 parser.parse(portfolio, { sourceType: 'module', plugins: ['jsx'] });
 
 assert(finalCard.includes('canonicalPositionSymbol(position.symbol) === canonicalPositionSymbol(item?.symbol)'), 'FinalDecisionCard canonical holder match missing');
-assert(portfolio.includes('<OpportunitiesView portfolioPositions={positions} />'), 'portfolio positions are not bridged to OpportunitiesView');
+assert(portfolio.includes('<OpportunitiesView portfolioPositions={positions} portfolioPolicy={state.minbeisPolicy} instrumentCapabilities={state.minbeisOnboarding} />'), 'portfolio positions and MINBEIS portfolio policy are not bridged to OpportunitiesView');
 assert(opportunities.includes('personalizedDecisionCounts(feed, portfolioPositions, decisionContext)'), 'personalized decision counter with validity context missing');
 assert(opportunities.includes("import { finalActionIsCurrent } from './decision-validity';"), 'personalized counters must fail closed through decision validity');
 assert(opportunities.includes('inferredReferenceCurrency(referencePrice, item)'), 'safe currency inference missing');
 assert(opportunities.includes("style: 'currency',\n      currency,"), 'currency formatter syntax contract missing');
 assert(!opportunities.includes("currency: referencePrice.currency || 'EUR'"), 'false EUR fallback still present');
 
-assert(versionAtLeast(app.expo.version, '1.7.1'), `app version predates v1.7.1: ${app.expo.version}`);
-assert(Number(app.expo.android.versionCode) >= 29, `Android versionCode predates v1.7.1: ${app.expo.android.versionCode}`);
+assert(versionAtLeast(app.expo.version, '1.8.0'), `app version predates MINBEIS v1.8.0: ${app.expo.version}`);
+assert(Number(app.expo.android.versionCode) >= 32, `Android versionCode predates MINBEIS build 32: ${app.expo.android.versionCode}`);
 assert(pkg.version === app.expo.version, `package/app version mismatch: ${pkg.version} vs ${app.expo.version}`);
 assert(portfolio.includes(`const VERSION = '${app.expo.version}';`), `PortfolioApp runtime version mismatch: ${app.expo.version}`);
 assert(decision.includes(`const VERSION = '${app.expo.version}';`), `DecisionOverlay runtime version mismatch: ${app.expo.version}`);
 
-console.log(`PASS v1.7.1+ portfolio-aware holder/non-holder decisions, validity-gated personalized counters, safe currency inference, JSX parse and consistent release identity ${app.expo.version} build ${app.expo.android.versionCode}.`);
+
+// 30-second clarity UX must remain visible for both holdings and new ideas.
+assert(opportunities.includes("function PositionClarityCard"), '30-second clarity UX component missing');
+assert(opportunities.includes(">ΤΩΡΑ<"), 'MINBEIS clarity NOW label missing');
+assert(opportunities.includes(">ΓΙΑΤΙ<"), 'MINBEIS clarity WHY label missing');
+assert(opportunities.includes("ΤΙ ΘΑ ΑΛΛΑΞΕΙ ΤΗΝ ΕΙΚΟΝΑ"), 'MINBEIS clarity change-condition label missing');
+assert(opportunities.includes("ΣΤΗΝ ΟΥΡΑ ΕΡΕΥΝΑΣ"), 'MINBEIS research queue status missing from portfolio UX');
+assert(opportunities.includes("Σε έρευνα:"), 'MINBEIS portfolio research queue summary missing');
+
+// User-friendly transaction entry must always persist the canonical market-qualified symbol.
+assert(portfolio.includes("const canonicalSymbol = canonicalInstrumentSymbol(form.symbol, form.market);"), 'canonical ticker transaction entry missing');
+assert(portfolio.includes("symbol: canonicalSymbol"), 'transaction save does not persist canonical ticker');
+assert(portfolio.includes("currency: instrumentCurrency(form.market)"), 'transaction currency is not derived from selected market');
+assert(portfolio.includes("value=\"GR\" current={form.market} label=\"Ελλάδα\""), 'Greek market selector missing');
+assert(portfolio.includes("value=\"US\" current={form.market} label=\"ΗΠΑ\""), 'US market selector missing');
+assert(portfolio.includes("onChangeText={setSymbolInput}"), 'ticker input does not use canonical-safe setter');
+console.log(`PASS MINBEIS v1.8.0+ portfolio-aware decisions, clarity UX, research queue, canonical routing and consistent release identity ${app.expo.version} build ${app.expo.android.versionCode}.`);

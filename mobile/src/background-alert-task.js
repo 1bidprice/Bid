@@ -6,6 +6,7 @@ import * as TaskManager from 'expo-task-manager';
 import { FINNHUB_TOKEN_KEY, fetchPortfolioQuotes } from './market-data';
 import { evaluateAlerts, normalizeAlerts, presentAlertEvents } from './alert-engine';
 import { PORTFOLIO_STATE_STORAGE_KEY } from './portfolio-state-storage';
+import { INSTALLATION_ID_SECURE_KEY, canBackgroundTaskUsePortfolio } from './local-data-ownership';
 
 export const STORAGE_KEY = PORTFOLIO_STATE_STORAGE_KEY;
 export const BACKGROUND_ALERT_TASK = 'investor-control-background-alerts-v1';
@@ -13,7 +14,8 @@ export const BACKGROUND_ALERT_TASK = 'investor-control-background-alerts-v1';
 function normalizeState(raw) {
   const source = raw && typeof raw === 'object' ? raw : {};
   return {
-    schemaVersion: 4,
+    schemaVersion: 6,
+    ownerInstallationId: source.ownerInstallationId || null,
     transactions: Array.isArray(source.transactions) ? source.transactions : [],
     prices: source.prices && typeof source.prices === 'object' ? source.prices : {},
     meta: {
@@ -26,8 +28,15 @@ function normalizeState(raw) {
 
 TaskManager.defineTask(BACKGROUND_ALERT_TASK, async () => {
   try {
-    const saved = await AsyncStorage.getItem(STORAGE_KEY);
-    const current = normalizeState(saved ? JSON.parse(saved) : null);
+    const [saved, installationId] = await Promise.all([
+      AsyncStorage.getItem(STORAGE_KEY),
+      SecureStore.getItemAsync(INSTALLATION_ID_SECURE_KEY),
+    ]);
+    const parsed = saved ? JSON.parse(saved) : null;
+    if (!installationId || !canBackgroundTaskUsePortfolio(parsed, installationId)) {
+      return BackgroundTask.BackgroundTaskResult.Success;
+    }
+    const current = normalizeState(parsed);
     if (!current.alerts.backgroundEnabled || !current.alerts.rules.some((rule) => rule.enabled)) {
       return BackgroundTask.BackgroundTaskResult.Success;
     }

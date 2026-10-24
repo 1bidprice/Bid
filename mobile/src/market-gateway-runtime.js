@@ -4,11 +4,15 @@ const {
   getOrCreateInstallationId,
   normalizeGatewayBaseUrl,
   fetchCanonicalGatewayMarketSnapshot,
+  fetchInstrumentCapability,
+  requestMinbeisResearch,
+  fetchMinbeisResearchQueueStatus,
 } = require('./market-gateway-client');
 
-// This value is intentionally public. Expo inlines EXPO_PUBLIC_* values into the client bundle.
-// Never place provider credentials or any other secret in this variable.
-const COMPILED_MARKET_GATEWAY_URL = process.env.EXPO_PUBLIC_MARKET_GATEWAY_URL;
+// This endpoint is intentionally public. Provider credentials remain server-side.
+export const DEFAULT_MARKET_GATEWAY_URL = 'https://investor-control-market-gateway.bidprice-alerts.workers.dev';
+// Expo may override the verified public endpoint for controlled environments.
+const COMPILED_MARKET_GATEWAY_URL = process.env.EXPO_PUBLIC_MARKET_GATEWAY_URL || DEFAULT_MARKET_GATEWAY_URL;
 
 export function configuredMarketGatewayUrl(value = COMPILED_MARKET_GATEWAY_URL) {
   return normalizeGatewayBaseUrl(value);
@@ -47,4 +51,75 @@ export async function fetchConfiguredMarketGatewaySnapshot(symbols, options = {}
     fxReference: snapshot.fxReference || null,
     ...(snapshot.fxError ? { fxError: snapshot.fxError } : {}),
   };
+}
+
+
+export async function fetchConfiguredInstrumentCapability(symbol, options = {}) {
+  const baseUrl = configuredMarketGatewayUrl(options.baseUrl === undefined ? COMPILED_MARKET_GATEWAY_URL : options.baseUrl);
+  if (!baseUrl) {
+    return {
+      enabled: false,
+      requestedSymbol: symbol,
+      onboardingStatus: 'GATEWAY_NOT_CONFIGURED',
+      identityVerified: false,
+      quoteSupported: false,
+      analysisSupported: false,
+    };
+  }
+
+  const storage = options.storage || AsyncStorage;
+  const clientId = await getOrCreateInstallationId(storage, options.installationIdOptions || {});
+  const result = await fetchInstrumentCapability(symbol, {
+    baseUrl,
+    clientId,
+    fetchImpl: options.fetchImpl,
+    timeoutMs: options.timeoutMs,
+  });
+  return {
+    enabled: true,
+    ...result,
+  };
+}
+
+
+export async function requestConfiguredMinbeisResearch(symbol, options = {}) {
+  const baseUrl = configuredMarketGatewayUrl(options.baseUrl === undefined ? COMPILED_MARKET_GATEWAY_URL : options.baseUrl);
+  if (!baseUrl) {
+    return {
+      enabled: false,
+      requestedSymbol: symbol,
+      queueStatus: 'GATEWAY_NOT_CONFIGURED',
+      queued: false,
+    };
+  }
+  const storage = options.storage || AsyncStorage;
+  const clientId = await getOrCreateInstallationId(storage, options.installationIdOptions || {});
+  const result = await requestMinbeisResearch(symbol, {
+    baseUrl,
+    clientId,
+    fetchImpl: options.fetchImpl,
+    timeoutMs: options.timeoutMs,
+  });
+  return { enabled: true, ...result };
+}
+
+export async function fetchConfiguredMinbeisResearchQueueStatus(symbol, options = {}) {
+  const baseUrl = configuredMarketGatewayUrl(options.baseUrl === undefined ? COMPILED_MARKET_GATEWAY_URL : options.baseUrl);
+  if (!baseUrl) {
+    return {
+      enabled: false,
+      requestedSymbol: symbol,
+      queueStatus: 'GATEWAY_NOT_CONFIGURED',
+      queued: false,
+    };
+  }
+  const storage = options.storage || AsyncStorage;
+  const clientId = await getOrCreateInstallationId(storage, options.installationIdOptions || {});
+  const result = await fetchMinbeisResearchQueueStatus(symbol, {
+    baseUrl,
+    clientId,
+    fetchImpl: options.fetchImpl,
+    timeoutMs: options.timeoutMs,
+  });
+  return { enabled: true, ...result };
 }
