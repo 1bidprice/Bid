@@ -1,29 +1,8 @@
 name: Investor Control Market Gateway
 
 on:
-  push:
-    branches:
-      - investor-control-core-stabilization-v174
-    paths:
-      - market-intelligence/gateway/**
-      - market-intelligence/test/market-gateway.test.js
-      - market-intelligence/test/market-gateway-edge.test.js
-      - market-intelligence/src/adapters/finnhub-quote.js
-      - market-intelligence/src/adapters/euronext-athens-quote.js
-      - market-intelligence/src/canonical-market-quote.js
-      - .github/workflows/investor-control-market-gateway.yml
-      - .github/workflows/investor-control-market-gateway-deploy.yml
-  pull_request:
-    paths:
-      - market-intelligence/gateway/**
-      - market-intelligence/test/market-gateway.test.js
-      - market-intelligence/test/market-gateway-edge.test.js
-      - market-intelligence/src/adapters/finnhub-quote.js
-      - market-intelligence/src/adapters/euronext-athens-quote.js
-      - market-intelligence/src/canonical-market-quote.js
-      - .github/workflows/investor-control-market-gateway.yml
-      - .github/workflows/investor-control-market-gateway-deploy.yml
-
+  # TEMPORARY MINBEIS FREEZE 2026-10-24: automatic triggers paused; manual dispatch preserved.
+  workflow_dispatch:
 permissions:
   contents: read
 
