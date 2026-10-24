@@ -1,21 +1,8 @@
 name: Investor Control v1839 V2 Post-Gate Performance Evaluation
 
 on:
-  push:
-    branches:
-      - investor-control-v1-market-intelligence-foundation
-    paths:
-      - '.github/workflows/run-v1839-prospective-holdout-v2-performance-evaluation.yml'
-      - 'market-intelligence/scripts/run-prospective-holdout-v2-performance-evaluation-v1839.js'
-      - 'market-intelligence/scripts/run-prospective-holdout-v2-structural-gate-v1838.js'
-      - 'market-intelligence/scripts/run-prospective-holdout-v2-outcome-maturation-v1837.js'
-      - 'market-intelligence/src/forecast-prospective-holdout-protocol-v2.js'
-      - 'market-intelligence/src/forecast-calibration.js'
-      - 'market-intelligence/test/research-prospective-v2-performance-evaluation-v1839.test.js'
+  # TEMPORARY MINBEIS FREEZE 2026-10-24: automatic triggers paused; manual dispatch preserved.
   workflow_dispatch:
-  schedule:
-    - cron: '15 0 * * 2-6'
-
 permissions:
   contents: read
   actions: read
