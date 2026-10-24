@@ -1,13 +1,8 @@
 name: Update Investor Control market data
 
 on:
+  # TEMPORARY MINBEIS FREEZE 2026-10-24: automatic triggers paused; manual dispatch preserved.
   workflow_dispatch:
-  push:
-    paths:
-      - '.github/workflows/update-market-data.yml'
-  schedule:
-    - cron: '*/5 7-22 * * 1-5'
-
 permissions:
   contents: write
 

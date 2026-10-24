@@ -1,11 +1,7 @@
 name: Cost Control - Audit old standalone APK artifacts
 
 on:
-  # A changed audit workflow on main gets one automatic AUDIT-only run.
-  # No cron; this path-scoped push cannot invoke deletion.
-  push:
-    branches: [main]
-    paths: [.github/workflows/cost-control-artifact-audit.yml]
+  # TEMPORARY MINBEIS FREEZE 2026-10-24: automatic triggers paused; manual dispatch preserved.
   workflow_dispatch:
     inputs:
       operation:
@@ -26,7 +22,6 @@ on:
         required: false
         type: string
         default: ''
-
 permissions:
   contents: read
   actions: write
