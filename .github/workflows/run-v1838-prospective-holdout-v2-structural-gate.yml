@@ -1,19 +1,8 @@
 name: Investor Control v1838 V2 Structural Evaluation Gate
 
 on:
-  push:
-    branches:
-      - investor-control-v1-market-intelligence-foundation
-    paths:
-      - '.github/workflows/run-v1838-prospective-holdout-v2-structural-gate.yml'
-      - 'market-intelligence/scripts/run-prospective-holdout-v2-structural-gate-v1838.js'
-      - 'market-intelligence/scripts/run-prospective-holdout-v2-outcome-maturation-v1837.js'
-      - 'market-intelligence/src/forecast-prospective-holdout-protocol-v2.js'
-      - 'market-intelligence/test/research-prospective-v2-structural-gate-v1838.test.js'
+  # TEMPORARY MINBEIS FREEZE 2026-10-24: automatic triggers paused; manual dispatch preserved.
   workflow_dispatch:
-  schedule:
-    - cron: '45 23 * * 1-5'
-
 permissions:
   contents: read
   actions: read

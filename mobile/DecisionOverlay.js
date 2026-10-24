@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -32,7 +32,7 @@ import {
   portfolioSnapshot,
 } from './src/decision-engine';
 
-const VERSION = '0.6.5';
+const VERSION = '1.7.3';
 const SUPPORTED_BACKUP_VERSIONS = [1, DECISION_VERSION];
 
 const parseNum = (value) => {
@@ -145,9 +145,17 @@ function Metric({ label, value, danger }) {
   );
 }
 
-export default function DecisionOverlay() {
-  const insets = useSafeAreaInsets();
-  const [visible, setVisible] = useState(false);
+function decisionScope(result) {
+  const blocked = result?.status === 'blocked' || (result?.blocking || []).length > 0;
+  const caution = result?.status === 'caution';
+  return {
+    existingPosition: blocked || caution ? 'Χρειάζεται επανεξέταση — δεν προκύπτει αυτόματη πώληση' : 'Το πλάνο δεν εμφανίζει σημερινή παραβίαση',
+    newBuy: blocked ? 'Μπλοκάρεται' : caution ? 'Μόνο με προσοχή' : 'Επιτρέπεται από τους κανόνες',
+    newBuyLabel: blocked ? 'ΝΕΑ ΑΓΟΡΑ: ΟΧΙ' : caution ? 'ΝΕΑ ΑΓΟΡΑ: ΠΡΟΣΟΧΗ' : 'ΝΕΑ ΑΓΟΡΑ: ΝΑΙ',
+  };
+}
+
+export default function DecisionOverlay({ visible = false, onRequestClose }) {
   const [screen, setScreen] = useState('list');
   const [portfolioState, setPortfolioState] = useState({ transactions: [], prices: {} });
   const [plans, setPlans] = useState({});
@@ -221,15 +229,15 @@ export default function DecisionOverlay() {
     return acc;
   }, { ready: 0, caution: 0, blocked: 0 });
 
-  const open = async () => {
-    await load();
+  useEffect(() => {
+    if (!visible) return;
+    load();
     setScreen('list');
     setSelectedSymbol(null);
-    setVisible(true);
-  };
+  }, [visible, load]);
 
   const close = () => {
-    setVisible(false);
+    onRequestClose?.();
     setScreen('list');
     setSelectedSymbol(null);
   };
@@ -362,10 +370,6 @@ export default function DecisionOverlay() {
 
   return (
     <>
-      <Pressable style={[styles.fab, { right: 14 + insets.right, bottom: 92 + insets.bottom }]} onPress={open} accessibilityLabel="Άνοιγμα Decision Gate" accessibilityHint="Έλεγχος επενδυτικής απόφασης">
-        <Text style={styles.fabTop}>✓</Text>
-      </Pressable>
-
       <Modal visible={visible} animationType="slide" onRequestClose={goBack} statusBarTranslucent={false}>
         <SafeAreaView style={styles.safe} edges={['top', 'bottom', 'left', 'right']}>
           <View style={styles.header}>
@@ -390,7 +394,7 @@ export default function DecisionOverlay() {
               <View style={styles.grid}>
                 <Metric label="Περνούν" value={String(counts.ready)} />
                 <Metric label="Προσοχή" value={String(counts.caution)} danger={counts.caution > 0} />
-                <Metric label="Μπλοκαρισμένες" value={String(counts.blocked)} danger={counts.blocked > 0} />
+                <Metric label="Νέες αγορές μπλοκαρισμένες" value={String(counts.blocked)} danger={counts.blocked > 0} />
                 <Metric label="Χαρτοφυλάκιο" value={money(snapshot.totalValueEUR)} />
               </View>
 
@@ -418,7 +422,7 @@ export default function DecisionOverlay() {
                       <Text style={styles.cardTitle}>{position.company}</Text>
                       <Text style={styles.muted}>{position.symbol} · {position.quantity.toLocaleString('el-GR')} μετοχές</Text>
                     </View>
-                    <StatusPill status={result.status} label={result.label} />
+                    <StatusPill status={result.status} label={decisionScope(result).newBuyLabel} />
                   </View>
                   <View style={styles.scoreRow}>
                     <Text style={styles.score}>{result.score}/100</Text>
@@ -432,6 +436,7 @@ export default function DecisionOverlay() {
                   {result.issues.length ? (
                     <Text style={styles.issuePreview}>{result.issues[0].message}{result.issues.length > 1 ? `  +${result.issues.length - 1} ακόμη` : ''}</Text>
                   ) : <Text style={styles.readyText}>Το πλάνο είναι πλήρες και δεν παραβιάζει τα σημερινά όρια.</Text>}
+                  <View style={styles.scopeBox}><Text style={styles.scopeLabel}>Υπάρχουσα θέση</Text><Text style={styles.scopeText}>{decisionScope(result).existingPosition}</Text><Text style={styles.scopeLabel}>Νέα αγορά / ενίσχυση</Text><Text style={styles.scopeStrong}>{decisionScope(result).newBuy}</Text></View>
                   <Pressable style={styles.primary} onPress={() => edit(position)}>
                     <Text style={styles.primaryText}>{plans[position.symbol] ? 'Έλεγχος / επεξεργασία πλάνου' : 'Δημιουργία γρήγορου πλάνου'}</Text>
                   </Pressable>
@@ -461,7 +466,7 @@ export default function DecisionOverlay() {
                       <Text style={styles.cardTitle}>{selectedPosition.company}</Text>
                       <Text style={styles.muted}>{selectedPosition.symbol} · τρέχουσα {nativePrice(selectedPosition.nativePrice, selectedPosition.currency)}</Text>
                     </View>
-                    <StatusPill status={liveResult.status} label={liveResult.label} />
+                    <StatusPill status={liveResult.status} label={decisionScope(liveResult).newBuyLabel} />
                   </View>
                   <Text style={styles.scoreLarge}>{liveResult.score}/100</Text>
                   <Text style={styles.muted}>Ο βαθμός αλλάζει ζωντανά όσο συμπληρώνεις τα τρία υποχρεωτικά στοιχεία.</Text>
@@ -521,9 +526,10 @@ export default function DecisionOverlay() {
 
                 <View style={styles.card}>
                   <View style={styles.rowTop}>
-                    <Text style={styles.cardTitle}>Ετυμηγορία</Text>
+                    <Text style={styles.cardTitle}>Ετυμηγορία νέας αγοράς / ενίσχυσης</Text>
                     <StatusPill status={liveResult.status} label={liveResult.label} />
                   </View>
+                  <View style={styles.scopeBox}><Text style={styles.scopeLabel}>Υπάρχουσα θέση</Text><Text style={styles.scopeText}>{decisionScope(liveResult).existingPosition}</Text><Text style={styles.scopeLabel}>Νέα αγορά / ενίσχυση</Text><Text style={styles.scopeStrong}>{decisionScope(liveResult).newBuy}</Text></View>
                   {liveResult.issues.length ? liveResult.issues.map((item) => (
                     <View key={item.code} style={[styles.issue, item.severity === 'block' && styles.issueBlock]}>
                       <Text style={[styles.issueMark, item.severity === 'block' && styles.issueMarkBlock]}>{item.severity === 'block' ? '×' : '!'}</Text>
@@ -619,7 +625,7 @@ const styles = StyleSheet.create({
   miniCellWide: { flexBasis: '100%', borderRadius: 16, backgroundColor: '#f5f8fd', padding: 13 },
   miniValue: { color: '#10233f', fontWeight: '900', fontSize: 18, marginTop: 5 },
   issuePreview: { color: '#b26b00', backgroundColor: '#fff7e5', borderRadius: 14, padding: 12, lineHeight: 20 },
-  readyText: { color: '#147a4a', backgroundColor: '#eaf9f1', borderRadius: 14, padding: 12, lineHeight: 20 },
+  readyText: { color: '#147a4a', backgroundColor: '#eaf9f1', borderRadius: 14, padding: 12, lineHeight: 20 }, scopeBox: { backgroundColor: '#f3f7fc', borderRadius: 14, padding: 12, gap: 3 }, scopeLabel: { color: '#7b8799', fontSize: 11, fontWeight: '800', marginTop: 3 }, scopeText: { color: '#425674', fontSize: 13, lineHeight: 18 }, scopeStrong: { color: '#10233f', fontSize: 14, lineHeight: 19, fontWeight: '900' },
   primary: { backgroundColor: '#0b66ff', borderRadius: 17, paddingHorizontal: 16, paddingVertical: 16, alignItems: 'center' },
   primaryText: { color: '#fff', fontWeight: '900', textAlign: 'center' },
   secondary: { backgroundColor: '#fff', borderRadius: 17, paddingHorizontal: 16, paddingVertical: 15, alignItems: 'center', borderWidth: 1, borderColor: '#d7e0ec' },

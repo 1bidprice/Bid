@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { validateForecastClassificationSnapshot } from '../src/forecast-classification-lineage.js';
+import { validateForecastMarketRegimeSnapshot } from '../src/forecast-market-regime.js';
 
 export function verifyForecastOutcomeArchive(archive) {
   const errors = [];
@@ -14,6 +16,14 @@ export function verifyForecastOutcomeArchive(archive) {
     if (record?.validationMode !== 'LIVE_SHADOW_OOS') errors.push(`NON_LIVE_OOS_RECORD:${record?.forecastId || 'unknown'}`);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(record?.forecastSampleDate || ''))) errors.push(`FORECAST_SAMPLE_DATE_REQUIRED:${record?.forecastId || 'unknown'}`);
     if (record?.decisionImpact !== 'NONE') errors.push(`DECISION_IMPACT_MUST_BE_NONE:${record?.forecastId || 'unknown'}`);
+    if (Object.prototype.hasOwnProperty.call(record, 'classificationSnapshot')) {
+      const classificationValidation = validateForecastClassificationSnapshot(record.classificationSnapshot, record);
+      for (const classificationError of classificationValidation.errors) errors.push(`CLASSIFICATION_SNAPSHOT_INVALID:${record?.forecastId || 'unknown'}:${classificationError}`);
+    }
+    if (Object.prototype.hasOwnProperty.call(record, 'marketRegimeSnapshot')) {
+      const regimeValidation = validateForecastMarketRegimeSnapshot(record.marketRegimeSnapshot, record);
+      for (const regimeError of regimeValidation.errors) errors.push(`MARKET_REGIME_SNAPSHOT_INVALID:${record?.forecastId || 'unknown'}:${regimeError}`);
+    }
     if (!['OPEN', 'MATURED'].includes(record?.status)) errors.push(`FORECAST_STATUS_INVALID:${record?.forecastId || 'unknown'}`);
     if (record?.status === 'MATURED') {
       if (![0, 1].includes(Number(record?.positiveOutcome))) errors.push(`MATURED_OUTCOME_BINARY_REQUIRED:${record?.forecastId || 'unknown'}`);

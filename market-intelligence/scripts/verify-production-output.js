@@ -1,5 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { verifyForecastFactorProductionSafety } from '../src/forecast-factor-production-safety.js';
+import { verifyForecastRegimeProductionSafety } from '../src/forecast-regime-production-safety.js';
+import { verifyForecastRegimeFactorProductionSafety } from '../src/forecast-regime-factor-production-safety.js';
+import { verifyForecastRegimeFactorGovernanceProductionSafety } from '../src/forecast-regime-factor-governance-production-safety.js';
+import { verifyForecastStackedEnsembleProductionSafety } from '../src/forecast-stacked-ensemble-production-safety.js';
+import { verifyForecastRegimeStackedEnsembleProductionSafety } from '../src/forecast-regime-stacked-ensemble-production-safety.js';
+import { verifyCrossSectionalRegimeWalkForwardProductionSafety } from '../src/forecast-cross-sectional-regime-walk-forward-production-safety.js';
 
 const reportPath = path.resolve(process.argv[2] || 'out/autonomous-intelligence.json');
 const feedPath = path.resolve(process.argv[3] || 'out/mobile-intelligence-feed.json');
@@ -35,6 +42,18 @@ if (!report.discovery?.marketsScanned?.includes('US') || !report.discovery?.mark
 
 const generated = new Date(report.generatedAt).getTime();
 if (!Number.isFinite(generated) || Math.abs(Date.now() - generated) > 3_600_000) fail('stale production output');
+
+try {
+  verifyForecastFactorProductionSafety(report);
+  verifyForecastRegimeProductionSafety(report);
+  verifyForecastRegimeFactorProductionSafety(report);
+  verifyForecastRegimeFactorGovernanceProductionSafety(report);
+  verifyForecastStackedEnsembleProductionSafety(report);
+  verifyForecastRegimeStackedEnsembleProductionSafety(report);
+  verifyCrossSectionalRegimeWalkForwardProductionSafety(report);
+} catch (error) {
+  fail(error instanceof Error ? error.message : String(error));
+}
 
 const greek = (report.discovery?.shortlist || []).filter((item) => item.market === 'GR');
 const unresolvedGreek = greek.filter((item) => !item.symbol || item.identityStatus === 'SYMBOL_RESOLUTION_REQUIRED');
@@ -178,5 +197,12 @@ console.log(JSON.stringify({
   canonicalIssuerFinancialProvenance: 'REQUIRED',
   ellaktorH1ConsolidatedRegression: 'VERIFIED',
   athensStatementAuthority: 'REQUIRED',
-  athensCandidateAudit: 'REQUIRED'
+  athensCandidateAudit: 'REQUIRED',
+  factorResearchGovernanceSafety: 'REQUIRED',
+  regimeStratifiedOosResearchSafety: 'REQUIRED',
+  regimeConditionalFactorResearchSafety: 'REQUIRED',
+  regimeConditionalFactorGovernanceSafety: 'REQUIRED',
+  stackedEnsembleResearchSafety: 'REQUIRED',
+  regimeConditionalStackedEnsembleSafety: 'REQUIRED',
+  crossSectionalHistoricalRegimeWalkForwardSafety: 'REQUIRED'
 }, null, 2));

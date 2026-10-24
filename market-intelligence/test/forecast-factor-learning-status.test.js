@@ -4,14 +4,42 @@ import { buildForecastFactorLearningStatus, evaluateFactorScoreTemporalStability
 
 const SCORE_LEVELS = [-0.9, -0.7, -0.5, -0.3, -0.1, 0.1, 0.3, 0.5, 0.7, 0.9];
 
+function classificationSnapshot(index, companyId, instrumentId, forecastAt) {
+  const majorGroups = ['10', '20', '30', '40', '50', '60'];
+  const code = majorGroups[index % majorGroups.length] + '00';
+  const cik = String((index % 20) + 1).padStart(10, '0');
+  return {
+    contract: 'FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1',
+    policyVersion: '2026-08-11.1',
+    companyId,
+    instrumentId,
+    sourceAuthority: 'SEC_EDGAR_SUBMISSIONS',
+    sourceUrl: 'https://data.sec.gov/submissions/CIK' + cik + '.json',
+    sourceDocumentId: 'CIK' + cik,
+    capturedAt: forecastAt,
+    taxonomy: 'SEC_SIC',
+    code,
+    description: 'Synthetic SIC ' + code,
+    inferenceUsed: false,
+    decisionImpact: 'NONE',
+  };
+}
+
 function factorRecord(index, options = {}) {
   const score = options.score ?? SCORE_LEVELS[index % SCORE_LEVELS.length];
   const positive = options.invert ? score < 0 : score > 0;
   const outcome = options.outcome ?? (positive ? 1 : 0);
   const realisedReturnPct = options.realisedReturnPct ?? (options.invert ? -score * 10 : score * 10);
-  const forecastAt = new Date(Date.UTC(2026, 0, 1 + index)).toISOString();
+  const forecastAt = new Date(Date.UTC(2000, 0, 1) + index * 30 * 86_400_000).toISOString();
+  const tradingDays = Number(options.tradingDays || 21);
+  const outcomeAt = new Date(new Date(forecastAt).getTime() + tradingDays * 86_400_000).toISOString();
+  const companyId = options.companyId || 'company:' + (index % 20);
+  const instrumentId = options.instrumentId || 'instrument:' + (index % 20);
   return {
-    forecastId: `factor:${options.version || 'factor-v1'}:${options.horizon || 'month1'}:${index}`,
+    forecastId: 'factor:' + (options.version || 'factor-v1') + ':' + (options.horizon || 'month1') + ':' + index,
+    companyId,
+    instrumentId,
+    classificationSnapshot: classificationSnapshot(index, companyId, instrumentId, forecastAt),
     validationMode: options.validationMode || 'LIVE_SHADOW_OOS',
     factorScorePolicyVersion: options.noLineage ? null : options.version || 'factor-v1',
     factorScoreStatus: options.factorScoreStatus || 'LATENT_SCORE_READY',
@@ -21,9 +49,11 @@ function factorRecord(index, options = {}) {
     horizon: options.horizon || 'month1',
     forecastAt,
     forecastSampleDate: forecastAt.slice(0, 10),
+    tradingDays,
+    referencePrice: { timestamp: forecastAt },
     status: options.open ? 'OPEN' : 'MATURED',
     positiveOutcome: options.open ? null : outcome,
-    realisedOutcome: options.open ? null : { realisedReturnPct },
+    realisedOutcome: options.open ? null : { timestamp: outcomeAt, realisedReturnPct },
   };
 }
 

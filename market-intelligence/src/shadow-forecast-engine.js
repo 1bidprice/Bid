@@ -4,6 +4,7 @@ import { synthesizeForecastDrivers } from './forecast-driver-synthesis.js';
 import { buildProbabilisticForecastContract } from './probabilistic-forecast-contract.js';
 import { buildForecastFeatureVector } from './forecast-feature-vector.js';
 import { buildForecastFactorScore } from './forecast-factor-score.js';
+import { buildForecastMarketRegimeSnapshot } from './forecast-market-regime.js';
 
 export const SHADOW_FORECAST_ENGINE_VERSION = '2026-08-11.2';
 
@@ -99,6 +100,7 @@ export function buildShadowForecasts(input = {}) {
   const universeByCompany = byId(universe);
   const opportunityMap = opportunityByInstrument(input.opportunityUniverse);
   const seriesCollector = input.historicalSeriesCollector instanceof Map ? input.historicalSeriesCollector : new Map();
+  const benchmarkSeriesCollector = input.benchmarkSeriesCollector instanceof Map ? input.benchmarkSeriesCollector : new Map();
   const longHistoryCollector = input.longHistoryResearchCollector instanceof Map ? input.longHistoryResearchCollector : new Map();
   const dossiers = Array.isArray(input.researchDossiers) ? input.researchDossiers : [];
   const generatedAt = new Date(input.generatedAt || Date.now()).toISOString();
@@ -113,6 +115,13 @@ export function buildShadowForecasts(input = {}) {
     const profile = buildInstrumentProfile(company, input.options?.opportunityContext || {});
     const instrumentId = company.instrumentId || company.companyId || dossier.companyId;
     const canonicalSeries = seriesCollector.get(dossier.companyId) || null;
+    const benchmarkSeries = benchmarkSeriesCollector.get(dossier.companyId) || null;
+    const marketRegimeSnapshot = benchmarkSeries ? buildForecastMarketRegimeSnapshot({
+      series: benchmarkSeries,
+      capturedAt: generatedAt,
+      benchmarkSymbol: benchmarkSeries.providerSymbol || benchmarkSeries.symbol || null,
+      minimumObservations: input.options?.marketRegimeMinimumObservations || 200,
+    }) : null;
     const selectedHistory = selectPatternSeries(dossier.companyId, canonicalSeries, longHistoryCollector);
     const series = selectedHistory.series;
     const opportunity = opportunityMap.get(instrumentId) || null;
@@ -183,11 +192,21 @@ export function buildShadowForecasts(input = {}) {
       decisionImpact: 'NONE',
       finalActionEligible: false,
       historySource: selectedHistory.source,
+      ...(marketRegimeSnapshot ? { marketRegimeSnapshot } : {}),
       existingFinalActionSnapshot: dossier.finalAction || null,
       historicalPatternForecast,
       multiFactorResearch,
       forecast,
-      diagnostics: [...selectedHistory.diagnostics, ...(diagnostic ? [diagnostic] : [])],
+      diagnostics: [
+        ...selectedHistory.diagnostics,
+        ...(diagnostic ? [diagnostic] : []),
+        ...(marketRegimeSnapshot && marketRegimeSnapshot.status !== 'REGIME_READY' ? [{
+          code: 'MARKET_REGIME_SNAPSHOT_NOT_READY',
+          blockers: marketRegimeSnapshot.blockers || [],
+          benchmarkSymbol: marketRegimeSnapshot.benchmarkSymbol || null,
+          message: 'Benchmark history did not satisfy the forecast-time market-regime research contract; no regime metadata may influence decisions.',
+        }] : []),
+      ],
     });
   }
 

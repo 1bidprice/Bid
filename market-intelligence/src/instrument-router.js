@@ -1,4 +1,5 @@
 import { buildInstrumentProfile, ASSET_CLASS } from './instrument-profile.js';
+import { evaluateInstrumentIntegrity } from './instrument-integrity-gate.js';
 
 export const INSTRUMENT_ROUTER_VERSION = '2026-08-08.1';
 
@@ -45,7 +46,12 @@ export function buildInstrumentRoute(instrument = {}, context = {}) {
     routes.analytics = route(profile.analysisModel, null, 'REQUIRES_PROVIDER', profile.requiredCapabilities);
   }
 
+  const integrity = evaluateInstrumentIntegrity({ profile, instrument, purpose: 'ROUTING' });
   const unavailable = Object.values(routes).filter((item) => item.status === 'UNAVAILABLE' || item.status === 'REQUIRES_PROVIDER');
+  const blockers = [...new Set([
+    ...integrity.blockers,
+    ...unavailable.map((item) => `${item.capability}:${item.status}`),
+  ])];
   return {
     format: 'investor-control-instrument-route',
     version: 1,
@@ -55,8 +61,9 @@ export function buildInstrumentRoute(instrument = {}, context = {}) {
     analysisModel: profile.analysisModel,
     profile,
     routes,
-    endToEndReady: unavailable.length === 0,
-    blockers: unavailable.map((item) => `${item.capability}:${item.status}`),
+    integrity,
+    endToEndReady: integrity.routingReady === true && unavailable.length === 0,
+    blockers,
     routingInvariant: 'CAPABILITY_AND_VENUE_ROUTING_ONLY',
   };
 }

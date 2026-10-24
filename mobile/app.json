@@ -2,7 +2,7 @@
   "expo": {
     "name": "Investor Control",
     "slug": "investor-control",
-    "version": "1.0.1",
+    "version": "1.7.3",
     "icon": "./assets/investor-control-icon.png",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -15,22 +15,51 @@
           "defaultChannel": "price-alerts"
         }
       ],
-      "expo-document-picker"
+      "expo-document-picker",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "buildToolsVersion": "36.0.0",
+            "usesCleartextTraffic": false
+          }
+        }
+      ]
     ],
     "android": {
       "package": "gr.investorcontrol.app",
-      "versionCode": 21,
+      "versionCode": 31,
       "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/investor-control-icon.png",
         "backgroundColor": "#07163E"
-      }
+      },
+      "blockedPermissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CALL_PHONE",
+        "android.permission.CAMERA",
+        "android.permission.READ_CONTACTS",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.READ_PHONE_STATE",
+        "android.permission.READ_SMS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SEND_SMS",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "com.google.android.c2dm.permission.RECEIVE"
+      ]
     },
     "ios": {
       "bundleIdentifier": "gr.investorcontrol.app",
-      "buildNumber": "21",
+      "buildNumber": "31",
       "supportsTablet": false
-    }
+    },
+    "description": "Προσωπικό χαρτοφυλάκιο και ελεγχόμενη αυτοματοποιημένη επενδυτική έρευνα, χωρίς εκτέλεση χρηματιστηριακών εντολών.",
+    "primaryColor": "#0B66FF"
   }
 }

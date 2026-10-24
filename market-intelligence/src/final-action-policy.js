@@ -1,4 +1,6 @@
-export const FINAL_ACTION_POLICY_VERSION = '2026-07-27.1';
+import { evaluateInstrumentIntegrity } from './instrument-integrity-gate.js';
+
+export const FINAL_ACTION_POLICY_VERSION = '2026-08-20.1';
 
 export const FINAL_ACTIONS = Object.freeze({
   BUY_NOW: 'BUY_NOW',
@@ -15,6 +17,8 @@ const SEVERE_FUNDAMENTAL_FLAGS = new Set([
   'NON_POSITIVE_EQUITY',
   'VERY_HIGH_LIABILITIES_TO_ASSETS',
   'SEVERE_NEGATIVE_NET_MARGIN',
+  'BANK_CAPITAL_BELOW_REQUIREMENT',
+  'BANK_HIGH_STAGE3_LOANS',
 ]);
 
 const SEVERE_MARKET_FLAGS = new Set([
@@ -24,6 +28,7 @@ const SEVERE_MARKET_FLAGS = new Set([
 ]);
 
 function finite(value) {
+  if (value === null || value === undefined || value === '') return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
@@ -41,6 +46,82 @@ function ageHours(now, timestamp) {
   const time = new Date(timestamp).getTime();
   if (!Number.isFinite(time)) return null;
   return Math.max(0, (now.getTime() - time) / 3_600_000);
+}
+
+function normalizedSymbol(value) {
+  return String(value || '').trim().toUpperCase().replace(/\.(US|GR)$/i, '');
+}
+
+function decisionIntegrity(dossier) {
+  const blockers = [];
+  const strict = Number(dossier?.integrityContractVersion || 0) >= 1;
+  const companyId = dossier?.companyId || null;
+  const proposed = dossier?.proposedAction || 'WATCH';
+  const directional = proposed !== 'WATCH';
+  const executionSensitive = ['CONSIDER_BUY', 'CONSIDER_REDUCE', 'AVOID'].includes(proposed);
+  const reference = dossier?.referencePrice || null;
+  const listingSymbol = normalizedSymbol(dossier?.listing?.symbol);
+  const referenceSymbol = normalizedSymbol(reference?.appSymbol || reference?.symbol || reference?.providerSymbol);
+  const evidence = Array.isArray(dossier?.evidence) ? dossier.evidence : [];
+  const universalIntegrity = evaluateInstrumentIntegrity({
+    instrument: {
+      instrumentId: companyId,
+      companyId,
+      assetClass: dossier?.assetClass || 'EQUITY',
+      primaryListing: {
+        ...(dossier?.listing || {}),
+        currency: dossier?.listing?.currency || reference?.nativeCurrency || reference?.currency || null,
+        activeTradingVerified: dossier?.listingIntegrity?.activeTradingVerified === true,
+        status: dossier?.listingIntegrity?.lifecycleStatus || dossier?.listing?.status || null,
+        verifiedAt: dossier?.listingIntegrity?.verifiedAt || null,
+      },
+    },
+    quote: reference ? {
+      ...reference,
+      valuationEligible: reference?.valuationEligible === true || reference?.analysisReferenceEligible === true,
+    } : null,
+    purpose: executionSensitive ? 'DECISION' : directional ? 'VALUATION' : 'ROUTING',
+  });
+  blockers.push(...universalIntegrity.blockers);
+
+  if ((!companyId || companyId === 'company:unknown') && strict) blockers.push('COMPANY_IDENTITY_REQUIRED');
+
+  if (directional) {
+    if (!evidence.length && strict) blockers.push('DECISION_EVIDENCE_REQUIRED');
+    for (const record of evidence) {
+      const ids = Array.isArray(record?.companyIds) ? record.companyIds.filter(Boolean) : [];
+      if (!ids.length) {
+        if (strict) blockers.push('EVIDENCE_ENTITY_UNVERIFIED');
+      } else if (companyId && !ids.includes(companyId)) {
+        blockers.push('EVIDENCE_ENTITY_MISMATCH');
+      }
+    }
+
+    if (reference?.companyId && companyId && reference.companyId !== companyId) blockers.push('REFERENCE_PRICE_ENTITY_MISMATCH');
+    if (strict && reference?.sourceApproved !== true) blockers.push('REFERENCE_PRICE_SOURCE_NOT_APPROVED');
+    if (strict && reference?.timestampVerified !== true) blockers.push('REFERENCE_PRICE_TIMESTAMP_NOT_VERIFIED');
+    if (strict && executionSensitive && reference?.decisionEligible !== true) blockers.push('REFERENCE_PRICE_NOT_DECISION_ELIGIBLE');
+    if (strict && executionSensitive && reference?.executionFreshnessEligible !== true) blockers.push('REFERENCE_PRICE_NOT_EXECUTION_ELIGIBLE');
+    if (listingSymbol && referenceSymbol && listingSymbol !== referenceSymbol) blockers.push('LISTING_IDENTITY_MISMATCH');
+  }
+
+  if (proposed === 'CONSIDER_BUY' && strict) {
+    if (dossier?.listingIntegrity?.activeTradingVerified !== true) blockers.push('ACTIVE_LISTING_NOT_VERIFIED');
+    const lifecycle = String(dossier?.listingIntegrity?.lifecycleStatus || '').toUpperCase();
+    if (['DELISTED', 'INACTIVE', 'PRIVATE', 'ACQUIRED', 'CEASED_TRADING'].includes(lifecycle)) blockers.push('LISTING_NOT_ACTIVE');
+  }
+
+  return {
+    contractVersion: Number(dossier?.integrityContractVersion || 0),
+    strict,
+    passed: blockers.length === 0,
+    blockers: unique(blockers),
+    companyId,
+    listingSymbol: listingSymbol || null,
+    referenceSymbol: referenceSymbol || null,
+    evidenceCount: evidence.length,
+    universal: universalIntegrity,
+  };
 }
 
 function actionLabel(action) {
@@ -63,41 +144,46 @@ function urgencyLabel(urgency) {
   }[urgency] || urgency;
 }
 
-function dataQualityScore(dossier) {
+function dataQualityScore(dossier, integrity) {
   const crossCheck = dossier?.metrics?.crossCheck || {};
+  const decisionCorroborated = dossier?.decisionBasis === 'FUNDAMENTAL_BASELINE' && dossier?.metrics?.decisionCorroboration?.ready === true;
   const fundamentals = dossier?.metrics?.fundamentals || {};
   const market = dossier?.metrics?.market || {};
   const reference = dossier?.referencePrice || null;
   let score = 0;
   if (dossier?.readiness?.publishable === true) score += 20;
-  if (crossCheck.recommendationReady === true) score += 25;
+  if (crossCheck.recommendationReady === true || decisionCorroborated) score += 25;
   if (fundamentals.metricsReady === true) score += 20;
   if (market.readiness?.marketMetricsReady === true) score += 20;
   if (reference?.timestamp && finite(reference?.value) > 0) score += 10;
   if ((dossier?.evidence || []).length >= 2) score += 5;
-  return clamp(score);
+  const raw = clamp(score);
+  return integrity?.passed === true ? raw : Math.min(raw, 79);
 }
 
-function confidenceScore(dossier, flags) {
+function confidenceScore(dossier, flags, integrity) {
   const crossCheck = dossier?.metrics?.crossCheck || {};
+  const decisionCorroborated = dossier?.decisionBasis === 'FUNDAMENTAL_BASELINE' && dossier?.metrics?.decisionCorroboration?.ready === true;
   const market = dossier?.metrics?.market || {};
   const risk = dossier?.metrics?.fundamentalRisk || {};
   let score = 45;
-  if (crossCheck.recommendationReady === true) score += 20;
+  if (crossCheck.recommendationReady === true || decisionCorroborated) score += 20;
   if (market.readiness?.marketMetricsReady === true) score += 15;
   if (risk.metricsReady === true) score += 10;
   if (finite(market.relativeStrength?.excessReturnPct) !== null) score += 5;
   if (finite(market.liquidity?.score) >= 65) score += 5;
   score -= flags.severeFundamental.length * 8;
   score -= flags.severeMarket.length * 8;
-  return clamp(score);
+  const raw = clamp(score);
+  return integrity?.passed === true ? raw : Math.min(raw, 79);
 }
 
-function finalBlockers(dossier, now, options) {
-  const blockers = [];
+function finalBlockers(dossier, now, options, integrity) {
+  const blockers = [...(integrity?.blockers || [])];
   const market = dossier?.metrics?.market || null;
   const fundamentals = dossier?.metrics?.fundamentals || null;
   const crossCheck = dossier?.metrics?.crossCheck || null;
+  const decisionCorroborated = dossier?.decisionBasis === 'FUNDAMENTAL_BASELINE' && dossier?.metrics?.decisionCorroboration?.ready === true;
   const referencePriceAgeHours = ageHours(now, dossier?.referencePrice?.timestamp);
   const dossierAgeHours = ageHours(now, dossier?.generatedAt);
   const latestMarketAgeHours = market?.latestTimestamp
@@ -106,11 +192,14 @@ function finalBlockers(dossier, now, options) {
 
   if (dossier?.readiness?.publishable !== true) blockers.push('DOSSIER_NOT_PUBLISHABLE');
   if (!['REVIEW_READY', 'PUBLISHED'].includes(dossier?.status)) blockers.push('DOSSIER_NOT_READY');
-  if (crossCheck?.recommendationReady !== true) blockers.push('CROSS_CHECK_NOT_READY');
+  if (crossCheck?.recommendationReady !== true && !decisionCorroborated) blockers.push('CROSS_CHECK_NOT_READY');
   if (fundamentals?.metricsReady !== true) blockers.push('FUNDAMENTALS_NOT_READY');
   if (market?.readiness?.marketMetricsReady !== true) blockers.push('MARKET_METRICS_NOT_READY');
+  if (market?.dataQuality?.sourceReady !== true) blockers.push('MARKET_HISTORY_SOURCE_NOT_READY');
+  if (market?.dataQuality?.crossCheckReady !== true) blockers.push('MARKET_HISTORY_NOT_CROSSCHECKED');
+  if (market?.dataQuality?.benchmarkReady !== true) blockers.push('MARKET_BENCHMARK_NOT_READY');
   if (!dossier?.referencePrice?.timestamp || finite(dossier?.referencePrice?.value) === null) blockers.push('REFERENCE_PRICE_REQUIRED');
-  if (referencePriceAgeHours === null || referencePriceAgeHours > Number(options.maxReferencePriceAgeHours ?? 6)) blockers.push('REFERENCE_PRICE_STALE');
+  if (referencePriceAgeHours === null || referencePriceAgeHours > Number(options.maxAnalysisReferencePriceAgeHours ?? 96)) blockers.push('REFERENCE_PRICE_STALE');
   if (dossierAgeHours === null || dossierAgeHours > Number(options.maxDossierAgeHours ?? 24)) blockers.push('DOSSIER_STALE');
   if (latestMarketAgeHours === null || latestMarketAgeHours > Number(options.maxHistoricalMarketAgeHours ?? 120)) blockers.push('MARKET_HISTORY_STALE');
   if (crossCheck?.contradictionCount > 0) blockers.push('UNRESOLVED_CONTRADICTION');
@@ -124,7 +213,9 @@ function finalBlockers(dossier, now, options) {
 }
 
 function riskFlags(dossier) {
-  const fundamental = dossier?.metrics?.fundamentalRisk?.flags || [];
+  const genericFundamental = dossier?.metrics?.fundamentalRisk?.flags || [];
+  const specializedBank = dossier?.metrics?.fundamentalRisk?.specializedAnalysis?.riskAssessment?.flags || [];
+  const fundamental = unique([...genericFundamental, ...specializedBank]);
   const market = dossier?.metrics?.market?.risk?.flags || [];
   return {
     fundamental,
@@ -134,10 +225,48 @@ function riskFlags(dossier) {
   };
 }
 
+function buildControlledPlan(dossier, blockers, flags, quality, confidence, now) {
+  const fundamentalRiskReady = dossier?.metrics?.fundamentalRisk?.metricsReady === true;
+  const marketRiskReady = dossier?.metrics?.market?.readiness?.marketMetricsReady === true;
+  const verifiedElevatedRisk =
+    (fundamentalRiskReady && flags.severeFundamental.length > 0) ||
+    (marketRiskReady && flags.severeMarket.length > 0);
+  const holderActionLabel = verifiedElevatedRisk
+    ? 'ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ — ΕΠΑΝΕΞΕΤΑΣΗ ΚΙΝΔΥΝΟΥ'
+    : 'ΚΡΑΤΑ ΧΩΡΙΣ ΕΝΙΣΧΥΣΗ';
+  const rationale = verifiedElevatedRisk
+    ? 'Υπάρχουν επαληθευμένες ενδείξεις αυξημένου κινδύνου, αλλά δεν έχουν περάσει ακόμη όλοι οι έλεγχοι που απαιτούνται για τελικό σήμα πώλησης ή μείωσης.'
+    : 'Δεν έχουν ολοκληρωθεί όλοι οι υποχρεωτικοί έλεγχοι για τελική αγορά ή πώληση. Μέχρι τότε η πειθαρχημένη στάση είναι διατήρηση υπάρχουσας θέσης χωρίς νέα ενίσχυση και αποφυγή νέας εισόδου.';
+  return {
+    status: 'AVAILABLE',
+    level: 'INTERIM_RISK_CONTROL',
+    title: 'Πλάνο τώρα',
+    holderAction: FINAL_ACTIONS.HOLD,
+    holderActionLabel,
+    nonHolderAction: FINAL_ACTIONS.DO_NOT_BUY,
+    nonHolderActionLabel: 'ΜΗΝ ΑΓΟΡΑΣΕΙΣ ΑΚΟΜΗ',
+    marketAction: FINAL_ACTIONS.WATCH,
+    marketActionLabel: 'ΠΑΡΑΚΟΛΟΥΘΗΣΗ',
+    newBuyAllowed: false,
+    sellSignalApproved: false,
+    confidenceScore: Math.min(75, Math.round(confidence)),
+    dataQualityScore: Math.round(quality),
+    rationale,
+    blockers: unique(blockers).slice(0, 8),
+    validUntil: new Date(now.getTime() + 24 * 3_600_000).toISOString(),
+  };
+}
+
 function determineActions(dossier, flags, confidence, now, options) {
   const proposed = dossier?.proposedAction || 'WATCH';
   const market = dossier?.metrics?.market || {};
-  const riskScore = finite(dossier?.metrics?.fundamentalRisk?.riskScore) ?? 100;
+  const fundamentalRisk = dossier?.metrics?.fundamentalRisk || {};
+  const specializedBankRiskScore = fundamentalRisk?.specializedAnalysis?.type === 'BANK'
+    ? finite(fundamentalRisk?.specializedAnalysis?.riskAssessment?.score)
+    : null;
+  const riskScore = fundamentalRisk?.specializedAnalysis?.type === 'BANK'
+    ? (specializedBankRiskScore ?? 100)
+    : (finite(fundamentalRisk?.riskScore) ?? 100);
   const liquidityScore = finite(market?.liquidity?.score) ?? 0;
   const relativeStrength = finite(market?.relativeStrength?.excessReturnPct);
   const distance50 = finite(market?.trend?.distanceFromSma50Pct);
@@ -148,39 +277,41 @@ function determineActions(dossier, flags, confidence, now, options) {
   const weakTrend = (relativeStrength !== null && relativeStrength < -10) || (distance50 !== null && distance50 < -8);
   const positiveTrend = (relativeStrength ?? -999) > 0 && (distance50 ?? -999) > 0 && (distance200 === null || distance200 > -3);
   const adequateLiquidity = liquidityScore >= Number(options.minimumImmediateLiquidityScore ?? 65);
+  const executionFreshnessEligible = dossier?.referencePrice?.executionFreshnessEligible === true;
 
   if (severeRisk) {
     return {
       marketAction: FINAL_ACTIONS.AVOID,
-      holderAction: FINAL_ACTIONS.SELL_NOW,
+      holderAction: executionFreshnessEligible ? FINAL_ACTIONS.SELL_NOW : FINAL_ACTIONS.HOLD,
       nonHolderAction: FINAL_ACTIONS.AVOID,
-      urgency: immediateFresh ? 'IMMEDIATE' : 'TODAY',
-      reasons: ['SEVERE_RISK_CONFIGURATION'],
+      urgency: executionFreshnessEligible && immediateFresh ? 'IMMEDIATE' : 'TODAY',
+      reasons: unique(['SEVERE_RISK_CONFIGURATION', executionFreshnessEligible ? null : 'EXECUTION_PRICE_NOT_VERIFIED']),
     };
   }
 
   if (proposed === 'CONSIDER_REDUCE') {
     return {
       marketAction: FINAL_ACTIONS.DO_NOT_BUY,
-      holderAction: FINAL_ACTIONS.SELL_NOW,
+      holderAction: executionFreshnessEligible ? FINAL_ACTIONS.SELL_NOW : FINAL_ACTIONS.HOLD,
       nonHolderAction: FINAL_ACTIONS.DO_NOT_BUY,
-      urgency: immediateFresh ? 'IMMEDIATE' : 'TODAY',
-      reasons: ['DIRECTIONAL_REDUCTION_SIGNAL'],
+      urgency: executionFreshnessEligible && immediateFresh ? 'IMMEDIATE' : 'TODAY',
+      reasons: unique(['DIRECTIONAL_REDUCTION_SIGNAL', executionFreshnessEligible ? null : 'EXECUTION_PRICE_NOT_VERIFIED']),
     };
   }
 
   if (proposed === 'AVOID') {
+    const sellApproved = weakTrend && executionFreshnessEligible;
     return {
       marketAction: FINAL_ACTIONS.AVOID,
-      holderAction: weakTrend ? FINAL_ACTIONS.SELL_NOW : FINAL_ACTIONS.HOLD,
+      holderAction: sellApproved ? FINAL_ACTIONS.SELL_NOW : FINAL_ACTIONS.HOLD,
       nonHolderAction: FINAL_ACTIONS.AVOID,
-      urgency: weakTrend && immediateFresh ? 'IMMEDIATE' : 'TODAY',
-      reasons: ['AVOIDANCE_SIGNAL'],
+      urgency: sellApproved && immediateFresh ? 'IMMEDIATE' : 'TODAY',
+      reasons: unique(['AVOIDANCE_SIGNAL', weakTrend && !executionFreshnessEligible ? 'EXECUTION_PRICE_NOT_VERIFIED' : null]),
     };
   }
 
   if (proposed === 'CONSIDER_BUY') {
-    if (immediateFresh && adequateLiquidity && positiveTrend && riskScore <= 55 && confidence >= 80) {
+    if (executionFreshnessEligible && immediateFresh && adequateLiquidity && positiveTrend && riskScore <= 55 && confidence >= 80) {
       return {
         marketAction: FINAL_ACTIONS.BUY_NOW,
         holderAction: FINAL_ACTIONS.HOLD,
@@ -194,7 +325,7 @@ function determineActions(dossier, flags, confidence, now, options) {
       holderAction: FINAL_ACTIONS.HOLD,
       nonHolderAction: FINAL_ACTIONS.DO_NOT_BUY,
       urgency: 'NORMAL',
-      reasons: ['BUY_SETUP_NOT_CONFIRMED'],
+      reasons: unique(['BUY_SETUP_NOT_CONFIRMED', executionFreshnessEligible ? null : 'EXECUTION_PRICE_NOT_VERIFIED']),
     };
   }
 
@@ -219,11 +350,13 @@ function determineActions(dossier, flags, confidence, now, options) {
 
 export function evaluateFinalAction(dossier, options = {}) {
   const now = new Date(options.now || Date.now());
-  const freshness = finalBlockers(dossier, now, options);
+  const integrity = decisionIntegrity(dossier);
+  const freshness = finalBlockers(dossier, now, options, integrity);
   const flags = riskFlags(dossier);
-  const quality = dataQualityScore(dossier);
-  const confidence = confidenceScore(dossier, flags);
+  const quality = dataQualityScore(dossier, integrity);
+  const confidence = confidenceScore(dossier, flags, integrity);
   const blocked = freshness.blockers.length > 0;
+  const controlledPlan = blocked ? buildControlledPlan(dossier, freshness.blockers, flags, quality, confidence, now) : null;
   const actions = blocked
     ? {
         marketAction: FINAL_ACTIONS.WATCH,
@@ -238,7 +371,7 @@ export function evaluateFinalAction(dossier, options = {}) {
 
   return {
     format: 'investor-control-final-action',
-    version: 1,
+    version: 2,
     policyVersion: FINAL_ACTION_POLICY_VERSION,
     generatedAt,
     validUntil: new Date(now.getTime() + validForHours * 3_600_000).toISOString(),
@@ -252,19 +385,25 @@ export function evaluateFinalAction(dossier, options = {}) {
     urgency: actions.urgency,
     urgencyLabel: urgencyLabel(actions.urgency),
     confidenceScore: confidence,
+    confidenceMeaning: 'POLICY_COMPLETENESS_HEURISTIC_NOT_PROBABILITY',
     dataQualityScore: quality,
+    integrity,
     reasons: unique(actions.reasons),
     blockers: freshness.blockers,
     freshness: {
       referencePriceAgeHours: freshness.referencePriceAgeHours,
       dossierAgeHours: freshness.dossierAgeHours,
       latestMarketAgeHours: freshness.latestMarketAgeHours,
+      referencePricePurpose: dossier?.referencePrice?.purpose || null,
+      referencePriceFreshnessModel: dossier?.referencePrice?.freshnessModel || null,
+      executionFreshnessEligible: dossier?.referencePrice?.executionFreshnessEligible === true,
     },
     risk: {
       riskScore: finite(dossier?.metrics?.fundamentalRisk?.riskScore),
       fundamentalFlags: flags.fundamental,
       marketFlags: flags.market,
     },
+    controlledPlan,
     execution: {
       automaticBrokerOrder: false,
       requiresUserExecution: true,

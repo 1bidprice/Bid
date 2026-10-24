@@ -5,184 +5,889 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "format", "version", "generatedAt", "policyVersion", "sourceSelection", "summary", "today",
-    "discoveryRadar", "decisions", "published", "reviewReady", "research", "urgent", "assistantContext", "disclosure"
+    "format",
+    "version",
+    "generatedAt",
+    "policyVersion",
+    "sourceSelection",
+    "operationalHealth",
+    "sourceHealth",
+    "quoteRegistry",
+    "summary",
+    "today",
+    "discoveryRadar",
+    "decisions",
+    "published",
+    "reviewReady",
+    "research",
+    "urgent",
+    "assistantContext",
+    "disclosure"
   ],
   "properties": {
-    "format": { "const": "investor-control-mobile-intelligence-feed" },
-    "version": { "const": 2 },
-    "generatedAt": { "type": "string", "format": "date-time" },
-    "policyVersion": { "type": ["string", "null"] },
-    "sourceSelection": { "type": ["object", "null"] },
+    "format": {
+      "const": "investor-control-mobile-intelligence-feed"
+    },
+    "version": {
+      "const": 2
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "policyVersion": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sourceSelection": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
     "summary": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "publishedCount", "reviewReadyCount", "researchCount", "urgentCount", "discoveryCandidateCount",
-        "discoveryDeepAnalysisCount", "unresolvedDiagnosticCount", "finalActionCount", "buyNowCount",
-        "sellNowCount", "holdCount", "doNotBuyCount", "avoidCount", "blockedDecisionCount"
+        "publishedCount",
+        "reviewReadyCount",
+        "researchCount",
+        "urgentCount",
+        "discoveryCandidateCount",
+        "discoveryDeepAnalysisCount",
+        "unresolvedDiagnosticCount",
+        "finalActionCount",
+        "buyNowCount",
+        "sellNowCount",
+        "holdCount",
+        "doNotBuyCount",
+        "avoidCount",
+        "blockedDecisionCount"
       ],
       "properties": {
-        "publishedCount": { "type": "integer", "minimum": 0 },
-        "reviewReadyCount": { "type": "integer", "minimum": 0 },
-        "researchCount": { "type": "integer", "minimum": 0 },
-        "urgentCount": { "type": "integer", "minimum": 0 },
-        "discoveryCandidateCount": { "type": "integer", "minimum": 0 },
-        "discoveryDeepAnalysisCount": { "type": "integer", "minimum": 0 },
-        "unresolvedDiagnosticCount": { "type": "integer", "minimum": 0 },
-        "finalActionCount": { "type": "integer", "minimum": 0 },
-        "buyNowCount": { "type": "integer", "minimum": 0 },
-        "sellNowCount": { "type": "integer", "minimum": 0 },
-        "holdCount": { "type": "integer", "minimum": 0 },
-        "doNotBuyCount": { "type": "integer", "minimum": 0 },
-        "avoidCount": { "type": "integer", "minimum": 0 },
-        "blockedDecisionCount": { "type": "integer", "minimum": 0 }
+        "publishedCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reviewReadyCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "researchCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "urgentCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "discoveryCandidateCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "discoveryDeepAnalysisCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolvedDiagnosticCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "finalActionCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "buyNowCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sellNowCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "holdCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "doNotBuyCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "avoidCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "blockedDecisionCount": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "today": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["headline", "primaryItem"],
+      "required": [
+        "headline",
+        "primaryItem"
+      ],
       "properties": {
-        "headline": { "type": "string", "minLength": 1 },
-        "primaryItem": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/feedItem" }] }
+        "headline": {
+          "type": "string",
+          "minLength": 1
+        },
+        "primaryItem": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/feedItem"
+            }
+          ]
+        }
       }
     },
-    "discoveryRadar": { "type": "array", "items": { "$ref": "#/$defs/discoveryItem" } },
-    "decisions": { "type": "array", "items": { "$ref": "#/$defs/feedItem" } },
-    "published": { "type": "array", "items": { "$ref": "#/$defs/feedItem" } },
-    "reviewReady": { "type": "array", "items": { "$ref": "#/$defs/feedItem" } },
-    "research": { "type": "array", "items": { "$ref": "#/$defs/feedItem" } },
-    "urgent": { "type": "array", "items": { "$ref": "#/$defs/feedItem" } },
+    "discoveryRadar": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/discoveryItem"
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/feedItem"
+      }
+    },
+    "published": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/feedItem"
+      }
+    },
+    "reviewReady": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/feedItem"
+      }
+    },
+    "research": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/feedItem"
+      }
+    },
+    "urgent": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/feedItem"
+      }
+    },
     "assistantContext": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["companyId", "companyName", "symbol", "origin", "discovery", "status", "category", "action", "finalAction", "thesis", "blockers", "nextStep", "reviewDate"],
+        "required": [
+          "companyId",
+          "companyName",
+          "symbol",
+          "origin",
+          "discovery",
+          "status",
+          "category",
+          "action",
+          "finalAction",
+          "thesis",
+          "blockers",
+          "nextStep",
+          "reviewDate"
+        ],
         "properties": {
-          "companyId": { "type": "string" },
-          "companyName": { "type": "string" },
-          "symbol": { "type": ["string", "null"] },
-          "origin": { "type": "string", "enum": ["FOCUS_UNIVERSE", "AUTONOMOUS_DISCOVERY"] },
-          "discovery": { "type": ["object", "null"] },
-          "status": { "type": "string" },
-          "category": { "type": "string" },
-          "action": { "type": "string" },
-          "finalAction": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/finalAction" }] },
-          "thesis": { "type": ["string", "null"] },
-          "blockers": { "type": "array", "items": { "type": "string" } },
-          "nextStep": { "type": "string" },
-          "reviewDate": { "type": ["string", "null"] }
+          "companyId": {
+            "type": "string"
+          },
+          "companyName": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "FOCUS_UNIVERSE",
+              "AUTONOMOUS_DISCOVERY"
+            ]
+          },
+          "discovery": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "finalAction": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/$defs/finalAction"
+              }
+            ]
+          },
+          "thesis": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "nextStep": {
+            "type": "string"
+          },
+          "reviewDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
         }
       }
     },
-    "disclosure": { "type": "string", "minLength": 20 }
+    "disclosure": {
+      "type": "string",
+      "minLength": 20
+    },
+    "operationalHealth": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "status",
+        "generatedAt",
+        "staleOutput"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "OPERATIONAL",
+            "DEGRADED"
+          ]
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "staleOutput": {
+          "type": "boolean"
+        },
+        "infrastructureStatus": {
+          "type": "string"
+        },
+        "marketDataStatus": {
+          "type": "string"
+        },
+        "fundamentalsStatus": {
+          "type": "string"
+        },
+        "researchStatus": {
+          "type": "string"
+        },
+        "decisionEngineStatus": {
+          "type": "string"
+        }
+      }
+    },
+    "sourceHealth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidenceCount",
+        "documentReviewedCount",
+        "independentDiscoveryCount",
+        "fundamentalSnapshotCount",
+        "marketSnapshotCount",
+        "historicalMarketMetricsCount",
+        "readyHistoricalMarketMetricsCount",
+        "diagnosticCount"
+      ],
+      "properties": {
+        "evidenceCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "documentReviewedCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "independentDiscoveryCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fundamentalSnapshotCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "marketSnapshotCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "historicalMarketMetricsCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "readyHistoricalMarketMetricsCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "diagnosticCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "quoteRegistry": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "appSymbol",
+          "price",
+          "currency",
+          "quoteAt",
+          "source",
+          "quoteContract"
+        ],
+        "properties": {
+          "appSymbol": {
+            "type": "string"
+          },
+          "companyId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "companyName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "price": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "previousClose": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quoteAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "checkedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceQuality": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quoteContract": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        }
+      }
+    }
   },
   "$defs": {
     "finalAction": {
       "type": "object",
       "additionalProperties": true,
       "required": [
-        "format", "version", "policyVersion", "generatedAt", "validUntil", "status", "marketAction",
-        "marketActionLabel", "holderAction", "holderActionLabel", "nonHolderAction", "nonHolderActionLabel",
-        "urgency", "urgencyLabel", "confidenceScore", "dataQualityScore", "reasons", "blockers", "execution"
+        "format",
+        "version",
+        "policyVersion",
+        "generatedAt",
+        "validUntil",
+        "status",
+        "marketAction",
+        "marketActionLabel",
+        "holderAction",
+        "holderActionLabel",
+        "nonHolderAction",
+        "nonHolderActionLabel",
+        "urgency",
+        "urgencyLabel",
+        "confidenceScore",
+        "dataQualityScore",
+        "reasons",
+        "blockers",
+        "execution"
       ],
       "properties": {
-        "format": { "const": "investor-control-final-action" },
-        "version": { "type": "integer", "minimum": 1 },
-        "policyVersion": { "type": "string" },
-        "generatedAt": { "type": "string", "format": "date-time" },
-        "validUntil": { "type": "string", "format": "date-time" },
-        "status": { "type": "string", "enum": ["FINAL", "BLOCKED"] },
-        "marketAction": { "$ref": "#/$defs/finalActionCode" },
-        "marketActionLabel": { "type": "string" },
-        "holderAction": { "$ref": "#/$defs/finalActionCode" },
-        "holderActionLabel": { "type": "string" },
-        "nonHolderAction": { "$ref": "#/$defs/finalActionCode" },
-        "nonHolderActionLabel": { "type": "string" },
-        "urgency": { "type": "string", "enum": ["IMMEDIATE", "TODAY", "NORMAL", "NONE"] },
-        "urgencyLabel": { "type": "string" },
-        "confidenceScore": { "type": "number", "minimum": 0, "maximum": 100 },
-        "dataQualityScore": { "type": "number", "minimum": 0, "maximum": 100 },
-        "reasons": { "type": "array", "items": { "type": "string" } },
-        "blockers": { "type": "array", "items": { "type": "string" } },
+        "format": {
+          "const": "investor-control-final-action"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "policyVersion": {
+          "type": "string"
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "validUntil": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "FINAL",
+            "BLOCKED"
+          ]
+        },
+        "marketAction": {
+          "$ref": "#/$defs/finalActionCode"
+        },
+        "marketActionLabel": {
+          "type": "string"
+        },
+        "holderAction": {
+          "$ref": "#/$defs/finalActionCode"
+        },
+        "holderActionLabel": {
+          "type": "string"
+        },
+        "nonHolderAction": {
+          "$ref": "#/$defs/finalActionCode"
+        },
+        "nonHolderActionLabel": {
+          "type": "string"
+        },
+        "urgency": {
+          "type": "string",
+          "enum": [
+            "IMMEDIATE",
+            "TODAY",
+            "NORMAL",
+            "NONE"
+          ]
+        },
+        "urgencyLabel": {
+          "type": "string"
+        },
+        "confidenceScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "dataQualityScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "execution": {
           "type": "object",
-          "required": ["automaticBrokerOrder", "requiresUserExecution"],
+          "required": [
+            "automaticBrokerOrder",
+            "requiresUserExecution"
+          ],
           "properties": {
-            "automaticBrokerOrder": { "const": false },
-            "requiresUserExecution": { "const": true }
+            "automaticBrokerOrder": {
+              "const": false
+            },
+            "requiresUserExecution": {
+              "const": true
+            }
           }
         }
       }
     },
-    "finalActionCode": { "type": "string", "enum": ["BUY_NOW", "SELL_NOW", "HOLD", "DO_NOT_BUY", "AVOID", "WATCH"] },
+    "finalActionCode": {
+      "type": "string",
+      "enum": [
+        "BUY_NOW",
+        "SELL_NOW",
+        "HOLD",
+        "DO_NOT_BUY",
+        "AVOID",
+        "WATCH"
+      ]
+    },
     "discoveryItem": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "discoveryId", "companyId", "companyName", "symbol", "exchange", "discoveryScore", "status",
-        "suggestedAction", "suggestedActionLabel", "reasons", "latestEventAt", "events", "isExistingFocusCompany"
+        "discoveryId",
+        "companyId",
+        "companyName",
+        "symbol",
+        "exchange",
+        "discoveryScore",
+        "scoreType",
+        "scoreLabel",
+        "investmentScore",
+        "status",
+        "suggestedAction",
+        "suggestedActionLabel",
+        "reasons",
+        "latestEventAt",
+        "events",
+        "isExistingFocusCompany"
       ],
       "properties": {
-        "discoveryId": { "type": "string" },
-        "companyId": { "type": "string" },
-        "companyName": { "type": "string" },
-        "symbol": { "type": ["string", "null"] },
-        "exchange": { "type": ["string", "null"] },
-        "discoveryScore": { "type": "number", "minimum": 0, "maximum": 100 },
-        "status": { "const": "DISCOVERED_RESEARCH_REQUIRED" },
-        "suggestedAction": { "const": "WATCH" },
-        "suggestedActionLabel": { "type": "string" },
-        "reasons": { "type": "array", "items": { "type": "string" } },
-        "latestEventAt": { "type": ["string", "null"], "format": "date-time" },
-        "events": { "type": "array", "items": { "type": "object" } },
-        "isExistingFocusCompany": { "type": "boolean" }
+        "discoveryId": {
+          "type": "string"
+        },
+        "companyId": {
+          "type": "string"
+        },
+        "companyName": {
+          "type": "string"
+        },
+        "symbol": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "exchange": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "discoveryScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "status": {
+          "const": "DISCOVERED_RESEARCH_REQUIRED"
+        },
+        "suggestedAction": {
+          "const": "WATCH"
+        },
+        "suggestedActionLabel": {
+          "type": "string"
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "latestEventAt": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "isExistingFocusCompany": {
+          "type": "boolean"
+        },
+        "scoreType": {
+          "const": "DISCOVERY_PRIORITY"
+        },
+        "scoreLabel": {
+          "type": "string"
+        },
+        "investmentScore": {
+          "type": "null"
+        }
       }
     },
     "feedItem": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "id", "companyId", "companyName", "symbol", "exchange", "origin", "discovery", "status", "statusLabel",
-        "category", "categoryLabel", "action", "actionLabel", "timeHorizon", "referencePrice", "referencePriceAgeHours",
-        "thesis", "causalMechanism", "bullCase", "bearCase", "catalysts", "risks", "invalidationCondition", "reviewDate",
-        "blockers", "blockerLabels", "nextStep", "sources", "metricNotes", "generatedAt", "publicationMode", "finalAction"
+        "id",
+        "companyId",
+        "companyName",
+        "symbol",
+        "exchange",
+        "origin",
+        "discovery",
+        "status",
+        "statusLabel",
+        "category",
+        "categoryLabel",
+        "action",
+        "actionLabel",
+        "timeHorizon",
+        "referencePrice",
+        "referencePriceAgeHours",
+        "marketQuote",
+        "thesis",
+        "causalMechanism",
+        "bullCase",
+        "bearCase",
+        "catalysts",
+        "risks",
+        "invalidationCondition",
+        "reviewDate",
+        "blockers",
+        "blockerLabels",
+        "nextStep",
+        "sources",
+        "metricNotes",
+        "generatedAt",
+        "publicationMode",
+        "finalAction"
       ],
       "properties": {
-        "id": { "type": "string" },
-        "companyId": { "type": "string" },
-        "companyName": { "type": "string" },
-        "symbol": { "type": ["string", "null"] },
-        "exchange": { "type": ["string", "null"] },
-        "origin": { "type": "string", "enum": ["FOCUS_UNIVERSE", "AUTONOMOUS_DISCOVERY"] },
-        "discovery": { "type": ["object", "null"] },
-        "status": { "type": "string", "enum": ["DRAFT_RESEARCH", "REVIEW_READY", "PUBLISHED"] },
-        "statusLabel": { "type": "string" },
-        "category": { "type": "string" },
-        "categoryLabel": { "type": "string" },
-        "action": { "type": "string", "enum": ["WATCH", "CONSIDER_BUY", "HOLD", "CONSIDER_REDUCE", "AVOID"] },
-        "actionLabel": { "type": "string" },
-        "timeHorizon": { "type": "string" },
-        "referencePrice": { "type": ["object", "null"] },
-        "referencePriceAgeHours": { "type": ["number", "null"], "minimum": 0 },
-        "thesis": { "type": ["string", "null"] },
-        "causalMechanism": { "type": ["string", "null"] },
-        "bullCase": { "type": ["string", "null"] },
-        "bearCase": { "type": ["string", "null"] },
-        "catalysts": { "type": "array" },
-        "risks": { "type": "array" },
-        "invalidationCondition": { "type": ["string", "null"] },
-        "reviewDate": { "type": ["string", "null"] },
-        "blockers": { "type": "array", "items": { "type": "string" } },
-        "blockerLabels": { "type": "array", "items": { "type": "string" } },
-        "nextStep": { "type": "string" },
-        "sources": { "type": "array", "items": { "type": "object" } },
-        "metricNotes": { "type": "array", "items": { "type": "string" } },
-        "generatedAt": { "type": "string", "format": "date-time" },
-        "publicationMode": { "type": ["string", "null"] },
-        "finalAction": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/finalAction" }] }
+        "id": {
+          "type": "string"
+        },
+        "companyId": {
+          "type": "string"
+        },
+        "companyName": {
+          "type": "string"
+        },
+        "symbol": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "exchange": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "origin": {
+          "type": "string",
+          "enum": [
+            "FOCUS_UNIVERSE",
+            "AUTONOMOUS_DISCOVERY"
+          ]
+        },
+        "discovery": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "DRAFT_RESEARCH",
+            "REVIEW_READY",
+            "PUBLISHED"
+          ]
+        },
+        "statusLabel": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "categoryLabel": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "WATCH",
+            "CONSIDER_BUY",
+            "HOLD",
+            "CONSIDER_REDUCE",
+            "AVOID"
+          ]
+        },
+        "actionLabel": {
+          "type": "string"
+        },
+        "timeHorizon": {
+          "type": "string"
+        },
+        "referencePrice": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "referencePriceAgeHours": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "thesis": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "causalMechanism": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "bullCase": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "bearCase": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "catalysts": {
+          "type": "array"
+        },
+        "risks": {
+          "type": "array"
+        },
+        "invalidationCondition": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reviewDate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "blockerLabels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "nextStep": {
+          "type": "string"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "metricNotes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "publicationMode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "finalAction": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/finalAction"
+            }
+          ]
+        },
+        "marketQuote": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
       }
     }
   }

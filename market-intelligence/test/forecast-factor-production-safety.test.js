@@ -11,14 +11,40 @@ import { FORECAST_FACTOR_SCORE_VERSION } from '../src/forecast-factor-score.js';
 
 const LEVELS = [-0.9, -0.6, -0.3, 0.3, 0.6, 0.9];
 
+function classificationSnapshot(index, companyId, instrumentId, forecastAt) {
+  const majorGroups = ['10', '20', '30', '40', '50', '60'];
+  const code = majorGroups[index % majorGroups.length] + '00';
+  const cik = String((index % 20) + 1).padStart(10, '0');
+  return {
+    contract: 'FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1',
+    policyVersion: '2026-08-11.1',
+    companyId,
+    instrumentId,
+    sourceAuthority: 'SEC_EDGAR_SUBMISSIONS',
+    sourceUrl: 'https://data.sec.gov/submissions/CIK' + cik + '.json',
+    sourceDocumentId: 'CIK' + cik,
+    capturedAt: forecastAt,
+    taxonomy: 'SEC_SIC',
+    code,
+    description: 'Synthetic SIC ' + code,
+    inferenceUsed: false,
+    decisionImpact: 'NONE',
+  };
+}
+
 function record(index) {
   const value = LEVELS[index % LEVELS.length];
   const positive = value > 0;
-  const forecastAt = new Date(Date.UTC(2025, 0, 1 + index)).toISOString();
+  const forecastAt = new Date(Date.UTC(2000, 0, 1) + index * 30 * 86_400_000).toISOString();
+  const tradingDays = 21;
+  const outcomeAt = new Date(new Date(forecastAt).getTime() + tradingDays * 86_400_000).toISOString();
+  const companyId = 'company:' + (index % 20);
+  const instrumentId = 'instrument:' + (index % 20);
   return {
-    forecastId: `prod-safe:${index}`,
-    companyId: `company:${index % 20}`,
-    instrumentId: `instrument:${index % 20}`,
+    forecastId: 'prod-safe:' + index,
+    companyId,
+    instrumentId,
+    classificationSnapshot: classificationSnapshot(index, companyId, instrumentId, forecastAt),
     validationMode: 'LIVE_SHADOW_OOS',
     factorFeatureVectorPolicyVersion: FORECAST_FEATURE_VECTOR_VERSION,
     factorScorePolicyVersion: FORECAST_FACTOR_SCORE_VERSION,
@@ -27,9 +53,11 @@ function record(index) {
     horizon: 'month1',
     forecastAt,
     forecastSampleDate: forecastAt.slice(0, 10),
+    tradingDays,
+    referencePrice: { timestamp: forecastAt },
     status: 'MATURED',
     positiveOutcome: positive ? 1 : 0,
-    realisedOutcome: { realisedReturnPct: value * 10 },
+    realisedOutcome: { timestamp: outcomeAt, realisedReturnPct: value * 10 },
   };
 }
 
@@ -153,4 +181,14 @@ test('production factor safety rejects telemetry mismatch and raw governance lea
   const leaked = makeReport({ withProposal: false });
   leaked.operationalHealth.beforeWeights = { ...FORECAST_FACTOR_DOMAIN_WEIGHTS };
   assert.throws(() => verifyForecastFactorProductionSafety(leaked), /raw factor governance payload leaked/);
+});
+
+test('production factor safety rejects weakened or cross-mapped taxonomy evidence', () => {
+  const weak = clone(makeReport({ withProposal: true }));
+  weak.forecastFactorWeightGovernanceStatus.proposals[0].evidence.taxonomyConcentration.thresholds.minimumClassificationCoveragePct = 50;
+  assert.throws(() => verifyForecastFactorProductionSafety(weak), /classification coverage threshold too weak/);
+
+  const mapped = clone(makeReport({ withProposal: true }));
+  mapped.forecastFactorWeightGovernanceStatus.proposals[0].evidence.taxonomyConcentration.crossTaxonomyMappingUsed = true;
+  assert.throws(() => verifyForecastFactorProductionSafety(mapped), /cross-taxonomy mapping is forbidden/);
 });

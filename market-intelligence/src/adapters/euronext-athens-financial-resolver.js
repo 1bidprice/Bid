@@ -1,6 +1,7 @@
 import { extractEuronextAthensAnnouncements } from './euronext-athens-announcements.js';
+import { resolveCanonicalIssuerFinancialDocuments } from './issuer-ir-financial-resolver.js';
 
-export const EURONEXT_FINANCIAL_RESOLVER_VERSION = '2026-08-08.1';
+export const EURONEXT_FINANCIAL_RESOLVER_VERSION = '2026-08-08.2';
 const BASE_URL = 'https://athens.euronext.com';
 
 function decodeHtml(value) {
@@ -168,6 +169,15 @@ export async function resolveEuronextAthensFinancialDocument(company, options = 
       candidates.push(candidate);
     }
   }
+
+  const issuerIr = await resolveCanonicalIssuerFinancialDocuments(company, {
+    fetchImpl,
+    userAgent,
+    issuerFinancialDetailLimit: options.issuerFinancialDetailLimit,
+    issuerFinancialPdfLimit: options.issuerFinancialPdfLimit,
+  });
+  diagnostics.push(...(issuerIr.diagnostics || []));
+  for (const candidate of issuerIr.candidates || []) candidates.push(candidate);
 
   const announcementsUrl = company?.marketData?.euronextIssuerAnnouncementsUrl || null;
   const announcementUrls = languageVariants(announcementsUrl, issuerId, 'announcements');

@@ -12,32 +12,55 @@ import { FORECAST_FACTOR_SCORE_VERSION } from '../src/forecast-factor-score.js';
 
 const LEVELS = [-0.9, -0.6, -0.3, 0.3, 0.6, 0.9];
 
+function classificationSnapshot(index, companyId, instrumentId, forecastAt) {
+  const majorGroups = ['10', '20', '30', '40', '50', '60'];
+  const code = majorGroups[index % majorGroups.length] + '00';
+  const cik = String((index % 20) + 1).padStart(10, '0');
+  return {
+    contract: 'FORECAST_TIME_CLASSIFICATION_SNAPSHOT_V1',
+    policyVersion: '2026-08-11.1',
+    companyId,
+    instrumentId,
+    sourceAuthority: 'SEC_EDGAR_SUBMISSIONS',
+    sourceUrl: 'https://data.sec.gov/submissions/CIK' + cik + '.json',
+    sourceDocumentId: 'CIK' + cik,
+    capturedAt: forecastAt,
+    taxonomy: 'SEC_SIC',
+    code,
+    description: 'Synthetic SIC ' + code,
+    inferenceUsed: false,
+    decisionImpact: 'NONE',
+  };
+}
+
 function record(index, options = {}) {
   const domain = options.domain || 'MOMENTUM';
   const value = options.value ?? LEVELS[index % LEVELS.length];
   const invert = options.invert === true;
   const positive = invert ? value < 0 : value > 0;
-  const forecastAt = new Date(Date.UTC(2025, 0, 1 + index)).toISOString();
+  const forecastAt = new Date(Date.UTC(2000, 0, 1) + index * 30 * 86_400_000).toISOString();
+  const tradingDays = Number(options.tradingDays || 21);
+  const outcomeAt = new Date(new Date(forecastAt).getTime() + tradingDays * 86_400_000).toISOString();
+  const companyId = options.companyId || 'company:' + (index % 20);
+  const instrumentId = options.instrumentId || 'instrument:' + (index % 20);
   return {
-    forecastId: `gov:${domain}:${index}:${options.vectorVersion || 'current'}`,
+    forecastId: 'gov:' + domain + ':' + index + ':' + (options.vectorVersion || 'current'),
+    companyId,
+    instrumentId,
+    classificationSnapshot: classificationSnapshot(index, companyId, instrumentId, forecastAt),
     validationMode: 'LIVE_SHADOW_OOS',
     factorFeatureVectorPolicyVersion: options.vectorVersion || FORECAST_FEATURE_VECTOR_VERSION,
     factorScorePolicyVersion: options.scoreVersion || FORECAST_FACTOR_SCORE_VERSION,
-    factorDomainSnapshot: [{
-      domain,
-      value,
-      weight: FORECAST_FACTOR_DOMAIN_WEIGHTS[domain],
-      verifiedDriverCount: 1,
-    }],
+    factorDomainSnapshot: [{ domain, value, weight: FORECAST_FACTOR_DOMAIN_WEIGHTS[domain], verifiedDriverCount: 1 }],
     assetClass: options.assetClass || 'EQUITY',
     horizon: options.horizon || 'month1',
     forecastAt,
     forecastSampleDate: forecastAt.slice(0, 10),
+    tradingDays,
+    referencePrice: { timestamp: forecastAt },
     status: 'MATURED',
     positiveOutcome: options.outcome ?? (positive ? 1 : 0),
-    realisedOutcome: {
-      realisedReturnPct: options.realisedReturnPct ?? (invert ? -value * 10 : value * 10),
-    },
+    realisedOutcome: { timestamp: outcomeAt, realisedReturnPct: options.realisedReturnPct ?? (invert ? -value * 10 : value * 10) },
   };
 }
 

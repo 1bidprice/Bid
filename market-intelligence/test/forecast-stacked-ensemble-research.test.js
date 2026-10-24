@@ -34,7 +34,7 @@ function classification(index, forecastAt, concentrated = false) {
 function record(index, options = {}) {
   const factorScore = options.factorScore ?? SCORES[index % SCORES.length];
   const forecastAt = new Date(Date.UTC(2024, 0, 1 + index)).toISOString();
-  const outcomePositive = options.outcome ?? (options.invert ? factorScore < 0 : factorScore > 0 ? 1 : 0);
+  const outcomePositive = options.outcome ?? ((options.invert ? factorScore < 0 : factorScore > 0) ? 1 : 0);
   const realisedReturnPct = options.realisedReturnPct ?? (outcomePositive ? 5 : -5);
   const outcomeDelayDays = options.outcomeDelayDays ?? 22;
   const companyIndex = options.companyIndex ?? index % 20;
@@ -113,6 +113,8 @@ test('strong incremental factor signal can make the stack research-ready while r
   assert.ok(group.prequentialPredictionCount >= 200);
   assert.ok(group.improvement.relativeBrierImprovementPct >= 3);
   assert.ok(group.improvement.logLossImprovement >= 0);
+  assert.equal(group.calibrationStatus, 'UNCALIBRATED_RESEARCH_ONLY');
+  assert.equal(group.probabilityCalibrationEnabled, false);
   assert.equal(group.sampleIndependence.status, 'INDEPENDENCE_READY');
   assert.equal(group.outcomeWindowIndependence.status, 'WINDOW_INDEPENDENCE_READY');
   assert.equal(group.instrumentConcentration.status, 'INSTRUMENT_DIVERSIFICATION_READY');
