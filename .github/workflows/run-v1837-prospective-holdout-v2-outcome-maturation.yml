@@ -1,21 +1,8 @@
 name: Investor Control v1837 V2 Prospective Outcome Maturation
 
 on:
-  push:
-    branches:
-      - investor-control-v1-market-intelligence-foundation
-    paths:
-      - '.github/workflows/run-v1837-prospective-holdout-v2-outcome-maturation.yml'
-      - 'market-intelligence/scripts/run-prospective-holdout-v2-outcome-maturation-v1837.js'
-      - 'market-intelligence/src/forecast-prospective-holdout-protocol-v2.js'
-      - 'market-intelligence/src/historical-research-validation-universe.js'
-      - 'market-intelligence/src/professional-market-data.js'
-      - 'market-intelligence/src/adapters/yahoo-chart.js'
-      - 'market-intelligence/test/research-prospective-v2-outcome-maturation-v1837.test.js'
+  # TEMPORARY MINBEIS FREEZE 2026-10-24: automatic triggers paused; manual dispatch preserved.
   workflow_dispatch:
-  schedule:
-    - cron: '15 23 * * 1-5'
-
 permissions:
   contents: read
   actions: read
